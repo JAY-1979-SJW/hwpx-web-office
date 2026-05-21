@@ -21,7 +21,7 @@ PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "para_edit_apply_format_smoke.mjs")
-BASELINE_COMMIT = "98d64ed"  # PARA_INSERT 준공 후 갱신 (abebab6 → 1f442ec)
+BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (abebab6 → 1f442ec)
 
 REQUIRED_STATE_PATTERNS = [
     r"export\s+function\s+applyFormatToSelection\(",

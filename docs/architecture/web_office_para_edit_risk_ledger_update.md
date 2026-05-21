@@ -141,3 +141,5 @@ Phase 3 IMPL (`WEB-OFFICE-PARA-EDIT-MODEL-01` 이후) 시공 시 본 별책의
 ---
 
 *생성: WEB-OFFICE-PARA-EDIT-SPEC-01 별책 (2026-05-20)*
+
+> **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)

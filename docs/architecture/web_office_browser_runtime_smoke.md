@@ -117,3 +117,5 @@ python scripts/ops/audit_web_office_browser_runtime_smoke.py
 ---
 
 *생성: WEB-OFFICE-BROWSER-RUNTIME-SMOKE-01 (2026-05-20)*
+
+> **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)

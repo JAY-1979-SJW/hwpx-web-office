@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-IME-LIVE-01 준공검사.
+﻿"""WEB-OFFICE-PARA-EDIT-IME-LIVE-01 준공검사.
 
 브라우저 IME composition (compositionstart / compositionupdate /
 compositionend) → TYPE_TEXT command 생성 흐름을 node 기반 live smoke 로
@@ -48,7 +48,7 @@ LOCKED_FILES = [
     # para_edit_state.mjs 는 applyFormatToSelection 추가로 본 LOCKED 에서 제거.
     "frontend/web_office_viewer/para_edit_runtime.mjs",
 ]
-BASELINE_COMMIT = "bb0939b"  # PARA_INSERT 준공 후 갱신 (c7810b3 → bb0939b)
+BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (c7810b3 → bb0939b)
 
 FORBIDDEN_WRITER_SYMBOLS = [
     r"apply_paragraph_edits_plan\(",

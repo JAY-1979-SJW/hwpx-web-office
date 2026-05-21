@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-CLOSEOUT-01 준공검사.
+﻿"""WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-CLOSEOUT-01 준공검사.
 
 Backspace paragraph merge 기능 준공 동결의 정적 검증.
 baseline: 5db3d7f / feature commit: 1f442ec
@@ -16,7 +16,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_structure_para_delete_closeout.md")
-BASELINE_COMMIT = "98d64ed"
+BASELINE_COMMIT = "e04d325"
 FEATURE_COMMIT  = "1f442ec"
 
 DOC_REQUIRED_IN_SCOPE = [

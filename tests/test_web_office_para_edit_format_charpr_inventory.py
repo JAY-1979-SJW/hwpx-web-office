@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 감리.
+﻿"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 감리.
 
 charPr inventory read-only helper 의 정확성 + 원본 무변경 + d61f10f
 부분준공 잠금 자재 무수정 확인.
@@ -24,7 +24,7 @@ from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
 from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
     import_hwpx_as_ro_view)
 
-BASELINE_COMMIT = "bb0939b"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
+BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
 
 
 def _sha(p: Path) -> str:

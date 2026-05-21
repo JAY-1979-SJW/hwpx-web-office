@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-E2E-FULL-CLOSEOUT-01 정식 준공검사.
+﻿"""WEB-OFFICE-PARA-EDIT-E2E-FULL-CLOSEOUT-01 정식 준공검사.
 
 cell containerScope · 단일 run 범위에서 PARA-EDIT E2E (TYPE_TEXT /
 REPLACE_TEXT_RANGE / DELETE_TEXT_RANGE / SET_CELL_TEXT) 가 V1~V7 PASS
@@ -45,7 +45,7 @@ LOCKED_FILES = [
     # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01:
     # para_edit_state.mjs 는 applyFormatToSelection 추가로 본 LOCKED 에서 제거.
 ]
-BASELINE_COMMIT = "56dc073"
+BASELINE_COMMIT = "e04d325"
 
 # 안전 게이트가 코드에 존재하는지 정적 검증
 SAFETY_GATE_PATTERNS = {

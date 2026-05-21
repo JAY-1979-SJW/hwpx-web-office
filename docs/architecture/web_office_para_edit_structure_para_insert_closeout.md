@@ -93,3 +93,5 @@
 | `STRUCTURE-CELL-PARA-INSERT-01` | cell 내부 Enter |
 | `APPLYFORMAT-FONT-ALIAS-MATCHING-01` | font alias fuzzy 매칭 |
 | `B동-XML-DEEP-STRUCTURE-ANALYZER-01` | XML 정밀진단동 신축 (P1) |
+
+> **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)

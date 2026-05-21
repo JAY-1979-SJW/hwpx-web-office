@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-CLOSEOUT-01 감리.
+﻿"""WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-CLOSEOUT-01 감리.
 
 Backspace paragraph merge 준공 동결 — 시방서 + audit + 회귀 자재
 목록 + 5db3d7f baseline 잠금 확인. 신규 시공 없음.
@@ -13,7 +13,7 @@ PR = Path(__file__).parents[1]
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_structure_para_delete_closeout.md")
-BASELINE_COMMIT = "98d64ed"
+BASELINE_COMMIT = "e04d325"
 FEATURE_COMMIT  = "1f442ec"
 
 LOCKED_VS_BASELINE = [

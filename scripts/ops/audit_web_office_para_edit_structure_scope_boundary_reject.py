@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-STRUCTURE-SCOPE-BOUNDARY-REJECT-01 준공검사.
+﻿"""WEB-OFFICE-PARA-EDIT-STRUCTURE-SCOPE-BOUNDARY-REJECT-01 준공검사.
 
 body paragraph (kind=="block") 외 scope에서 PARA_INSERT / PARA_DELETE가
 명시적 reason code로 reject되는지 정적·동적 검증.
@@ -15,7 +15,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-BASELINE_COMMIT = "3464f1f"
+BASELINE_COMMIT = "e04d325"
 
 SCOPE_REASON_VALUES = [
     "HEADER_SCOPE_NOT_SUPPORTED",

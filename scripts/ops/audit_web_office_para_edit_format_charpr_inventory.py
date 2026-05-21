@@ -1,4 +1,4 @@
-"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 준공검사.
+﻿"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 준공검사.
 
 charPr inventory read-only helper 의 정적·동적 신호를 확인하고,
 content closeout (d61f10f) 잠금 자재가 무수정인지 + ApplyFormat 활성화
@@ -20,7 +20,7 @@ if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
 INVENTORY_PY = (PR / "scripts/hwpx/web_office/charpr_inventory.py")
-BASELINE_COMMIT = "bb0939b"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
+BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
 
 REQUIRED_INVENTORY_PATTERNS = [
     r"def\s+paragraph_char_pr_inventory\(",
