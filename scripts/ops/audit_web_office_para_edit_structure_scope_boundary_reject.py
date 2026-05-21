@@ -15,7 +15,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-BASELINE_COMMIT = "e04d325"
+BASELINE_COMMIT = "619f2e0"
 
 SCOPE_REASON_VALUES = [
     "HEADER_SCOPE_NOT_SUPPORTED",

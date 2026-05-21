@@ -27,7 +27,7 @@ from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
 
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (dc9e6ad → 1f442ec)
+BASELINE_COMMIT = "619f2e0"  # PARA_INSERT 준공 후 갱신 (dc9e6ad → 1f442ec)
 
 
 def _sha(p: Path) -> str:

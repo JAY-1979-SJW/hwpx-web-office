@@ -20,7 +20,7 @@ if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
 INVENTORY_PY = (PR / "scripts/hwpx/web_office/charpr_inventory.py")
-BASELINE_COMMIT = "e04d325"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
+BASELINE_COMMIT = "619f2e0"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
 
 REQUIRED_INVENTORY_PATTERNS = [
     r"def\s+paragraph_char_pr_inventory\(",
