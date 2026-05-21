@@ -11,6 +11,8 @@ import {
   allocateNewParagraphId, applyParaInsertToParagraphs,
   applyParaDeleteToParagraphs, makeParaInsertCommand,
   makeParaDeleteCommand, applyParaDeleteForwardToParagraphs,
+  validateRunCharPrIntegrity, splitRun,
+  REASON_CHARPR_MISSING_ON_RUN, REASON_CHARPR_SPLIT_SOURCE_MISSING,
 } from "./para_edit_command.mjs";
 
 const out = { task: "STRUCTURE-PARA-INSERT-01", checks: {} };
@@ -392,6 +394,92 @@ function makeNonBlockState(kind) {
   const r = mergeParagraphWithPrevious(st);
   rec("unknownScopeDeleteReject",
       r.reason === "BODY_SCOPE_ONLY_SUPPORTED", { got: r.reason });
+}
+
+// ── WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01 ───────────────────────────
+
+// 29. validateRunCharPrIntegrity — 정상 문서 PASS
+{
+  const para = makeState().paragraphs[0];
+  const result = validateRunCharPrIntegrity(para);
+  rec("charPrIntegrityValidNormal", result.valid === true,
+      { got: result });
+}
+
+// 30. validateRunCharPrIntegrity — null charPrIDRef → FAIL
+{
+  const badPara = {
+    paragraphId: "BAD", parPrIDRef: "6", containerScope: null,
+    runs: [{ runId: "BAD_r0", text: "hello", charPrIDRef: null }],
+  };
+  const result = validateRunCharPrIntegrity(badPara);
+  rec("charPrIntegrityDetectsMissing", result.valid === false
+      && result.missingRunIds.includes("BAD_r0"), { got: result });
+}
+
+// 31. charPrIDRef 없는 paragraph → typeTextAtCaret reject
+{
+  const nullCharPrDoc = { sourceDocumentHash: "SHA_NULL" };
+  const nullCharPrParas = [
+    { paragraphId: "NC1", parPrIDRef: "6",
+        containerScope: { kind: "block", sectionIndex: 0, blockIndex: 0 },
+        runs: [{ runId: "NC1_r0", text: "hello", charPrIDRef: null }] },
+  ];
+  let ncState = makeParagraphEditorState(nullCharPrDoc, nullCharPrParas);
+  ncState = setCaret(ncState, "NC1", 2);
+  const result = typeTextAtCaret(ncState, "X");
+  rec("charPrMissingRunReject",
+      result.reason === REASON_CHARPR_MISSING_ON_RUN, { got: result.reason });
+}
+
+// 32. splitRun — charPrIDRef 보존 확인
+{
+  const para = {
+    paragraphId: "SP1", parPrIDRef: "6", containerScope: null,
+    runs: [{ runId: "SP1_r0", text: "Hello World", charPrIDRef: "11" }],
+  };
+  const { p: split, info } = splitRun(para, "SP1_r0", 5);
+  const left = split.runs.find((r) => r.runId === info.leftRunId);
+  const right = split.runs.find((r) => r.runId === info.rightRunId);
+  rec("splitRunPreservesCharPr",
+      left?.charPrIDRef === "11" && right?.charPrIDRef === "11",
+      { left: left?.charPrIDRef, right: right?.charPrIDRef });
+}
+
+// 33. splitRun — null charPrIDRef source → throws CHARPR_SPLIT_SOURCE_MISSING
+{
+  const badPara = {
+    paragraphId: "BS1", parPrIDRef: "6", containerScope: null,
+    runs: [{ runId: "BS1_r0", text: "hello", charPrIDRef: null }],
+  };
+  let threw = false; let errMsg = "";
+  try { splitRun(badPara, "BS1_r0", 3); }
+  catch (e) { threw = true; errMsg = e.message; }
+  rec("splitNullCharPrThrows",
+      threw && errMsg === REASON_CHARPR_SPLIT_SOURCE_MISSING,
+      { threw, errMsg });
+}
+
+// 34. PARA_DELETE merge 후 서로 다른 charPrIDRef run은 분리 유지
+{
+  const paras = [
+    { paragraphId: "M1", parPrIDRef: "6", containerScope: null,
+        runs: [{ runId: "M1_r0", text: "First", charPrIDRef: "C1" }] },
+    { paragraphId: "M2", parPrIDRef: "6", containerScope: null,
+        runs: [{ runId: "M2_r0", text: "Second", charPrIDRef: "C2" }] },
+  ];
+  const cmd = makeParaDeleteCommand({
+    prevParagraph: paras[0], currentParagraph: paras[1],
+    sourceDocumentHash: "SH",
+  });
+  const result = applyParaDeleteForwardToParagraphs(paras, cmd);
+  // 병합 후 run 이 두 개여야 함 (charPrIDRef 다르므로 auto-merge 안 됨)
+  rec("paraDeleteMergeKeepsDifferentCharPrSeparate",
+      result.length === 1 && result[0].runs.length === 2
+      && result[0].runs[0].charPrIDRef === "C1"
+      && result[0].runs[1].charPrIDRef === "C2",
+      { runCount: result[0]?.runs?.length,
+              charPrs: result[0]?.runs?.map((r) => r.charPrIDRef) });
 }
 
 out.verdict = "PASS";

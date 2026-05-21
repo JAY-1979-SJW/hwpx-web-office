@@ -66,6 +66,9 @@ REASON_EXPECTED_BEFORE_MISMATCH = "EXPECTED_BEFORE_MISMATCH_PARAGRAPH"
 REASON_STALE_SESSION = "STALE_SESSION"
 REASON_UNSAFE_MULTI_STYLE_PARA = "UNSAFE_MULTI_STYLE_PARA"
 REASON_REQUIRES_REVIEW = "REQUIRES_REVIEW"
+# WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
+REASON_CHARPR_MISSING_ON_RUN = "CHARPR_MISSING_ON_RUN"
+REASON_CHARPR_SPLIT_SOURCE_MISSING = "CHARPR_SPLIT_SOURCE_MISSING"
 
 
 def _now_iso() -> str:
@@ -155,12 +158,23 @@ def _next_run_id(paragraph: Paragraph) -> str:
         n += 1
 
 
+def validate_run_charpr_integrity(paragraph: Paragraph) -> dict:
+    """모든 run 의 charPrIDRef 가 non-null/non-empty 인지 검증.
+
+    WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01.
+    """
+    missing = [r.runId for r in paragraph.runs
+               if not r.charPrIDRef]
+    return {"valid": len(missing) == 0, "missingRunIds": missing}
+
+
 def split_run(paragraph: Paragraph, run_id: str,
                         offset: int) -> tuple[Paragraph, dict | None]:
     """run_id 의 offset 지점에서 split.
 
     offset==0 또는 offset==len(text) 이면 NOOP — None 반환.
     좌·우 모두 원본 charPrIDRef 상속.
+    charPrIDRef 가 null/empty 인 run 은 split 금지 (CHARPR_SPLIT_SOURCE_MISSING).
     """
     runs = paragraph.runs
     idx = next((i for i, r in enumerate(runs) if r.runId == run_id), -1)
@@ -169,6 +183,8 @@ def split_run(paragraph: Paragraph, run_id: str,
     target = runs[idx]
     if offset <= 0 or offset >= len(target.text):
         return paragraph, None
+    if not target.charPrIDRef:
+        raise ValueError(REASON_CHARPR_SPLIT_SOURCE_MISSING)
     left_text = target.text[:offset]
     right_text = target.text[offset:]
     left = ParaTextRun(runId=target.runId, text=left_text,

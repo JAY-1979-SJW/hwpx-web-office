@@ -16,6 +16,8 @@ import {
   applyParaInsertToParagraphs, applyParaDeleteToParagraphs,
   // WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-01.
   makeParaDeleteCommand, applyParaDeleteForwardToParagraphs,
+  // WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01.
+  validateRunCharPrIntegrity, REASON_CHARPR_MISSING_ON_RUN,
 } from "./para_edit_command.mjs";
 
 export const SEL_NONE = "NONE";
@@ -166,6 +168,13 @@ function _buildTarget(state, paragraphId) {
   };
 }
 
+// WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
+function _charPrGuard(paragraph) {
+  if (!paragraph) return null;
+  const check = validateRunCharPrIntegrity(paragraph);
+  return check.valid ? null : REASON_CHARPR_MISSING_ON_RUN;
+}
+
 function _scopeMissing(state) {
   if (!state.activeParagraphId) return false;
   const p = _findPara(state, state.activeParagraphId);
@@ -229,6 +238,8 @@ export function typeTextAtCaret(state, text) {
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
   }
   const p = _findPara(state, state.activeParagraphId);
+  const _cprg = _charPrGuard(p);
+  if (_cprg) return { state, command: null, reason: _cprg };
 
   if (state.selectionMode === SEL_TEXT_RANGE
       && state.rangeAnchor !== null && state.rangeFocus !== null
@@ -313,6 +324,8 @@ export function applyFormatToSelection(
                   reason: "TARGET_CHARPR_NOT_IN_HEADER" };
   }
   const p = _findPara(state, state.activeParagraphId);
+  const _cprg = _charPrGuard(p);
+  if (_cprg) return { state, command: null, reason: _cprg };
   const cmd = makeApplyFormatCommand({
     target: _buildTarget(state, p.paragraphId),
     paragraph: p,
@@ -342,6 +355,8 @@ export function deleteRange(state) {
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
   }
   const p = _findPara(state, state.activeParagraphId);
+  const _cprg = _charPrGuard(p);
+  if (_cprg) return { state, command: null, reason: _cprg };
   const cmd = makeDeleteTextRangeCommand({
     target: _buildTarget(state, p.paragraphId),
     paragraph: p,
@@ -383,6 +398,8 @@ export function deleteBackward(state) {
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
   }
   const p = _findPara(state, state.activeParagraphId);
+  const _cprg = _charPrGuard(p);
+  if (_cprg) return { state, command: null, reason: _cprg };
   const cmd = makeDeleteTextRangeCommand({
     target: _buildTarget(state, p.paragraphId),
     paragraph: p,
@@ -635,6 +652,8 @@ export function splitParagraphAtCaret(state) {
   if (_insertScopeReject) {
     return { state, command: null, reason: _insertScopeReject };
   }
+  const _cprg = _charPrGuard(p);
+  if (_cprg) return { state, command: null, reason: _cprg };
   const caret = state.caretOffset ?? 0;
   const newPid = allocateNewParagraphId(state.paragraphs);
   const cmd = makeParaInsertCommand({
@@ -683,6 +702,8 @@ export function mergeParagraphWithPrevious(state) {
   if (_deleteScopeReject) {
     return { state, command: null, reason: _deleteScopeReject };
   }
+  const _curCprg = _charPrGuard(curPara);
+  if (_curCprg) return { state, command: null, reason: _curCprg };
   // 이전 paragraph 탐색 (paragraphs 배열 순서 기반)
   const curIdx = state.paragraphs.findIndex(
     (p) => p.paragraphId === state.activeParagraphId);
@@ -690,6 +711,8 @@ export function mergeParagraphWithPrevious(state) {
     return { state, command: null, reason: "NO_PREV_PARAGRAPH" };
   }
   const prevPara = state.paragraphs[curIdx - 1];
+  const _prevCprg = _charPrGuard(prevPara);
+  if (_prevCprg) return { state, command: null, reason: _prevCprg };
   // 이전 paragraph 가 다른 section (containerScope) 이면 reject
   const prevScope = prevPara.containerScope ?? null;
   if (prevScope && scope

@@ -25,6 +25,9 @@ export const REASON_EXPECTED_BEFORE_MISMATCH =
   "EXPECTED_BEFORE_MISMATCH_PARAGRAPH";
 export const REASON_STALE_SESSION = "STALE_SESSION";
 export const REASON_REQUIRES_REVIEW = "REQUIRES_REVIEW";
+// WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
+export const REASON_CHARPR_MISSING_ON_RUN = "CHARPR_MISSING_ON_RUN";
+export const REASON_CHARPR_SPLIT_SOURCE_MISSING = "CHARPR_SPLIT_SOURCE_MISSING";
 
 export const STATUS_PENDING = "PENDING";
 export const STATUS_VALIDATED = "VALIDATED";
@@ -65,11 +68,27 @@ function _locateOffset(p, off) {
   return { runId: last.runId, offset: last.text.length };
 }
 
+// WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
+export function validateRunCharPrIntegrity(paragraph) {
+  const missingRunIds = [];
+  for (const r of paragraph.runs) {
+    if (r.charPrIDRef === null || r.charPrIDRef === undefined
+        || r.charPrIDRef === "") {
+      missingRunIds.push(r.runId);
+    }
+  }
+  return { valid: missingRunIds.length === 0, missingRunIds };
+}
+
 export function splitRun(p, runId, offset) {
   const idx = p.runs.findIndex((r) => r.runId === runId);
   if (idx < 0) throw new Error(`run not found: ${runId}`);
   const t = p.runs[idx];
   if (offset <= 0 || offset >= t.text.length) return { p, info: null };
+  if (t.charPrIDRef === null || t.charPrIDRef === undefined
+      || t.charPrIDRef === "") {
+    throw new Error(REASON_CHARPR_SPLIT_SOURCE_MISSING);
+  }
   const left = { runId: t.runId, text: t.text.slice(0, offset),
                           charPrIDRef: t.charPrIDRef };
   const newRightId = _nextRunId(p);
