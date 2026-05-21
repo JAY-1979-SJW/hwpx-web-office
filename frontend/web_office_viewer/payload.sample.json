@@ -1,0 +1,481 @@
+{
+  "schemaVersion": "web-office-doc-1.0",
+  "engineVersion": "ro-view-mvp-01",
+  "payloadVersion": "render-payload-1.0",
+  "documentId": "doc_77e1505a6dafd698",
+  "sourceRef": {
+    "sha256": "77e1505a6dafd6980572cf89a791829ae4e190237613bd56048450ddbf5b9642",
+    "path": "C:\\Users\\skyjw\\OneDrive\\03. PYTHON\\33. office-analysis-engine\\deliverables\\local_hwp_hwpx_converted\\C_Users_skyjw_OneDrive\\_longpath\\0018a0240c771c1c_011_[별지_제8호서식]_기계설비_사용_전_검사_확인증.hwpx"
+  },
+  "editable": false,
+  "pages": [
+    {
+      "sectionIndex": 0,
+      "sourceXmlPath": "Contents/section0.xml",
+      "editable": false
+    }
+  ],
+  "blocks": [
+    {
+      "blockId": "blk_table_t_s0_000",
+      "type": "table",
+      "sectionIndex": 0,
+      "blockIndex": 0,
+      "ref": "t_s0_000",
+      "editable": false
+    },
+    {
+      "blockId": "blk_table_t_s0_001",
+      "type": "table",
+      "sectionIndex": 0,
+      "blockIndex": 1,
+      "ref": "t_s0_001",
+      "editable": false
+    },
+    {
+      "blockId": "blk_paragraph_s0_b0",
+      "type": "paragraph",
+      "sectionIndex": 0,
+      "blockIndex": 0,
+      "ref": "par_s0_b0_p0",
+      "editable": false,
+      "paragraph": {
+        "paragraphId": "par_s0_b0_p0",
+        "text": "■ 기계설비법 시행규칙 [별지 제8호서식]기계설비 사용 전 검사 확인증신청인(건축주)성명(기관 또는 법인 명칭)대표자전화번호주소기계설비시공자상호공사업 등록번호대표자전화번호영업소 소재지기계설비감리업무수행자상호기계설비 감리 관련 등록번호대표자전화번호영업소 소재지검사결과건축허가번호검사 현장 명칭검사 현장 주소검사 연월일검사자 소속: 성명: (서명 또는 인)판정 「기계설비법」 제15조, 같은 법 시행령 제13조제3항 및 같은 법 시행규칙 제6조제2항에 따라 위와 같이 기계설비 사용 전 검사 확인증을 발급합니다. 년 월 일특별자치시장ᆞ특별자치도지사ᆞ시장ᆞ군수ᆞ자치구구청장직인210mm×297mm[백상지(120g/m2)]",
+        "parPrIDRef": null,
+        "runs": [
+          {
+            "runId": "par_s0_b0_p0_run0",
+            "text": "■ 기계설비법 시행규칙 [별지 제8호서식]기계설비 사용 전 검사 확인증신청인(건축주)성명(기관 또는 법인 명칭)대표자전화번호주소기계설비시공자상호공사업 등록번호대표자전화번호영업소 소재지기계설비감리업무수행자상호기계설비 감리 관련 등록번호대표자전화번호영업소 소재지검사결과건축허가번호검사 현장 명칭검사 현장 주소검사 연월일검사자 소속: 성명: (서명 또는 인)판정 「기계설비법」 제15조, 같은 법 시행령 제13조제3항 및 같은 법 시행규칙 제6조제2항에 따라 위와 같이 기계설비 사용 전 검사 확인증을 발급합니다. 년 월 일특별자치시장ᆞ특별자치도지사ᆞ시장ᆞ군수ᆞ자치구구청장직인210mm×297mm[백상지(120g/m2)]",
+            "charPrIDRef": null
+          }
+        ],
+        "editable": false
+      }
+    }
+  ],
+  "tables": [
+    {
+      "tableId": "t_s0_000",
+      "blockId": "blk_table_t_s0_000",
+      "sectionIndex": 0,
+      "rowCount": 21,
+      "colCount": 3,
+      "visualColCount": 3,
+      "hasMergedCells": true,
+      "cells": [
+        {
+          "cellId": "cell_t_s0_000_r0_c0",
+          "navigationId": "cell_t_s0_000_r0_c0",
+          "row": 0,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "■ 기계설비법시행규칙 [별지제8호서식]",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r1_c0",
+          "navigationId": "cell_t_s0_000_r1_c0",
+          "row": 1,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "기계설비사용전검사확인증",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r2_c0",
+          "navigationId": "cell_t_s0_000_r2_c0",
+          "row": 2,
+          "col": 0,
+          "rowSpan": 3,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "신청인(건축주)",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r2_c1",
+          "navigationId": "cell_t_s0_000_r2_c1",
+          "row": 2,
+          "col": 1,
+          "rowSpan": 2,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "성명(기관또는법인명칭)",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r2_c2",
+          "navigationId": "cell_t_s0_000_r2_c2",
+          "row": 2,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "대표자",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r3_c0",
+          "navigationId": "cell_t_s0_000_r3_c0",
+          "row": 3,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "전화번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r4_c0",
+          "navigationId": "cell_t_s0_000_r4_c0",
+          "row": 4,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "주소",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r5_c0",
+          "navigationId": "cell_t_s0_000_r5_c0",
+          "row": 5,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r6_c0",
+          "navigationId": "cell_t_s0_000_r6_c0",
+          "row": 6,
+          "col": 0,
+          "rowSpan": 3,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "기계설비시공자",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r6_c1",
+          "navigationId": "cell_t_s0_000_r6_c1",
+          "row": 6,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "상호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r6_c2",
+          "navigationId": "cell_t_s0_000_r6_c2",
+          "row": 6,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "공사업등록번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r7_c0",
+          "navigationId": "cell_t_s0_000_r7_c0",
+          "row": 7,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "대표자",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r7_c1",
+          "navigationId": "cell_t_s0_000_r7_c1",
+          "row": 7,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "전화번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r8_c0",
+          "navigationId": "cell_t_s0_000_r8_c0",
+          "row": 8,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "영업소소재지",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r9_c0",
+          "navigationId": "cell_t_s0_000_r9_c0",
+          "row": 9,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r10_c0",
+          "navigationId": "cell_t_s0_000_r10_c0",
+          "row": 10,
+          "col": 0,
+          "rowSpan": 3,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "기계설비감리업무수행자",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r10_c1",
+          "navigationId": "cell_t_s0_000_r10_c1",
+          "row": 10,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "상호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r10_c2",
+          "navigationId": "cell_t_s0_000_r10_c2",
+          "row": 10,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "기계설비감리관련등록번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r11_c0",
+          "navigationId": "cell_t_s0_000_r11_c0",
+          "row": 11,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "대표자",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r11_c1",
+          "navigationId": "cell_t_s0_000_r11_c1",
+          "row": 11,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "전화번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r12_c0",
+          "navigationId": "cell_t_s0_000_r12_c0",
+          "row": 12,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "영업소소재지",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r13_c0",
+          "navigationId": "cell_t_s0_000_r13_c0",
+          "row": 13,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r14_c0",
+          "navigationId": "cell_t_s0_000_r14_c0",
+          "row": 14,
+          "col": 0,
+          "rowSpan": 5,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "검사결과",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r14_c1",
+          "navigationId": "cell_t_s0_000_r14_c1",
+          "row": 14,
+          "col": 1,
+          "rowSpan": 2,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "건축허가번호",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r14_c2",
+          "navigationId": "cell_t_s0_000_r14_c2",
+          "row": 14,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "검사현장명칭",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r15_c0",
+          "navigationId": "cell_t_s0_000_r15_c0",
+          "row": 15,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 2,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "검사현장주소",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r16_c0",
+          "navigationId": "cell_t_s0_000_r16_c0",
+          "row": 16,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "검사연월일",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r17_c0",
+          "navigationId": "cell_t_s0_000_r17_c0",
+          "row": 17,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "검사자소속: 성명: (서명또는인)",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r18_c0",
+          "navigationId": "cell_t_s0_000_r18_c0",
+          "row": 18,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 3,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "판정",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r19_c0",
+          "navigationId": "cell_t_s0_000_r19_c0",
+          "row": 19,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "「기계설비법」 제15조, 같은법시행령제13조제3항및같은법시행규칙제6조제2항에따라위와같이기계설비사용전검사확인증을발급합니다. 년월일특별자치시장ᆞ특별자치도지사ᆞ시장ᆞ군수ᆞ자치구구청장직인",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_000_r20_c0",
+          "navigationId": "cell_t_s0_000_r20_c0",
+          "row": 20,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 4,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": true,
+          "text": "210mm×297mm[백상지(120g/m2)]",
+          "editable": false
+        }
+      ],
+      "editable": false
+    },
+    {
+      "tableId": "t_s0_001",
+      "blockId": "blk_table_t_s0_001",
+      "sectionIndex": 0,
+      "rowCount": 1,
+      "colCount": 2,
+      "visualColCount": 2,
+      "hasMergedCells": false,
+      "cells": [
+        {
+          "cellId": "cell_t_s0_001_r0_c0",
+          "navigationId": "cell_t_s0_001_r0_c0",
+          "row": 0,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "특별자치시장ᆞ특별자치도지사ᆞ시장ᆞ군수ᆞ자치구구청장",
+          "editable": false
+        },
+        {
+          "cellId": "cell_t_s0_001_r0_c1",
+          "navigationId": "cell_t_s0_001_r0_c1",
+          "row": 0,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "isCoveredByMerge": false,
+          "isMergedOrigin": false,
+          "text": "직인",
+          "editable": false
+        }
+      ],
+      "editable": false
+    }
+  ],
+  "objects": [],
+  "warnings": []
+}

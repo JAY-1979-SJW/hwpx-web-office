@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>HWPX Web Office Viewer (RO)</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; margin: 0; }
+  .wo-toolbar { display: flex; gap: 16px; padding: 8px 16px;
+                            background: #1f2937; color: #fff; }
+  .wo-toolbar-title { flex: 1; font-weight: bold; }
+  .wo-toolbar-mode { background: #374151; padding: 2px 8px; border-radius: 4px; }
+  .wo-body { display: grid; grid-template-columns: 240px 1fr 280px;
+                      min-height: calc(100vh - 40px); }
+  .wo-left-panel, .wo-right-panel { background: #f3f4f6; padding: 12px;
+                                                          font-size: 13px; overflow: auto; }
+  .wo-center { padding: 16px 24px; background: #fff; overflow: auto; }
+  .wo-table { border-collapse: collapse; margin: 8px 0; }
+  .wo-cell { border: 1px solid #888; padding: 4px 6px; vertical-align: top;
+                    min-width: 32px; }
+  .wo-cell-merged-origin { background: #fef9c3; }
+  .wo-paragraph { padding: 4px 0; }
+  .wo-warnings-empty { color: #6b7280; font-style: italic; }
+  ul.wo-table-list { padding-left: 18px; }
+</style>
+</head>
+<body>
+<div id="root">로딩 중…</div>
+<script type="module">
+  import { renderPayloadToHTML } from "./viewer_core.mjs";
+  // payload.json 은 서버가 /document/load 응답으로 내려준다고 가정.
+  // 본 prototype 은 동일 경로의 정적 fixture 를 fetch.
+  const res = await fetch("./payload.json");
+  if (!res.ok) {
+    document.getElementById("root").textContent =
+      "payload.json 을 찾을 수 없습니다 (RO-VIEW prototype).";
+  } else {
+    const payload = await res.json();
+    document.getElementById("root").innerHTML =
+      renderPayloadToHTML(payload);
+  }
+</script>
+</body>
+</html>
