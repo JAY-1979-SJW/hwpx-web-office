@@ -28,6 +28,11 @@ export const REASON_REQUIRES_REVIEW = "REQUIRES_REVIEW";
 // WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
 export const REASON_CHARPR_MISSING_ON_RUN = "CHARPR_MISSING_ON_RUN";
 export const REASON_CHARPR_SPLIT_SOURCE_MISSING = "CHARPR_SPLIT_SOURCE_MISSING";
+// WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01
+export const REASON_EMPTY_PARA_ID_MISSING = "EMPTY_PARA_ID_MISSING";
+export const REASON_EMPTY_PARA_PR_MISSING = "EMPTY_PARA_PR_MISSING";
+export const REASON_EMPTY_RUN_CHARPR_MISSING = "EMPTY_RUN_CHARPR_MISSING";
+export const REASON_PARAGRAPH_COUNT_DECREASED = "PARAGRAPH_COUNT_DECREASED";
 
 export const STATUS_PENDING = "PENDING";
 export const STATUS_VALIDATED = "VALIDATED";
@@ -78,6 +83,32 @@ export function validateRunCharPrIntegrity(paragraph) {
     }
   }
   return { valid: missingRunIds.length === 0, missingRunIds };
+}
+
+// WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01
+export function validateEmptyParagraphIntegrity(paragraph) {
+  const issues = [];
+  if (!paragraph.paragraphId) issues.push(REASON_EMPTY_PARA_ID_MISSING);
+  if (!paragraph.parPrIDRef) issues.push(REASON_EMPTY_PARA_PR_MISSING);
+  for (const r of (paragraph.runs ?? [])) {
+    if (r.charPrIDRef === null || r.charPrIDRef === undefined
+        || r.charPrIDRef === "") {
+      issues.push(REASON_EMPTY_RUN_CHARPR_MISSING);
+      break;
+    }
+  }
+  return { valid: issues.length === 0, issues };
+}
+
+export function validateParagraphCountPreserved(beforeParas, afterParas) {
+  if (afterParas.length < beforeParas.length) {
+    return {
+      valid: false,
+      reason: REASON_PARAGRAPH_COUNT_DECREASED,
+      before: beforeParas.length, after: afterParas.length,
+    };
+  }
+  return { valid: true };
 }
 
 export function splitRun(p, runId, offset) {

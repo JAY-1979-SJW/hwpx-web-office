@@ -18,6 +18,8 @@ import {
   makeParaDeleteCommand, applyParaDeleteForwardToParagraphs,
   // WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01.
   validateRunCharPrIntegrity, REASON_CHARPR_MISSING_ON_RUN,
+  // WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01.
+  validateEmptyParagraphIntegrity,
 } from "./para_edit_command.mjs";
 
 export const SEL_NONE = "NONE";
@@ -173,6 +175,13 @@ function _charPrGuard(paragraph) {
   if (!paragraph) return null;
   const check = validateRunCharPrIntegrity(paragraph);
   return check.valid ? null : REASON_CHARPR_MISSING_ON_RUN;
+}
+
+// WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01
+function _emptyParaGuard(paragraph) {
+  if (!paragraph) return null;
+  const check = validateEmptyParagraphIntegrity(paragraph);
+  return check.valid ? null : check.issues[0];
 }
 
 function _scopeMissing(state) {
@@ -664,6 +673,12 @@ export function splitParagraphAtCaret(state) {
     sourceDocumentHash: state.sourceDocumentHash,
   });
   const nextParas = applyParaInsertToParagraphs(state.paragraphs, cmd);
+  // WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01: 생성된 두 paragraph 무결성 검사.
+  for (const pid of [p.paragraphId, newPid]) {
+    const np = nextParas.find((x) => x.paragraphId === pid);
+    const _epg = _emptyParaGuard(np);
+    if (_epg) return { state, command: null, reason: _epg };
+  }
   return {
     state: {
       ..._appendCommandWithParas(state, cmd, nextParas),

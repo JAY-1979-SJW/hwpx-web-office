@@ -69,6 +69,11 @@ REASON_REQUIRES_REVIEW = "REQUIRES_REVIEW"
 # WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01
 REASON_CHARPR_MISSING_ON_RUN = "CHARPR_MISSING_ON_RUN"
 REASON_CHARPR_SPLIT_SOURCE_MISSING = "CHARPR_SPLIT_SOURCE_MISSING"
+# WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01
+REASON_EMPTY_PARA_ID_MISSING = "EMPTY_PARA_ID_MISSING"
+REASON_EMPTY_PARA_PR_MISSING = "EMPTY_PARA_PR_MISSING"
+REASON_EMPTY_RUN_CHARPR_MISSING = "EMPTY_RUN_CHARPR_MISSING"
+REASON_PARAGRAPH_COUNT_DECREASED = "PARAGRAPH_COUNT_DECREASED"
 
 
 def _now_iso() -> str:
@@ -166,6 +171,40 @@ def validate_run_charpr_integrity(paragraph: Paragraph) -> dict:
     missing = [r.runId for r in paragraph.runs
                if not r.charPrIDRef]
     return {"valid": len(missing) == 0, "missingRunIds": missing}
+
+
+def validate_empty_paragraph_integrity(paragraph: Paragraph) -> dict:
+    """빈 paragraph 무결성 검증.
+
+    WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01.
+    paragraphId / parPrIDRef / run 의 charPrIDRef 누락 여부를 검사.
+    """
+    issues: list[str] = []
+    if not paragraph.paragraphId:
+        issues.append(REASON_EMPTY_PARA_ID_MISSING)
+    if not paragraph.parPrIDRef:
+        issues.append(REASON_EMPTY_PARA_PR_MISSING)
+    for r in paragraph.runs:
+        if not r.charPrIDRef:
+            issues.append(REASON_EMPTY_RUN_CHARPR_MISSING)
+            break
+    return {"valid": len(issues) == 0, "issues": issues}
+
+
+def validate_paragraph_count_preserved(
+    before: list[Paragraph], after: list[Paragraph],
+) -> dict:
+    """writer 전후 paragraph 수 감소를 검출.
+
+    WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01.
+    """
+    if len(after) < len(before):
+        return {
+            "valid": False,
+            "reason": REASON_PARAGRAPH_COUNT_DECREASED,
+            "before": len(before), "after": len(after),
+        }
+    return {"valid": True}
 
 
 def split_run(paragraph: Paragraph, run_id: str,

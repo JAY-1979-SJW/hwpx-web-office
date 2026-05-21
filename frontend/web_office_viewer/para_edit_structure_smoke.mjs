@@ -13,6 +13,9 @@ import {
   makeParaDeleteCommand, applyParaDeleteForwardToParagraphs,
   validateRunCharPrIntegrity, splitRun,
   REASON_CHARPR_MISSING_ON_RUN, REASON_CHARPR_SPLIT_SOURCE_MISSING,
+  // WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01
+  validateEmptyParagraphIntegrity, validateParagraphCountPreserved,
+  normalizeParagraph,
 } from "./para_edit_command.mjs";
 
 const out = { task: "STRUCTURE-PARA-INSERT-01", checks: {} };
@@ -480,6 +483,85 @@ function makeNonBlockState(kind) {
       && result[0].runs[1].charPrIDRef === "C2",
       { runCount: result[0]?.runs?.length,
               charPrs: result[0]?.runs?.map((r) => r.charPrIDRef) });
+}
+
+// ── WEB-OFFICE-P3-EMPTY-PARAGRAPH-WRITER-GUARD-01 ───────────────────────────
+
+// 35. validateEmptyParagraphIntegrity — 정상 paragraph PASS
+{
+  const para = makeState().paragraphs[0];
+  const result = validateEmptyParagraphIntegrity(para);
+  rec("emptyParaIntegrityValid", result.valid === true, { got: result });
+}
+
+// 36. validateEmptyParagraphIntegrity — parPrIDRef 없음 → FAIL
+{
+  const badPara = {
+    paragraphId: "BP1", parPrIDRef: null, containerScope: null,
+    runs: [{ runId: "BP1_r0", text: "", charPrIDRef: "11" }],
+  };
+  const result = validateEmptyParagraphIntegrity(badPara);
+  rec("emptyParaPrMissingReject",
+      result.valid === false
+      && result.issues.includes("EMPTY_PARA_PR_MISSING"),
+      { got: result });
+}
+
+// 37. validateEmptyParagraphIntegrity — 빈 run charPrIDRef 없음 → FAIL
+{
+  const badPara = {
+    paragraphId: "BP2", parPrIDRef: "6", containerScope: null,
+    runs: [{ runId: "BP2_r0", text: "", charPrIDRef: null }],
+  };
+  const result = validateEmptyParagraphIntegrity(badPara);
+  rec("emptyParaRunCharPrMissingReject",
+      result.valid === false
+      && result.issues.includes("EMPTY_RUN_CHARPR_MISSING"),
+      { got: result });
+}
+
+// 38. normalizeParagraph — 빈 paragraph → hp:p 유지, run 1개, charPr 보존
+{
+  const emptyPara = {
+    paragraphId: "EP1", parPrIDRef: "6", containerScope: null,
+    runs: [{ runId: "EP1_r0", text: "", charPrIDRef: "11" }],
+  };
+  const result = normalizeParagraph(emptyPara);
+  rec("normEmptyParaPreserved",
+      result.paragraphId === "EP1"
+      && result.parPrIDRef === "6"
+      && result.runs.length === 1
+      && result.runs[0].charPrIDRef === "11",
+      { got: result });
+}
+
+// 39. validateParagraphCountPreserved — 감소 시 reject
+{
+  const before = [{ paragraphId: "A" }, { paragraphId: "B" }];
+  const after  = [{ paragraphId: "A" }];
+  const result = validateParagraphCountPreserved(before, after);
+  rec("paragraphCountDecreaseReject",
+      result.valid === false
+      && result.reason === "PARAGRAPH_COUNT_DECREASED",
+      { got: result });
+}
+
+// 40. PARA_INSERT caret at end → 빈 뒤쪽 paragraph 보존
+{
+  let st = makeState();
+  st = setCaret(st, "100", 11); // end of "Hello World" (length 11)
+  const r = splitParagraphAtCaret(st);
+  const newPara = r.state?.paragraphs?.find(
+    (p) => p.paragraphId === r.command?.forward?.newParagraphId);
+  rec("paraInsertEmptyBackParaPreserved",
+      r.reason === "OK"
+      && r.state.paragraphs.length === 3
+      && newPara !== undefined
+      && newPara.runs.length >= 1
+      && newPara.runs[0].charPrIDRef !== null
+      && newPara.runs[0].charPrIDRef !== undefined,
+      { paraCount: r.state?.paragraphs?.length,
+              newPara: newPara?.runs });
 }
 
 out.verdict = "PASS";
