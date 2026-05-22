@@ -1,0 +1,72 @@
+{
+  "document": "hwpx_editor_usecase_plan",
+  "phase": "P11A",
+  "date": "2026-05-15",
+  "implementation_order": [
+    {
+      "phase": "P12",
+      "components": ["HwpxEditorCommandUseCase", "HwpxEditorValidationGate"],
+      "layer": ["usecase", "gate"],
+      "mvp": true,
+      "status": "planned"
+    },
+    {
+      "phase": "P13",
+      "components": ["browser editor UI"],
+      "layer": ["frontend"],
+      "mvp": true,
+      "status": "planned"
+    },
+    {
+      "phase": "P14",
+      "components": ["HwpxEditorSessionUseCase"],
+      "layer": ["usecase"],
+      "mvp": false,
+      "status": "planned"
+    },
+    {
+      "phase": "P15",
+      "components": ["이미지 교체", "builder 연결"],
+      "layer": ["usecase", "frontend"],
+      "mvp": false,
+      "status": "planned"
+    }
+  ],
+  "command_usecase": {
+    "name": "HwpxEditorCommandUseCase",
+    "input": "List<CommandEdit>",
+    "output": "EditPlan",
+    "flow": ["validate_via_gate", "transform_to_plan", "separate_post_processing"],
+    "gate": "HwpxEditorValidationGate"
+  },
+  "validation_gate": {
+    "name": "HwpxEditorValidationGate",
+    "side_effects": false,
+    "fail_codes": [
+      "EMPTY_COMMAND_LIST",
+      "UNKNOWN_COMMAND_TYPE",
+      "INVALID_PARAGRAPH_INDEX",
+      "INVALID_TABLE_INDEX",
+      "INVALID_CELL_COORDINATE",
+      "MISSING_VALUE",
+      "FORBIDDEN_PATH_IN_COMMAND",
+      "FORBIDDEN_HWP_EXEC"
+    ],
+    "warn_codes": [
+      "EMPTY_MAPPING",
+      "EMPTY_ROWS",
+      "TOO_MANY_COMMANDS"
+    ]
+  },
+  "handler_wiring_change": {
+    "before": "Browser -> HwpxEditorApiHandler -> hwpx_edit_tool.py",
+    "after": "Browser -> HwpxEditorApiHandler -> HwpxEditorCommandUseCase -> HwpxEditorValidationGate -> hwpx_edit_tool.py",
+    "external_interface_change": false
+  },
+  "session_usecase": {
+    "name": "HwpxEditorSessionUseCase",
+    "server_stateless": true,
+    "db_write": false,
+    "session_storage": "server_memory_only"
+  }
+}

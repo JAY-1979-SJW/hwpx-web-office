@@ -1,0 +1,89 @@
+{
+  "audit": "ui_design_system",
+  "phase": "P12B",
+  "status": "PASS",
+  "ui_docs": {
+    "ui_design_system_20260515.md": true,
+    "ui_design_system_20260515.json": true,
+    "hwpx_editor_ui_layout_20260515.md": true,
+    "hwpx_editor_ui_layout_20260515.json": true,
+    "ui_component_rules_20260515.md": true,
+    "ui_component_rules_20260515.json": true,
+    "hwpx_editor_ui_state_policy_20260515.md": true,
+    "hwpx_editor_ui_state_policy_20260515.json": true
+  },
+  "brand_colors": {
+    "#F97316": true,
+    "#EA580C": true,
+    "#FFF7ED": true,
+    "#0F172A": true,
+    "#1E293B": true,
+    "#F1F5F9": true,
+    "#F5F7FA": true,
+    "#111827": true,
+    "#4B5563": true,
+    "#6B7280": true,
+    "#E5E7EB": true
+  },
+  "top_accent_line": true,
+  "components": {
+    "TopAccentLine": true,
+    "HeaderBar": true,
+    "StatusBadge": true,
+    "UploadCard": true,
+    "GateStatusPanel": true,
+    "EditorToolbar": true,
+    "DocumentTree": true,
+    "ValidationPanel": true,
+    "CommandResultPanel": true,
+    "DownloadPanel": true,
+    "ArtifactInfoPanel": true,
+    "ErrorBoundaryPanel": true
+  },
+  "status_badges": {
+    "PASS": true,
+    "WARN": true,
+    "FAIL": true,
+    "DRY_RUN": true,
+    "LOCAL_WORKER_REQUIRED": true,
+    "USER_PRESENT_REQUIRED": true,
+    "SAVED": true,
+    "ERROR": true
+  },
+  "ui_phases": {
+    "IDLE": true,
+    "UPLOADING": true,
+    "UPLOADED": true,
+    "PARSING": true,
+    "READY": true,
+    "EDITING": true,
+    "VALIDATING": true,
+    "DRY_RUN": true,
+    "SAVING": true,
+    "EXPORTED": true,
+    "ERROR": true
+  },
+  "policies": {
+    "artifact_id_policy": true,
+    "raw_path_forbidden": true,
+    "xml_zip_forbidden": true,
+    "command_only_browser": true,
+    "download_panel_raw_path_rule": true,
+    "gate_status_panel_rule": true
+  },
+  "existing_ui": {
+    "orange_accent_in_styles": true,
+    "navy_in_styles": true,
+    "no_raw_path_in_view": true
+  },
+  "finding_count": 0,
+  "findings": [],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_browser_hwpx_direct_access": true,
+    "no_hancom_auto_run": true,
+    "push_forbidden": true,
+    "db_write_forbidden": true
+  }
+}

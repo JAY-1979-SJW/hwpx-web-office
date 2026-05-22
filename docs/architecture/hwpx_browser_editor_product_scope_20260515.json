@@ -1,0 +1,58 @@
+{
+  "document": "hwpx_browser_editor_product_scope",
+  "phase": "P11A",
+  "date": "2026-05-15",
+  "status": "CONFIRMED",
+  "core_principle": {
+    "browser_role": "command_only",
+    "server_role": "hwpx_modify_validate_save",
+    "browser_direct_hwpx_access": false,
+    "hancom_auto_run": false,
+    "external_browser_auto_run": false,
+    "endpoint_path_change": false,
+    "existing_gate_change": false
+  },
+  "mvp_features": [
+    {"id": "upload", "name": "HWPX 업로드", "endpoint": "POST /parse-hwpx"},
+    {"id": "view_structure", "name": "문서 구조 보기", "endpoint": "POST /parse-hwpx"},
+    {"id": "edit_paragraph", "name": "문단 텍스트 편집", "endpoint": "POST /api/hwpx/editor"},
+    {"id": "edit_cell", "name": "표 셀 텍스트 편집", "endpoint": "POST /api/hwpx/editor"},
+    {"id": "table_row_ops", "name": "행 추가/삭제", "endpoint": "POST /api/hwpx/editor"},
+    {"id": "placeholder_fill", "name": "placeholder 치환", "endpoint": "POST /api/hwpx/editor"},
+    {"id": "save_download", "name": "저장/다운로드", "endpoint": "POST /api/hwpx/editor"},
+    {"id": "package_validation", "name": "package validation", "endpoint": "usecase_internal"},
+    {"id": "roundtrip_validation", "name": "roundtrip validation", "endpoint": "usecase_internal"}
+  ],
+  "post_mvp_features": [
+    "이미지 교체",
+    "차트 삽입",
+    "스타일 편집",
+    "공정표 builder 연결",
+    "안전서류 builder 연결",
+    "Excel/내역서 분석 결과 binding"
+  ],
+  "excluded_features": [
+    {"name": "hwp 직접 브라우저 편집", "reason": "HWP binary format 브라우저 지원 불가"},
+    {"name": "Hancom 자동 실행", "reason": "서버 환경 의존성, gate 금지"},
+    {"name": "인증서/OTP/전자서명", "reason": "ExecutionLocationGate: USER_PRESENT_REQUIRED"},
+    {"name": "외부 사이트 제출/투찰", "reason": "외부 브라우저 자동 실행 금지"},
+    {"name": "서버 HWP 변환 직접 실행", "reason": "local_worker 의존, 서버 gate 통과 불가"}
+  ],
+  "reuse_components": [
+    "HwpxEditorApiHandler",
+    "HwpxUploadParseUseCase",
+    "HwpxDownloadExportUseCase",
+    "FileTypeGate",
+    "UploadSecurityGate",
+    "OutputArtifactGate",
+    "hwpx_edit_tool.py",
+    "hwpx_server_ops.py"
+  ],
+  "new_components_needed": [
+    {"name": "HwpxEditorCommandUseCase", "layer": "usecase"},
+    {"name": "HwpxEditorSessionUseCase", "layer": "usecase"},
+    {"name": "HwpxEditorValidationGate", "layer": "gate"},
+    {"name": "browser editor UI", "layer": "frontend"},
+    {"name": "GET /hwpx-editor (확장)", "layer": "http"}
+  ]
+}

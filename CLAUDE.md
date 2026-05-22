@@ -1,7 +1,7 @@
 # hwpx-web-office 작업 표준시방서 (CLAUDE.md)
 
-이 저장소는 **HWPX 편집 브라우저** 공정 전용이다.
-Excel·AI fill·기타 도메인은 이 저장소 범위 밖이다.
+이 저장소는 **HWPX 전체 도메인** 공정 전용이다.
+Excel·기타 비HWPX 도메인은 이 저장소 범위 밖이다.
 
 ---
 
@@ -10,10 +10,18 @@ Excel·AI fill·기타 도메인은 이 저장소 범위 밖이다.
 | 포함 (IN_SCOPE) | 제외 (OUT_OF_SCOPE) |
 |----------------|-------------------|
 | `frontend/web_office_viewer/` | Excel 관련 파일 일체 |
-| `scripts/hwpx/web_office/` | `scripts/excel/` |
-| `tests/test_web_office_*.py` | AI 자동 입력 (§10) |
-| `scripts/ops/audit_web_office_*.py` | 서버 배포 자동화 |
-| `docs/architecture/web_office_*.md` | price-classifier 등 타 도메인 |
+| `scripts/hwpx/` (전체 서브모듈 포함) | `scripts/excel/` |
+| `tests/test_hwpx_*.py` | 서버 배포 자동화 |
+| `tests/test_web_office_*.py` | price-classifier 등 타 도메인 |
+| `scripts/ops/audit_hwpx_*.py` | |
+| `scripts/ops/audit_web_office_*.py` | |
+| `docs/architecture/hwpx_*.md` | |
+| `docs/architecture/web_office_*.md` | |
+| `docs/contracts/`, `docs/deploy/`, `docs/design/` (hwpx 관련) | |
+| `docs/reports/` (hwpx/web_office 관련) | |
+| `tests/fixtures/hwpx/` | |
+| `samples/` (hwpx 샘플) | |
+| `data/drafts/` (hwpx 데이터) | |
 
 ---
 
@@ -87,9 +95,11 @@ Excel·AI fill·기타 도메인은 이 저장소 범위 밖이다.
 
 ---
 
-## 7. AI 없이 자동 입력 금지 (§10 계승)
+## 7. AI fill 파이프라인 범위
 
-AI inject 없이 자동 입력 진행 금지.
+AI fill(자동 입력) 로직은 `scripts/hwpx/pipeline/`, `scripts/hwpx/ai_proposal/`,
+`scripts/hwpx/recognition_corpus/` 등에 포함되어 있으며 이 저장소에서 관리한다.
+단, AI inject 없이 자동 입력 실행은 금지한다.
 
 ---
 

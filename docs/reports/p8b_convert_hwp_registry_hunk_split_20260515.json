@@ -1,0 +1,75 @@
+{
+  "task": "OFFICE-ANALYSIS-P8B-CONVERT-HWP-REGISTRY-HUNK-SPLIT",
+  "baseline": {
+    "head": "b90ed616f42a7fe12d0c65c68fc020ecced4d5ca",
+    "branch": "main",
+    "hooksPath": "scripts/hooks",
+    "trackedDirtyAtStart": 35,
+    "stagedAtStart": 0,
+    "untrackedStatusEntriesAtStart": 118,
+    "deletedAtStart": 0,
+    "knownPrefixQuotedLiteralCount": 0,
+    "push": "not_run"
+  },
+  "engineHttpServer": {
+    "path": "src/main/java/com/haehan/engine/http/EngineHttpServer.java",
+    "trackedDirty": true,
+    "diffInsertions": 12,
+    "diffDeletions": 0,
+    "existingDirtyExcluded": [
+      "audit watch lifecycle",
+      "/api/hwpx/editor registry candidate",
+      "/hwpx-editor registry candidate",
+      "audit watch shutdown close candidate"
+    ]
+  },
+  "registryHunk": {
+    "exists": true,
+    "endpointPath": "/convert-hwp-to-hwpx",
+    "handlerClass": "ConvertHwpToHwpxHandler",
+    "registration": "server.createContext",
+    "splitPossible": true,
+    "patchStagingUsed": true,
+    "stagedOnlyRegistryHunk": true,
+    "importRequired": false,
+    "endpointPathChanged": false,
+    "apiResponseKeyChanged": false,
+    "endpointConflict": false
+  },
+  "gateState": {
+    "handlerBaselineCommitted": true,
+    "executionLocationGateConnected": true,
+    "serverDefault": "LOCAL_WORKER_REQUIRED",
+    "directHwpHancomExecutionAdded": false
+  },
+  "tests": {
+    "handlerGateRuntimeAudit": "PASS_WITH_WARN_STATUS",
+    "handlerGateRuntimeAuditTest": "PASS",
+    "largeHandlerGateConnectionTest": "PASS",
+    "p1ToP7AuditTests": "PASS",
+    "gradlewTasks": "PASS",
+    "gradlewTest": "PASS",
+    "secretScan": "PASS_ZERO"
+  },
+  "security": {
+    "secretValuePrinted": false,
+    "dbWrite": false,
+    "schemaChange": false,
+    "externalBrowserExecution": false,
+    "hwpHancomServerDirectExecution": false
+  },
+  "remainingWarn": [
+    "HwpxUploadHandler gate direct connection remains deferred",
+    "InspectionPageHandler output gate connection remains deferred",
+    "EngineHttpServer audit watch and hwpx editor registry dirty remain excluded",
+    "API meta contract and output artifact policy remain follow-up items"
+  ],
+  "nextStep": {
+    "recommendation": "A",
+    "options": [
+      "P8C InspectionPageHandler output gate connection",
+      "P8D HwpxUploadHandler baseline split"
+    ]
+  },
+  "finalDecision": "PASS"
+}

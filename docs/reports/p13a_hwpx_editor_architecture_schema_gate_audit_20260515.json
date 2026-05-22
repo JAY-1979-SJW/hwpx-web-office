@@ -1,0 +1,48 @@
+{
+  "audit": "hwpx_editor_architecture_gate",
+  "phase": "P13A",
+  "status": "PASS",
+  "arch_docs": {
+    "hwpx_browser_editor_app_structure_20260515.md": true,
+    "hwpx_browser_editor_module_boundary_rules_20260515.md": true,
+    "hwpx_editor_api_schema_map_20260515.md": true,
+    "hwpx_editor_command_schema_contract_20260515.md": true,
+    "hwpx_editor_operating_rules_20260515.md": true
+  },
+  "gate_files": {
+    "audit_hwpx_editor_architecture_gate.py": true,
+    "test_hwpx_editor_architecture_gate.py": true
+  },
+  "rules": {
+    "rule01_ui_command_dispatch": true,
+    "rule02_no_xml_zip_in_command_dispatch": true,
+    "rule03_no_raw_path_in_view": true,
+    "rule04_artifact_path_guard": true,
+    "rule05_handler_uses_usecase": true,
+    "rule06_usecase_no_http_import": true,
+    "rule07_gate_no_side_effects": true,
+    "rule07_gate_checks_security": true,
+    "rule08_dry_run_default_true": true,
+    "rule09_apply_deferred_present": true,
+    "rule10_endpoints_stable": true,
+    "rule11_meta_contract_in_handler": true,
+    "rule12_secret_key_check": true,
+    "rule14_gate_and_test_exist": true,
+    "rule15_scripts_size_ok": true,
+    "rule16_operating_rules_gated": true,
+    "cmd_model_boundary_ok": true
+  },
+  "p13_readiness": true,
+  "finding_count": 0,
+  "findings": [],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_browser_xml_zip_direct": true,
+    "no_raw_path_in_ui": true,
+    "no_actual_apply_in_p13": true,
+    "no_hancom_auto_run": true,
+    "push_forbidden": true,
+    "db_write_forbidden": true
+  }
+}

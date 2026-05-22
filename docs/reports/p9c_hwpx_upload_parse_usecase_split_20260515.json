@@ -1,0 +1,69 @@
+{
+  "report": "p9c_hwpx_upload_parse_usecase_split",
+  "phase": "P9C",
+  "date": "2026-05-15",
+  "base_head": "37bb0e1213c6fb4e25270b6b5c952f0805eadd61",
+  "usecase": {
+    "new_files": [
+      "src/main/java/com/haehan/engine/usecase/HwpxUploadParseUseCase.java",
+      "src/main/java/com/haehan/engine/usecase/HwpxUploadParseResult.java"
+    ],
+    "handler_wiring_deferred": "P9D",
+    "reason_for_deferral": "ParseHwpxHandler currently accepts empty filename and unbounded size; gate wiring would change existing behavior"
+  },
+  "responsibility_analysis": {
+    "ParseHwpxHandler": "HTTP POST /api/hwpx/parse — raw binary upload, no gate validation",
+    "HwpxEditorApiHandler": "HTTP POST /api/hwpx/editor — multipart, Python bridge, archive",
+    "HwpxUploadHandler": "HTTP GET /hwpx-upload /hwpx-editor — serves upload page only",
+    "HwpxUploadParseUseCase": "NEW Application layer: FileTypeGate + UploadSecurityGate + HwpxParser orchestration",
+    "HwpxUploadParseResult": "NEW Result DTO: Status(PASS/GATE_REJECTED/PARSE_ERROR), gate result, parse response"
+  },
+  "gate_locations": {
+    "FileTypeGate": "HwpxUploadPageGatePolicy (JS), HwpxUploadParseUseCase (Java)",
+    "UploadSecurityGate": "HwpxUploadPageGatePolicy (JS), HwpxUploadParseUseCase (Java)",
+    "ExecutionLocationGate": "HwpxUploadPageGatePolicy (JS)",
+    "OutputArtifactGate": "HwpxUploadPageGatePolicy (JS)",
+    "all_gates_maintained": true
+  },
+  "layer_boundary": {
+    "usecase_no_http_import": true,
+    "usecase_no_view_import": true,
+    "usecase_package": "com.haehan.engine.usecase"
+  },
+  "test_results": {
+    "HwpxUploadParseUseCaseTest": "8 PASS",
+    "HwpxUploadParseResultTest": "3 PASS",
+    "test_hwpx_upload_handler_split_readiness": "9 PASS",
+    "test_handler_gate_runtime_connections": "5 PASS",
+    "p1_p9b_audit_tests": "23 PASS (1 pre-existing FAIL: test_p8e_reports_hunk_split_decision, not P9C-introduced)",
+    "gradlew_test": "BUILD SUCCESSFUL",
+    "secret_scan": "CLEAR"
+  },
+  "endpoint_paths": {
+    "hwpx_upload": "/hwpx-upload",
+    "hwpx_editor": "/hwpx-editor",
+    "parse_api": "/api/hwpx/parse",
+    "editor_api": "/api/hwpx/editor",
+    "all_unchanged": true
+  },
+  "remaining_warn": [
+    "raw_path_candidate_guarded",
+    "tracked_dirty_large_handler",
+    "convert_handler_has_preexisting_gate_signals",
+    "inspection_large_handler_deferred",
+    "ParseHwpxHandler_gate_wiring_deferred_to_P9D"
+  ],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_gate_logic_change": true,
+    "no_hwp_hancom_direct_execution": true,
+    "no_db_write": true,
+    "no_external_browser": true,
+    "no_local_gui_change": true,
+    "no_dockerfile_change": true,
+    "push_forbidden": true
+  },
+  "next_phase": "P9D: ParseHwpxHandler에 HwpxUploadParseUseCase 연결 (gate 통과 후 파싱)",
+  "verdict": "PASS"
+}

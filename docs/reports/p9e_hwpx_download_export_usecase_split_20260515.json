@@ -1,0 +1,36 @@
+{
+  "audit": "hwpx_download_export_usecase",
+  "phase": "P9E",
+  "status": "PASS",
+  "usecase": {
+    "exists": true,
+    "no_http_import": true,
+    "uses_output_artifact_gate": true,
+    "uses_sanitize_download_name": true,
+    "uses_new_artifact_id": true
+  },
+  "result": {
+    "exists": true
+  },
+  "js_functions_preserved": {
+    "downloadBlob": true,
+    "downloadRawBlob": true,
+    "downloadDraftJson": true,
+    "outputArtifactSanitizeName": true,
+    "outputArtifactRawPathGuard": true
+  },
+  "handler_wiring": {
+    "editor_handler_wired_p9f_deferred": true
+  },
+  "gate_presence": {
+    "OutputArtifactGate": true
+  },
+  "finding_count": 0,
+  "findings": [],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_gate_logic_change": true,
+    "push_forbidden": true
+  }
+}

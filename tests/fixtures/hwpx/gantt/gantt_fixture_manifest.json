@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-05-17",
+  "task": "HWPX-GANTT-LIKE-FIXTURE-SELECTION-01",
+  "fixtures": [
+    {
+      "fixtureName": "fx_gantt_like_basic.hwpx",
+      "fileId": "f00068_2c8f293c31",
+      "sourceFileName": "03449_gamri_result_report_schedule_diagram_suite.hwpx",
+      "fixtureDecision": "SAFE_FOR_FIXTURE",
+      "privacyAssessment": "template_labels_only",
+      "ganttTableId": "s0:t0",
+      "rowCount": 7,
+      "colCount": 6,
+      "header": ["공종", "기간", "5월", "6월", "7월", "진척률"],
+      "barType": "text_full",
+      "barSample": "■■■■■",
+      "inputSlotCount": 0,
+      "description": "기본 갠트 — 5월 바 완전 채움(■+·), 진척률 명시"
+    },
+    {
+      "fixtureName": "fx_gantt_like_template_empty.hwpx",
+      "fileId": "f00069_ecee83e8bb",
+      "sourceFileName": "03450_gamri_result_report_schedule_diagram_suite_v2.hwpx",
+      "fixtureDecision": "SAFE_FOR_FIXTURE",
+      "privacyAssessment": "template_labels_only",
+      "ganttTableId": "s0:t0",
+      "rowCount": 7,
+      "colCount": 6,
+      "header": ["공종", "기간", "5월", "6월", "7월", "진척률"],
+      "barType": "empty",
+      "barSample": "",
+      "inputSlotCount": 18,
+      "description": "빈 갠트 서식 — 바 셀 전부 비어있음, input slot 탐지 대상"
+    },
+    {
+      "fixtureName": "fx_gantt_like_partial_filled.hwpx",
+      "fileId": "f00071_96a226f359",
+      "sourceFileName": "03457_gamri_result_report_work_schedule_front_manifest_fixed.hwpx",
+      "fixtureDecision": "SAFE_FOR_FIXTURE",
+      "privacyAssessment": "template_labels_only",
+      "ganttTableId": "s0:t5",
+      "rowCount": 7,
+      "colCount": 6,
+      "header": ["공종", "기간", "5월", "6월", "7월", "진척률"],
+      "barType": "text_partial",
+      "barSample": "■■■■■",
+      "inputSlotCount": 12,
+      "description": "부분 채움 갠트 — 5월 바만 채움, 6·7월 비어있음"
+    }
+  ]
+}

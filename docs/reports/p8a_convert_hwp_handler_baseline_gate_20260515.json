@@ -1,0 +1,79 @@
+{
+  "task": "OFFICE-ANALYSIS-P8A-CONVERT-HWP-HANDLER-BASELINE-AND-GATE-CONNECT",
+  "baseline": {
+    "head": "32c41460b8e1c1ff1cbacc6d832d582c07b8f4ac",
+    "branch": "main",
+    "hooksPath": "scripts/hooks",
+    "trackedDirtyAtStart": 35,
+    "stagedAtStart": 0,
+    "untrackedStatusEntriesAtStart": 121,
+    "deletedAtStart": 0,
+    "workingTreeKnownPrefixQuotedLiteralCount": 0,
+    "push": "not_run"
+  },
+  "handler": {
+    "path": "src/main/java/com/haehan/engine/http/ConvertHwpToHwpxHandler.java",
+    "classification": "BASELINE_CANDIDATE",
+    "package": "com.haehan.engine.http",
+    "type": "HttpHandler",
+    "endpointPath": "/convert-hwp-to-hwpx",
+    "registryConnectionVisibleInWorkingTree": true,
+    "registryConnectionCommittedInP8A": false,
+    "registryConnectionCommitDeferredReason": "EngineHttpServer.java is pre-existing tracked dirty content and is outside the safe P8A commit scope",
+    "apiResponseKeysChanged": false,
+    "endpointPathChanged": false
+  },
+  "dependencies": {
+    "includedForCleanCompile": [
+      "src/main/java/com/haehan/engine/hwp/HwpToHwpxCliBridge.java",
+      "src/main/java/com/haehan/engine/hwp/HwpToHwpxRouterBridge.java",
+      "src/main/java/com/haehan/engine/hwp/PythonScriptBridge.java"
+    ],
+    "reason": "ConvertHwpToHwpxHandler directly imports the hwp bridge package"
+  },
+  "gateConnection": {
+    "gate": "ExecutionLocationGate",
+    "hwpHancomConversionLocation": "LOCAL_WORKER_REQUIRED",
+    "serverDirectConversionDefault": "blocked",
+    "localWorkerRequestHeader": "X-Remote-Worker-Request",
+    "remoteWorkerProviderForwarding": "preserved",
+    "remoteWorkerLoopBlocked": true,
+    "newHeaders": [
+      "X-Execution-Location-Gate",
+      "X-Required-Execution-Location"
+    ]
+  },
+  "security": {
+    "actualHancomHwpExecutionAdded": false,
+    "externalBrowserExecution": false,
+    "dbWrite": false,
+    "schemaChange": false,
+    "secretValuePrinted": false,
+    "knownPrefixQuotedLiteralCount": 0
+  },
+  "tests": {
+    "convertHandlerTest": "PASS",
+    "p1ToP7AuditTests": "PASS",
+    "gradlewTasks": "PASS",
+    "gradlewTest": "PASS",
+    "secretScan": "PASS_ZERO"
+  },
+  "commitCandidates": [
+    "src/main/java/com/haehan/engine/http/ConvertHwpToHwpxHandler.java",
+    "src/main/java/com/haehan/engine/hwp/HwpToHwpxCliBridge.java",
+    "src/main/java/com/haehan/engine/hwp/HwpToHwpxRouterBridge.java",
+    "src/main/java/com/haehan/engine/hwp/PythonScriptBridge.java",
+    "src/test/java/com/haehan/engine/http/ConvertHwpToHwpxHandlerTest.java",
+    "src/test/java/com/haehan/engine/hwp/HwpToHwpxCliBridgeTest.java",
+    "docs/reports/p8a_convert_hwp_handler_baseline_gate_20260515.md",
+    "docs/reports/p8a_convert_hwp_handler_baseline_gate_20260515.json"
+  ],
+  "deferred": [
+    "EngineHttpServer.java registry connection commit",
+    "HwpxUploadHandler gate direct connection",
+    "InspectionPageHandler output gate connection",
+    "API meta contract consistency",
+    "raw path output artifact policy"
+  ],
+  "finalDecision": "WARN"
+}

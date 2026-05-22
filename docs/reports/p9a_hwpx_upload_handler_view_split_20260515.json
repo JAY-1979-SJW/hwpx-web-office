@@ -1,0 +1,75 @@
+{
+  "report": "p9a_hwpx_upload_handler_view_split",
+  "phase": "P9A",
+  "date": "2026-05-15",
+  "base_head": "9b0652e99be968976af13edb4a5be6d0b4812890",
+  "split": {
+    "handler_lines_before": 3044,
+    "handler_lines_after": 27,
+    "view_lines": 3024,
+    "new_files": [
+      "src/main/java/com/haehan/engine/http/HwpxUploadPageView.java",
+      "src/test/java/com/haehan/engine/http/HwpxUploadPageViewTest.java"
+    ]
+  },
+  "responsibilities_moved_to_view": [
+    "PAGE_HTML_HEAD (HTML+CSS)",
+    "PAGE_HTML_SCRIPT_1-4 (JavaScript)",
+    "uploadGatePolicyScript()",
+    "gateResultJson() / jsString()",
+    "pageHtml()",
+    "all gate static fields"
+  ],
+  "responsibilities_kept_in_handler": [
+    "HTTP GET endpoint handle()",
+    "405 method not allowed response",
+    "HwpxUploadPageView.PAGE_HTML reference"
+  ],
+  "gate_locations": {
+    "FileTypeGate": "HwpxUploadPageView",
+    "UploadSecurityGate": "HwpxUploadPageView",
+    "ExecutionLocationGate": "HwpxUploadPageView",
+    "OutputArtifactGate": "HwpxUploadPageView",
+    "all_gates_maintained": true
+  },
+  "endpoint_paths": {
+    "hwpx_editor": "/hwpx-editor",
+    "hwpx_upload": "/hwpx-upload",
+    "all_unchanged": true
+  },
+  "api_response_keys": {
+    "error_key_preserved": true,
+    "method_not_allowed_preserved": true
+  },
+  "test_results": {
+    "audit_hwpx_upload_handler_split_readiness": "WARN",
+    "test_hwpx_upload_handler_split_readiness": "7 PASS",
+    "audit_handler_gate_runtime_connections": "WARN",
+    "test_handler_gate_runtime_connections": "5 PASS",
+    "test_large_handler_gate_connections": "2 PASS",
+    "p1_p8i_audit_tests": "8 PASS",
+    "HwpxUploadPageViewTest": "6 PASS",
+    "gradlew_tasks": "BUILD SUCCESSFUL",
+    "gradlew_test": "BUILD SUCCESSFUL",
+    "secret_scan": "CLEAR"
+  },
+  "remaining_warn": [
+    "tracked_dirty_large_handler",
+    "raw_path_candidate_guarded",
+    "convert_handler_has_preexisting_gate_signals",
+    "inspection_large_handler_deferred"
+  ],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_gate_logic_change": true,
+    "no_hwp_hancom_direct_execution": true,
+    "no_db_write": true,
+    "no_external_browser": true,
+    "no_local_gui_change": true,
+    "no_dockerfile_change": true,
+    "push_forbidden": true
+  },
+  "next_phase": "P9B: HwpxUploadPageView JS 분리 또는 다음 도메인 handler gate 연결",
+  "verdict": "PASS"
+}

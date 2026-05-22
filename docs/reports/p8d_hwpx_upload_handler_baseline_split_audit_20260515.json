@@ -1,0 +1,103 @@
+{
+  "task": "OFFICE-ANALYSIS-P8D-HWPX-UPLOAD-HANDLER-BASELINE-SPLIT-AUDIT",
+  "baseline": {
+    "head": "3aa5c19d0bdb66a334fad366449d3cc4e454585a",
+    "branch": "main",
+    "hooksPath": "scripts/hooks",
+    "trackedDirtyAtStart": 35,
+    "stagedAtStart": 0,
+    "untrackedStatusEntriesAtStart": 120,
+    "deletedAtStart": 0,
+    "knownPrefixQuotedLiteralCount": 0,
+    "push": "not_run"
+  },
+  "handler": {
+    "path": "src/main/java/com/haehan/engine/http/HwpxUploadHandler.java",
+    "status": "tracked_dirty",
+    "lines": 2895,
+    "diffInsertions": 2776,
+    "diffDeletions": 327,
+    "bodyCommittedInP8D": false,
+    "endpointPaths": [
+      "/hwpx-editor",
+      "/hwpx-upload"
+    ],
+    "responsibilities": [
+      "html_page_response",
+      "browser_hwpx_editor_ui",
+      "hwpx_upload_parse_flow",
+      "hwp_upload_conversion_flow",
+      "api_hwpx_parse_call",
+      "api_hwpx_editor_call",
+      "convert_hwp_to_hwpx_call",
+      "download_blob_flow",
+      "raw_report_export",
+      "draft_json_export",
+      "filename_sanitize_candidate"
+    ]
+  },
+  "gateCandidates": {
+    "FileTypeGate": [
+      "file input accept",
+      ".hwpx/.hwp branch",
+      "selectFile parse flow"
+    ],
+    "UploadSecurityGate": [
+      "filename header",
+      "asciiSafeFileName",
+      "upload size and filename validation candidate"
+    ],
+    "ExecutionLocationGate": [
+      ".hwp detection",
+      "/convert-hwp-to-hwpx call",
+      "X-Conversion-Gate handling"
+    ],
+    "OutputArtifactGate": [
+      "downloadBlob",
+      "downloadRawBlob",
+      "draft/report export",
+      "URL.createObjectURL"
+    ]
+  },
+  "audit": {
+    "script": "scripts/audit_hwpx_upload_handler_split_readiness.py",
+    "test": "tests/test_hwpx_upload_handler_split_readiness.py",
+    "status": "WARN",
+    "findingCount": 9,
+    "recommendedNextHunks": [
+      "file_type_upload_gate",
+      "hwp_conversion_execution_gate",
+      "download_output_artifact_gate"
+    ]
+  },
+  "tests": {
+    "p8dAuditScript": "PASS_WITH_WARN_STATUS",
+    "p8dAuditTest": "PASS",
+    "handlerGateRuntimeAudit": "PASS_WITH_WARN_STATUS",
+    "p1ToP8CAuditTests": "PASS",
+    "gradlewTasks": "PASS",
+    "gradlewTest": "PASS",
+    "secretScan": "PASS_ZERO"
+  },
+  "security": {
+    "secretValuePrinted": false,
+    "dbWrite": false,
+    "schemaChange": false,
+    "externalBrowserExecution": false,
+    "hwpHancomDirectExecutionAdded": false,
+    "endpointPathChanged": false,
+    "apiResponseKeyChanged": false
+  },
+  "remainingWarn": [
+    "HwpxUploadHandler remains tracked dirty large handler",
+    "gate direct connections are not yet present",
+    "hwp conversion UI flow requires ExecutionLocationGate hunk",
+    "download/report export flow requires OutputArtifactGate hunk",
+    "HTML/UI and orchestration split remains P9+ candidate"
+  ],
+  "nextStep": {
+    "recommendation": "A",
+    "target": "P8E file_type_upload_gate hunk split readiness"
+  },
+  "finalDecision": "WARN"
+}

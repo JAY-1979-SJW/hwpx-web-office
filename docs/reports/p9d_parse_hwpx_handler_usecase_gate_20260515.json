@@ -1,0 +1,61 @@
+{
+  "report": "p9d_parse_hwpx_handler_usecase_gate",
+  "phase": "P9D",
+  "date": "2026-05-15",
+  "base_head": "ac85ddf481d3c9f1832598bbc6e8f3ac448bbf26",
+  "handler_change": {
+    "file": "src/main/java/com/haehan/engine/http/ParseHwpxHandler.java",
+    "lines_before": 99,
+    "lines_after": 103,
+    "usecase_wired": true,
+    "injectable_parser": true,
+    "removed": ["direct HwpxParser instantiation", "direct temp file management", "direct body streaming"]
+  },
+  "status_code_mapping": {
+    "FILE_TYPE_GATE_rejected": 415,
+    "UPLOAD_SECURITY_GATE_UPLOAD_TOO_LARGE": 413,
+    "UPLOAD_SECURITY_GATE_other": 400,
+    "PARSE_ERROR": 500,
+    "PASS_ok_true": 200,
+    "PASS_ok_false": 400
+  },
+  "api_contract": {
+    "endpoint_path": "/parse-hwpx",
+    "error_key_preserved": true,
+    "success_response_structure_preserved": true,
+    "method_not_allowed_preserved": true
+  },
+  "audit_result": {
+    "status": "PASS",
+    "finding_count": 0
+  },
+  "test_results": {
+    "ParseHwpxHandlerTest_gate_rejection_cases": "4 new PASS (unknownExt 415, hwp 415, pathTraversal 400, emptyBody 400)",
+    "ParseHwpxHandlerTest_existing": "all preserved PASS",
+    "HwpxUploadParseUseCaseTest": "8 PASS",
+    "test_parse_hwpx_handler_usecase_gate": "6 PASS",
+    "test_hwpx_upload_handler_split_readiness": "9 PASS",
+    "test_handler_gate_runtime_connections": "5 PASS",
+    "all_python_tests": "29 PASS (1 pre-existing FAIL: test_p8e, not P9D-introduced)",
+    "gradlew_test": "BUILD SUCCESSFUL",
+    "secret_scan": "CLEAR"
+  },
+  "remaining_warn": [
+    "raw_path_candidate_guarded",
+    "convert_handler_has_preexisting_gate_signals",
+    "inspection_large_handler_deferred"
+  ],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_gate_logic_change": true,
+    "no_hwp_hancom_direct_execution": true,
+    "no_db_write": true,
+    "no_external_browser": true,
+    "no_local_gui_change": true,
+    "no_dockerfile_change": true,
+    "push_forbidden": true
+  },
+  "next_phase": "P9E: download/export usecase 분리 또는 ConvertHwpToHwpxHandler gate 정규화",
+  "verdict": "PASS"
+}

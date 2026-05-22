@@ -1,0 +1,71 @@
+{
+  "report": "p8i_hwpx_upload_output_artifact_gate",
+  "phase": "P8I",
+  "date": "2026-05-15",
+  "base_head": "52da821c9de73ebf90cd452e1523541cf51d8cb1",
+  "output_artifact_gate": {
+    "import_added": true,
+    "static_field": "HWPX_DOWNLOAD_ARTIFACT_GATE = OutputArtifactGate.validateResponseReference(\"hwpx.artifact\")",
+    "js_policy_key": "uploadGatePolicy.outputArtifact.downloadGate",
+    "sanitize_helper": "outputArtifactSanitizeName",
+    "raw_path_guard": "outputArtifactRawPathGuard"
+  },
+  "download_flow": {
+    "downloadBlob": "existing .hwpx extension enforcement maintained",
+    "downloadRawBlob": "outputArtifactSanitizeName applied to name",
+    "downloadDraftJson": "hardcoded safe name unchanged",
+    "report_exports": "sanitize applied via downloadRawBlob"
+  },
+  "raw_path_handling": {
+    "x_hwpx_editor_saved_path": "guarded by outputArtifactRawPathGuard",
+    "raw_path_direct_log": "blocked - replaced with [artifact] or [artifact: raw-path-guarded]",
+    "raw_path_response_policy": "WARN"
+  },
+  "endpoint_paths": {
+    "hwpx_editor": "/hwpx-editor",
+    "hwpx_upload": "/hwpx-upload",
+    "convert_hwp_to_hwpx": "/convert-hwp-to-hwpx",
+    "api_hwpx_parse": "/api/hwpx/parse",
+    "api_hwpx_editor": "/api/hwpx/editor",
+    "all_unchanged": true
+  },
+  "test_results": {
+    "audit_hwpx_upload_handler_split_readiness": "WARN",
+    "test_hwpx_upload_handler_split_readiness": "6 PASS",
+    "audit_handler_gate_runtime_connections": "WARN",
+    "test_handler_gate_runtime_connections": "3 PASS",
+    "test_large_handler_gate_connections": "2 PASS",
+    "test_api_upload_download_gate_audit": "PASS",
+    "test_integrated_usecase_boundary_audit": "PASS",
+    "test_hwpx_engine_boundary_audit": "PASS",
+    "test_excel_statement_boundary_audit": "PASS",
+    "test_layer_boundary_audit": "PASS",
+    "test_import_cycle_audit": "PASS",
+    "test_execution_location_gate_audit": "PASS",
+    "test_upload_file_gate_audit": "PASS",
+    "gradlew_tasks": "BUILD SUCCESSFUL",
+    "gradlew_test": "BUILD SUCCESSFUL",
+    "secret_scan": "CLEAR"
+  },
+  "remaining_warn": [
+    "tracked_dirty_large_handler",
+    "large_handler",
+    "raw_path_candidate_guarded"
+  ],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_hwp_hancom_direct_execution": true,
+    "no_db_write": true,
+    "no_external_browser": true,
+    "no_filetype_gate_rewrite": true,
+    "no_upload_security_gate_rewrite": true,
+    "no_execution_location_gate_rewrite": true,
+    "no_hwpx_engine_large_change": true,
+    "no_local_gui_change": true,
+    "no_dockerfile_change": true,
+    "push_forbidden": true
+  },
+  "next_phase": "P9 / P8J: HwpxUploadHandler 1차 분리 또는 다음 도메인 이동",
+  "verdict": "PASS"
+}

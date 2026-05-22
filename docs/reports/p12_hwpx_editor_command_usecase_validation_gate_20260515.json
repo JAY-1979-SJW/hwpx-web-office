@@ -1,0 +1,71 @@
+{
+  "phase": "P12",
+  "task": "OFFICE-ANALYSIS-P12-HWPX-EDITOR-COMMAND-USECASE-AND-VALIDATION-GATE",
+  "date": "2026-05-15",
+  "baseline_head": "360f6ea",
+  "status": "PASS",
+  "summary": "HwpxEditorCommand contract, HwpxEditorValidationGate, HwpxEditorCommandUseCase, HwpxEditorCommandResult Java 구현 완료. 단위 테스트 PASS. audit PASS.",
+  "new_files": [
+    "src/main/java/com/haehan/engine/contract/HwpxEditorCommand.java",
+    "src/main/java/com/haehan/engine/gate/HwpxEditorValidationGate.java",
+    "src/main/java/com/haehan/engine/gate/HwpxEditorValidationResult.java",
+    "src/main/java/com/haehan/engine/usecase/HwpxEditorCommandUseCase.java",
+    "src/main/java/com/haehan/engine/usecase/HwpxEditorCommandResult.java",
+    "src/test/java/com/haehan/engine/gate/HwpxEditorValidationGateTest.java",
+    "src/test/java/com/haehan/engine/usecase/HwpxEditorCommandUseCaseTest.java",
+    "src/test/java/com/haehan/engine/contract/HwpxEditorCommandTest.java"
+  ],
+  "supported_commands": {
+    "mvp": ["replaceText", "replacePlaceholder", "updateParagraph", "updateTableCell", "addTableRow", "deleteTableRow", "validateDocument"],
+    "post_mvp_warn": ["replaceImage", "insertChart", "updateCellStyle", "saveDocument", "exportHwpx"]
+  },
+  "validation_rules": {
+    "UNKNOWN_COMMAND_TYPE": "FAIL",
+    "NULL_COMMAND": "FAIL",
+    "MISSING_COMMAND_TYPE": "FAIL",
+    "MISSING_ARTIFACT_ID": "FAIL (except validateDocument)",
+    "MISSING_TARGET": "FAIL (for structural commands)",
+    "MISSING_PAYLOAD": "FAIL (for content commands)",
+    "FORBIDDEN_KEY_IN_COMMAND": "FAIL (secret/token/password/cookie/session/auth)",
+    "RAW_PATH_IN_COMMAND": "FAIL (unix path, windows path, path traversal, zip/xml entry)",
+    "POST_MVP_COMMAND": "WARN",
+    "COMMAND_WARN": "WARN (missing expectedVersion for destructive)"
+  },
+  "usecase_p12_scope": {
+    "validate_command": true,
+    "dry_run_result": true,
+    "apply_deferred_skeleton": true,
+    "actual_hwpx_engine_apply": false,
+    "actual_engine_wiring": "P13"
+  },
+  "constraints_observed": {
+    "usecase_no_http_import": true,
+    "gate_no_side_effects": true,
+    "gate_no_file_io": true,
+    "gate_no_network": true,
+    "gate_no_hwpx_modification": true,
+    "endpoint_path_unchanged": true,
+    "api_response_key_unchanged": true,
+    "push_forbidden": true,
+    "db_write_forbidden": true,
+    "secret_scan": "0건"
+  },
+  "test_results": {
+    "HwpxEditorValidationGateTest": "27 cases PASS",
+    "HwpxEditorCommandUseCaseTest": "9 cases PASS",
+    "HwpxEditorCommandTest": "4 cases PASS",
+    "pytest_hwpx_browser_editor_structure": "19/19 PASS",
+    "pytest_api_meta_contract": "9/9 PASS",
+    "audit_new_code_structure_rules": "PASS",
+    "audit_hwpx_browser_editor_structure": "PASS",
+    "gradle_test": "BUILD SUCCESSFUL (1m 52s)",
+    "existing_unrelated_failure": {
+      "file": "tests/test_hwpx_upload_filetype_gate_hunk.py",
+      "reason": "P8E 시점 스냅샷 감사 스크립트, P12와 무관",
+      "severity": "WARN (기존 미해결)"
+    }
+  },
+  "next_phase": {
+    "P13": "browser editor UI — /hwpx-editor 확장, command dispatch 연결, HwpxEditorCommandUseCase 실제 wiring"
+  }
+}

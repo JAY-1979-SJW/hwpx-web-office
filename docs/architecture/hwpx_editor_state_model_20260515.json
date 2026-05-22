@@ -1,0 +1,35 @@
+{
+  "document": "hwpx_editor_state_model",
+  "phase": "P11A",
+  "date": "2026-05-15",
+  "editor_state": {
+    "phases": ["IDLE", "UPLOADED", "EDITING", "SAVING", "DONE", "ERROR"],
+    "transitions": [
+      {"from": "IDLE", "trigger": "file_select", "to": "UPLOADED"},
+      {"from": "UPLOADED", "trigger": "parse_hwpx_ok", "to": "EDITING"},
+      {"from": "UPLOADED", "trigger": "gate_reject_or_error", "to": "ERROR"},
+      {"from": "EDITING", "trigger": "add_command", "to": "EDITING"},
+      {"from": "EDITING", "trigger": "dry_run_request", "to": "EDITING"},
+      {"from": "EDITING", "trigger": "save_request", "to": "SAVING"},
+      {"from": "EDITING", "trigger": "reset", "to": "IDLE"},
+      {"from": "SAVING", "trigger": "editor_api_ok", "to": "DONE"},
+      {"from": "SAVING", "trigger": "error", "to": "ERROR"},
+      {"from": "DONE", "trigger": "continue_edit", "to": "EDITING"},
+      {"from": "DONE", "trigger": "new_file", "to": "IDLE"},
+      {"from": "ERROR", "trigger": "retry", "to": "prev_phase"},
+      {"from": "ERROR", "trigger": "reset", "to": "IDLE"}
+    ],
+    "fields": ["phase", "filename", "artifactId", "docStructure", "pendingEdits", "draftReport", "lastError", "sessionId"]
+  },
+  "artifact_ref_fields": ["artifactId", "filename", "schemaVersion", "engineVersion", "requestId", "savedRef", "reportRef", "sha256", "timestamp"],
+  "session_policy": {
+    "server_stateless": true,
+    "browser_storage": "memory_or_sessionStorage",
+    "raw_path_in_browser": false,
+    "reload_resets_to_idle": true
+  },
+  "command_types": [
+    "paragraph_edit", "cell_edit", "row_add", "row_delete",
+    "placeholder_fill", "fill_cells", "schedule_graph"
+  ]
+}

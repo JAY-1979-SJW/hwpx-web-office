@@ -1,0 +1,57 @@
+{
+  "document": "hwpx_editor_ui_state_policy",
+  "phase": "P12B",
+  "date": "2026-05-15",
+  "phases": [
+    "IDLE", "UPLOADING", "UPLOADED", "PARSING",
+    "READY", "EDITING", "VALIDATING", "DRY_RUN",
+    "SAVING", "EXPORTED", "ERROR"
+  ],
+  "button_active_phases": {
+    "Validate": ["READY", "EDITING"],
+    "Dry Run": ["READY", "EDITING"],
+    "Save": ["EDITING"],
+    "Download": ["EXPORTED"],
+    "Reset": ["READY", "EDITING", "ERROR"]
+  },
+  "api_allowed_phases": {
+    "POST /parse-hwpx": ["UPLOADING"],
+    "POST /api/hwpx/editor (dry-run)": ["READY", "EDITING", "DRY_RUN"],
+    "POST /api/hwpx/editor (apply)": ["SAVING"],
+    "POST /api/hwpx/editor (validate)": ["VALIDATING"]
+  },
+  "command_dispatch_allowed": ["READY", "EDITING"],
+  "principles": {
+    "ui_state_not_hwpx_state": true,
+    "source_of_truth": "server_side_artifactId",
+    "browser_storage": "memory_or_sessionStorage",
+    "server_stateless": true,
+    "reload_resets": "IDLE",
+    "artifact_display": "first_8_chars",
+    "raw_path_display": false
+  },
+  "transitions": [
+    {"from": "IDLE", "trigger": "file_selected", "to": "UPLOADING"},
+    {"from": "UPLOADING", "trigger": "gate_pass", "to": "PARSING"},
+    {"from": "UPLOADING", "trigger": "gate_fail", "to": "ERROR"},
+    {"from": "PARSING", "trigger": "parse_ok", "to": "READY"},
+    {"from": "PARSING", "trigger": "parse_fail", "to": "ERROR"},
+    {"from": "READY", "trigger": "block_edit", "to": "EDITING"},
+    {"from": "READY", "trigger": "validate_click", "to": "VALIDATING"},
+    {"from": "READY", "trigger": "dry_run_click", "to": "DRY_RUN"},
+    {"from": "EDITING", "trigger": "save_click", "to": "SAVING"},
+    {"from": "EDITING", "trigger": "validate_click", "to": "VALIDATING"},
+    {"from": "EDITING", "trigger": "dry_run_click", "to": "DRY_RUN"},
+    {"from": "EDITING", "trigger": "reset_click", "to": "READY"},
+    {"from": "VALIDATING", "trigger": "result_received", "to": "EDITING"},
+    {"from": "VALIDATING", "trigger": "error", "to": "ERROR"},
+    {"from": "DRY_RUN", "trigger": "result_received", "to": "EDITING"},
+    {"from": "DRY_RUN", "trigger": "error", "to": "ERROR"},
+    {"from": "SAVING", "trigger": "success", "to": "EXPORTED"},
+    {"from": "SAVING", "trigger": "fail", "to": "ERROR"},
+    {"from": "EXPORTED", "trigger": "continue_edit", "to": "EDITING"},
+    {"from": "EXPORTED", "trigger": "new_file", "to": "IDLE"},
+    {"from": "ERROR", "trigger": "retry", "to": "prev_phase"},
+    {"from": "ERROR", "trigger": "reset", "to": "IDLE"}
+  ]
+}

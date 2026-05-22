@@ -1,0 +1,377 @@
+{
+  "validation_date": "2026-05-07",
+  "phase": "P1F-ALL",
+  "task": "HWPX-READER-P1F-ALL-SAMPLE-DEEP-VALIDATION",
+  "mime_type_fix": {
+    "issue": "Initial validation failed due to strict MIME type check",
+    "root_cause": "Real Hancom HWPX files use 'application/hwp+zip', test fixtures use 'application/vnd.hancom.hwpml'",
+    "fix_applied": "Extended isValidHwpx() to accept both MIME types",
+    "commit_ref": "TBD (after fix testing)"
+  },
+  "overall_validation": {
+    "total_samples": 27,
+    "all_passed": true,
+    "passed_count": 27,
+    "failed_count": 0,
+    "pass_rate": "100%",
+    "key_metrics": {
+      "average_fullText_length": 6920,
+      "average_blocks": 7,
+      "average_paragraphs": 7,
+      "average_tables": 0
+    }
+  },
+  "per_sample_analysis": [
+    {
+      "filename": "[별지 10] 레미콘(아스콘) 공장 정기점검  결과 보고(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 207,
+      "paragraphs_count": 7,
+      "blocks_count": 7,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 11] 레미콘 시공품질관리 점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 571,
+      "paragraphs_count": 8,
+      "blocks_count": 8,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 12] 아스콘 시공품질관리 점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 511,
+      "paragraphs_count": 7,
+      "blocks_count": 7,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 13] 불량자재폐기 확약서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 371,
+      "paragraphs_count": 10,
+      "blocks_count": 10,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 13의2] 철강 자재 점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 1737,
+      "paragraphs_count": 6,
+      "blocks_count": 6,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 14] 실태조사 신청서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 558,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 1] 품질관리계획서 검토·승인서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 11224,
+      "paragraphs_count": 14,
+      "blocks_count": 14,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 2] 품질관리 적절성 확인점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 12450,
+      "paragraphs_count": 3,
+      "blocks_count": 3,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 3] 품질검사를 대행하는 건설엔지니어링사업자 평가계획서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 416,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 4] 청렴서약 및 이해관계확인서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 1090,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 5] 품질검사를 대행하는 건설엔지니어링사업자 평가보고서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 686,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 6] 품질검사를 대행하는 건설엔지니어링사업자 부적합보고서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 476,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 7] 품질검사를 대행하는 건설엔지니어링사업자 확인보고서(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 494,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 8] 레미콘공장 사전(정기)점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 4342,
+      "paragraphs_count": 11,
+      "blocks_count": 11,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별지 9] 아스콘공장 사전(정기) 점검표(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 3214,
+      "paragraphs_count": 5,
+      "blocks_count": 5,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 10] 철강구조물 제작공장 인증의 세부기준(제46조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 7253,
+      "paragraphs_count": 11,
+      "blocks_count": 11,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 11] 철강구조물 제작공장 실태조사 세부기준(제72조제2항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 298,
+      "paragraphs_count": 4,
+      "blocks_count": 4,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 12] 철강구조물 제작공장 인증업무의 인력편성(제52조 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 602,
+      "paragraphs_count": 4,
+      "blocks_count": 4,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 1] 품질관리계획서 작성기준(제7조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 12185,
+      "paragraphs_count": 3,
+      "blocks_count": 3,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 2] 건설공사 품질시험기준(제8조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 39045,
+      "paragraphs_count": 41,
+      "blocks_count": 41,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 3] 품질관리 적절성 확인기준 및 요령(제10조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 10564,
+      "paragraphs_count": 3,
+      "blocks_count": 3,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 4] 품질시험비 산출 단위량 기준(제9조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 68566,
+      "paragraphs_count": 38,
+      "blocks_count": 38,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 5] 품질관리규정 작성기준(제13조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 2009,
+      "paragraphs_count": 2,
+      "blocks_count": 2,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 6] 품질검사를 대행하는 건설엔지니어링사업자 시험장비 보유기준 (제16조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 4995,
+      "paragraphs_count": 4,
+      "blocks_count": 4,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 7] 소요인원 및 평가일수(제19조제1항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 290,
+      "paragraphs_count": 5,
+      "blocks_count": 5,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 8] 평가사 자격기준(제28조제2항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 481,
+      "paragraphs_count": 4,
+      "blocks_count": 4,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    },
+    {
+      "filename": "[별표 9] 혼화재를 사용한 레미콘의 품질관리(제38조제2항 관련)(건설공사 품질관리 업무지침).hwpx",
+      "fullText_length": 2224,
+      "paragraphs_count": 5,
+      "blocks_count": 5,
+      "tables_count": 0,
+      "ok": true,
+      "quality_assessment": {
+        "text_extracted": "✅",
+        "has_structure": "✅",
+        "complex_document": "⚠️ (text only)"
+      }
+    }
+  ]
+}

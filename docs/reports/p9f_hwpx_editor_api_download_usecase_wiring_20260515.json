@@ -1,0 +1,70 @@
+{
+  "phase": "P9F",
+  "date": "2026-05-15",
+  "baseline_head": "e0a8acaa97f34a5a74c7096f41f393fd21bfa55a",
+  "title": "HwpxEditorApiHandler Download Export Usecase Wiring",
+  "verdict": "PASS",
+  "usecase_wiring": {
+    "call_site": "HwpxEditorApiHandler.handle() after archive creation, before response headers",
+    "method": "HwpxDownloadExportUseCase.prepare(outputName, artifactRef)",
+    "artifact_ref_source": "archive.outputPath().toString() or empty string when no archive"
+  },
+  "result_mapping": {
+    "PASS": "success flow maintained, X-Hwpx-Editor-Saved-Path = archive path",
+    "RAW_PATH_GUARDED": "success flow maintained, X-Hwpx-Editor-Saved-Path = artifactId (raw path not exposed)",
+    "GATE_REJECTED": "no archive case, success flow maintained, no Saved-Path header"
+  },
+  "api_preservation": {
+    "endpoint_path": "/api/hwpx/editor (unchanged)",
+    "http_method": "POST (unchanged)",
+    "error_keys": "error, message (unchanged)",
+    "X-Hwpx-Editor-Status": "unchanged",
+    "X-Hwpx-Editor-Report": "unchanged",
+    "X-Hwpx-Editor-Saved-Path": "key unchanged, value now artifact ID when RAW_PATH_GUARDED",
+    "X-Hwpx-Editor-Saved-Report-Path": "unchanged",
+    "X-Hwpx-Editor-Saved-Sha256": "unchanged",
+    "X-Hwpx-Editor-Artifact-Id": "new header added",
+    "content_type_owpml": "unchanged"
+  },
+  "gate_status": {
+    "OutputArtifactGate_policy_changed": false,
+    "raw_path_guard_active": true,
+    "handler_direct_gate_bypass": false
+  },
+  "test_results": {
+    "java_total": 335,
+    "java_failed": 0,
+    "java_build": "SUCCESSFUL",
+    "python_audit_status": "PASS",
+    "python_tests_failed": 0
+  },
+  "changed_files": [
+    "src/main/java/com/haehan/engine/http/HwpxEditorApiHandler.java",
+    "src/test/java/com/haehan/engine/http/HwpxEditorApiHandlerTest.java",
+    "scripts/audit_hwpx_download_export_usecase.py",
+    "tests/test_hwpx_download_export_usecase.py"
+  ],
+  "remaining_warns": [
+    "WARN raw_path_candidate_guarded (upload handler split audit) - pre-existing",
+    "WARN convert_handler_has_preexisting_gate_signals - pre-existing",
+    "WARN inspection_large_handler_deferred - pre-existing",
+    "Python FAIL test_p8e_reports_hunk_split_decision - pre-existing"
+  ],
+  "forbidden_actions": {
+    "push": false,
+    "db_write": false,
+    "schema_change": false,
+    "external_browser": false,
+    "secret_exposed": false,
+    "upload_parse_usecase_modified": false,
+    "endpoint_path_changed": false,
+    "api_response_key_changed": false,
+    "gate_behavior_changed": false,
+    "history_rewrite": false
+  },
+  "p10_recommendations": [
+    "Apply raw path guard to X-Hwpx-Editor-Saved-Report-Path header",
+    "API meta contract uniform application",
+    "Consider artifact registry for download tracking"
+  ]
+}

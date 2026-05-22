@@ -1,0 +1,79 @@
+{
+  "task": "OFFICE-ANALYSIS-P8E-HWPX-UPLOAD-FILETYPE-UPLOAD-GATE-HUNK",
+  "baseline": {
+    "head": "3681cc2fd684302b79e302d68081051c263b2ffe",
+    "branch": "main",
+    "hooksPath": "scripts/hooks",
+    "trackedDirtyAtStart": 35,
+    "stagedAtStart": 0,
+    "untrackedStatusEntriesAtStart": 121,
+    "deletedAtStart": 0,
+    "knownPrefixQuotedLiteralCount": 0,
+    "push": "not_run"
+  },
+  "handler": {
+    "path": "src/main/java/com/haehan/engine/http/HwpxUploadHandler.java",
+    "status": "tracked_dirty",
+    "headLines": 385,
+    "worktreeLines": 2895,
+    "diffInsertions": 2776,
+    "diffDeletions": 327,
+    "bodyModifiedInP8E": false,
+    "bodyCommittedInP8E": false
+  },
+  "hunkSplit": {
+    "possible": false,
+    "reason": "P8E upload gate candidate flow exists only in the large tracked dirty worktree body, not in the committed HEAD baseline",
+    "patchStagingUsedForHandler": false,
+    "handlerCommitDeferred": true
+  },
+  "gateConnection": {
+    "FileTypeGate": "deferred",
+    "UploadSecurityGate": "deferred",
+    "ExecutionLocationGate": "excluded",
+    "OutputArtifactGate": "excluded",
+    ".hwpx": "existing flow preserved, gate not connected",
+    ".hwp": "existing dirty flow preserved, gate not connected",
+    "unknown": "gate block not connected",
+    "pathTraversal": "gate block not connected",
+    "filename": "existing sanitize candidate observed",
+    "size": "gate check not connected"
+  },
+  "audit": {
+    "script": "scripts/audit_hwpx_upload_filetype_gate_hunk.py",
+    "test": "tests/test_hwpx_upload_filetype_gate_hunk.py",
+    "status": "WARN",
+    "hunkSplitPossible": false
+  },
+  "tests": {
+    "p8eAuditScript": "PASS_WITH_WARN_STATUS",
+    "p8eAuditTest": "PASS",
+    "p8dAuditScript": "PASS_WITH_WARN_STATUS",
+    "p8dAuditTest": "PASS",
+    "handlerGateRuntimeAudit": "PASS_WITH_WARN_STATUS",
+    "p1ToP8DAuditTests": "PASS",
+    "gradlewTasks": "PASS",
+    "gradlewTest": "PASS",
+    "secretScan": "PASS_ZERO"
+  },
+  "security": {
+    "secretValuePrinted": false,
+    "dbWrite": false,
+    "schemaChange": false,
+    "externalBrowserExecution": false,
+    "hwpHancomDirectExecutionAdded": false,
+    "endpointPathChanged": false,
+    "apiResponseKeyChanged": false
+  },
+  "remainingWarn": [
+    "HwpxUploadHandler remains tracked dirty large handler",
+    "FileTypeGate and UploadSecurityGate are not directly connected",
+    "P8E hunk cannot be safely staged without first separating the handler baseline",
+    "HWP conversion flow requires later ExecutionLocationGate hunk"
+  ],
+  "nextStep": {
+    "recommendation": "B",
+    "target": "HwpxUploadHandler baseline separation strategy"
+  },
+  "finalDecision": "WARN"
+}

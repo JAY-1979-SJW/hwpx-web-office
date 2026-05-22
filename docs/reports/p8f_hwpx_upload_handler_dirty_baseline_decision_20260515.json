@@ -1,0 +1,57 @@
+{
+  "task": "OFFICE-ANALYSIS-P8F-HWPX-UPLOAD-HANDLER-DIRTY-BASELINE-DECISION",
+  "baseline_head": "06463896e24376172ac800a4f08ccab9f1df00f5",
+  "branch": "main",
+  "target": "src/main/java/com/haehan/engine/http/HwpxUploadHandler.java",
+  "handler": {
+    "git_status": "M",
+    "lines": 2895,
+    "diff_numstat": {
+      "insertions": 2776,
+      "deletions": 327
+    }
+  },
+  "baseline_decision": {
+    "status": "BASELINE_WARN",
+    "commit_allowed": true,
+    "reason": "No FAIL-level secret, direct execution, external browser execution, DB write, endpoint contract, or API response key risk was detected."
+  },
+  "risk_checks": {
+    "endpoint_path_changed": false,
+    "api_response_key_changed": false,
+    "known_prefix_quoted_literal_count": 0,
+    "direct_hwp_hancom_execution": false,
+    "external_browser_execution": false,
+    "db_write": false,
+    "raw_path_candidate": true,
+    "path_traversal_candidate_requires_followup": true
+  },
+  "remaining_warn": [
+    "large_handler",
+    "hwp_conversion_ui_flow",
+    "file_type_gate_not_connected",
+    "upload_security_gate_not_connected",
+    "execution_location_gate_not_connected",
+    "output_artifact_gate_not_connected",
+    "raw_path_candidate"
+  ],
+  "tests": {
+    "p8f_audit_test": "PASS",
+    "p1_to_p8e_audit_tests": "PASS",
+    "gradlew_tasks": "PASS",
+    "gradlew_test": "PASS",
+    "secret_scan_known_prefix_quoted_literal": "PASS"
+  },
+  "commit_plan": {
+    "commit_hwpx_upload_handler": true,
+    "commit_message": "chore(baseline): capture hwpx upload handler dirty baseline",
+    "excluded": [
+      "Dockerfile",
+      "local-gui",
+      "other HWPX engine dirty files",
+      "untracked outputs",
+      "remote push"
+    ]
+  },
+  "final_status": "WARN"
+}

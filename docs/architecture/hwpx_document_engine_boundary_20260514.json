@@ -1,0 +1,55 @@
+{
+  "date": "2026-05-15",
+  "scope": "P3 HWPX document automation engine boundary",
+  "layers": {
+    "package": [
+      "ZIP read/write",
+      "manifest",
+      "metadata",
+      "section XML discovery",
+      "preview/bindata/media inventory",
+      "package inspection"
+    ],
+    "xml_edit": [
+      "paragraph",
+      "table",
+      "cell",
+      "row",
+      "style",
+      "image",
+      "chart"
+    ],
+    "template": [
+      "placeholder",
+      "template render",
+      "safety document builder",
+      "schedule builder",
+      "report builder"
+    ],
+    "validation": [
+      "package validation",
+      "XML validation",
+      "roundtrip validation",
+      "golden validation"
+    ],
+    "adapter": [
+      "filesystem",
+      "Java/Python bridge",
+      "local Hancom/HWP converter",
+      "external converter provider"
+    ]
+  },
+  "forbidden_coupling": [
+    "HWPX engine directly calling Excel parser internals",
+    "Excel engine directly calling HWPX internal XML writer",
+    "HWP/Hancom conversion directly running from server runtime without local worker gate",
+    "HWPX package editor directly coupling to local-gui",
+    "API handlers containing detailed HWPX XML manipulation",
+    "untested HWPX runtime changes"
+  ],
+  "execution_policy": {
+    "server_allowed": ["HWPX ZIP/XML editing", "package validation", "template rendering without local desktop dependencies"],
+    "local_worker_required": ["native HWP conversion", "Hancom GUI automation", "desktop app control"],
+    "user_present_required": ["password", "OTP", "certificate", "signature", "submission", "payment", "transfer", "bid"]
+  }
+}

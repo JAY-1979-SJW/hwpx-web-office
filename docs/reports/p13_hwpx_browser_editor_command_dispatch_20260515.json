@@ -1,0 +1,90 @@
+{
+  "audit": "hwpx_browser_editor_structure",
+  "phase": "P13",
+  "status": "PASS",
+  "arch_docs": {
+    "hwpx_browser_editor_product_scope_20260515.md": true,
+    "hwpx_browser_editor_product_scope_20260515.json": true,
+    "hwpx_editor_command_contract_20260515.md": true,
+    "hwpx_editor_command_contract_20260515.json": true,
+    "hwpx_editor_state_model_20260515.md": true,
+    "hwpx_editor_state_model_20260515.json": true,
+    "hwpx_editor_usecase_plan_20260515.md": true,
+    "hwpx_editor_usecase_plan_20260515.json": true
+  },
+  "editor_handlers": {
+    "HwpxEditorApiHandler.java": true,
+    "HwpxUploadHandler.java": true,
+    "ParseHwpxHandler.java": true
+  },
+  "usecases": {
+    "HwpxUploadParseUseCase.java": true,
+    "HwpxDownloadExportUseCase.java": true
+  },
+  "gates": {
+    "FileTypeGate.java": true,
+    "UploadSecurityGate.java": true,
+    "OutputArtifactGate.java": true,
+    "ExecutionLocationGate.java": true
+  },
+  "editor_endpoint_registered": true,
+  "upload_page_registered": true,
+  "exec_gate": {
+    "user_present_required_enforced": true,
+    "server_allowed_for_hwpx": true
+  },
+  "filetype_gate": {
+    "hwpx_allowed": true,
+    "hwp_not_server_pass": true
+  },
+  "p12": {
+    "usecases": {
+      "HwpxEditorCommandUseCase.java": true,
+      "HwpxEditorCommandResult.java": true
+    },
+    "gates": {
+      "HwpxEditorValidationGate.java": true,
+      "HwpxEditorValidationResult.java": true
+    },
+    "contracts": {
+      "HwpxEditorCommand.java": true
+    },
+    "usecase_no_http_import": true,
+    "gate_no_side_effects": true,
+    "gate_raw_path_check": true,
+    "gate_forbidden_key_check": true,
+    "command_type_coverage": {
+      "replaceText": true,
+      "replacePlaceholder": true,
+      "updateParagraph": true,
+      "updateTableCell": true,
+      "addTableRow": true,
+      "deleteTableRow": true,
+      "validateDocument": true
+    },
+    "command_in_contract_package": true
+  },
+  "p13": {
+    "build_editor_command": true,
+    "dispatch_editor_command": true,
+    "render_editor_command_result": true,
+    "validate_editor_document": true,
+    "dry_run_replace_text": true,
+    "dry_run_update_table_cell": true,
+    "command_result_panel": true,
+    "handler_wired_to_usecase": true,
+    "handler_wired_to_command": true,
+    "no_xml_zip_in_scripts": true,
+    "dry_run_default_true": true
+  },
+  "finding_count": 0,
+  "findings": [],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_existing_gate_change": true,
+    "no_browser_hwpx_direct_access": true,
+    "no_hancom_auto_run": true,
+    "push_forbidden": true,
+    "db_write_forbidden": true
+  }
+}

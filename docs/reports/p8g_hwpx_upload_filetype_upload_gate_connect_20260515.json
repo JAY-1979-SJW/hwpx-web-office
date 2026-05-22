@@ -1,0 +1,43 @@
+{
+  "task": "OFFICE-ANALYSIS-P8G-HWPX-UPLOAD-FILETYPE-UPLOAD-GATE-CONNECT",
+  "baseline_head": "44431ce4077e338fe2184bead9859ab7f48b0a54",
+  "branch": "main",
+  "target": "src/main/java/com/haehan/engine/http/HwpxUploadHandler.java",
+  "gate_connections": {
+    "FileTypeGate": "CONNECTED",
+    "UploadSecurityGate": "CONNECTED",
+    "ExecutionLocationGate": "EXCLUDED",
+    "OutputArtifactGate": "EXCLUDED"
+  },
+  "file_type_policy": {
+    "hwpx": "SERVER_ALLOWED",
+    "hwp": "LOCAL_WORKER_REQUIRED",
+    "unknown": "BLOCK"
+  },
+  "upload_security_policy": {
+    "path_traversal": "BLOCK",
+    "empty_filename": "BLOCK",
+    "unsafe_control_character": "BLOCK",
+    "size_limit": "UploadSecurityGate.DEFAULT_MAX_UPLOAD_BYTES"
+  },
+  "handler_contract": {
+    "endpoint_path_changed": false,
+    "api_response_key_changed": false,
+    "convert_hwp_to_hwpx_flow_changed": false,
+    "x_conversion_gate_changed": false
+  },
+  "tests": {
+    "p8g_audit_test": "PASS",
+    "p1_to_p8f_audit_tests": "PASS",
+    "gradlew_tasks": "PASS",
+    "gradlew_test": "PASS",
+    "known_prefix_quoted_literal": "PASS"
+  },
+  "remaining_warn": [
+    "large_handler",
+    "hwp_conversion_ui_flow_requires_execution_location_gate",
+    "output_artifact_gate_not_connected",
+    "raw_path_candidate"
+  ],
+  "final_status": "WARN"
+}

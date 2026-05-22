@@ -1,0 +1,130 @@
+{
+  "task": "OFFICE-ANALYSIS-P3-HWPX-DOCUMENT-ENGINE-BOUNDARY-LOCK",
+  "baseline": {
+    "head": "804031cd2d690f9b9838331b2d8e1815d464e844",
+    "branch": "main",
+    "push_performed": false,
+    "history_secret_risk": "USER_ACTION_REQUIRED",
+    "working_tree_known_prefix_quoted_literal_count": 0
+  },
+  "hwpx_locations": {
+    "package_layer": [
+      "scripts/hwpx/hwpx_package.py",
+      "scripts/hwpx/hwpx_manifest_ops.py",
+      "scripts/hwpx/hwpx_metadata_ops.py",
+      "scripts/hwpx/hwpx_package_audit.py",
+      "scripts/hwpx/hwpx_package_inspector.py",
+      "scripts/hwpx/hwp_full_fidelity_package.py"
+    ],
+    "xml_edit_layer": [
+      "scripts/hwpx/hwpx_element_factory.py",
+      "scripts/hwpx/hwpx_style_ops.py",
+      "scripts/hwpx/hwpx_list_style_ops.py",
+      "scripts/hwpx/hwpx_table_cell_address_style.py",
+      "scripts/hwpx/hwpx_compose_schema_reference.py",
+      "scripts/hwpx/hwpx_spine_repair.py"
+    ],
+    "template_generation_layer": [
+      "scripts/hwpx/hwpx_api.py",
+      "scripts/hwpx/hwpx_full_scenario.py",
+      "scripts/hwpx/hwpx_delivery_auto_verify.py",
+      "src/main/java/com/haehan/engine/http/HwpxUploadHandler.java",
+      "src/main/java/com/haehan/engine/http/HwpxEditorApiHandler.java",
+      "src/main/java/com/haehan/engine/http/ConvertHwpToHwpxHandler.java"
+    ],
+    "validation_layer": [
+      "scripts/hwpx/test_hwp_to_hwpx_standalone.py",
+      "scripts/hwpx/test_hancom_hwp_converter_router.py",
+      "scripts/hwpx/test_hancom_hwp_converter_providers.py",
+      "src/test/java/com/haehan/engine/parser/HwpxParserTableCoordinatesTest.java",
+      "src/test/java/com/haehan/engine/http/HwpxUploadHandlerEncodingTest.java"
+    ],
+    "local_worker_candidates": [
+      "scripts/hwpx/hancom_hwp_converter_router.py",
+      "scripts/hwpx/hancom_hwp_converter_providers.py",
+      "scripts/hwpx/index_local_hwp_hwpx_files.py",
+      "scripts/local-gui/hancom_hwp_to_hwpx_local_gui.py",
+      "src/main/java/com/haehan/engine/hwp/HwpToHwpxCliBridge.java",
+      "src/main/java/com/haehan/engine/hwp/PythonScriptBridge.java"
+    ]
+  },
+  "boundaries": {
+    "package_layer": [
+      "ZIP read/write",
+      "manifest",
+      "metadata",
+      "section XML",
+      "preview",
+      "bindata",
+      "media"
+    ],
+    "xml_edit_layer": [
+      "paragraph",
+      "table",
+      "cell",
+      "row",
+      "style",
+      "image",
+      "chart"
+    ],
+    "template_layer": [
+      "placeholder",
+      "template render",
+      "safety document builder",
+      "schedule builder",
+      "report builder"
+    ],
+    "validation_layer": [
+      "package validation",
+      "XML validation",
+      "roundtrip validation",
+      "golden validation"
+    ],
+    "forbidden_couplings": [
+      "HWPX engine directly calling Excel parser",
+      "Excel engine directly calling HWPX internal XML writer",
+      "server runtime directly executing HWP/Hancom conversion",
+      "HWPX package editor directly coupling to local-gui",
+      "API handler directly implementing detailed HWPX XML edits",
+      "untested HWPX runtime change treated as complete"
+    ]
+  },
+  "cycles": {
+    "initial_scripts_hwpx_cycle_count": 2,
+    "final_cycle_count": 0,
+    "changed_files": [
+      "scripts/hwpx/hwp_to_hwpx_standalone.py",
+      "scripts/hwpx/hwpx_api.py",
+      "scripts/hwpx/hwp_full_fidelity_audit.py"
+    ],
+    "strategy": "Static import coupling was lowered to lazy module loading without feature changes."
+  },
+  "audit_results": {
+    "hwpx_engine_boundary": {
+      "status": "WARN",
+      "cycle_count": 0,
+      "finding_count": 17
+    },
+    "known_prefix_quoted_literal_count": 0
+  },
+  "tests": {
+    "tests/test_hwpx_engine_boundary_audit.py": "PASS",
+    "tests/test_layer_boundary_audit.py": "PASS",
+    "tests/test_import_cycle_audit.py": "PASS",
+    "tests/test_execution_location_gate_audit.py": "PASS",
+    "tests/test_upload_file_gate_audit.py": "PASS",
+    "tests/test_excel_statement_boundary_audit.py": "PASS",
+    "gradlew_tasks": "PASS",
+    "gradlew_test": "PASS"
+  },
+  "remaining_warn": [
+    "HWP/Hancom bridge local worker gate must be made explicit at runtime usecase boundary.",
+    "API handler HWPX package/upload validation gates need clearer implementation boundary.",
+    "Excel to HWPX/report generation connection must be adapter-based in P4.",
+    "Existing HWPX/local-gui/Docker/src main dirty changes remain outside this commit scope.",
+    "History secret risk remains user action item."
+  ],
+  "remaining_fail": [],
+  "next_step": "P4 integrated usecase boundary: Excel/statement analysis result to domain model to HWPX/report/safety/schedule generation to validation and API/download response.",
+  "final_judgement": "WARN"
+}

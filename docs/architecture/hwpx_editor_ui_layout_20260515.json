@@ -1,0 +1,41 @@
+{
+  "document": "hwpx_editor_ui_layout",
+  "phase": "P12B",
+  "date": "2026-05-15",
+  "status": "CONFIRMED",
+  "layout_zones": [
+    {"id": "top_accent_line", "height": "4px", "color": "#F97316", "position": "fixed-top"},
+    {"id": "header_bar", "background": "#0F172A", "height": "44px"},
+    {"id": "left_sidebar", "width": "280px", "background": "#F9FAFB"},
+    {"id": "main_editor", "flex": 1, "background": "#FFFFFF"},
+    {"id": "bottom_status_bar", "height": "36px", "background": "#F9FAFB"}
+  ],
+  "panels": [
+    {"id": "UploadCard", "zone": "left_sidebar", "order": 1},
+    {"id": "GateStatusPanel", "zone": "left_sidebar", "order": 2},
+    {"id": "EditorToolbar", "zone": "left_sidebar", "order": 3},
+    {"id": "PlaceholderPanel", "zone": "left_sidebar", "order": 4},
+    {"id": "BlockInspector", "zone": "left_sidebar", "order": 5},
+    {"id": "ArtifactInfoPanel", "zone": "left_sidebar", "order": 6},
+    {"id": "DownloadPanel", "zone": "left_sidebar", "order": 7},
+    {"id": "DocumentTree", "zone": "main_editor"},
+    {"id": "BlockEditor", "zone": "main_editor"},
+    {"id": "ValidationPanel", "zone": "main_editor"},
+    {"id": "CommandResultPanel", "zone": "main_editor"}
+  ],
+  "toolbar_buttons": [
+    {"id": "validate", "type": "secondary", "command": "validateDocument", "min_phase": "READY"},
+    {"id": "dry_run", "type": "secondary", "command": "dry_run", "min_phase": "READY"},
+    {"id": "save", "type": "primary", "command": "save", "min_phase": "EDITING"},
+    {"id": "download", "type": "ghost", "command": "download", "min_phase": "SAVED"}
+  ],
+  "tabs": ["Paragraphs", "Tables", "Preview"],
+  "forbidden_in_ui": [
+    "raw_filesystem_path",
+    "hwpx_xml_zip_content",
+    "server_internal_path",
+    "secret_token_cookie",
+    "stack_trace_direct_display"
+  ],
+  "artifact_display": "first_8_chars_of_uuid"
+}

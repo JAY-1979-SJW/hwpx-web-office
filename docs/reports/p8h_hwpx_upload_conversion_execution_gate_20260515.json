@@ -1,0 +1,69 @@
+{
+  "report": "p8h_hwpx_upload_conversion_execution_gate",
+  "phase": "P8H",
+  "date": "2026-05-15",
+  "base_head": "bde45ed027d53859ea984c5b2516be20ab812572",
+  "execution_location_gate": {
+    "import_added": true,
+    "static_field": "HWP_CONVERSION_EXECUTION_GATE = ExecutionLocationGate.classifyOperation(\"hwp.conversion\")",
+    "js_policy_key": "uploadGatePolicy.hwpConversionExecution",
+    "hwp_result": "LOCAL_WORKER_REQUIRED",
+    "hwpx_result": "SERVER_ALLOWED"
+  },
+  "hwp_conversion_ui_flow": {
+    "select_file_notice": true,
+    "validate_upload_report_event": true,
+    "render_hwp_conversion_notice_detail": true,
+    "convert_hwp_to_hwpx_structure_changed": false
+  },
+  "endpoint_paths": {
+    "hwpx_editor": "/hwpx-editor",
+    "hwpx_upload": "/hwpx-upload",
+    "convert_hwp_to_hwpx": "/convert-hwp-to-hwpx",
+    "api_hwpx_parse": "/api/hwpx/parse",
+    "api_hwpx_editor": "/api/hwpx/editor",
+    "all_unchanged": true
+  },
+  "api_response_keys": {
+    "error_key_preserved": true,
+    "method_not_allowed_preserved": true
+  },
+  "test_results": {
+    "audit_hwpx_upload_handler_split_readiness": "WARN",
+    "test_hwpx_upload_handler_split_readiness": "5 PASS",
+    "audit_handler_gate_runtime_connections": "WARN",
+    "test_handler_gate_runtime_connections": "3 PASS",
+    "test_large_handler_gate_connections": "2 PASS",
+    "test_api_upload_download_gate_audit": "PASS",
+    "test_integrated_usecase_boundary_audit": "PASS",
+    "test_hwpx_engine_boundary_audit": "PASS",
+    "test_excel_statement_boundary_audit": "PASS",
+    "test_layer_boundary_audit": "PASS",
+    "test_import_cycle_audit": "PASS",
+    "test_execution_location_gate_audit": "PASS",
+    "test_upload_file_gate_audit": "PASS",
+    "gradlew_tasks": "BUILD SUCCESSFUL",
+    "gradlew_test": "BUILD SUCCESSFUL",
+    "secret_scan": "CLEAR"
+  },
+  "remaining_warn": [
+    "tracked_dirty_large_handler",
+    "large_handler",
+    "output_artifact_gate_not_connected",
+    "raw_path_candidate"
+  ],
+  "policy": {
+    "no_endpoint_path_change": true,
+    "no_api_response_key_change": true,
+    "no_hwp_hancom_direct_execution": true,
+    "no_db_write": true,
+    "no_external_browser": true,
+    "no_output_artifact_gate_hunk": true,
+    "no_download_export_flow_change": true,
+    "no_local_gui_change": true,
+    "no_dockerfile_change": true,
+    "push_forbidden": true
+  },
+  "next_phase": "P8I: HwpxUploadHandler OutputArtifactGate 연결",
+  "verdict": "PASS"
+}

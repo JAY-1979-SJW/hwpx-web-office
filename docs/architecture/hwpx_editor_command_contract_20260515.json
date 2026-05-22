@@ -1,0 +1,82 @@
+{
+  "document": "hwpx_editor_command_contract",
+  "phase": "P11A",
+  "date": "2026-05-15",
+  "endpoint": "POST /api/hwpx/editor",
+  "content_type": "multipart/form-data",
+  "command_types": [
+    {
+      "type": "paragraph_edit",
+      "target_fields": ["paragraph_index"],
+      "value_fields": ["value"],
+      "mvp": true
+    },
+    {
+      "type": "cell_edit",
+      "target_fields": ["table_index", "row", "col"],
+      "value_fields": ["value"],
+      "mvp": true
+    },
+    {
+      "type": "row_add",
+      "target_fields": ["table_index", "after_row"],
+      "value_fields": ["template_row"],
+      "mvp": true
+    },
+    {
+      "type": "row_delete",
+      "target_fields": ["table_index", "row"],
+      "value_fields": [],
+      "mvp": true
+    },
+    {
+      "type": "placeholder_fill",
+      "target_fields": [],
+      "value_fields": ["mapping"],
+      "mvp": true
+    },
+    {
+      "type": "fill_cells",
+      "target_fields": ["table_index"],
+      "value_fields": ["rows"],
+      "mvp": false,
+      "post_processing": true
+    },
+    {
+      "type": "schedule_graph",
+      "target_fields": ["insert_after_paragraph"],
+      "value_fields": ["gantt_data"],
+      "mvp": false,
+      "post_processing": true
+    }
+  ],
+  "operations": ["apply", "create"],
+  "dry_run_support": true,
+  "server_save_support": true,
+  "response": {
+    "success": {
+      "content_type": "application/owpml",
+      "headers": [
+        "X-Hwpx-Editor-Status",
+        "X-Hwpx-Editor-Report",
+        "X-Hwpx-Editor-Artifact-Id",
+        "X-Schema-Version",
+        "X-Engine-Version",
+        "X-Request-Id"
+      ]
+    },
+    "error_codes": {
+      "400": "plan/file missing or unknown operation",
+      "413": "file too large (>80MB)",
+      "415": "file type rejected",
+      "422": "HWPX_EDIT_FAILED",
+      "500": "internal server error"
+    }
+  },
+  "forbidden": [
+    "browser_direct_hwpx_access",
+    "filesystem_path_in_command",
+    "hwp_direct_execution",
+    "certificate_otp_signature_fields"
+  ]
+}
