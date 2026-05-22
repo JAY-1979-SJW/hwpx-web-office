@@ -1,0 +1,296 @@
+{
+  "task": "HWPX-FORM-AUTO-FILL-WRITER-REAL-LIKE-SANDBOX-BATCH-10",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_LIKE_SANDBOX_BATCH",
+  "samplePolicy": {
+    "synthetic": "Allowed for negative and control tests.",
+    "realLikeSanitized": "Allowed only after removing or masking personal data, project names, addresses, phone numbers, business numbers, account numbers, and raw filenames.",
+    "realUserFileUsed": false,
+    "recommendedLocation": "data/fixtures/hwpx/real_like_sanitized/",
+    "commitPolicy": "Do not commit actual HWPX samples or generated output HWPX files."
+  },
+  "dirtyBaseline": {
+    "documented": true,
+    "knownHold": [
+      "change_history_log_modified",
+      "devlog_untracked",
+      "reports_untracked"
+    ],
+    "knownHoldCounts": {
+      "changeHistoryLog": 1,
+      "devlogUntracked": 22,
+      "reportsUntracked": 1
+    },
+    "unexpectedOutsideScope": []
+  },
+  "limitRuns": {
+    "limit1": {
+      "overallVerdict": "PASS_REAL_LIKE_SANDBOX_BATCH",
+      "summary": {
+        "totalCandidates": 1,
+        "processed": 1,
+        "ready": 1,
+        "writtenFiles": 1,
+        "blockedFiles": 0,
+        "failedFiles": 0,
+        "readbackFail": 0,
+        "unexpectedMutation": 0,
+        "sourceMutation": 0,
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    "limit5": {
+      "overallVerdict": "PASS_REAL_LIKE_SANDBOX_BATCH",
+      "summary": {
+        "totalCandidates": 5,
+        "processed": 5,
+        "ready": 5,
+        "writtenFiles": 5,
+        "blockedFiles": 0,
+        "failedFiles": 0,
+        "readbackFail": 0,
+        "unexpectedMutation": 0,
+        "sourceMutation": 0,
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    "limit10": {
+      "overallVerdict": "PASS_REAL_LIKE_SANDBOX_BATCH",
+      "summary": {
+        "totalCandidates": 10,
+        "processed": 10,
+        "ready": 10,
+        "writtenFiles": 10,
+        "blockedFiles": 0,
+        "failedFiles": 0,
+        "readbackFail": 0,
+        "unexpectedMutation": 0,
+        "sourceMutation": 0,
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    }
+  },
+  "blockedBreakdown": {
+    "BLOCKED_INVALID_HWPX": 1,
+    "BLOCKED_PII_RISK": 1,
+    "BLOCKED_NO_TARGET_MAP": 1,
+    "BLOCKED_AMBIGUOUS_TARGET": 1,
+    "BLOCKED_LOW_TARGET_CONFIDENCE": 1
+  },
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "batch runner exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "sanitized real-like sample policy enforced",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "limit=1 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "limit=5 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "limit=10 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "SANDBOX_ONLY enforced",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "READY_FOR_SANDBOX_WRITE only written",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "blocked files not written",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "blocked reasons recorded",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "output_path == source_path absent",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "per-file source sha256 unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "per-file source mtime unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "readbackFail zero required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "unexpectedMutation zero required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "sourceMutation zero required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "final export requires ACCEPTED_BY_USER",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "previous real file preflight tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "previous browser/API/E2E tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "runs": {
+    "batch": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_like_sandbox_batch.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "32 passed in 0.76s"
+    },
+    "realFilePreflight": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_file_preflight.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "30 passed in 0.51s"
+    },
+    "browserApiE2e": {
+      "paths": [
+        "tests/test_hwpx_form_autofill_browser_smoke.py",
+        "tests/test_hwpx_form_autofill_api_route.py",
+        "tests/test_hwpx_form_autofill_frontend_contract.py",
+        "tests/test_hwpx_form_auto_fill_e2e_smoke.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "103 passed in 198.14s (0:03:18)"
+    },
+    "writerChain": {
+      "paths": [
+        "tests/test_hwpx_form_writer_final_export_gate.py",
+        "tests/test_hwpx_form_writer_download_review.py",
+        "tests/test_hwpx_form_writer_ui_connect.py",
+        "tests/test_hwpx_form_writer_readback_hardening.py",
+        "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
+        "tests/test_hwpx_approval_gate.py",
+        "tests/test_hwpx_review_panel.py",
+        "tests/test_hwpx_form_field_mapping.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "213 passed in 25.08s"
+    }
+  },
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_SOME_FILES_BLOCKED",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}

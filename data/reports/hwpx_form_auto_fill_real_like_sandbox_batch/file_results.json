@@ -1,0 +1,112 @@
+[
+  {
+    "sampleId": "real_like_001_dd9a814cf1",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_002_82d2dc1fdb",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_003_edbbbeaf9d",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_004_943652d86b",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_005_953a79d676",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_006_63cd805396",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_007_8460ab050a",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_008_9021ff6da7",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_009_768d409144",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  },
+  {
+    "sampleId": "real_like_010_d7648d6f54",
+    "status": "SANDBOX_WRITE_PASS",
+    "sourceHashChanged": false,
+    "sourceMtimeChanged": false,
+    "writtenFields": 3,
+    "readbackPass": 3,
+    "readbackFail": 0,
+    "unexpectedMutation": 0,
+    "finalExportEnabled": true
+  }
+]

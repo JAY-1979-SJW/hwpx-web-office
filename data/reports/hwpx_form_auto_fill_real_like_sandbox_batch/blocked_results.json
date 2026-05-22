@@ -1,0 +1,32 @@
+[
+  {
+    "sampleId": "real_like_001_a89e1d449c",
+    "status": "BLOCKED_INVALID_HWPX",
+    "blockedReason": "BLOCKED_INVALID_HWPX",
+    "writtenFields": 0
+  },
+  {
+    "sampleId": "real_like_002_c5af9a783a",
+    "status": "BLOCKED_PII_RISK",
+    "blockedReason": "BLOCKED_PII_RISK",
+    "writtenFields": 0
+  },
+  {
+    "sampleId": "real_like_001_dd9a814cf1",
+    "status": "BLOCKED_NO_TARGET_MAP",
+    "blockedReason": "BLOCKED_NO_TARGET_MAP",
+    "writtenFields": 0
+  },
+  {
+    "sampleId": "real_like_001_dd9a814cf1",
+    "status": "BLOCKED_AMBIGUOUS_TARGET",
+    "blockedReason": "BLOCKED_AMBIGUOUS_TARGET",
+    "writtenFields": 0
+  },
+  {
+    "sampleId": "real_like_001_dd9a814cf1",
+    "status": "BLOCKED_LOW_TARGET_CONFIDENCE",
+    "blockedReason": "BLOCKED_LOW_TARGET_CONFIDENCE",
+    "writtenFields": 0
+  }
+]
