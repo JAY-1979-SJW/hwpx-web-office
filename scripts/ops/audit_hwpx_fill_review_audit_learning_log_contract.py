@@ -31,7 +31,7 @@ def run_audit() -> dict:
         })
 
     # 1. migration file
-    mig = PROJECT_ROOT / "data/recognition_corpus/schema/002_audit_learning_logs.sql"
+    mig = PROJECT_ROOT / "scripts/hwpx/recognition_corpus/schema/002_audit_learning_logs.sql"
     add("002_migration_exists", mig.is_file(), str(mig.relative_to(PROJECT_ROOT)))
 
     # 2. log contract module

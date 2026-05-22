@@ -75,7 +75,7 @@ _BIZNO_RE = re.compile(r"\b\d{3}-\d{2}-\d{5}\b")
 _PHONE_RE = re.compile(r"\b01[016789][-\s]?\d{3,4}[-\s]?\d{4}\b")
 _RRN_RE = re.compile(r"\b\d{6}-?\d{7}\b")
 
-SCHEMA_DIR = Path(__file__).resolve().parents[3] / "data/recognition_corpus/schema"
+SCHEMA_DIR = Path(__file__).resolve().parent / "schema"
 MIGRATION_002_PATH = SCHEMA_DIR / "002_audit_learning_logs.sql"
 
 

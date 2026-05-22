@@ -37,7 +37,7 @@ def _grep_for_set_cell_paragraph_text() -> list[str]:
         "scripts/hwpx/recognition_corpus/audit_learning_log_contract.py",
         "scripts/ops/audit_hwpx_fill_review_audit_learning_log_contract.py",
         "tests/test_hwpx_fill_review_audit_learning_log_contract.py",
-        "data/recognition_corpus/schema/002_audit_learning_logs.sql",
+        "scripts/hwpx/recognition_corpus/schema/002_audit_learning_logs.sql",
         # 배관 (orchestration) — negative reference only.
         "scripts/ops/audit_hwpx_fill_review_log_orchestration.py",
         "tests/test_hwpx_fill_review_log_orchestration.py",

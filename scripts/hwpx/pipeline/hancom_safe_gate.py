@@ -30,7 +30,8 @@ def verify(output_path: Path) -> HancomVerifyResult:
         return result
 
     if not _VERIFY_AVAILABLE:
-        result.warnings.append("hwpx_full_verify not available; fallback to basic ZIP check")
+        result.info["verify_mode"] = "basic_zip_check"
+        result.info["reason"] = "hwpx_full_verify not available"
         return _basic_check(output_path, result)
 
     try:

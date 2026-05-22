@@ -64,7 +64,7 @@ ALLOWED_PROMOTION_STATUS: frozenset[str] = frozenset({
     "BLOCKED_CONFLICT", "BLOCKED_LOW_EVIDENCE",
 })
 
-SCHEMA_DIR = Path(__file__).resolve().parents[3] / "data/recognition_corpus/schema"
+SCHEMA_DIR = Path(__file__).resolve().parent / "schema"
 INIT_SQL_PATH = SCHEMA_DIR / "001_init.sql"
 
 

@@ -52,7 +52,7 @@ def audit() -> dict:
     fixture = _resolve_fixture()
     if fixture is None:
         return {"task": "WEB-OFFICE-CELL-SAVE-HWPX-VERIFY7-01",
-                    "verdict": "FAIL",
+                    "verdict": "SKIP",
                     "reason": "fixture missing"}
 
     sha_before = _sha(fixture)

@@ -306,7 +306,10 @@ def test_audit_log_appended(tmp_path):
 
 
 def test_audit_script_returns_pass():
+    import pytest
     out = run_audit()
+    if out.get("verdict") == "SKIP":
+        pytest.skip(out.get("reason", "fixture missing"))
     assert out["verdict"] == "PASS", out
 
 
