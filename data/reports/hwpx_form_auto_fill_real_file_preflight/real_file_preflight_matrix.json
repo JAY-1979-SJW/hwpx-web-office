@@ -1,0 +1,68 @@
+{
+  "ready": {
+    "preflightStatus": "READY_FOR_SANDBOX_WRITE",
+    "writtenFields": 3,
+    "readbackFail": 0,
+    "finalExportEnabled": true
+  },
+  "invalid": {
+    "preflightStatus": "BLOCKED_INVALID_HWPX",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "missingSection": {
+    "preflightStatus": "BLOCKED_MISSING_SECTION_XML",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "pii": {
+    "preflightStatus": "BLOCKED_PII_RISK",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "rawPath": {
+    "preflightStatus": "BLOCKED_RAW_PATH_RISK",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "rawFilename": {
+    "preflightStatus": "BLOCKED_RAW_FILENAME_RISK",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "noTargetMap": {
+    "preflightStatus": "BLOCKED_NO_TARGET_MAP",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "ambiguous": {
+    "preflightStatus": "BLOCKED_AMBIGUOUS_TARGET",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "lowConfidence": {
+    "preflightStatus": "BLOCKED_LOW_TARGET_CONFIDENCE",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "noApproved": {
+    "preflightStatus": "BLOCKED_NO_APPROVED_FIELDS",
+    "writtenFields": 0,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  },
+  "holdExport": {
+    "preflightStatus": "READY_FOR_SANDBOX_WRITE",
+    "writtenFields": 3,
+    "readbackFail": 0,
+    "finalExportEnabled": false
+  }
+}

@@ -1,0 +1,42 @@
+# HWPX Form Auto Fill Real File Preflight 09
+
+- verdict: PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_FILE_PREFLIGHT
+- real file preflight: PASS
+- browser smoke: PASS
+- API/frontend: PASS
+- E2E smoke: PASS
+- writer chain: PASS
+- warnings: WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY, WARN_SANDBOX_ONLY, WARN_REAL_USER_FILE_NOT_TESTED, WARN_DEPLOY_NOT_PERFORMED, WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED
+
+## Checks
+- PASS A01 real file preflight module exists
+- PASS A02 sanitized real-like HWPX sample policy exists
+- PASS A03 invalid HWPX blocked
+- PASS A04 missing section XML blocked
+- PASS A05 PII risk blocked
+- PASS A06 raw path risk blocked
+- PASS A07 raw filename risk blocked
+- PASS A08 missing target map blocked
+- PASS A09 ambiguous target blocked
+- PASS A10 low confidence target blocked
+- PASS A11 no approved fields blocked
+- PASS A12 READY_FOR_SANDBOX_WRITE allows sandbox only
+- PASS A13 mode SANDBOX_ONLY
+- PASS A14 sourceMutationAllowed false
+- PASS A15 output_path == source_path absent
+- PASS A16 source sha256 unchanged
+- PASS A17 source mtime unchanged
+- PASS A18 readback fail blocks success
+- PASS A19 unexpected mutation blocks success
+- PASS A20 final export requires ACCEPTED_BY_USER
+- PASS A21 no raw path leak
+- PASS A22 no raw filename leak
+- PASS A23 no PII leak
+- PASS A24 AI API not called
+- PASS A25 OCR not called
+- PASS A26 Hancom not required
+- PASS A27 previous browser smoke tests pass
+- PASS A28 previous API/frontend tests pass
+- PASS A29 previous E2E smoke tests pass
+- PASS A30 previous writer chain tests pass
+- PASS A31 dirty baseline documented

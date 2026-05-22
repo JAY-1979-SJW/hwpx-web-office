@@ -1,0 +1,34 @@
+{
+  "ready": {
+    "piiLeak": false,
+    "rawPathLeak": false,
+    "rawFilenameLeak": false,
+    "aiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "pii": {
+    "piiLeak": true,
+    "rawPathLeak": false,
+    "rawFilenameLeak": false,
+    "aiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "rawPath": {
+    "piiLeak": false,
+    "rawPathLeak": true,
+    "rawFilenameLeak": false,
+    "aiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "rawFilename": {
+    "piiLeak": false,
+    "rawPathLeak": false,
+    "rawFilenameLeak": true,
+    "aiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  }
+}

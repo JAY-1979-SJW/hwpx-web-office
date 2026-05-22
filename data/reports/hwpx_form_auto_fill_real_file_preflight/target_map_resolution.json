@@ -1,0 +1,22 @@
+{
+  "ready": {
+    "resolvedTargets": 3,
+    "ambiguousTargets": 0,
+    "lowConfidenceTargets": 0
+  },
+  "ambiguous": {
+    "resolvedTargets": 4,
+    "ambiguousTargets": 1,
+    "lowConfidenceTargets": 0
+  },
+  "lowConfidence": {
+    "resolvedTargets": 3,
+    "ambiguousTargets": 0,
+    "lowConfidenceTargets": 1
+  },
+  "noTargetMap": {
+    "resolvedTargets": 0,
+    "ambiguousTargets": 0,
+    "lowConfidenceTargets": 0
+  }
+}

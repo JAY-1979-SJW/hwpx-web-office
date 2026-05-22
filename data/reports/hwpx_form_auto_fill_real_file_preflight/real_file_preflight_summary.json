@@ -1,0 +1,312 @@
+{
+  "task": "HWPX-FORM-AUTO-FILL-WRITER-REAL-FILE-PREFLIGHT-09",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_FILE_PREFLIGHT",
+  "samplePolicy": {
+    "synthetic": "Allowed for negative and control tests.",
+    "realLikeSanitized": "Allowed only after removing or masking personal data, project names, addresses, phone numbers, business numbers, account numbers, and raw filenames.",
+    "realUserFileUsed": false,
+    "recommendedLocation": "data/fixtures/hwpx/real_like_sanitized/",
+    "commitPolicy": "Do not commit actual HWPX samples or generated output HWPX files."
+  },
+  "dirtyBaseline": {
+    "documented": true,
+    "knownHold": [
+      "change_history_log_modified",
+      "devlog_untracked",
+      "reports_untracked"
+    ],
+    "knownHoldCounts": {
+      "changeHistoryLog": 1,
+      "devlogUntracked": 21,
+      "reportsUntracked": 1
+    },
+    "unexpectedOutsideScope": []
+  },
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "real file preflight module exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "sanitized real-like HWPX sample policy exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "invalid HWPX blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "missing section XML blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "PII risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "raw path risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "raw filename risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "missing target map blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "ambiguous target blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "low confidence target blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "no approved fields blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "READY_FOR_SANDBOX_WRITE allows sandbox only",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "mode SANDBOX_ONLY",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "sourceMutationAllowed false",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "output_path == source_path absent",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "source sha256 unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "source mtime unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "readback fail blocks success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "unexpected mutation blocks success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "final export requires ACCEPTED_BY_USER",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "previous browser smoke tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "previous API/frontend tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A29",
+      "desc": "previous E2E smoke tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A30",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A31",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "runs": {
+    "realFilePreflight": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_file_preflight.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "30 passed in 0.51s"
+    },
+    "browserSmoke": {
+      "paths": [
+        "tests/test_hwpx_form_autofill_browser_smoke.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "31 passed in 2.88s"
+    },
+    "apiFrontend": {
+      "paths": [
+        "tests/test_hwpx_form_autofill_api_route.py",
+        "tests/test_hwpx_form_autofill_frontend_contract.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "42 passed in 193.03s (0:03:13)"
+    },
+    "e2eSmoke": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_e2e_smoke.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "30 passed in 29.90s"
+    },
+    "writerChain": {
+      "paths": [
+        "tests/test_hwpx_form_writer_final_export_gate.py",
+        "tests/test_hwpx_form_writer_download_review.py",
+        "tests/test_hwpx_form_writer_ui_connect.py",
+        "tests/test_hwpx_form_writer_readback_hardening.py",
+        "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
+        "tests/test_hwpx_approval_gate.py",
+        "tests/test_hwpx_review_panel.py",
+        "tests/test_hwpx_form_field_mapping.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "213 passed in 24.49s"
+    }
+  },
+  "readySummary": {
+    "schemaVersion": "form_auto_fill_real_file_preflight_v1",
+    "sampleId": "real_like_hwpx_001",
+    "mode": "SANDBOX_ONLY",
+    "preflightStatus": "READY_FOR_SANDBOX_WRITE",
+    "sourceMutationAllowed": false,
+    "sourceHashBefore": "ccc9c5bc4c9241f6",
+    "sourceHashAfter": "ccc9c5bc4c9241f6",
+    "sourceMtimeChanged": false,
+    "structure": {
+      "zipValid": true,
+      "sectionXmlValid": true,
+      "tableCount": 1,
+      "cellCount": 8,
+      "paragraphCount": 8
+    },
+    "targetMap": {
+      "resolvedTargets": 3,
+      "ambiguousTargets": 0,
+      "lowConfidenceTargets": 0
+    },
+    "sandboxResult": {
+      "writtenFields": 3,
+      "readbackPass": 3,
+      "readbackFail": 0,
+      "unexpectedMutation": 0,
+      "finalExportEnabled": true
+    },
+    "security": {
+      "piiLeak": false,
+      "rawPathLeak": false,
+      "rawFilenameLeak": false,
+      "aiCalled": false,
+      "ocrCalled": false,
+      "hancomRequired": false
+    },
+    "warnings": [
+      "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+      "WARN_SANDBOX_ONLY"
+    ]
+  },
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}

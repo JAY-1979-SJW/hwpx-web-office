@@ -1,0 +1,199 @@
+{
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_FILE_PREFLIGHT",
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "real file preflight module exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "sanitized real-like HWPX sample policy exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "invalid HWPX blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "missing section XML blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "PII risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "raw path risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "raw filename risk blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "missing target map blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "ambiguous target blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "low confidence target blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "no approved fields blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "READY_FOR_SANDBOX_WRITE allows sandbox only",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "mode SANDBOX_ONLY",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "sourceMutationAllowed false",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "output_path == source_path absent",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "source sha256 unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "source mtime unchanged",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "readback fail blocks success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "unexpected mutation blocks success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "final export requires ACCEPTED_BY_USER",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "previous browser smoke tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "previous API/frontend tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A29",
+      "desc": "previous E2E smoke tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A30",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A31",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}
