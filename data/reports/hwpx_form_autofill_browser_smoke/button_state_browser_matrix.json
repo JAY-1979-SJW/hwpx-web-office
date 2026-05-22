@@ -1,0 +1,34 @@
+{
+  "READY_FOR_WRITER": {
+    "enabled": true,
+    "reason": "all writer gates satisfied"
+  },
+  "BLOCKED_NEEDS_REVIEW": {
+    "enabled": false,
+    "reason": "needsReviewRemaining"
+  },
+  "BLOCKED_MISSING_REQUIRED": {
+    "enabled": false,
+    "reason": "missingRequired"
+  },
+  "BLOCKED_ATTACHMENT_MISSING": {
+    "enabled": false,
+    "reason": "attachmentsMissing"
+  },
+  "HOLD_BY_USER": {
+    "enabled": false,
+    "reason": "approvalStatus"
+  },
+  "writerEligible_false": {
+    "enabled": false,
+    "reason": "writerEligible"
+  },
+  "approvedFields_zero": {
+    "enabled": false,
+    "reason": "approvedFields"
+  },
+  "mode_not_sandbox": {
+    "enabled": false,
+    "reason": "mode"
+  }
+}

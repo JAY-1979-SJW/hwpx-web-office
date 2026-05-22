@@ -1,0 +1,25 @@
+{
+  "SUCCESS": {
+    "successShown": true,
+    "downloadEnabled": true,
+    "finalExportEnabled": true
+  },
+  "FAILED_READBACK": {
+    "successShown": false,
+    "failureText": "readback 실패",
+    "downloadEnabled": false,
+    "finalExportEnabled": false
+  },
+  "FAILED_SOURCE_MUTATED": {
+    "successShown": false,
+    "failureText": "원본 변경 위험 실패",
+    "downloadEnabled": false,
+    "finalExportEnabled": false
+  },
+  "FAILED_OUTPUT_BROKEN": {
+    "successShown": false,
+    "failureText": "출력 파일 손상",
+    "downloadEnabled": false,
+    "finalExportEnabled": false
+  }
+}

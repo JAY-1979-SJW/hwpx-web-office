@@ -1,0 +1,19 @@
+{
+  "allowed": [
+    "POST /api/hwpx/form-autofill/write-sandbox"
+  ],
+  "mode": "SANDBOX_ONLY",
+  "sourceMutationAllowed": false,
+  "output_path_equals_source_path": false,
+  "raw_path_payload": false,
+  "raw_filename_payload": false,
+  "approved_fields_only": true,
+  "forbidden": {
+    "production_write": 0,
+    "source_overwrite": 0,
+    "deploy_final_apply": 0,
+    "ai_api": 0,
+    "ocr_api": 0,
+    "hancom_only": 0
+  }
+}

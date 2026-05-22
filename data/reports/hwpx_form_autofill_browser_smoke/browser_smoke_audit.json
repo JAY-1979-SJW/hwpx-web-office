@@ -1,0 +1,192 @@
+{
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_BROWSER_SMOKE",
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "browser smoke test exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "autofill page renders",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "recommend section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "parser section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "autoFillReady section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "needsReview section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "missingRequired section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "requiredAttachments section visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "SANDBOX_ONLY warning visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "READY_FOR_WRITER enables button",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "blocked statuses disable button",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "write-sandbox API called on click",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "request mode SANDBOX_ONLY",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "sourceMutationAllowed false",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "output_path == source_path absent",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "success result shown correctly",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "readback failure shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "source mutation shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "output broken shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "download status shown",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "final export status shown",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "previous API/frontend tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A29",
+      "desc": "previous E2E smoke tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A30",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "warnings": [
+    "WARN_SYNTHETIC_BROWSER_SCENARIO_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED"
+  ],
+  "failCodes": []
+}

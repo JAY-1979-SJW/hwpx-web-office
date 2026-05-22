@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX Form Auto Fill Browser Smoke</title>
+<style>
+  :root {
+    color-scheme: light;
+    font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+    color: #1f2933;
+    background: #f7f8fa;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 18px 22px;
+    background: #ffffff;
+    border-bottom: 1px solid #d8dee8;
+  }
+  h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; }
+  p { margin: 0; }
+  .sandbox-warning { margin-top: 8px; color: #8a4b00; font-size: 13px; }
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid #2f6f73;
+    color: #1f5f63;
+    background: #e7f6f3;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .workspace {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+  .panel {
+    min-height: 134px;
+    padding: 14px;
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    background: #ffffff;
+  }
+  .kv,
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 28px;
+    font-size: 13px;
+  }
+  .kv span,
+  .field-row span { color: #52606d; }
+  .kv strong,
+  .field-row strong { font-weight: 700; overflow-wrap: anywhere; }
+  ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .muted { color: #66788a; font-size: 13px; }
+  .blocked,
+  .is-failure { color: #b42318; font-size: 13px; font-weight: 700; }
+  .is-success { color: #1f7a4d; font-size: 13px; font-weight: 700; }
+  button {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid #1c5d99;
+    border-radius: 6px;
+    background: #1c5d99;
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled {
+    border-color: #b7c2cf;
+    background: #e1e7ef;
+    color: #65758b;
+    cursor: not-allowed;
+  }
+  .action-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  @media (max-width: 860px) {
+    .topbar { flex-direction: column; }
+    .workspace { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root" data-testid="form-autofill-root">Loading</div>
+<script type="module">
+  import {
+    createSyntheticScenario,
+    renderFormAutoFillBrowserSmoke,
+  } from "./form_autofill_browser_smoke.mjs";
+
+  const root = document.getElementById("root");
+  const scenario = createSyntheticScenario();
+  window.__hwpxFormAutoFillSmoke = {
+    scenario,
+    render(overrides = {}) {
+      const next = createSyntheticScenario(overrides);
+      this.scenario = next;
+      renderFormAutoFillBrowserSmoke(root, next);
+    },
+    setWriterStatus(status) {
+      this.render({
+        writerResult: {
+          writerStatus: status,
+          readbackFail: status === "FAILED_READBACK" ? 1 : 0,
+          sourceMutated: status === "FAILED_SOURCE_MUTATED",
+          downloadEnabled: status === "SUCCESS",
+          finalExportEnabled: status === "SUCCESS",
+        },
+      });
+    },
+  };
+  renderFormAutoFillBrowserSmoke(root, scenario);
+</script>
+</body>
+</html>
