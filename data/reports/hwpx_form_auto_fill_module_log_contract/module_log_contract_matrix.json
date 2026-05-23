@@ -1,0 +1,62 @@
+[
+  {
+    "moduleId": "field_mapping",
+    "zone": "input_parse",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "review_panel",
+    "zone": "review_approval",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "approval_gate",
+    "zone": "review_approval",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "writer_sandbox",
+    "zone": "writer_readback",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "readback_hardening",
+    "zone": "writer_readback",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "download_review",
+    "zone": "download_export",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "final_export_gate",
+    "zone": "download_export",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "api_batch",
+    "zone": "batch_api_browser",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "api_browser_e2e",
+    "zone": "batch_api_browser",
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "moduleId": "user_flow_closeout",
+    "zone": "closeout_security",
+    "status": "PASS",
+    "failures": []
+  }
+]

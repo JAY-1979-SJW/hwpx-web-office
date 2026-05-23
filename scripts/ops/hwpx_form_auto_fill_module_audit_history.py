@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_module_history"
+COMM_MANIFEST = Path("scripts") / "ops" / "hwpx_form_auto_fill_module_communication_manifest.json"
 ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
 RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
 PII_RE = re.compile(
@@ -28,30 +29,54 @@ def _safe_summary(text: str) -> str:
     return text
 
 
+def _module_zones(manifest_path: Path = COMM_MANIFEST) -> dict[str, str]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return {item["id"]: item["zone"] for item in manifest.get("modules", [])}
+
+
 def build_history_entries(module_payload: dict[str, Any], run_id: str | None = None) -> list[dict[str, Any]]:
     """Convert module audit results to append-only safe history records."""
     run_id = run_id or datetime.now(UTC).strftime("run_%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    zones = _module_zones()
     entries = []
     for item in module_payload.get("moduleResults", []):
         pytest = item.get("pytest", {})
         security = item.get("security", {})
+        checks = {
+            "staticStatus": item.get("staticStatus"),
+            "pytestStatus": pytest.get("status"),
+            "missingFiles": len(item.get("missingFiles", [])),
+            "missingTokens": len(item.get("missingTokens", [])),
+            "forbiddenSourceHits": len(item.get("forbiddenSourceHits", [])),
+        }
+        safe_security = {
+            "piiLeak": security.get("piiLeak", 0),
+            "rawPathLeak": security.get("rawPathLeak", 0),
+            "rawFilenameLeak": security.get("rawFilenameLeak", 0),
+        }
         entries.append(
             {
                 "schemaVersion": "hwpx_form_auto_fill_module_audit_history_v1",
                 "runId": run_id,
+                "timestampUtc": timestamp,
                 "moduleId": item.get("id"),
+                "zone": zones.get(item.get("id"), "unknown"),
+                "verdict": item.get("status"),
                 "status": item.get("status"),
                 "staticStatus": item.get("staticStatus"),
                 "pytestStatus": pytest.get("status"),
                 "durationSeconds": pytest.get("durationSeconds"),
                 "attempts": pytest.get("attempts"),
                 "summary": _safe_summary(str(pytest.get("summary", ""))),
-                "missingFiles": len(item.get("missingFiles", [])),
-                "missingTokens": len(item.get("missingTokens", [])),
-                "forbiddenSourceHits": len(item.get("forbiddenSourceHits", [])),
-                "piiLeak": security.get("piiLeak", 0),
-                "rawPathLeak": security.get("rawPathLeak", 0),
-                "rawFilenameLeak": security.get("rawFilenameLeak", 0),
+                "checks": checks,
+                "security": safe_security,
+                "missingFiles": checks["missingFiles"],
+                "missingTokens": checks["missingTokens"],
+                "forbiddenSourceHits": checks["forbiddenSourceHits"],
+                "piiLeak": safe_security["piiLeak"],
+                "rawPathLeak": safe_security["rawPathLeak"],
+                "rawFilenameLeak": safe_security["rawFilenameLeak"],
             }
         )
     return entries
@@ -89,4 +114,3 @@ def write_history(
         raise ValueError("unsafe module history summary")
     (report_dir / "module_audit_history_summary.json").write_text(text, encoding="utf-8")
     return summary
-

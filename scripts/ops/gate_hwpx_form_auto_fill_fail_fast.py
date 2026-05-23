@@ -17,6 +17,7 @@ from scripts.ops import audit_hwpx_form_auto_fill_construction_work_design as co
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit
 from scripts.ops import build_hwpx_form_auto_fill_gate_dashboard as dashboard_builder
 from scripts.ops import gate_hwpx_form_auto_fill_upload as upload_gate
+from scripts.ops import gate_hwpx_form_auto_fill_module_log_contract as module_log_contract
 from scripts.ops import hwpx_form_auto_fill_module_audit_history as history
 from scripts.ops import install_hwpx_form_auto_fill_persistent_gates as persistent
 from scripts.ops import plan_hwpx_repo_detailed_separation as separation_plan
@@ -122,22 +123,57 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     if steps[-2]["status"] != "PASS" or steps[-1]["status"] != "PASS":
         return _finish(report_dir, run_id, steps, module_payload, None, None, history_summary, None, None, None, None, None, None, None)
 
+    module_log_contract_payload = module_log_contract.run_module_log_contract_gate(
+        report_dir=_output_dir(
+            report_dir,
+            "module_log_contract",
+            Path("data") / "reports" / "hwpx_form_auto_fill_module_log_contract",
+        ),
+        module_payload=module_payload,
+        run_id=run_id,
+    )
+    steps.append(
+        _step(
+            "module_log_contract",
+            module_log_contract_payload["verdict"],
+            "FAIL_MODULE_LOG_CONTRACT",
+        )
+    )
+    if steps[-1]["status"] != "PASS":
+        return _finish(
+            report_dir,
+            run_id,
+            steps,
+            module_payload,
+            None,
+            None,
+            history_summary,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            module_log_contract_payload=module_log_contract_payload,
+        )
+
     zone_payload = _evaluate_zones_from_module_audit(module_payload)
     steps.append(_step("zone_gates_from_module_audit", zone_payload["verdict"], "FAIL_ZONE_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload)
 
     upload_payload = upload_gate.run_upload_gate_scenarios(
         report_dir=_output_dir(report_dir, "upload_gate", Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate")
     )
     steps.append(_step("upload_gate", upload_payload["verdict"], "FAIL_UPLOAD_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload)
 
     construction_payload = construction_audit.audit()
     steps.append(_step("construction_design_audit", construction_payload["verdict"], "FAIL_CONSTRUCTION_DESIGN_AUDIT"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload)
 
     separation_payload = separation_plan.plan_detailed_separation(
         report_dir=_output_dir(
@@ -148,7 +184,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     )
     steps.append(_step("repo_detailed_separation_plan", separation_payload["verdict"], "FAIL_REPO_DETAILED_SEPARATION_PLAN"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload)
 
     execution_payload = separation_execution_gate.run_execution_gate(
         report_dir=_output_dir(
@@ -172,6 +208,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             None,
             None,
+            module_log_contract_payload=module_log_contract_payload,
         )
 
     owner_review_payload = owner_review_builder.build_owner_review_packets(
@@ -197,6 +234,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             None,
             None,
+            module_log_contract_payload=module_log_contract_payload,
         )
 
     approval_decision_payload = approval_decision_gate.run_approval_decision_gate(
@@ -229,6 +267,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             None,
             None,
+            module_log_contract_payload=module_log_contract_payload,
         )
 
     execution_plan_payload = execution_plan_draft.build_execution_plan_draft(
@@ -261,6 +300,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             execution_plan_payload,
             None,
             None,
+            module_log_contract_payload=module_log_contract_payload,
         )
 
     final_execution_approval_payload = final_execution_approval_gate.run_final_execution_approval_gate(
@@ -293,6 +333,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             execution_plan_payload,
             final_execution_approval_payload,
             None,
+            module_log_contract_payload=module_log_contract_payload,
         )
 
     preliminary = _finish(
@@ -310,6 +351,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         execution_plan_payload,
         final_execution_approval_payload,
         None,
+        module_log_contract_payload=module_log_contract_payload,
     )
     dashboard = dashboard_builder.build_dashboard(
         preliminary,
@@ -333,6 +375,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         execution_plan_payload,
         final_execution_approval_payload,
         dashboard,
+        module_log_contract_payload=module_log_contract_payload,
     )
 
 
@@ -351,6 +394,7 @@ def _finish(
     execution_plan_payload: dict[str, Any] | None,
     final_execution_approval_payload: dict[str, Any] | None,
     dashboard: dict[str, Any] | None,
+    module_log_contract_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     failed = [step for step in steps if step["status"] != "PASS"]
     payload = {
@@ -370,6 +414,8 @@ def _finish(
         "zoneSummary": (zone_payload or {}).get("summary"),
         "uploadSummary": (upload_payload or {}).get("summary"),
         "historySummary": history_summary,
+        "moduleLogContractSummary": (module_log_contract_payload or {}).get("summary"),
+        "moduleLogContractVerdict": (module_log_contract_payload or {}).get("verdict"),
         "separationSummary": (separation_payload or {}).get("summary"),
         "separationVerdict": (separation_payload or {}).get("verdict"),
         "separationExecutionSummary": (execution_payload or {}).get("summary"),

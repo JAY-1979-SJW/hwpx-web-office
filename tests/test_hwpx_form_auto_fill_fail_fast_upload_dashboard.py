@@ -138,6 +138,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
         "persistent_gate_installation",
         "module_audits",
         "module_audit_history",
+        "module_log_contract",
         "zone_gates_from_module_audit",
         "upload_gate",
         "construction_design_audit",
@@ -156,6 +157,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
     assert result["separationApprovalDecisionVerdict"] == fail_fast.approval_decision_gate.PASS_VERDICT
     assert result["separationExecutionPlanVerdict"] == fail_fast.execution_plan_draft.PASS_VERDICT
     assert result["separationFinalExecutionApprovalVerdict"] == fail_fast.final_execution_approval_gate.PASS_VERDICT
+    assert result["moduleLogContractVerdict"] == fail_fast.module_log_contract.PASS_VERDICT
 
 
 def test_09_fail_fast_reports_have_no_leaks(tmp_path: Path) -> None:
