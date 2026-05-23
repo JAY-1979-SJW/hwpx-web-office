@@ -1,0 +1,231 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_module_audits_v1",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+  "summary": {
+    "modulesTotal": 10,
+    "modulesPassed": 10,
+    "modulesFailed": 0
+  },
+  "moduleResults": [
+    {
+      "id": "field_mapping",
+      "title": "Field mapping",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.648,
+        "summary": "28 passed in 0.10s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "review_panel",
+      "title": "Review panel",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.655,
+        "summary": "23 passed in 0.10s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "approval_gate",
+      "title": "Human approval gate",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.597,
+        "summary": "22 passed in 0.09s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "writer_sandbox",
+      "title": "Sandbox writer",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.823,
+        "summary": "30 passed in 0.28s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "readback_hardening",
+      "title": "Readback hardening",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.855,
+        "summary": "32 passed in 0.32s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "download_review",
+      "title": "Download review",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 6.13,
+        "summary": "26 passed in 5.59s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "final_export_gate",
+      "title": "Final export gate",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 11.353,
+        "summary": "26 passed in 10.82s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "api_batch",
+      "title": "Real-like API batch",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 1.004,
+        "summary": "25 passed in 0.38s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "api_browser_e2e",
+      "title": "API browser E2E",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 4.559,
+        "summary": "29 passed in 3.98s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    },
+    {
+      "id": "user_flow_closeout",
+      "title": "User flow closeout",
+      "status": "PASS",
+      "staticStatus": "PASS",
+      "pytest": {
+        "status": "PASS",
+        "returncode": 0,
+        "attempts": 1,
+        "durationSeconds": 0.604,
+        "summary": "17 passed in 0.05s"
+      },
+      "missingFiles": [],
+      "missingTokens": [],
+      "forbiddenSourceHits": [],
+      "security": {
+        "piiLeak": 0,
+        "rawPathLeak": 0,
+        "rawFilenameLeak": 0
+      }
+    }
+  ],
+  "dirtyBaseline": {
+    "documented": true,
+    "trackedDirty": [],
+    "untrackedCount": 3
+  },
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED"
+  ]
+}

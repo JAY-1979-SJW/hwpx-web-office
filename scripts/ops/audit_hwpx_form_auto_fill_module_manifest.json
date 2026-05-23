@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_module_audit_manifest_v1",
+  "forbiddenSourceTokens": [
+    "openai",
+    "anthropic",
+    "chatcompletion",
+    "gemini",
+    "pytesseract",
+    "easyocr",
+    "paddleocr",
+    "hwpctrl",
+    "import hancom",
+    "write-production",
+    "overwrite-source"
+  ],
+  "modules": [
+    {
+      "id": "field_mapping",
+      "title": "Field mapping",
+      "sourceFiles": ["scripts/hwpx/pipeline/form_field_mapper.py"],
+      "testFiles": ["tests/test_hwpx_form_field_mapping.py"],
+      "requiredTokens": ["AUTO_FILL_READY", "NEEDS_REVIEW", "MISSING_REQUIRED"]
+    },
+    {
+      "id": "review_panel",
+      "title": "Review panel",
+      "sourceFiles": ["scripts/hwpx/pipeline/review_panel.py"],
+      "testFiles": ["tests/test_hwpx_review_panel.py"],
+      "requiredTokens": ["AUTO_FILL_READY", "NEEDS_REVIEW", "MISSING_REQUIRED", "REQUIRED_ATTACHMENT"]
+    },
+    {
+      "id": "approval_gate",
+      "title": "Human approval gate",
+      "sourceFiles": ["scripts/hwpx/pipeline/approval_gate.py"],
+      "testFiles": ["tests/test_hwpx_approval_gate.py"],
+      "requiredTokens": ["CONFIRM_FIELD", "EDIT_VALUE", "HOLD", "REQUEST_ATTACHMENT"]
+    },
+    {
+      "id": "writer_sandbox",
+      "title": "Sandbox writer",
+      "sourceFiles": ["scripts/hwpx/pipeline/form_auto_fill_writer_sandbox.py"],
+      "testFiles": ["tests/test_hwpx_form_auto_fill_writer_sandbox.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_writer_sandbox.py"],
+      "requiredTokens": ["SANDBOX", "source_path", "output_path", "readback"]
+    },
+    {
+      "id": "readback_hardening",
+      "title": "Readback hardening",
+      "sourceFiles": ["scripts/hwpx/pipeline/form_writer_readback_hardening.py"],
+      "testFiles": ["tests/test_hwpx_form_writer_readback_hardening.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_writer_readback_hardening.py"],
+      "requiredTokens": ["readback", "source", "mutation"]
+    },
+    {
+      "id": "download_review",
+      "title": "Download review",
+      "sourceFiles": ["scripts/hwpx/pipeline/form_writer_download_review.py"],
+      "testFiles": ["tests/test_hwpx_form_writer_download_review.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_writer_download_review.py"],
+      "requiredTokens": ["download", "sourceMutated", "readbackFail"]
+    },
+    {
+      "id": "final_export_gate",
+      "title": "Final export gate",
+      "sourceFiles": ["scripts/hwpx/pipeline/form_writer_final_export_gate.py"],
+      "testFiles": ["tests/test_hwpx_form_writer_final_export_gate.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_writer_final_export_gate.py"],
+      "requiredTokens": ["ACCEPTED_BY_USER", "finalExportEnabled", "sourceMutated"]
+    },
+    {
+      "id": "api_batch",
+      "title": "Real-like API batch",
+      "sourceFiles": ["scripts/ops/hwpx_form_autofill_batch_api_route.py"],
+      "testFiles": ["tests/test_hwpx_form_auto_fill_real_like_api_batch.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_real_like_api_batch.py"],
+      "requiredTokens": ["SANDBOX_ONLY", "sourceMutationAllowed", "call_real_like_sandbox"]
+    },
+    {
+      "id": "api_browser_e2e",
+      "title": "API browser E2E",
+      "sourceFiles": [
+        "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.mjs",
+        "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.html"
+      ],
+      "testFiles": ["tests/test_hwpx_form_auto_fill_real_like_api_browser_e2e.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_real_like_api_browser_e2e.py"],
+      "requiredTokens": ["SANDBOX_ONLY", "sourceMutationAllowed", "real-like-sandbox", "batch/result"]
+    },
+    {
+      "id": "user_flow_closeout",
+      "title": "User flow closeout",
+      "sourceFiles": ["docs/reports/HWPX_FORM_AUTO_FILL_USER_FLOW_CLOSEOUT_14.md"],
+      "testFiles": ["tests/test_hwpx_form_auto_fill_user_flow_closeout.py"],
+      "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_user_flow_closeout.py"],
+      "requiredTokens": ["SANDBOX_ONLY", "Prohibited Scope", "Promotion Criteria"]
+    }
+  ]
+}
