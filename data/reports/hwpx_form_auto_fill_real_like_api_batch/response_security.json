@@ -1,0 +1,10 @@
+{
+  "rawPathLeak": 0,
+  "rawFilenameLeak": 0,
+  "piiLeak": 0,
+  "productionWrite": false,
+  "sourceOverwrite": false,
+  "aiApi": false,
+  "ocr": false,
+  "hancomRequired": false
+}

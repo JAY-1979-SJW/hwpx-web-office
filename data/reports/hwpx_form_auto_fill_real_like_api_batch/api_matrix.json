@@ -1,0 +1,11 @@
+{
+  "limit1": "SUCCESS",
+  "limit5": "SUCCESS",
+  "limit10": "SUCCESS",
+  "nonSandboxMode": "BLOCKED_NON_SANDBOX_MODE",
+  "realUserFile": "BLOCKED_REAL_USER_FILE",
+  "readbackFail": "FAILED_READBACK",
+  "sourceMutation": "FAILED_SOURCE_MUTATION",
+  "unexpectedMutation": "FAILED_UNEXPECTED_MUTATION",
+  "securityLeak": "FAILED_SECURITY_LEAK"
+}

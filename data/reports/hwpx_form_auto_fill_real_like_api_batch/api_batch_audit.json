@@ -1,0 +1,169 @@
+{
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_LIKE_API_BATCH",
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "API batch route exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "health endpoint works",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "real-like sandbox endpoint works",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "limit=1 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "limit=5 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "limit=10 supported",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "mode SANDBOX_ONLY enforced",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "sourceMutationAllowed false",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "non-sandbox mode blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "real user file blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "readbackFail shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "unexpectedMutation shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "sourceMutation shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "security leak shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "no raw path in response",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "no raw filename in response",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "no PII in response",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "production write not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "source overwrite not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "previous browser batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "previous sandbox batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}
