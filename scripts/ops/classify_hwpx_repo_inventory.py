@@ -173,7 +173,15 @@ def _infer_zone(path: str) -> str:
     lower = path.lower()
     if any(token in lower for token in ("repo_separation", "repo_inventory", "detailed_separation", "new_file_classification")):
         return "closeout_security"
+    if any(token in lower for token in ("existing_file_classification", "module_log_contract", "module_audits", "persistent_gates", "fail_fast", "zone_gates")):
+        return "closeout_security"
+    if any(token in lower for token in ("api_route", "frontend_contract", "browser_smoke", "browser_batch", "ui_connect", "module_communication")):
+        return "batch_api_browser"
+    if any(token in lower for token in ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")):
+        return "batch_api_browser"
     if any(token in lower for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")):
+        return "input_parse"
+    if any(token in lower for token in ("field_catalog", "index_and_recommend", "type_classification", "construction_work_design")):
         return "input_parse"
     if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):
         return "review_approval"
