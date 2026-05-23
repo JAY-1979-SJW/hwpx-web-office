@@ -17,6 +17,7 @@ from scripts.ops import audit_hwpx_form_auto_fill_construction_work_design as co
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit
 from scripts.ops import build_hwpx_form_auto_fill_gate_dashboard as dashboard_builder
 from scripts.ops import gate_hwpx_form_auto_fill_upload as upload_gate
+from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as manifest_promotion_builder
 from scripts.ops import gate_hwpx_form_auto_fill_module_log_contract as module_log_contract
 from scripts.ops import gate_hwpx_repo_classification_contract as repo_classification_contract_gate
 from scripts.ops import gate_hwpx_repo_existing_file_classification as existing_file_classification_gate
@@ -197,6 +198,42 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             repo_classification_contract_payload=repo_classification_contract_payload,
         )
 
+    manifest_promotion_payload = manifest_promotion_builder.build_manifest_promotion_candidates(
+        report_dir=_output_dir(
+            report_dir,
+            "repo_manifest_promotion_candidates",
+            Path("data") / "reports" / "hwpx_repo_manifest_promotion_candidates",
+        ),
+        contract_payload=repo_classification_contract_payload,
+    )
+    steps.append(
+        _step(
+            "repo_manifest_promotion_candidates",
+            manifest_promotion_payload["verdict"],
+            "FAIL_REPO_MANIFEST_PROMOTION_CANDIDATES",
+        )
+    )
+    if steps[-1]["status"] != "PASS":
+        return _finish(
+            report_dir,
+            run_id,
+            steps,
+            module_payload,
+            None,
+            None,
+            history_summary,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            module_log_contract_payload=module_log_contract_payload,
+            repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
+        )
+
     existing_file_gate_payload = existing_file_classification_gate.run_existing_file_classification_gate(
         report_dir=_output_dir(
             report_dir,
@@ -229,6 +266,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
         )
 
@@ -265,6 +303,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -272,19 +311,19 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     zone_payload = _evaluate_zones_from_module_audit(module_payload)
     steps.append(_step("zone_gates_from_module_audit", zone_payload["verdict"], "FAIL_ZONE_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
 
     upload_payload = upload_gate.run_upload_gate_scenarios(
         report_dir=_output_dir(report_dir, "upload_gate", Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate")
     )
     steps.append(_step("upload_gate", upload_payload["verdict"], "FAIL_UPLOAD_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
 
     construction_payload = construction_audit.audit()
     steps.append(_step("construction_design_audit", construction_payload["verdict"], "FAIL_CONSTRUCTION_DESIGN_AUDIT"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
 
     separation_payload = separation_plan.plan_detailed_separation(
         report_dir=_output_dir(
@@ -295,7 +334,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     )
     steps.append(_step("repo_detailed_separation_plan", separation_payload["verdict"], "FAIL_REPO_DETAILED_SEPARATION_PLAN"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
 
     execution_payload = separation_execution_gate.run_execution_gate(
         report_dir=_output_dir(
@@ -321,6 +360,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -350,6 +390,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -386,6 +427,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -422,6 +464,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -458,6 +501,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
             None,
             module_log_contract_payload=module_log_contract_payload,
             repo_classification_contract_payload=repo_classification_contract_payload,
+            manifest_promotion_payload=manifest_promotion_payload,
             existing_file_gate_payload=existing_file_gate_payload,
             new_file_gate_payload=new_file_gate_payload,
         )
@@ -479,6 +523,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         None,
         module_log_contract_payload=module_log_contract_payload,
         repo_classification_contract_payload=repo_classification_contract_payload,
+        manifest_promotion_payload=manifest_promotion_payload,
         existing_file_gate_payload=existing_file_gate_payload,
         new_file_gate_payload=new_file_gate_payload,
     )
@@ -506,6 +551,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         dashboard,
         module_log_contract_payload=module_log_contract_payload,
         repo_classification_contract_payload=repo_classification_contract_payload,
+        manifest_promotion_payload=manifest_promotion_payload,
         existing_file_gate_payload=existing_file_gate_payload,
         new_file_gate_payload=new_file_gate_payload,
     )
@@ -528,6 +574,7 @@ def _finish(
     dashboard: dict[str, Any] | None,
     module_log_contract_payload: dict[str, Any] | None = None,
     repo_classification_contract_payload: dict[str, Any] | None = None,
+    manifest_promotion_payload: dict[str, Any] | None = None,
     existing_file_gate_payload: dict[str, Any] | None = None,
     new_file_gate_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -553,6 +600,8 @@ def _finish(
         "moduleLogContractVerdict": (module_log_contract_payload or {}).get("verdict"),
         "repoClassificationContractSummary": (repo_classification_contract_payload or {}).get("summary"),
         "repoClassificationContractVerdict": (repo_classification_contract_payload or {}).get("verdict"),
+        "repoManifestPromotionSummary": (manifest_promotion_payload or {}).get("summary"),
+        "repoManifestPromotionVerdict": (manifest_promotion_payload or {}).get("verdict"),
         "existingFileClassificationSummary": (existing_file_gate_payload or {}).get("summary"),
         "existingFileClassificationVerdict": (existing_file_gate_payload or {}).get("verdict"),
         "newFileClassificationSummary": (new_file_gate_payload or {}).get("summary"),

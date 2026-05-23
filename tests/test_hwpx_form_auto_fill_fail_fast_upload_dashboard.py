@@ -140,6 +140,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
         "module_audit_history",
         "module_log_contract",
         "repo_classification_contract",
+        "repo_manifest_promotion_candidates",
         "repo_existing_file_classification",
         "repo_new_file_classification",
         "zone_gates_from_module_audit",
@@ -162,6 +163,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
     assert result["separationFinalExecutionApprovalVerdict"] == fail_fast.final_execution_approval_gate.PASS_VERDICT
     assert result["moduleLogContractVerdict"] == fail_fast.module_log_contract.PASS_VERDICT
     assert result["repoClassificationContractVerdict"] == fail_fast.repo_classification_contract_gate.PASS_VERDICT
+    assert result["repoManifestPromotionVerdict"] == fail_fast.manifest_promotion_builder.PASS_VERDICT
     assert result["existingFileClassificationVerdict"] == fail_fast.existing_file_classification_gate.PASS_VERDICT
     assert result["newFileClassificationVerdict"] == fail_fast.new_file_classification_gate.PASS_VERDICT
 

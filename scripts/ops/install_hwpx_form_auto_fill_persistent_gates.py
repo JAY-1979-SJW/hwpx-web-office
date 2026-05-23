@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
+from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as manifest_promotion_builder  # noqa: E402
 from scripts.ops import gate_hwpx_repo_classification_contract as repo_contract_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_existing_file_classification as existing_file_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_new_file_classification as new_file_gate  # noqa: E402
@@ -105,6 +106,7 @@ def validate_manifests(
         _check("A12", "new file classification gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_new_file_classification.py").is_file()),
         _check("A13", "existing file classification gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_existing_file_classification.py").is_file()),
         _check("A14", "repo classification contract gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_classification_contract.py").is_file()),
+        _check("A15", "manifest promotion builder exists", (ROOT / "scripts" / "ops" / "build_hwpx_repo_manifest_promotion_candidates.py").is_file()),
     ]
 
     link_errors = []
@@ -129,8 +131,8 @@ def validate_manifests(
 
     checks.extend(
         [
-            _check("A15", "module links reference known modules", not link_errors),
-            _check("A16", "module communication remains sandbox and safe", not unsafe_modules),
+            _check("A16", "module links reference known modules", not link_errors),
+            _check("A17", "module communication remains sandbox and safe", not unsafe_modules),
         ]
     )
 
@@ -170,6 +172,7 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         "enabled": run_smoke,
         "moduleAudit": None,
         "repoClassificationContract": None,
+        "manifestPromotion": None,
         "newFileGate": None,
         "existingFileGate": None,
         "zoneGate": None,
@@ -182,6 +185,10 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         )
         repo_contract_result = repo_contract_gate.run_repo_classification_contract_gate(
             report_dir=report_dir / "repo_classification_contract_smoke",
+        )
+        manifest_promotion_result = manifest_promotion_builder.build_manifest_promotion_candidates(
+            report_dir=report_dir / "manifest_promotion_smoke",
+            contract_payload=repo_contract_result,
         )
         new_file_result = new_file_gate.run_new_file_classification_gate(
             report_dir=report_dir / "new_file_gate_smoke",
@@ -203,6 +210,10 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
             "verdict": repo_contract_result["verdict"],
             "summary": repo_contract_result["summary"],
         }
+        smoke_runs["manifestPromotion"] = {
+            "verdict": manifest_promotion_result["verdict"],
+            "summary": manifest_promotion_result["summary"],
+        }
         smoke_runs["newFileGate"] = {
             "verdict": new_file_result["verdict"],
             "summary": new_file_result["summary"],
@@ -217,11 +228,12 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         }
         checks.extend(
             [
-                _check("A17", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
-                _check("A18", "representative repo classification contract gate runs", repo_contract_result["verdict"] == repo_contract_gate.PASS_VERDICT),
-                _check("A19", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
-                _check("A20", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
-                _check("A21", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
+                _check("A18", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
+                _check("A19", "representative repo classification contract gate runs", repo_contract_result["verdict"] == repo_contract_gate.PASS_VERDICT),
+                _check("A20", "representative manifest promotion builder runs", manifest_promotion_result["verdict"] == manifest_promotion_builder.PASS_VERDICT),
+                _check("A21", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
+                _check("A22", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
+                _check("A23", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
             ]
         )
 
@@ -240,6 +252,7 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         "commands": [
             "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
             "python scripts/ops/gate_hwpx_repo_classification_contract.py",
+            "python scripts/ops/build_hwpx_repo_manifest_promotion_candidates.py",
             "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
             "python scripts/ops/gate_hwpx_repo_existing_file_classification.py",
             "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
