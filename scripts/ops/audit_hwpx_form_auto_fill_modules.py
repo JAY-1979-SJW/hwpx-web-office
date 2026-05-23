@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -49,8 +51,14 @@ def _run_pytest(paths: list[str], timeout: int) -> dict[str, Any]:
     attempts = 0
     for attempt in (1, 2):
         attempts = attempt
+        cmd = [sys.executable, "-m", "pytest", *paths, "-q", "--tb=short"]
+        if attempt > 1:
+            safe_name = "_".join(Path(path).stem for path in paths)[:80]
+            basetemp = Path(tempfile.gettempdir()) / "hwpx_form_auto_fill_module_audits" / f"{os.getpid()}_{attempt}_{safe_name}"
+            basetemp.parent.mkdir(parents=True, exist_ok=True)
+            cmd.append(f"--basetemp={basetemp}")
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
+            cmd,
             cwd=str(ROOT),
             capture_output=True,
             text=True,
@@ -72,6 +80,22 @@ def _run_pytest(paths: list[str], timeout: int) -> dict[str, Any]:
     }
 
 
+def _run_pytest_combined(paths: list[str], timeout: int) -> dict[str, Any]:
+    started = time.perf_counter()
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", *paths, "-q", "--tb=short"],
+        cwd=str(ROOT),
+        timeout=timeout,
+    )
+    return {
+        "status": "PASS" if result.returncode == 0 else "FAIL",
+        "returncode": result.returncode,
+        "attempts": 1,
+        "durationSeconds": round(time.perf_counter() - started, 3),
+        "summary": f"combined pytest {'passed' if result.returncode == 0 else 'failed'} for {len(paths)} files",
+    }
+
+
 def _is_transient_error(text: str) -> bool:
     lower = text.lower()
     return any(marker.lower() in lower for marker in TRANSIENT_ERROR_MARKERS)
@@ -86,7 +110,7 @@ def _read_source(files: list[str]) -> str:
     return "\n".join(chunks)
 
 
-def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: int) -> dict[str, Any]:
+def audit_module_static(module: dict[str, Any], forbidden_tokens: list[str]) -> dict[str, Any]:
     source_files = module.get("sourceFiles", [])
     test_files = module.get("testFiles", [])
     audit_files = module.get("auditFiles", [])
@@ -96,14 +120,26 @@ def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: i
     combined_text = _read_source(all_files)
     missing_tokens = [token for token in module.get("requiredTokens", []) if token not in combined_text]
     forbidden_hits = [token for token in forbidden_tokens if token.lower() in source_text.lower()]
-    pytest_run = _run_pytest(test_files, timeout) if test_files and not missing_files else {
+    static_status = "PASS" if not missing_files and not missing_tokens and not forbidden_hits else "FAIL"
+    return {
+        "staticStatus": static_status,
+        "missingFiles": missing_files,
+        "missingTokens": missing_tokens,
+        "forbiddenSourceHits": forbidden_hits,
+    }
+
+
+def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: int) -> dict[str, Any]:
+    test_files = module.get("testFiles", [])
+    static = audit_module_static(module, forbidden_tokens)
+    pytest_run = _run_pytest(test_files, timeout) if test_files and not static["missingFiles"] else {
         "status": "FAIL",
         "returncode": 2,
         "attempts": 0,
         "durationSeconds": 0.0,
         "summary": "missing files",
     }
-    static_status = "PASS" if not missing_files and not missing_tokens and not forbidden_hits else "FAIL"
+    static_status = static["staticStatus"]
     status = "PASS" if static_status == "PASS" and pytest_run["status"] == "PASS" else "FAIL"
     return {
         "id": module["id"],
@@ -111,9 +147,9 @@ def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: i
         "status": status,
         "staticStatus": static_status,
         "pytest": pytest_run,
-        "missingFiles": missing_files,
-        "missingTokens": missing_tokens,
-        "forbiddenSourceHits": forbidden_hits,
+        "missingFiles": static["missingFiles"],
+        "missingTokens": static["missingTokens"],
+        "forbiddenSourceHits": static["forbiddenSourceHits"],
         "security": {
             "piiLeak": 0,
             "rawPathLeak": 0,
@@ -137,11 +173,48 @@ def run_module_audits(
     report_dir: Path = REPORT_DIR,
     module_ids: set[str] | None = None,
     timeout: int = 300,
+    combined_pytest: bool = False,
 ) -> dict[str, Any]:
     manifest = load_manifest(manifest_path)
     modules = manifest["modules"]
     selected = [module for module in modules if not module_ids or module["id"] in module_ids]
-    results = [audit_module(module, manifest.get("forbiddenSourceTokens", []), timeout) for module in selected]
+    if combined_pytest and selected:
+        test_files = sorted({path for module in selected for path in module.get("testFiles", [])})
+        combined_run = _run_pytest_combined(test_files, timeout) if test_files else {
+            "status": "FAIL",
+            "returncode": 2,
+            "attempts": 0,
+            "durationSeconds": 0.0,
+            "summary": "missing files",
+        }
+        results = []
+        for module in selected:
+            static = audit_module_static(module, manifest.get("forbiddenSourceTokens", []))
+            pytest_run = combined_run if module.get("testFiles") and not static["missingFiles"] else {
+                "status": "FAIL",
+                "returncode": 2,
+                "attempts": 0,
+                "durationSeconds": 0.0,
+                "summary": "missing files",
+            }
+            status = "PASS" if static["staticStatus"] == "PASS" and pytest_run["status"] == "PASS" else "FAIL"
+            results.append({
+                "id": module["id"],
+                "title": module.get("title", module["id"]),
+                "status": status,
+                "staticStatus": static["staticStatus"],
+                "pytest": pytest_run,
+                "missingFiles": static["missingFiles"],
+                "missingTokens": static["missingTokens"],
+                "forbiddenSourceHits": static["forbiddenSourceHits"],
+                "security": {
+                    "piiLeak": 0,
+                    "rawPathLeak": 0,
+                    "rawFilenameLeak": 0,
+                },
+            })
+    else:
+        results = [audit_module(module, manifest.get("forbiddenSourceTokens", []), timeout) for module in selected]
     failed = [item for item in results if item["status"] != "PASS"]
     payload = {
         "schemaVersion": "hwpx_form_auto_fill_module_audits_v1",

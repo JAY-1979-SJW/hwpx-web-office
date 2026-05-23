@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_gate_dashboard_v1",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_GATE_DASHBOARD",
+  "sections": {
+    "failFast": {
+      "verdict": "PASS_HWPX_FORM_AUTO_FILL_FAIL_FAST_GATE",
+      "failedChecks": 0
+    },
+    "uploadGate": {
+      "verdict": "PASS_HWPX_FORM_AUTO_FILL_UPLOAD_GATE",
+      "accepted": 1,
+      "blocked": 4
+    },
+    "moduleHistory": {
+      "entriesWritten": 10,
+      "modulesPassed": 10,
+      "modulesFailed": 0
+    }
+  },
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "aiApiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED"
+  ]
+}

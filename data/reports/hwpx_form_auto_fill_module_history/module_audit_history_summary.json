@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_module_audit_history_summary_v1",
+  "runId": "ff_20260523T041309Z",
+  "entriesWritten": 10,
+  "modulesPassed": 10,
+  "modulesFailed": 0,
+  "piiLeak": 0,
+  "rawPathLeak": 0,
+  "rawFilenameLeak": 0
+}

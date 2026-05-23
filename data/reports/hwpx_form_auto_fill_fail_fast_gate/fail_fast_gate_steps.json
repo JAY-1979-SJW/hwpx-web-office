@@ -1,0 +1,44 @@
+[
+  {
+    "name": "persistent_gate_installation",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "module_audits",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "module_audit_history",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDIT_HISTORY",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "zone_gates_from_module_audit",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "upload_gate",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_UPLOAD_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "construction_design_audit",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "gate_dashboard",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_GATE_DASHBOARD",
+    "status": "PASS",
+    "failCode": null
+  }
+]

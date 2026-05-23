@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_upload_gate_scenarios_v1",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_UPLOAD_GATE",
+  "summary": {
+    "scenarios": 5,
+    "accepted": 1,
+    "blocked": 4
+  },
+  "results": {
+    "sanitizedSynthetic": {
+      "schemaVersion": "hwpx_form_auto_fill_upload_gate_v1",
+      "mode": "SANDBOX_ONLY",
+      "sourceMutationAllowed": false,
+      "status": "UPLOAD_ACCEPTED_SANITIZED",
+      "blockedReason": null,
+      "sampleId": "sample_3f851aa94dd92dc2",
+      "displayName": "sanitized_building_form",
+      "packageKind": "SYNTHETIC_PACKAGE",
+      "allowedForPreflight": true,
+      "allowedForWriter": false,
+      "security": {
+        "piiRisk": false,
+        "rawPathRisk": false,
+        "rawFilenameRisk": false,
+        "realUserFile": false
+      }
+    },
+    "realUserFile": {
+      "schemaVersion": "hwpx_form_auto_fill_upload_gate_v1",
+      "mode": "SANDBOX_ONLY",
+      "sourceMutationAllowed": false,
+      "status": "BLOCKED",
+      "blockedReason": "BLOCKED_REAL_USER_FILE",
+      "sampleId": "sample_ec136bec64970dfd",
+      "displayName": "sanitized_building_form",
+      "packageKind": "HWPX_PACKAGE",
+      "allowedForPreflight": false,
+      "allowedForWriter": false,
+      "security": {
+        "piiRisk": false,
+        "rawPathRisk": false,
+        "rawFilenameRisk": false,
+        "realUserFile": true
+      }
+    },
+    "piiRisk": {
+      "schemaVersion": "hwpx_form_auto_fill_upload_gate_v1",
+      "mode": "SANDBOX_ONLY",
+      "sourceMutationAllowed": false,
+      "status": "BLOCKED",
+      "blockedReason": "BLOCKED_PII_RISK",
+      "sampleId": "sample_ec136bec64970dfd",
+      "displayName": "sanitized_building_form",
+      "packageKind": "HWPX_PACKAGE",
+      "allowedForPreflight": false,
+      "allowedForWriter": false,
+      "security": {
+        "piiRisk": true,
+        "rawPathRisk": false,
+        "rawFilenameRisk": false,
+        "realUserFile": false
+      }
+    },
+    "rawFilenameRisk": {
+      "schemaVersion": "hwpx_form_auto_fill_upload_gate_v1",
+      "mode": "SANDBOX_ONLY",
+      "sourceMutationAllowed": false,
+      "status": "BLOCKED",
+      "blockedReason": "BLOCKED_RAW_FILENAME_RISK",
+      "sampleId": "sample_d698118e3df3b2d1",
+      "displayName": "sanitized-sample",
+      "packageKind": "HWPX_PACKAGE",
+      "allowedForPreflight": false,
+      "allowedForWriter": false,
+      "security": {
+        "piiRisk": false,
+        "rawPathRisk": false,
+        "rawFilenameRisk": true,
+        "realUserFile": false
+      }
+    },
+    "nonSandbox": {
+      "schemaVersion": "hwpx_form_auto_fill_upload_gate_v1",
+      "mode": "SANDBOX_ONLY",
+      "sourceMutationAllowed": false,
+      "status": "BLOCKED",
+      "blockedReason": "BLOCKED_NON_SANDBOX_MODE",
+      "sampleId": "sample_ec136bec64970dfd",
+      "displayName": "sanitized_building_form",
+      "packageKind": "HWPX_PACKAGE",
+      "allowedForPreflight": false,
+      "allowedForWriter": false,
+      "security": {
+        "piiRisk": false,
+        "rawPathRisk": false,
+        "rawFilenameRisk": false,
+        "realUserFile": false
+      }
+    }
+  },
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "aiApiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_UPLOAD_GATE_METADATA_ONLY"
+  ]
+}
