@@ -503,6 +503,7 @@ All future work in this repository follows the execution control rule documented
 The mandatory operating rule is:
 - every distinct work item must have its own task standard
 - the task standard must be shown first
+- reports and next-task proposals must also be shown first in the current conversation
 - the user must explicitly approve it
 - only then may implementation, test expansion, staging, or commit work begin
 

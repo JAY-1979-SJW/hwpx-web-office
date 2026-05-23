@@ -120,7 +120,39 @@ Operational reporting rule:
 - if work continues, progress must be reported periodically in the conversation
 - long-running commands must be accompanied by intermediate status updates
 
-## RULE-08: Repo governance changes also require approval
+## RULE-08: All standards and reports must be shown in the current conversation first
+
+Before saving, editing, committing, or executing task work, the following must be shown in the current conversation first:
+- task standards
+- execution reports
+- completion reports
+- next-task proposals
+- next-task standards
+
+This rule applies to:
+- new task standards
+- updated task standards
+- implementation result summaries
+- follow-up task proposals
+
+Required sequence:
+1. show the report or standard in the current conversation
+2. obtain explicit approval when approval is required
+3. only then save files, edit files, run the approved task, or commit task-scoped changes
+
+## RULE-09: Detailed reporting is mandatory for every completed task step
+
+After a task step is completed, the report in the current conversation must include:
+- what changed
+- which files changed
+- why the change was made
+- what was validated
+- what remains on hold
+- what the next task is
+
+Short “done” responses are not sufficient for governed work.
+
+## RULE-10: Repo governance changes also require approval
 
 The following are governed changes and require a task standard plus approval:
 - module manifest updates
@@ -131,7 +163,7 @@ The following are governed changes and require a task standard plus approval:
 - hook/precheck rule changes
 - repo separation rules
 
-## RULE-09: This rule overrides informal “just do it” execution
+## RULE-11: This rule overrides informal “just do it” execution
 
 Even when the user asks to continue generally, implementation still requires:
 - a task-specific standard
@@ -139,7 +171,7 @@ Even when the user asks to continue generally, implementation still requires:
 
 This rule is intended to keep execution auditable, bounded, and reviewable.
 
-## RULE-10: Standard documents are part of the engineering control surface
+## RULE-12: Standard documents are part of the engineering control surface
 
 Task standards are not informal notes.
 
