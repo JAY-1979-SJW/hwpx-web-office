@@ -1,0 +1,96 @@
+[
+  {
+    "id": "input_parse",
+    "title": "Input / parse / mapping",
+    "status": "PASS",
+    "modules": [
+      "field_mapping"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  },
+  {
+    "id": "review_approval",
+    "title": "Review / approval",
+    "status": "PASS",
+    "modules": [
+      "approval_gate",
+      "review_panel"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  },
+  {
+    "id": "writer_readback",
+    "title": "Sandbox writer / readback",
+    "status": "PASS",
+    "modules": [
+      "readback_hardening",
+      "writer_sandbox"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  },
+  {
+    "id": "download_export",
+    "title": "Download review / final export",
+    "status": "PASS",
+    "modules": [
+      "download_review",
+      "final_export_gate"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  },
+  {
+    "id": "batch_api_browser",
+    "title": "Real-like batch / API / browser",
+    "status": "PASS",
+    "modules": [
+      "api_batch",
+      "api_browser_e2e"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  },
+  {
+    "id": "closeout_security",
+    "title": "Closeout / security / prohibited scope",
+    "status": "PASS",
+    "modules": [
+      "user_flow_closeout"
+    ],
+    "moduleVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+    "failedModules": [],
+    "security": {
+      "piiLeak": 0,
+      "rawPathLeak": 0,
+      "rawFilenameLeak": 0
+    }
+  }
+]

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_zone_gate_manifest_v1",
+  "zones": [
+    {
+      "id": "input_parse",
+      "title": "Input / parse / mapping",
+      "modules": ["field_mapping"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    },
+    {
+      "id": "review_approval",
+      "title": "Review / approval",
+      "modules": ["review_panel", "approval_gate"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    },
+    {
+      "id": "writer_readback",
+      "title": "Sandbox writer / readback",
+      "modules": ["writer_sandbox", "readback_hardening"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    },
+    {
+      "id": "download_export",
+      "title": "Download review / final export",
+      "modules": ["download_review", "final_export_gate"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    },
+    {
+      "id": "batch_api_browser",
+      "title": "Real-like batch / API / browser",
+      "modules": ["api_batch", "api_browser_e2e"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    },
+    {
+      "id": "closeout_security",
+      "title": "Closeout / security / prohibited scope",
+      "modules": ["user_flow_closeout"],
+      "requiredVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    }
+  ],
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED"
+  ]
+}
