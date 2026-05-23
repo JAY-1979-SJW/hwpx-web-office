@@ -81,8 +81,15 @@
     {
       "id": "api_batch",
       "title": "Real-like API batch",
-      "sourceFiles": ["scripts/ops/hwpx_form_autofill_batch_api_route.py"],
-      "testFiles": ["tests/test_hwpx_form_auto_fill_real_like_api_batch.py"],
+      "sourceFiles": [
+        "scripts/ops/hwpx_form_autofill_batch_api_route.py",
+        "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
+        "scripts/ops/hwpx_form_autofill_api_route.py"
+      ],
+      "testFiles": [
+        "tests/test_hwpx_form_auto_fill_real_like_api_batch.py",
+        "tests/test_hwpx_form_autofill_api_route.py"
+      ],
       "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_real_like_api_batch.py"],
       "requiredTokens": ["SANDBOX_ONLY", "sourceMutationAllowed", "call_real_like_sandbox"]
     },
