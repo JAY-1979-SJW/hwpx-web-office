@@ -17,8 +17,19 @@
     {
       "id": "field_mapping",
       "title": "Field mapping",
-      "sourceFiles": ["scripts/hwpx/pipeline/form_field_mapper.py"],
-      "testFiles": ["tests/test_hwpx_form_field_mapping.py"],
+      "sourceFiles": [
+        "scripts/hwpx/pipeline/form_field_mapper.py",
+        "scripts/hwpx/pipeline/form_auto_fill_real_file_preflight.py",
+        "scripts/hwpx/pipeline/upload_document_parser.py"
+      ],
+      "testFiles": [
+        "tests/test_hwpx_form_field_mapping.py",
+        "tests/test_hwpx_form_auto_fill_construction_work_design.py",
+        "tests/test_hwpx_form_auto_fill_real_file_preflight.py",
+        "tests/test_hwpx_form_field_catalog.py",
+        "tests/test_hwpx_form_index_and_recommend.py",
+        "tests/test_hwpx_form_type_classification.py"
+      ],
       "requiredTokens": ["AUTO_FILL_READY", "NEEDS_REVIEW", "MISSING_REQUIRED"]
     },
     {

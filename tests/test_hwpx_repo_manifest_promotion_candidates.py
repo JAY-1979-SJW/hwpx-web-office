@@ -22,7 +22,8 @@ def test_02_real_repo_candidates_pass(tmp_path: Path) -> None:
     result = builder.build_manifest_promotion_candidates(report_dir=tmp_path)
     assert result["verdict"] == builder.PASS_VERDICT
     assert result["contractVerdict"] == contract_gate.PASS_VERDICT
-    assert result["summary"]["manifestPromotionCandidates"] >= 1
+    assert result["summary"]["stablePathMappedFiles"] == 37
+    assert result["summary"]["manifestPromotionCandidates"] == 37
 
 
 def test_03_target_key_routing() -> None:
@@ -63,7 +64,12 @@ def test_05_reports_are_written(tmp_path: Path) -> None:
     assert (tmp_path / "manifest_promotion_candidates_summary.md").is_file()
 
 
-def test_06_reports_have_no_leaks(tmp_path: Path) -> None:
+def test_06_field_mapping_candidates_removed_after_promotion(tmp_path: Path) -> None:
+    result = builder.build_manifest_promotion_candidates(report_dir=tmp_path)
+    assert "field_mapping" not in result["moduleBreakdown"]
+
+
+def test_07_reports_have_no_leaks(tmp_path: Path) -> None:
     builder.build_manifest_promotion_candidates(report_dir=tmp_path)
     for path in tmp_path.iterdir():
         text = path.read_text(encoding="utf-8")
@@ -72,7 +78,7 @@ def test_06_reports_have_no_leaks(tmp_path: Path) -> None:
         assert not builder.inventory.PII_RE.search(text)
 
 
-def test_07_json_reports_valid(tmp_path: Path) -> None:
+def test_08_json_reports_valid(tmp_path: Path) -> None:
     builder.build_manifest_promotion_candidates(report_dir=tmp_path)
     json.loads((tmp_path / "manifest_promotion_candidates_summary.json").read_text(encoding="utf-8"))
     json.loads((tmp_path / "manifest_promotion_candidates.json").read_text(encoding="utf-8"))
