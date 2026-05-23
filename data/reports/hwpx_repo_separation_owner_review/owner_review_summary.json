@@ -1,0 +1,284 @@
+{
+  "schemaVersion": "hwpx_repo_separation_owner_review_packets_v1",
+  "verdict": "PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS",
+  "baselineHead": "fbfb29f",
+  "mode": "OWNER_REVIEW_PENDING",
+  "summary": {
+    "packets": 9,
+    "pendingPackets": 9,
+    "approvedPackets": 0,
+    "executionAllowedPackets": 0,
+    "holdPackets": 2,
+    "totalFiles": 955
+  },
+  "ownerReviewPackets": [
+    {
+      "packetId": "owner_review_runtime_autofill_line",
+      "packageId": "pkg_runtime_autofill_line",
+      "areaId": "runtime_autofill_line",
+      "reviewTrack": "GATE_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 18,
+      "reviewRequiredFiles": 6,
+      "operation": "REVIEW_AND_GATE_ONLY",
+      "movePolicy": "no_move_until_gate_green",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_hwpx_core_library",
+      "packageId": "pkg_hwpx_core_library",
+      "areaId": "hwpx_core_library",
+      "reviewTrack": "DEPENDENCY_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 184,
+      "reviewRequiredFiles": 42,
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "movePolicy": "no_move_until_import_impact_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_frontend_viewer_shell",
+      "packageId": "pkg_frontend_viewer_shell",
+      "areaId": "frontend_viewer_shell",
+      "reviewTrack": "DEPENDENCY_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 28,
+      "reviewRequiredFiles": 0,
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "movePolicy": "no_move_until_route_contract_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_audit_gate_layer",
+      "packageId": "pkg_audit_gate_layer",
+      "areaId": "audit_gate_layer",
+      "reviewTrack": "GATE_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 120,
+      "reviewRequiredFiles": 50,
+      "operation": "REVIEW_AND_GATE_ONLY",
+      "movePolicy": "no_move_until_gate_bootstrap_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_test_support_layer",
+      "packageId": "pkg_test_support_layer",
+      "areaId": "test_support_layer",
+      "reviewTrack": "DEPENDENCY_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 169,
+      "reviewRequiredFiles": 86,
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "movePolicy": "no_move_until_test_owner_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_docs_reports_layer",
+      "packageId": "pkg_docs_reports_layer",
+      "areaId": "docs_reports_layer",
+      "reviewTrack": "RETENTION_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 284,
+      "reviewRequiredFiles": 142,
+      "operation": "RETENTION_REVIEW_ONLY",
+      "movePolicy": "no_move_until_report_retention_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_legacy_experiment_quarantine",
+      "packageId": "pkg_legacy_experiment_quarantine",
+      "areaId": "legacy_experiment_quarantine",
+      "reviewTrack": "HOLD_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 149,
+      "reviewRequiredFiles": 149,
+      "operation": "HOLD_ONLY",
+      "movePolicy": "no_move_no_delete_without_owner_approval",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_config_root_layer",
+      "packageId": "pkg_config_root_layer",
+      "areaId": "config_root_layer",
+      "reviewTrack": "CONFIG_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 2,
+      "reviewRequiredFiles": 1,
+      "operation": "CONFIG_REVIEW_ONLY",
+      "movePolicy": "no_move_without_build_review",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    },
+    {
+      "packetId": "owner_review_manual_review_hold",
+      "packageId": "pkg_manual_review_hold",
+      "areaId": "manual_review_hold",
+      "reviewTrack": "HOLD_OWNER_REVIEW",
+      "approvalStatus": "PENDING_OWNER_REVIEW",
+      "fileCount": 1,
+      "reviewRequiredFiles": 1,
+      "operation": "HOLD_ONLY",
+      "movePolicy": "no_move_no_delete_without_owner_approval",
+      "dryRunOnly": true,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false,
+      "requiredChecks": [
+        "confirm_package_owner",
+        "confirm_import_impact_review",
+        "confirm_gate_green",
+        "confirm_no_pii_raw_path_raw_filename",
+        "confirm_no_file_move_delete_archive_without_explicit_approval"
+      ],
+      "blockedUntil": [
+        "owner_review_completed",
+        "gate_regression_passed",
+        "execution_plan_committed_separately"
+      ]
+    }
+  ],
+  "failures": [],
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "fileMoveApproved": false,
+    "fileDeleteApproved": false,
+    "fileArchiveApproved": false,
+    "fileMovePerformed": false,
+    "fileDeletePerformed": false
+  },
+  "warnings": [
+    "WARN_OWNER_REVIEW_PENDING",
+    "WARN_NO_FILE_MOVE_PERFORMED",
+    "WARN_APPROVAL_PACKETS_ONLY"
+  ]
+}

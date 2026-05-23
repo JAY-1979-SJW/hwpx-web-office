@@ -1,16 +1,16 @@
 {
   "schemaVersion": "hwpx_repo_detailed_separation_plan_v1",
   "verdict": "PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN",
-  "baselineHead": "d5297ad",
+  "baselineHead": "fbfb29f",
   "scope": "tracked_files_only_classification_no_move",
   "summary": {
-    "totalFiles": 950,
+    "totalFiles": 955,
     "areas": 9,
     "zones": 11,
     "modules": 10,
     "releaseZonesGated": 6,
     "holdZones": 5,
-    "legacyExperimentFiles": 148,
+    "legacyExperimentFiles": 149,
     "unknownReviewRequiredFiles": 1
   },
   "areaMatrix": [
@@ -221,7 +221,7 @@
     {
       "id": "test_support_layer",
       "title": "Tests and fixtures",
-      "fileCount": 168,
+      "fileCount": 169,
       "categories": [
         "TEST_FIXTURE",
         "TEST_ONLY"
@@ -233,12 +233,12 @@
         "input_parse": 9,
         "review_approval": 2,
         "test_support": 30,
-        "unassigned": 91,
+        "unassigned": 92,
         "writer_readback": 2
       },
       "safetyClasses": {
         "HIGH_REVIEW": 86,
-        "LOW_REVIEW": 29,
+        "LOW_REVIEW": 30,
         "STANDARD_REVIEW": 53
       },
       "riskTags": {
@@ -282,16 +282,16 @@
     {
       "id": "docs_reports_layer",
       "title": "PII-safe reports and closeout docs",
-      "fileCount": 281,
+      "fileCount": 284,
       "categories": [
         "REPORT_DOC"
       ],
       "zones": {
-        "docs_reports": 281
+        "docs_reports": 284
       },
       "safetyClasses": {
         "HIGH_REVIEW": 142,
-        "LOW_REVIEW": 47,
+        "LOW_REVIEW": 50,
         "STANDARD_REVIEW": 92
       },
       "riskTags": {
@@ -335,16 +335,16 @@
     {
       "id": "legacy_experiment_quarantine",
       "title": "Legacy and experimental scripts",
-      "fileCount": 148,
+      "fileCount": 149,
       "categories": [
         "LEGACY_EXPERIMENT"
       ],
       "zones": {
         "hwpx_core": 23,
-        "unassigned": 125
+        "unassigned": 126
       },
       "safetyClasses": {
-        "REVIEW_REQUIRED": 148
+        "REVIEW_REQUIRED": 149
       },
       "riskTags": {
         "AI_API_REVIEW": 1,
@@ -355,7 +355,7 @@
         "RAW_PATH_PATTERN_REVIEW": 16,
         "SOURCE_MUTATION_REVIEW": 28
       },
-      "reviewRequiredFiles": 148,
+      "reviewRequiredFiles": 149,
       "action": "quarantine_before_any_archive_or_split",
       "gatePolicy": "manual_review_required",
       "movePolicy": "no_move_no_delete_without_owner_approval",
@@ -458,7 +458,7 @@
     },
     {
       "zone": "docs_reports",
-      "fileCount": 281,
+      "fileCount": 284,
       "releaseGate": false,
       "gateMode": "inventory_review_only",
       "splitReadiness": "HOLD_FOR_REVIEW"
@@ -500,7 +500,7 @@
     },
     {
       "zone": "unassigned",
-      "fileCount": 223,
+      "fileCount": 225,
       "releaseGate": false,
       "gateMode": "inventory_review_only",
       "splitReadiness": "HOLD_FOR_REVIEW"
