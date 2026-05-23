@@ -1,0 +1,226 @@
+{
+  "task": "HWPX-FORM-AUTO-FILL-WRITER-REAL-LIKE-USER-FLOW-CLOSEOUT-14",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_USER_FLOW_CLOSEOUT",
+  "baselineCommit": "ad53a0f",
+  "dirtyBaseline": {
+    "documented": true,
+    "knownHold": [
+      "change_history_log_modified",
+      "devlog_untracked",
+      "reports_untracked"
+    ],
+    "knownHoldCounts": {
+      "changeHistoryLog": 1,
+      "devlogUntracked": 26,
+      "reportsUntracked": 1
+    },
+    "unexpectedOutsideScope": []
+  },
+  "closeoutSummary": {
+    "completedStages": 18,
+    "currentAllowedScope": [
+      "sanitized synthetic",
+      "real-like sanitized",
+      "SANDBOX_ONLY",
+      "output copy",
+      "readback",
+      "download review",
+      "final export payload",
+      "batch limit 1/5/10",
+      "browser API E2E mock or test server"
+    ],
+    "prohibitedScope": [
+      "real user file",
+      "PII file",
+      "source overwrite",
+      "production write",
+      "final deploy",
+      "AI/OCR fallback",
+      "required Hancom dependency"
+    ],
+    "promotionCriteria": [
+      "30 sanitized real-like samples pass",
+      "readbackFail 0",
+      "sourceMutation 0",
+      "unexpectedMutation 0",
+      "PII/path/filename leak 0",
+      "clear blocked reasons",
+      "upload gate",
+      "PII detection gate",
+      "operational gates separately approved"
+    ]
+  },
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "aiApiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "closeout report exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "all completed stages listed",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "latest baseline commit documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "SANDBOX_ONLY scope documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "real user file prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "source overwrite prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "production write prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "final deploy prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "AI/OCR prohibition documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "Hancom not required documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "promotion criteria documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "previous API browser E2E tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "previous batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "runs": {
+    "closeout": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_user_flow_closeout.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "17 passed in 0.04s"
+    },
+    "apiBrowserE2E": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_like_api_browser_e2e.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "29 passed in 3.98s"
+    },
+    "batch": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_like_api_batch.py",
+        "tests/test_hwpx_form_auto_fill_real_like_browser_batch.py",
+        "tests/test_hwpx_form_auto_fill_real_like_sandbox_batch.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "81 passed in 2.62s"
+    },
+    "writerChain": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_file_preflight.py",
+        "tests/test_hwpx_form_autofill_browser_smoke.py",
+        "tests/test_hwpx_form_autofill_api_route.py",
+        "tests/test_hwpx_form_autofill_frontend_contract.py",
+        "tests/test_hwpx_form_auto_fill_e2e_smoke.py",
+        "tests/test_hwpx_form_writer_final_export_gate.py",
+        "tests/test_hwpx_form_writer_download_review.py",
+        "tests/test_hwpx_form_writer_ui_connect.py",
+        "tests/test_hwpx_form_writer_readback_hardening.py",
+        "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
+        "tests/test_hwpx_approval_gate.py",
+        "tests/test_hwpx_review_panel.py",
+        "tests/test_hwpx_form_field_mapping.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "346 passed in 159.94s (0:02:39)"
+    }
+  },
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}

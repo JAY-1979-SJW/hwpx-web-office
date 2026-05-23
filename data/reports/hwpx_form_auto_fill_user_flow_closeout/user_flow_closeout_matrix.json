@@ -1,0 +1,34 @@
+{
+  "completedStages": 18,
+  "currentAllowedScope": [
+    "sanitized synthetic",
+    "real-like sanitized",
+    "SANDBOX_ONLY",
+    "output copy",
+    "readback",
+    "download review",
+    "final export payload",
+    "batch limit 1/5/10",
+    "browser API E2E mock or test server"
+  ],
+  "prohibitedScope": [
+    "real user file",
+    "PII file",
+    "source overwrite",
+    "production write",
+    "final deploy",
+    "AI/OCR fallback",
+    "required Hancom dependency"
+  ],
+  "promotionCriteria": [
+    "30 sanitized real-like samples pass",
+    "readbackFail 0",
+    "sourceMutation 0",
+    "unexpectedMutation 0",
+    "PII/path/filename leak 0",
+    "clear blocked reasons",
+    "upload gate",
+    "PII detection gate",
+    "operational gates separately approved"
+  ]
+}
