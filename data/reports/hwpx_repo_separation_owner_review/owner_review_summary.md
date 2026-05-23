@@ -1,7 +1,7 @@
 # HWPX Repo Separation Owner Review Packets
 
 - verdict: PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS
-- baseline: 596ae60
+- baseline: e587c7e
 - mode: OWNER_REVIEW_PENDING
 - packets: 9
 - pending: 9
@@ -13,8 +13,8 @@
 - owner_review_runtime_autofill_line: track=GATE_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=18
 - owner_review_hwpx_core_library: track=DEPENDENCY_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=184
 - owner_review_frontend_viewer_shell: track=DEPENDENCY_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=28
-- owner_review_audit_gate_layer: track=GATE_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=123
-- owner_review_test_support_layer: track=DEPENDENCY_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=173
+- owner_review_audit_gate_layer: track=GATE_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=124
+- owner_review_test_support_layer: track=DEPENDENCY_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=174
 - owner_review_docs_reports_layer: track=RETENTION_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=296
 - owner_review_legacy_experiment_quarantine: track=HOLD_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=150
 - owner_review_config_root_layer: track=CONFIG_OWNER_REVIEW status=PENDING_OWNER_REVIEW files=2

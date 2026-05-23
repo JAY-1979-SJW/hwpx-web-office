@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "hwpx_repo_new_file_classification_gate_v1",
+  "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
+  "summary": {
+    "newFiles": 2,
+    "ignoredFiles": 0,
+    "passedFiles": 2,
+    "failedFiles": 0
+  },
+  "newFileResults": [
+    {
+      "safePath": "scripts/ops/gate_hwpx_repo_new_file_classification.py",
+      "category": "AUDIT_GATE",
+      "zone": "closeout_security",
+      "separationPlan": "keep_gate_audit",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tests/test_hwpx_repo_new_file_classification.py",
+      "category": "TEST_ONLY",
+      "zone": "closeout_security",
+      "separationPlan": "keep_test",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    }
+  ],
+  "ignoredSafePaths": [],
+  "failures": [],
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0
+  },
+  "warnings": [
+    "WARN_NEW_FILES_MUST_BE_CLASSIFIED",
+    "WARN_DEVLOG_AND_REPORTS_HOLD_IGNORED"
+  ]
+}

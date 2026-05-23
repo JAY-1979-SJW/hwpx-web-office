@@ -9,6 +9,7 @@
   "moduleCommunicationManifest": "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
   "commands": [
     "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+    "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
     "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
     "python scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py"
   ],

@@ -1,7 +1,7 @@
 # HWPX Repo Separation Approval Decision Gate
 
 - verdict: PASS_HWPX_REPO_SEPARATION_APPROVAL_DECISION_GATE
-- baseline: 596ae60
+- baseline: e587c7e
 - mode: REVIEW_DECISION_ONLY
 - decisions: 9
 - pending: 9

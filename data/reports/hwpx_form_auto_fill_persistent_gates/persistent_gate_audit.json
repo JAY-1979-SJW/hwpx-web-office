@@ -69,25 +69,19 @@
     },
     {
       "code": "A12",
-      "desc": "module links reference known modules",
+      "desc": "new file classification gate exists",
       "status": "PASS",
       "failCode": null
     },
     {
       "code": "A13",
-      "desc": "module communication remains sandbox and safe",
+      "desc": "module links reference known modules",
       "status": "PASS",
       "failCode": null
     },
     {
       "code": "A14",
-      "desc": "representative module audit runs",
-      "status": "PASS",
-      "failCode": null
-    },
-    {
-      "code": "A15",
-      "desc": "representative zone gate runs",
+      "desc": "module communication remains sandbox and safe",
       "status": "PASS",
       "failCode": null
     }

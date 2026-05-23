@@ -1,7 +1,7 @@
 # HWPX Repo Separation Execution Gate
 
 - verdict: PASS_HWPX_REPO_SEPARATION_EXECUTION_GATE
-- baseline: 596ae60
+- baseline: e587c7e
 - mode: DRY_RUN_ONLY
 - executionAllowed: False
 - packages: 9
@@ -13,8 +13,8 @@
 - pkg_runtime_autofill_line: phase=P1_GATE_PROTECTED_REFACTOR_PLAN operation=REVIEW_AND_GATE_ONLY files=18 dryRun=True
 - pkg_hwpx_core_library: phase=P2_DEPENDENCY_IMPACT_REVIEW operation=REVIEW_AND_IMPORT_IMPACT_ONLY files=184 dryRun=True
 - pkg_frontend_viewer_shell: phase=P2_DEPENDENCY_IMPACT_REVIEW operation=REVIEW_AND_IMPORT_IMPACT_ONLY files=28 dryRun=True
-- pkg_audit_gate_layer: phase=P1_GATE_PROTECTED_REFACTOR_PLAN operation=REVIEW_AND_GATE_ONLY files=123 dryRun=True
-- pkg_test_support_layer: phase=P2_DEPENDENCY_IMPACT_REVIEW operation=REVIEW_AND_IMPORT_IMPACT_ONLY files=173 dryRun=True
+- pkg_audit_gate_layer: phase=P1_GATE_PROTECTED_REFACTOR_PLAN operation=REVIEW_AND_GATE_ONLY files=124 dryRun=True
+- pkg_test_support_layer: phase=P2_DEPENDENCY_IMPACT_REVIEW operation=REVIEW_AND_IMPORT_IMPACT_ONLY files=174 dryRun=True
 - pkg_docs_reports_layer: phase=P3_RETENTION_REVIEW operation=RETENTION_REVIEW_ONLY files=296 dryRun=True
 - pkg_legacy_experiment_quarantine: phase=P0_HOLD operation=HOLD_ONLY files=150 dryRun=True
 - pkg_config_root_layer: phase=P4_CONFIG_REVIEW operation=CONFIG_REVIEW_ONLY files=2 dryRun=True

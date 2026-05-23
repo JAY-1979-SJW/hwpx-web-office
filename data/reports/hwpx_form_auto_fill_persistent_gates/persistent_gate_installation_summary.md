@@ -9,6 +9,7 @@
 
 ## Commands
 - python scripts/ops/audit_hwpx_form_auto_fill_modules.py
+- python scripts/ops/gate_hwpx_repo_new_file_classification.py
 - python scripts/ops/gate_hwpx_form_auto_fill_zones.py
 - python scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py
 
@@ -24,7 +25,6 @@
 - PASS A09 global raw payload is disabled
 - PASS A10 global PII payload is disabled
 - PASS A11 production and unsafe endpoints are globally forbidden
-- PASS A12 module links reference known modules
-- PASS A13 module communication remains sandbox and safe
-- PASS A14 representative module audit runs
-- PASS A15 representative zone gate runs
+- PASS A12 new file classification gate exists
+- PASS A13 module links reference known modules
+- PASS A14 module communication remains sandbox and safe

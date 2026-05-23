@@ -12,6 +12,7 @@
     "moduleCommunicationManifest": "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
     "commands": [
       "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+      "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
       "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
       "python scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py"
     ],
@@ -97,25 +98,19 @@
     },
     {
       "code": "A12",
-      "desc": "module links reference known modules",
+      "desc": "new file classification gate exists",
       "status": "PASS",
       "failCode": null
     },
     {
       "code": "A13",
-      "desc": "module communication remains sandbox and safe",
+      "desc": "module links reference known modules",
       "status": "PASS",
       "failCode": null
     },
     {
       "code": "A14",
-      "desc": "representative module audit runs",
-      "status": "PASS",
-      "failCode": null
-    },
-    {
-      "code": "A15",
-      "desc": "representative zone gate runs",
+      "desc": "module communication remains sandbox and safe",
       "status": "PASS",
       "failCode": null
     }
@@ -326,23 +321,10 @@
     ]
   },
   "smokeRuns": {
-    "enabled": true,
-    "moduleAudit": {
-      "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
-      "summary": {
-        "modulesTotal": 1,
-        "modulesPassed": 1,
-        "modulesFailed": 0
-      }
-    },
-    "zoneGate": {
-      "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
-      "summary": {
-        "zonesTotal": 1,
-        "zonesPassed": 1,
-        "zonesFailed": 0
-      }
-    }
+    "enabled": false,
+    "moduleAudit": null,
+    "newFileGate": null,
+    "zoneGate": null
   },
   "security": {
     "piiLeak": 0,

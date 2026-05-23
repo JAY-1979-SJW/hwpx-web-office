@@ -171,6 +171,8 @@ def classify_path(path: str) -> tuple[str, str, str]:
 
 def _infer_zone(path: str) -> str:
     lower = path.lower()
+    if any(token in lower for token in ("repo_separation", "repo_inventory", "detailed_separation", "new_file_classification")):
+        return "closeout_security"
     if any(token in lower for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")):
         return "input_parse"
     if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):

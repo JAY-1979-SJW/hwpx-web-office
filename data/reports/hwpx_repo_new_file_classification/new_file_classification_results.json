@@ -1,0 +1,20 @@
+[
+  {
+    "safePath": "scripts/ops/gate_hwpx_repo_new_file_classification.py",
+    "category": "AUDIT_GATE",
+    "zone": "closeout_security",
+    "separationPlan": "keep_gate_audit",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tests/test_hwpx_repo_new_file_classification.py",
+    "category": "TEST_ONLY",
+    "zone": "closeout_security",
+    "separationPlan": "keep_test",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  }
+]
