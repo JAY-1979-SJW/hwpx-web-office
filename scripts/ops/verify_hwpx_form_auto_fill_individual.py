@@ -46,6 +46,11 @@ DEFAULT_TARGETS = [
     ("missing_review_panel", "tests/test_hwpx_review_panel.py"),
     ("field_mapping", "tests/test_hwpx_form_field_mapping.py"),
 ]
+TRANSIENT_ERROR_MARKERS = (
+    "PermissionError: [WinError 5]",
+    "access is denied",
+    "액세스가 거부되었습니다",
+)
 
 
 def _safe_text(text: str) -> str:
@@ -93,26 +98,42 @@ def _run_target(label: str, rel_path: str, timeout: int) -> dict[str, Any]:
             "status": "FAIL",
             "returncode": 2,
             "durationSeconds": 0.0,
+            "attempts": 0,
             "summary": "target missing",
         }
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", rel_path, "-q", "--tb=no"],
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    result: subprocess.CompletedProcess[str] | None = None
+    summary = "no output"
+    attempts = 0
+    for attempt in (1, 2):
+        attempts = attempt
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", rel_path, "-q", "--tb=no"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        lines = [line.strip() for line in (result.stdout + "\n" + result.stderr).splitlines() if line.strip()]
+        summary = _safe_text(lines[-1] if lines else "no output")
+        if result.returncode == 0 or not _is_transient_error(result.stdout + "\n" + result.stderr):
+            break
+        time.sleep(0.5)
     duration = round(time.perf_counter() - started, 3)
-    lines = [line.strip() for line in (result.stdout + "\n" + result.stderr).splitlines() if line.strip()]
-    summary = _safe_text(lines[-1] if lines else "no output")
+    assert result is not None
     return {
         "label": label,
         "path": rel_path,
         "status": "PASS" if result.returncode == 0 else "FAIL",
         "returncode": result.returncode,
         "durationSeconds": duration,
+        "attempts": attempts,
         "summary": summary,
     }
+
+
+def _is_transient_error(text: str) -> bool:
+    lower = text.lower()
+    return any(marker.lower() in lower for marker in TRANSIENT_ERROR_MARKERS)
 
 
 def _write_json(path: Path, payload: Any) -> None:

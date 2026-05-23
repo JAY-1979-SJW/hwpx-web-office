@@ -4,7 +4,8 @@
     "path": "tests/test_hwpx_form_auto_fill_user_flow_closeout.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.55,
+    "durationSeconds": 0.596,
+    "attempts": 1,
     "summary": "17 passed in 0.04s"
   },
   {
@@ -12,47 +13,53 @@
     "path": "tests/test_hwpx_form_auto_fill_real_like_api_browser_e2e.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 4.198,
-    "summary": "29 passed in 3.66s"
+    "durationSeconds": 4.356,
+    "attempts": 1,
+    "summary": "29 passed in 3.77s"
   },
   {
     "label": "api_batch",
     "path": "tests/test_hwpx_form_auto_fill_real_like_api_batch.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.963,
-    "summary": "25 passed in 0.35s"
+    "durationSeconds": 0.988,
+    "attempts": 1,
+    "summary": "25 passed in 0.38s"
   },
   {
     "label": "browser_batch",
     "path": "tests/test_hwpx_form_auto_fill_real_like_browser_batch.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 2.167,
-    "summary": "24 passed in 1.61s"
+    "durationSeconds": 2.075,
+    "attempts": 1,
+    "summary": "24 passed in 1.52s"
   },
   {
     "label": "sandbox_batch",
     "path": "tests/test_hwpx_form_auto_fill_real_like_sandbox_batch.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 1.165,
-    "summary": "32 passed in 0.59s"
+    "durationSeconds": 1.403,
+    "attempts": 1,
+    "summary": "32 passed in 0.68s"
   },
   {
     "label": "real_file_preflight",
     "path": "tests/test_hwpx_form_auto_fill_real_file_preflight.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.928,
-    "summary": "30 passed in 0.34s"
+    "durationSeconds": 0.925,
+    "attempts": 1,
+    "summary": "30 passed in 0.35s"
   },
   {
     "label": "browser_smoke",
     "path": "tests/test_hwpx_form_autofill_browser_smoke.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 2.567,
+    "durationSeconds": 2.588,
+    "attempts": 1,
     "summary": "31 passed in 2.03s"
   },
   {
@@ -60,87 +67,98 @@
     "path": "tests/test_hwpx_form_autofill_api_route.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 43.123,
-    "summary": "21 passed in 42.53s"
+    "durationSeconds": 45.28,
+    "attempts": 1,
+    "summary": "21 passed in 44.57s"
   },
   {
     "label": "frontend_contract",
     "path": "tests/test_hwpx_form_autofill_frontend_contract.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 83.403,
-    "summary": "21 passed in 82.88s (0:01:22)"
+    "durationSeconds": 89.866,
+    "attempts": 1,
+    "summary": "21 passed in 89.24s (0:01:29)"
   },
   {
     "label": "e2e_smoke",
     "path": "tests/test_hwpx_form_auto_fill_e2e_smoke.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 21.912,
-    "summary": "30 passed in 21.35s"
+    "durationSeconds": 24.821,
+    "attempts": 1,
+    "summary": "30 passed in 24.21s"
   },
   {
     "label": "final_export_gate",
     "path": "tests/test_hwpx_form_writer_final_export_gate.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 12.01,
-    "summary": "26 passed in 11.47s"
+    "durationSeconds": 12.275,
+    "attempts": 1,
+    "summary": "26 passed in 11.75s"
   },
   {
     "label": "download_review",
     "path": "tests/test_hwpx_form_writer_download_review.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 5.861,
-    "summary": "26 passed in 5.30s"
+    "durationSeconds": 5.94,
+    "attempts": 1,
+    "summary": "26 passed in 5.38s"
   },
   {
     "label": "ui_connect",
     "path": "tests/test_hwpx_form_writer_ui_connect.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 3.334,
-    "summary": "26 passed in 2.78s"
+    "durationSeconds": 3.424,
+    "attempts": 1,
+    "summary": "26 passed in 2.86s"
   },
   {
     "label": "readback_hardening",
     "path": "tests/test_hwpx_form_writer_readback_hardening.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.92,
-    "summary": "32 passed in 0.37s"
+    "durationSeconds": 0.893,
+    "attempts": 1,
+    "summary": "32 passed in 0.33s"
   },
   {
     "label": "writer_sandbox",
     "path": "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.886,
-    "summary": "30 passed in 0.28s"
+    "durationSeconds": 0.928,
+    "attempts": 1,
+    "summary": "30 passed in 0.31s"
   },
   {
     "label": "human_approval_gate",
     "path": "tests/test_hwpx_approval_gate.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.666,
-    "summary": "22 passed in 0.10s"
+    "durationSeconds": 0.629,
+    "attempts": 1,
+    "summary": "22 passed in 0.09s"
   },
   {
     "label": "missing_review_panel",
     "path": "tests/test_hwpx_review_panel.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.664,
-    "summary": "23 passed in 0.11s"
+    "durationSeconds": 0.684,
+    "attempts": 1,
+    "summary": "23 passed in 0.10s"
   },
   {
     "label": "field_mapping",
     "path": "tests/test_hwpx_form_field_mapping.py",
     "status": "PASS",
     "returncode": 0,
-    "durationSeconds": 0.733,
-    "summary": "28 passed in 0.11s"
+    "durationSeconds": 0.625,
+    "attempts": 1,
+    "summary": "28 passed in 0.10s"
   }
 ]
