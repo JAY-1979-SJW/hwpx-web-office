@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only

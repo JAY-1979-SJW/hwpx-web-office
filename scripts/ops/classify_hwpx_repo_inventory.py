@@ -118,6 +118,8 @@ def classify_path(path: str) -> tuple[str, str, str]:
     lower = path.lower()
     name = Path(path).name.lower()
 
+    if lower.startswith(".githooks/"):
+        return "CONFIG_BUILD", "unassigned", "keep_git_hooks"
     if path in {".gitignore", "CLAUDE.md"} or name in {"package.json", "package-lock.json", "pyproject.toml"}:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
