@@ -31,8 +31,8 @@ def test_02_real_repo_contract_passes(tmp_path: Path) -> None:
     assert result["verdict"] == gate.PASS_VERDICT
     assert result["existingVerdict"] == existing_gate.PASS_VERDICT
     assert result["newVerdict"] == new_gate.PASS_VERDICT
-    assert result["summary"]["stablePathMappedFiles"] == 34
-    assert result["summary"]["manifestPromotionCandidates"] == 34
+    assert result["summary"]["stablePathMappedFiles"] == 24
+    assert result["summary"]["manifestPromotionCandidates"] == 24
 
 
 def test_03_existing_failure_fails_contract(tmp_path: Path) -> None:
@@ -60,6 +60,7 @@ def test_05_stable_mapping_candidates_are_reported(tmp_path: Path) -> None:
     assert all(item["moduleId"] for item in result["stablePathMappedFiles"])
     assert all(item["moduleId"] != "field_mapping" for item in result["stablePathMappedFiles"])
     assert all(item["moduleId"] != "api_batch" for item in result["stablePathMappedFiles"])
+    assert all(item["moduleId"] == "user_flow_closeout" for item in result["stablePathMappedFiles"])
 
 
 def test_06_manifest_declared_new_file_reduces_failure(tmp_path: Path) -> None:

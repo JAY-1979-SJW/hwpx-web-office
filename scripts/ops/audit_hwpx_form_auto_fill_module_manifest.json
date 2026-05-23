@@ -97,10 +97,22 @@
       "id": "api_browser_e2e",
       "title": "API browser E2E",
       "sourceFiles": [
+        "frontend/web_office_viewer/form_autofill_browser_smoke.mjs",
+        "frontend/web_office_viewer/form_autofill_browser_smoke.html",
+        "scripts/hwpx/pipeline/form_auto_fill_e2e_smoke.py",
+        "scripts/hwpx/pipeline/form_auto_fill_real_like_sandbox_batch.py",
         "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.mjs",
         "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.html"
       ],
-      "testFiles": ["tests/test_hwpx_form_auto_fill_real_like_api_browser_e2e.py"],
+      "testFiles": [
+        "tests/test_hwpx_form_auto_fill_e2e_smoke.py",
+        "tests/test_hwpx_form_auto_fill_real_like_api_browser_e2e.py",
+        "tests/test_hwpx_form_auto_fill_real_like_browser_batch.py",
+        "tests/test_hwpx_form_auto_fill_real_like_sandbox_batch.py",
+        "tests/test_hwpx_form_autofill_browser_smoke.py",
+        "tests/test_hwpx_form_autofill_frontend_contract.py",
+        "tests/test_hwpx_form_writer_ui_connect.py"
+      ],
       "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_real_like_api_browser_e2e.py"],
       "requiredTokens": ["SANDBOX_ONLY", "sourceMutationAllowed", "real-like-sandbox", "batch/result"]
     },
