@@ -1,0 +1,10 @@
+{
+  "healthCalled": true,
+  "realLikeSandboxCalled": true,
+  "resultCalled": true,
+  "productionWriteCalled": false,
+  "sourceOverwriteCalled": false,
+  "finalDeployCalled": false,
+  "aiApiCalled": false,
+  "ocrCalled": false
+}

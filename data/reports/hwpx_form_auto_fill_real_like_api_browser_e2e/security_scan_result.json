@@ -1,0 +1,6 @@
+{
+  "piiLeak": 0,
+  "rawPathLeak": 0,
+  "rawFilenameLeak": 0,
+  "hancomRequired": false
+}

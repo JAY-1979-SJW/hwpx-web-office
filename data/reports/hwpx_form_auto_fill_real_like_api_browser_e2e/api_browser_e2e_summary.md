@@ -1,0 +1,44 @@
+# HWPX Form Auto Fill Real-Like API Browser E2E 13
+
+- verdict: PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_LIKE_API_BROWSER_E2E
+- API browser E2E: PASS
+- API batch: PASS
+- browser batch: PASS
+- sandbox batch: PASS
+- regression: PASS
+- warnings: WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY, WARN_SANDBOX_ONLY, WARN_REAL_USER_FILE_NOT_TESTED, WARN_DEPLOY_NOT_PERFORMED, WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED, WARN_BROWSER_API_E2E_WITH_MOCK_SERVER
+
+## Checks
+- PASS A01 API browser E2E test exists
+- PASS A02 real-like batch page loads
+- PASS A03 health endpoint called
+- PASS A04 limit=1 request works
+- PASS A05 limit=5 request works
+- PASS A06 limit=10 request works
+- PASS A07 batch API called from browser
+- PASS A08 request mode SANDBOX_ONLY
+- PASS A09 request sourceMutationAllowed false
+- PASS A10 request limit preserved
+- PASS A11 batchId rendered
+- PASS A12 result endpoint called
+- PASS A13 SUCCESS shown as success
+- PASS A14 BLOCKED_NON_SANDBOX_MODE shown as blocked
+- PASS A15 BLOCKED_REAL_USER_FILE shown as blocked
+- PASS A16 FAILED_READBACK shown as failure
+- PASS A17 FAILED_SOURCE_MUTATION shown as failure
+- PASS A18 FAILED_UNEXPECTED_MUTATION shown as failure
+- PASS A19 FAILED_SECURITY_LEAK shown as failure
+- PASS A20 failure states not shown as success
+- PASS A21 no raw path leak
+- PASS A22 no raw filename leak
+- PASS A23 no PII leak
+- PASS A24 production write not called
+- PASS A25 source overwrite not called
+- PASS A26 final deploy not called
+- PASS A27 AI API not called
+- PASS A28 OCR not called
+- PASS A29 Hancom not required
+- PASS A30 previous API batch tests pass
+- PASS A31 previous browser/sandbox batch tests pass
+- PASS A32 previous writer chain tests pass
+- PASS A33 dirty baseline documented

@@ -1,0 +1,212 @@
+{
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_LIKE_API_BROWSER_E2E",
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "API browser E2E test exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "real-like batch page loads",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "health endpoint called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "limit=1 request works",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "limit=5 request works",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "limit=10 request works",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "batch API called from browser",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "request mode SANDBOX_ONLY",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "request sourceMutationAllowed false",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "request limit preserved",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "batchId rendered",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "result endpoint called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "SUCCESS shown as success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "BLOCKED_NON_SANDBOX_MODE shown as blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "BLOCKED_REAL_USER_FILE shown as blocked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "FAILED_READBACK shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "FAILED_SOURCE_MUTATION shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "FAILED_UNEXPECTED_MUTATION shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "FAILED_SECURITY_LEAK shown as failure",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "failure states not shown as success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "production write not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "source overwrite not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "final deploy not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A29",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A30",
+      "desc": "previous API batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A31",
+      "desc": "previous browser/sandbox batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A32",
+      "desc": "previous writer chain tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A33",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED",
+    "WARN_BROWSER_API_E2E_WITH_MOCK_SERVER"
+  ],
+  "failCodes": []
+}
