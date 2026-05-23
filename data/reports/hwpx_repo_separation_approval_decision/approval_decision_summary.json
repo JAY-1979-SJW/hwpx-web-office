@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "hwpx_repo_separation_approval_decision_gate_v1",
+  "verdict": "PASS_HWPX_REPO_SEPARATION_APPROVAL_DECISION_GATE",
+  "baselineHead": "f63e141",
+  "mode": "REVIEW_DECISION_ONLY",
+  "summary": {
+    "packets": 9,
+    "decisions": 9,
+    "pendingDecisions": 9,
+    "reviewApprovedDecisions": 0,
+    "blockedDecisions": 0,
+    "executionAllowedDecisions": 0
+  },
+  "decisionResults": [
+    {
+      "packetId": "owner_review_runtime_autofill_line",
+      "areaId": "runtime_autofill_line",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_hwpx_core_library",
+      "areaId": "hwpx_core_library",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_frontend_viewer_shell",
+      "areaId": "frontend_viewer_shell",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_audit_gate_layer",
+      "areaId": "audit_gate_layer",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_test_support_layer",
+      "areaId": "test_support_layer",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_docs_reports_layer",
+      "areaId": "docs_reports_layer",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_legacy_experiment_quarantine",
+      "areaId": "legacy_experiment_quarantine",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_config_root_layer",
+      "areaId": "config_root_layer",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    },
+    {
+      "packetId": "owner_review_manual_review_hold",
+      "areaId": "manual_review_hold",
+      "decision": "PENDING",
+      "status": "PENDING",
+      "blockedReasons": [],
+      "reviewApproved": false,
+      "executionAllowed": false,
+      "approvedForMove": false,
+      "approvedForDelete": false,
+      "approvedForArchive": false
+    }
+  ],
+  "blockedReasons": [],
+  "failures": [],
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "fileMoveApproved": false,
+    "fileDeleteApproved": false,
+    "fileArchiveApproved": false,
+    "fileMovePerformed": false,
+    "fileDeletePerformed": false
+  },
+  "warnings": [
+    "WARN_REVIEW_DECISION_ONLY",
+    "WARN_EXECUTION_APPROVAL_NOT_ALLOWED",
+    "WARN_OWNER_REVIEW_DECISIONS_PENDING"
+  ]
+}

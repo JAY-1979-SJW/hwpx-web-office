@@ -1,10 +1,10 @@
 {
   "schemaVersion": "hwpx_repo_detailed_separation_plan_v1",
   "verdict": "PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN",
-  "baselineHead": "fbfb29f",
+  "baselineHead": "f63e141",
   "scope": "tracked_files_only_classification_no_move",
   "summary": {
-    "totalFiles": 955,
+    "totalFiles": 960,
     "areas": 9,
     "zones": 11,
     "modules": 10,
@@ -168,16 +168,16 @@
     {
       "id": "audit_gate_layer",
       "title": "Audits, gates, installers, dashboards",
-      "fileCount": 120,
+      "fileCount": 121,
       "categories": [
         "AUDIT_GATE"
       ],
       "zones": {
-        "closeout_security": 120
+        "closeout_security": 121
       },
       "safetyClasses": {
         "HIGH_REVIEW": 50,
-        "LOW_REVIEW": 36,
+        "LOW_REVIEW": 37,
         "STANDARD_REVIEW": 34
       },
       "riskTags": {
@@ -221,7 +221,7 @@
     {
       "id": "test_support_layer",
       "title": "Tests and fixtures",
-      "fileCount": 169,
+      "fileCount": 170,
       "categories": [
         "TEST_FIXTURE",
         "TEST_ONLY"
@@ -233,12 +233,12 @@
         "input_parse": 9,
         "review_approval": 2,
         "test_support": 30,
-        "unassigned": 92,
+        "unassigned": 93,
         "writer_readback": 2
       },
       "safetyClasses": {
         "HIGH_REVIEW": 86,
-        "LOW_REVIEW": 30,
+        "LOW_REVIEW": 31,
         "STANDARD_REVIEW": 53
       },
       "riskTags": {
@@ -282,16 +282,16 @@
     {
       "id": "docs_reports_layer",
       "title": "PII-safe reports and closeout docs",
-      "fileCount": 284,
+      "fileCount": 287,
       "categories": [
         "REPORT_DOC"
       ],
       "zones": {
-        "docs_reports": 284
+        "docs_reports": 287
       },
       "safetyClasses": {
         "HIGH_REVIEW": 142,
-        "LOW_REVIEW": 50,
+        "LOW_REVIEW": 53,
         "STANDARD_REVIEW": 92
       },
       "riskTags": {
@@ -451,14 +451,14 @@
     },
     {
       "zone": "closeout_security",
-      "fileCount": 148,
+      "fileCount": 149,
       "releaseGate": true,
       "gateMode": "module_audit_and_zone_gate",
       "splitReadiness": "GATED"
     },
     {
       "zone": "docs_reports",
-      "fileCount": 284,
+      "fileCount": 287,
       "releaseGate": false,
       "gateMode": "inventory_review_only",
       "splitReadiness": "HOLD_FOR_REVIEW"
@@ -500,7 +500,7 @@
     },
     {
       "zone": "unassigned",
-      "fileCount": 225,
+      "fileCount": 226,
       "releaseGate": false,
       "gateMode": "inventory_review_only",
       "splitReadiness": "HOLD_FOR_REVIEW"
