@@ -130,6 +130,7 @@ def evaluate_existing_files(
         category, zone, separation_plan = inventory.classify_path(path)
         declared_module = declared_map.get(path)
         resolved_module = declared_module or _infer_module_id(path, zone)
+        resolution_source = "manifestDeclaration" if declared_module else ("stablePathMapping" if resolved_module else None)
         file_failures: list[str] = []
         if category == "UNKNOWN_REVIEW_REQUIRED":
             file_failures.append(new_file_gate.FAIL_NEW_FILE_UNKNOWN_CLASSIFICATION)
@@ -146,6 +147,7 @@ def evaluate_existing_files(
                 "separationPlan": separation_plan,
                 "moduleDeclared": bool(declared_module),
                 "moduleId": resolved_module,
+                "resolutionSource": resolution_source,
                 "status": "PASS" if not file_failures else "FAIL",
                 "failures": sorted(set(file_failures)),
             }

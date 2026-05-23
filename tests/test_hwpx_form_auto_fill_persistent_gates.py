@@ -16,6 +16,7 @@ def test_01_manifests_exist() -> None:
     assert installer.MODULE_MANIFEST.is_file()
     assert installer.ZONE_MANIFEST.is_file()
     assert installer.COMM_MANIFEST.is_file()
+    assert (ROOT / "scripts" / "ops" / "gate_hwpx_repo_classification_contract.py").is_file()
     assert (ROOT / "scripts" / "ops" / "gate_hwpx_repo_new_file_classification.py").is_file()
     assert (ROOT / "scripts" / "ops" / "gate_hwpx_repo_existing_file_classification.py").is_file()
 
@@ -94,6 +95,7 @@ def test_10_representative_smoke_passes(tmp_path: Path) -> None:
     result = installer.install_persistent_gates(report_dir=tmp_path, run_smoke=True)
     assert result["verdict"] == installer.PASS_VERDICT
     assert result["smokeRuns"]["moduleAudit"]["verdict"] == installer.module_audit.PASS_VERDICT
+    assert result["smokeRuns"]["repoClassificationContract"]["verdict"] == installer.repo_contract_gate.PASS_VERDICT
     assert result["smokeRuns"]["newFileGate"]["verdict"] == installer.new_file_gate.PASS_VERDICT
     assert result["smokeRuns"]["existingFileGate"]["verdict"] == installer.existing_file_gate.PASS_VERDICT
     assert result["smokeRuns"]["zoneGate"]["verdict"] == installer.zone_gate.PASS_VERDICT

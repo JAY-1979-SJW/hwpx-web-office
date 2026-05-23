@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
+from scripts.ops import gate_hwpx_repo_classification_contract as repo_contract_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_existing_file_classification as existing_file_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_new_file_classification as new_file_gate  # noqa: E402
 from scripts.ops import gate_hwpx_form_auto_fill_zones as zone_gate  # noqa: E402
@@ -103,6 +104,7 @@ def validate_manifests(
         ),
         _check("A12", "new file classification gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_new_file_classification.py").is_file()),
         _check("A13", "existing file classification gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_existing_file_classification.py").is_file()),
+        _check("A14", "repo classification contract gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_classification_contract.py").is_file()),
     ]
 
     link_errors = []
@@ -127,8 +129,8 @@ def validate_manifests(
 
     checks.extend(
         [
-            _check("A14", "module links reference known modules", not link_errors),
-            _check("A15", "module communication remains sandbox and safe", not unsafe_modules),
+            _check("A15", "module links reference known modules", not link_errors),
+            _check("A16", "module communication remains sandbox and safe", not unsafe_modules),
         ]
     )
 
@@ -167,6 +169,7 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
     smoke_runs: dict[str, Any] = {
         "enabled": run_smoke,
         "moduleAudit": None,
+        "repoClassificationContract": None,
         "newFileGate": None,
         "existingFileGate": None,
         "zoneGate": None,
@@ -176,6 +179,9 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
             report_dir=report_dir / "module_audit_smoke",
             module_ids={"field_mapping"},
             timeout=180,
+        )
+        repo_contract_result = repo_contract_gate.run_repo_classification_contract_gate(
+            report_dir=report_dir / "repo_classification_contract_smoke",
         )
         new_file_result = new_file_gate.run_new_file_classification_gate(
             report_dir=report_dir / "new_file_gate_smoke",
@@ -193,6 +199,10 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
             "verdict": module_result["verdict"],
             "summary": module_result["summary"],
         }
+        smoke_runs["repoClassificationContract"] = {
+            "verdict": repo_contract_result["verdict"],
+            "summary": repo_contract_result["summary"],
+        }
         smoke_runs["newFileGate"] = {
             "verdict": new_file_result["verdict"],
             "summary": new_file_result["summary"],
@@ -207,10 +217,11 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         }
         checks.extend(
             [
-                _check("A16", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
-                _check("A17", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
-                _check("A18", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
-                _check("A19", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
+                _check("A17", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
+                _check("A18", "representative repo classification contract gate runs", repo_contract_result["verdict"] == repo_contract_gate.PASS_VERDICT),
+                _check("A19", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
+                _check("A20", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
+                _check("A21", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
             ]
         )
 
@@ -228,6 +239,7 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         "moduleCommunicationManifest": "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
         "commands": [
             "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+            "python scripts/ops/gate_hwpx_repo_classification_contract.py",
             "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
             "python scripts/ops/gate_hwpx_repo_existing_file_classification.py",
             "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
