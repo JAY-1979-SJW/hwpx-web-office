@@ -15,14 +15,14 @@
   },
   {
     "zone": "closeout_security",
-    "fileCount": 149,
+    "fileCount": 150,
     "releaseGate": true,
     "gateMode": "module_audit_and_zone_gate",
     "splitReadiness": "GATED"
   },
   {
     "zone": "docs_reports",
-    "fileCount": 290,
+    "fileCount": 293,
     "releaseGate": false,
     "gateMode": "inventory_review_only",
     "splitReadiness": "HOLD_FOR_REVIEW"
@@ -64,7 +64,7 @@
   },
   {
     "zone": "unassigned",
-    "fileCount": 228,
+    "fileCount": 229,
     "releaseGate": false,
     "gateMode": "inventory_review_only",
     "splitReadiness": "HOLD_FOR_REVIEW"

@@ -146,6 +146,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
         "repo_separation_owner_review",
         "repo_separation_approval_decision",
         "repo_separation_execution_plan_draft",
+        "repo_separation_final_execution_approval",
         "gate_dashboard",
     ]:
         assert expected in step_names
@@ -154,6 +155,7 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
     assert result["separationOwnerReviewVerdict"] == fail_fast.owner_review_builder.PASS_VERDICT
     assert result["separationApprovalDecisionVerdict"] == fail_fast.approval_decision_gate.PASS_VERDICT
     assert result["separationExecutionPlanVerdict"] == fail_fast.execution_plan_draft.PASS_VERDICT
+    assert result["separationFinalExecutionApprovalVerdict"] == fail_fast.final_execution_approval_gate.PASS_VERDICT
 
 
 def test_09_fail_fast_reports_have_no_leaks(tmp_path: Path) -> None:

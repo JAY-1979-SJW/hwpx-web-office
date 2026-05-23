@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_separation_owner_review_packets_v1",
   "verdict": "PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS",
-  "baselineHead": "adab265",
+  "baselineHead": "23bae47",
   "mode": "OWNER_REVIEW_PENDING",
   "summary": {
     "packets": 9,
@@ -9,7 +9,7 @@
     "approvedPackets": 0,
     "executionAllowedPackets": 0,
     "holdPackets": 2,
-    "totalFiles": 965
+    "totalFiles": 970
   },
   "ownerReviewPackets": [
     {
@@ -102,7 +102,7 @@
       "areaId": "audit_gate_layer",
       "reviewTrack": "GATE_OWNER_REVIEW",
       "approvalStatus": "PENDING_OWNER_REVIEW",
-      "fileCount": 121,
+      "fileCount": 122,
       "reviewRequiredFiles": 50,
       "operation": "REVIEW_AND_GATE_ONLY",
       "movePolicy": "no_move_until_gate_bootstrap_review",
@@ -130,7 +130,7 @@
       "areaId": "test_support_layer",
       "reviewTrack": "DEPENDENCY_OWNER_REVIEW",
       "approvalStatus": "PENDING_OWNER_REVIEW",
-      "fileCount": 171,
+      "fileCount": 172,
       "reviewRequiredFiles": 86,
       "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
       "movePolicy": "no_move_until_test_owner_review",
@@ -158,7 +158,7 @@
       "areaId": "docs_reports_layer",
       "reviewTrack": "RETENTION_OWNER_REVIEW",
       "approvalStatus": "PENDING_OWNER_REVIEW",
-      "fileCount": 290,
+      "fileCount": 293,
       "reviewRequiredFiles": 142,
       "operation": "RETENTION_REVIEW_ONLY",
       "movePolicy": "no_move_until_report_retention_review",
