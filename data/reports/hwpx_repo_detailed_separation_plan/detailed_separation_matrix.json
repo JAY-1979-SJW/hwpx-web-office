@@ -1,0 +1,421 @@
+[
+  {
+    "id": "runtime_autofill_line",
+    "title": "SANDBOX_ONLY autofill runtime",
+    "fileCount": 18,
+    "categories": [
+      "ACTIVE_AUTOFILL"
+    ],
+    "zones": {
+      "batch_api_browser": 5,
+      "download_export": 2,
+      "input_parse": 3,
+      "review_approval": 2,
+      "unassigned": 4,
+      "writer_readback": 2
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 6,
+      "LOW_REVIEW": 4,
+      "STANDARD_REVIEW": 8
+    },
+    "riskTags": {
+      "HANCOM_DEPENDENCY_REVIEW": 9,
+      "OCR_REVIEW": 10,
+      "RAW_FILENAME_PATTERN_REVIEW": 7,
+      "RAW_PATH_PATTERN_REVIEW": 2,
+      "REAL_USER_FILE_REVIEW": 3,
+      "SOURCE_MUTATION_REVIEW": 6
+    },
+    "reviewRequiredFiles": 6,
+    "action": "protect_with_module_audit_and_zone_gate",
+    "gatePolicy": "required_for_release_zones",
+    "movePolicy": "no_move_until_gate_green",
+    "sampleSafePaths": [
+      "frontend/web_office_viewer/form_autofill_browser_smoke.html",
+      "frontend/web_office_viewer/form_autofill_browser_smoke.mjs",
+      "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.html",
+      "frontend/web_office_viewer/form_autofill_real_like_batch_smoke.mjs",
+      "scripts/hwpx/pipeline/approval_gate.py",
+      "scripts/hwpx/pipeline/form_auto_fill_e2e_smoke.py",
+      "scripts/hwpx/pipeline/form_auto_fill_real_file_preflight.py",
+      "scripts/hwpx/pipeline/form_auto_fill_real_like_sandbox_batch.py",
+      "scripts/hwpx/pipeline/form_auto_fill_writer_sandbox.py",
+      "scripts/hwpx/pipeline/form_field_mapper.py",
+      "scripts/hwpx/pipeline/form_writer_download_review.py",
+      "scripts/hwpx/pipeline/form_writer_final_export_gate.py",
+      "scripts/hwpx/pipeline/form_writer_readback_hardening.py",
+      "scripts/hwpx/pipeline/review_panel.py",
+      "scripts/hwpx/pipeline/upload_document_parser.py",
+      "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
+      "scripts/ops/hwpx_form_autofill_api_route.py",
+      "scripts/ops/hwpx_form_autofill_batch_api_route.py"
+    ]
+  },
+  {
+    "id": "hwpx_core_library",
+    "title": "HWPX core parser and document utilities",
+    "fileCount": 184,
+    "categories": [
+      "ACTIVE_HWPX_CORE"
+    ],
+    "zones": {
+      "hwpx_core": 184
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 42,
+      "LOW_REVIEW": 91,
+      "STANDARD_REVIEW": 51
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 1,
+      "HANCOM_DEPENDENCY_REVIEW": 38,
+      "OCR_REVIEW": 13,
+      "PII_PATTERN_REVIEW": 8,
+      "PRODUCTION_WRITE_REVIEW": 4,
+      "RAW_FILENAME_PATTERN_REVIEW": 37,
+      "RAW_PATH_PATTERN_REVIEW": 6,
+      "SOURCE_MUTATION_REVIEW": 32
+    },
+    "reviewRequiredFiles": 42,
+    "action": "keep_as_shared_core_with_import_review",
+    "gatePolicy": "source_dependency_review_required",
+    "movePolicy": "no_move_until_import_impact_review",
+    "sampleSafePaths": [
+      "scripts/hwpx/ai_proposal/__init__.py",
+      "scripts/hwpx/ai_proposal/ai_proposal_contract.py",
+      "scripts/hwpx/ai_proposal/confidence_policy.py",
+      "scripts/hwpx/ai_proposal/format_normalizer.py",
+      "scripts/hwpx/ai_proposal/review_item_builder.py",
+      "scripts/hwpx/ai_proposal/target_resolver.py",
+      "scripts/hwpx/api_contract/__init__.py",
+      "scripts/hwpx/api_contract/editor_command_contract.py",
+      "scripts/hwpx/audit_hwpx_samples.py",
+      "scripts/hwpx/build_page_capped_review_index.py",
+      "scripts/hwpx/client_parse_hwpx_smoke.py",
+      "scripts/hwpx/convert_local_hwp_inventory_to_hwpx.py",
+      "scripts/hwpx/diagnostics/00_input_signature.py",
+      "scripts/hwpx/diagnostics/01_extract_inventory.py",
+      "scripts/hwpx/diagnostics/02_fidelity_gate.py",
+      "scripts/hwpx/diagnostics/03_convert_smoke.py",
+      "scripts/hwpx/diagnostics/04_audit_log_probe.py",
+      "scripts/hwpx/diagnostics/05_batch_plan_probe.py",
+      "scripts/hwpx/diagnostics/06_roundtrip_text_probe.py",
+      "scripts/hwpx/diagnostics/hwp_diag_common.py"
+    ]
+  },
+  {
+    "id": "frontend_viewer_shell",
+    "title": "Browser viewer and UI shell",
+    "fileCount": 28,
+    "categories": [
+      "FRONTEND_VIEWER"
+    ],
+    "zones": {
+      "browser_ui": 28
+    },
+    "safetyClasses": {
+      "LOW_REVIEW": 26,
+      "STANDARD_REVIEW": 2
+    },
+    "riskTags": {
+      "OCR_REVIEW": 1,
+      "RAW_FILENAME_PATTERN_REVIEW": 1,
+      "RAW_PATH_PATTERN_REVIEW": 1
+    },
+    "reviewRequiredFiles": 0,
+    "action": "protect_browser_contracts",
+    "gatePolicy": "browser_regression_required",
+    "movePolicy": "no_move_until_route_contract_review",
+    "sampleSafePaths": [
+      "frontend/web_office_viewer/cell_edit_self_test.mjs",
+      "frontend/web_office_viewer/cell_edit_state.mjs",
+      "frontend/web_office_viewer/components/FormAutoFillWorkspace.tsx",
+      "frontend/web_office_viewer/components/WebOfficeCellEditor.tsx",
+      "frontend/web_office_viewer/components/WebOfficeFormatPreview.tsx",
+      "frontend/web_office_viewer/components/WebOfficeFormatToolbar.tsx",
+      "frontend/web_office_viewer/components/WebOfficeParagraphBlock.tsx",
+      "frontend/web_office_viewer/components/WebOfficeParagraphEditor.tsx",
+      "frontend/web_office_viewer/components/WebOfficePayloadSummary.tsx",
+      "frontend/web_office_viewer/components/WebOfficeTableBlock.tsx",
+      "frontend/web_office_viewer/components/WebOfficeViewer.tsx",
+      "frontend/web_office_viewer/edit_command.mjs",
+      "frontend/web_office_viewer/format_charpr_matcher.mjs",
+      "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs",
+      "frontend/web_office_viewer/index.html",
+      "frontend/web_office_viewer/para_edit_apply_format_smoke.mjs",
+      "frontend/web_office_viewer/para_edit_browser_self_test.mjs",
+      "frontend/web_office_viewer/para_edit_command.mjs",
+      "frontend/web_office_viewer/para_edit_ime_live_smoke.mjs",
+      "frontend/web_office_viewer/para_edit_normalizer.mjs"
+    ]
+  },
+  {
+    "id": "audit_gate_layer",
+    "title": "Audits, gates, installers, dashboards",
+    "fileCount": 119,
+    "categories": [
+      "AUDIT_GATE"
+    ],
+    "zones": {
+      "closeout_security": 119
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 50,
+      "LOW_REVIEW": 35,
+      "STANDARD_REVIEW": 34
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 29,
+      "HANCOM_DEPENDENCY_REVIEW": 29,
+      "OCR_REVIEW": 38,
+      "PII_PATTERN_REVIEW": 17,
+      "PRODUCTION_WRITE_REVIEW": 7,
+      "RAW_FILENAME_PATTERN_REVIEW": 59,
+      "RAW_PATH_PATTERN_REVIEW": 10,
+      "REAL_USER_FILE_REVIEW": 18,
+      "SOURCE_MUTATION_REVIEW": 39
+    },
+    "reviewRequiredFiles": 50,
+    "action": "keep_as_release_gate_layer",
+    "gatePolicy": "self_audit_required",
+    "movePolicy": "no_move_until_gate_bootstrap_review",
+    "sampleSafePaths": [
+      "scripts/ops/audit_collected_hwpx_inventory.py",
+      "scripts/ops/audit_collected_hwpx_recognition_full.py",
+      "scripts/ops/audit_hwp_hwpx_full_inventory_profile.py",
+      "scripts/ops/audit_hwpx_ai_proposal_contract.py",
+      "scripts/ops/audit_hwpx_ai_recognition_safe_edit_pipeline.py",
+      "scripts/ops/audit_hwpx_api_contract_lock.py",
+      "scripts/ops/audit_hwpx_approval_gate.py",
+      "scripts/ops/audit_hwpx_auto_fill_master.py",
+      "scripts/ops/audit_hwpx_cell_style_postprocess.py",
+      "scripts/ops/audit_hwpx_corpus_profiler.py",
+      "scripts/ops/audit_hwpx_fill_review_audit_learning_log_contract.py",
+      "scripts/ops/audit_hwpx_fill_review_contract.py",
+      "scripts/ops/audit_hwpx_fill_review_evidence_ingestion_contract.py",
+      "scripts/ops/audit_hwpx_fill_review_live_pipeline_integration.py",
+      "scripts/ops/audit_hwpx_fill_review_log_orchestration.py",
+      "scripts/ops/audit_hwpx_fill_review_ui_adapter.py",
+      "scripts/ops/audit_hwpx_fixture_selection.py",
+      "scripts/ops/audit_hwpx_form_auto_fill_construction_work_design.py",
+      "scripts/ops/audit_hwpx_form_auto_fill_e2e_smoke.py",
+      "scripts/ops/audit_hwpx_form_auto_fill_module_manifest.json"
+    ]
+  },
+  {
+    "id": "test_support_layer",
+    "title": "Tests and fixtures",
+    "fileCount": 166,
+    "categories": [
+      "TEST_FIXTURE",
+      "TEST_ONLY"
+    ],
+    "zones": {
+      "batch_api_browser": 4,
+      "closeout_security": 27,
+      "download_export": 2,
+      "input_parse": 9,
+      "review_approval": 2,
+      "test_support": 30,
+      "unassigned": 90,
+      "writer_readback": 2
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 86,
+      "LOW_REVIEW": 28,
+      "STANDARD_REVIEW": 52
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 31,
+      "HANCOM_DEPENDENCY_REVIEW": 54,
+      "OCR_REVIEW": 32,
+      "PII_PATTERN_REVIEW": 45,
+      "PRODUCTION_WRITE_REVIEW": 7,
+      "RAW_FILENAME_PATTERN_REVIEW": 117,
+      "RAW_PATH_PATTERN_REVIEW": 20,
+      "REAL_USER_FILE_REVIEW": 4,
+      "SOURCE_MUTATION_REVIEW": 53
+    },
+    "reviewRequiredFiles": 86,
+    "action": "keep_with_target_module_mapping",
+    "gatePolicy": "pytest_required",
+    "movePolicy": "no_move_until_test_owner_review",
+    "sampleSafePaths": [
+      "scripts/hwpx/test_hancom_hwp_converter_providers.py",
+      "scripts/hwpx/test_hancom_hwp_converter_router.py",
+      "scripts/hwpx/test_hancom_hwpx_delivery_quality_gate.py",
+      "scripts/hwpx/test_hancom_hwpx_form_input_validation.py",
+      "scripts/hwpx/test_hancom_hwpx_form_output_audit.py",
+      "scripts/hwpx/test_hancom_hwpx_special_table_demo.py",
+      "scripts/hwpx/test_hancom_hwpx_table_integrity_audit.py",
+      "scripts/hwpx/test_hancom_hwpx_table_tool.py",
+      "scripts/hwpx/test_hancom_hwpx_work_schedule_demo.py",
+      "scripts/hwpx/test_hancom_provider_promotion_gate.py",
+      "scripts/hwpx/test_hancom_user_present_evidence.py",
+      "scripts/hwpx/test_hwp_full_fidelity_converter.py",
+      "scripts/hwpx/test_hwp_hwp5proc_audit.py",
+      "scripts/hwpx/test_hwp_native_com_batch.py",
+      "scripts/hwpx/test_hwp_realtime_audit_watch.py",
+      "scripts/hwpx/test_hwp_to_hwpx_sdk.py",
+      "scripts/hwpx/test_hwp_to_hwpx_standalone.py",
+      "scripts/hwpx/test_hwpx_delivery_auto_verify.py",
+      "scripts/hwpx/test_hwpx_edit_tool.py",
+      "scripts/hwpx/test_hwpx_header_field_detector.py"
+    ]
+  },
+  {
+    "id": "docs_reports_layer",
+    "title": "PII-safe reports and closeout docs",
+    "fileCount": 273,
+    "categories": [
+      "REPORT_DOC"
+    ],
+    "zones": {
+      "docs_reports": 273
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 142,
+      "LOW_REVIEW": 41,
+      "STANDARD_REVIEW": 90
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 3,
+      "HANCOM_DEPENDENCY_REVIEW": 112,
+      "OCR_REVIEW": 48,
+      "PII_PATTERN_REVIEW": 109,
+      "PRODUCTION_WRITE_REVIEW": 21,
+      "RAW_FILENAME_PATTERN_REVIEW": 74,
+      "RAW_PATH_PATTERN_REVIEW": 16,
+      "REAL_USER_FILE_REVIEW": 42,
+      "SOURCE_MUTATION_REVIEW": 34
+    },
+    "reviewRequiredFiles": 142,
+    "action": "keep_pii_safe_artifacts",
+    "gatePolicy": "leak_scan_required",
+    "movePolicy": "no_move_until_report_retention_review",
+    "sampleSafePaths": [
+      "data/reports/hwpx_form_auto_fill_construction_work_design/construction_work_design_audit.json",
+      "data/reports/hwpx_form_auto_fill_construction_work_design/construction_work_design_checks.json",
+      "data/reports/hwpx_form_auto_fill_construction_work_design/construction_work_design_summary.json",
+      "data/reports/hwpx_form_auto_fill_construction_work_design/construction_work_design_summary.md",
+      "data/reports/hwpx_form_auto_fill_construction_work_design/security_scan_result.json",
+      "data/reports/hwpx_form_auto_fill_fail_fast_gate/fail_fast_gate_steps.json",
+      "data/reports/hwpx_form_auto_fill_fail_fast_gate/fail_fast_gate_summary.json",
+      "data/reports/hwpx_form_auto_fill_fail_fast_gate/fail_fast_gate_summary.md",
+      "data/reports/hwpx_form_auto_fill_gate_dashboard/gate_dashboard.json",
+      "data/reports/hwpx_form_auto_fill_gate_dashboard/gate_dashboard.md",
+      "data/reports/hwpx_form_auto_fill_individual_verification/individual_verification_audits.json",
+      "data/reports/hwpx_form_auto_fill_individual_verification/individual_verification_results.json",
+      "data/reports/hwpx_form_auto_fill_individual_verification/individual_verification_summary.json",
+      "data/reports/hwpx_form_auto_fill_individual_verification/individual_verification_summary.md",
+      "data/reports/hwpx_form_auto_fill_module_audits/module_audit_results.json",
+      "data/reports/hwpx_form_auto_fill_module_audits/module_audit_summary.json",
+      "data/reports/hwpx_form_auto_fill_module_audits/module_audit_summary.md",
+      "data/reports/hwpx_form_auto_fill_module_history/module_audit_history.jsonl",
+      "data/reports/hwpx_form_auto_fill_module_history/module_audit_history_summary.json",
+      "data/reports/hwpx_form_auto_fill_persistent_gates/module_communication_matrix.json"
+    ]
+  },
+  {
+    "id": "legacy_experiment_quarantine",
+    "title": "Legacy and experimental scripts",
+    "fileCount": 147,
+    "categories": [
+      "LEGACY_EXPERIMENT"
+    ],
+    "zones": {
+      "hwpx_core": 23,
+      "unassigned": 124
+    },
+    "safetyClasses": {
+      "REVIEW_REQUIRED": 147
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 1,
+      "HANCOM_DEPENDENCY_REVIEW": 36,
+      "OCR_REVIEW": 3,
+      "PII_PATTERN_REVIEW": 15,
+      "RAW_FILENAME_PATTERN_REVIEW": 16,
+      "RAW_PATH_PATTERN_REVIEW": 16,
+      "SOURCE_MUTATION_REVIEW": 28
+    },
+    "reviewRequiredFiles": 147,
+    "action": "quarantine_before_any_archive_or_split",
+    "gatePolicy": "manual_review_required",
+    "movePolicy": "no_move_no_delete_without_owner_approval",
+    "sampleSafePaths": [
+      "scripts/audit_agency_submission_documents.py",
+      "scripts/audit_api_meta_contract.py",
+      "scripts/audit_api_upload_download_gates.py",
+      "scripts/audit_excel_statement_boundaries.py",
+      "scripts/audit_execution_location_gates.py",
+      "scripts/audit_handler_gate_runtime_connections.py",
+      "scripts/audit_hwpx_browser_editor_structure.py",
+      "scripts/audit_hwpx_download_export_usecase.py",
+      "scripts/audit_hwpx_editor_architecture_gate.py",
+      "scripts/audit_hwpx_engine_boundaries.py",
+      "scripts/audit_hwpx_upload_filetype_gate_hunk.py",
+      "scripts/audit_hwpx_upload_handler_split_readiness.py",
+      "scripts/audit_import_cycles.py",
+      "scripts/audit_integrated_usecase_boundaries.py",
+      "scripts/audit_large_handler_gate_connections.py",
+      "scripts/audit_layer_boundaries.py",
+      "scripts/audit_new_code_structure_rules.py",
+      "scripts/audit_parse_hwpx_handler_usecase_gate.py",
+      "scripts/audit_ui_design_system.py",
+      "scripts/audit_upload_file_gates.py"
+    ]
+  },
+  {
+    "id": "config_root_layer",
+    "title": "Root configuration and build metadata",
+    "fileCount": 2,
+    "categories": [
+      "CONFIG_BUILD"
+    ],
+    "zones": {
+      "unassigned": 2
+    },
+    "safetyClasses": {
+      "HIGH_REVIEW": 1,
+      "LOW_REVIEW": 1
+    },
+    "riskTags": {
+      "PII_PATTERN_REVIEW": 1
+    },
+    "reviewRequiredFiles": 1,
+    "action": "keep_as_root_configuration",
+    "gatePolicy": "config_change_review_required",
+    "movePolicy": "no_move_without_build_review",
+    "sampleSafePaths": [
+      ".gitignore",
+      "CLAUDE.md"
+    ]
+  },
+  {
+    "id": "manual_review_hold",
+    "title": "Unknown files requiring manual review",
+    "fileCount": 1,
+    "categories": [
+      "UNKNOWN_REVIEW_REQUIRED"
+    ],
+    "zones": {
+      "unassigned": 1
+    },
+    "safetyClasses": {
+      "REVIEW_REQUIRED": 1
+    },
+    "riskTags": {
+      "AI_API_REVIEW": 1,
+      "PII_PATTERN_REVIEW": 1
+    },
+    "reviewRequiredFiles": 1,
+    "action": "hold_until_classified",
+    "gatePolicy": "manual_review_required",
+    "movePolicy": "no_move_no_delete_without_owner_approval",
+    "sampleSafePaths": [
+      "logs/change_history.jsonl"
+    ]
+  }
+]

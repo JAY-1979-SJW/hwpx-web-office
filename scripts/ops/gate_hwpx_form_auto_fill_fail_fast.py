@@ -19,6 +19,7 @@ from scripts.ops import build_hwpx_form_auto_fill_gate_dashboard as dashboard_bu
 from scripts.ops import gate_hwpx_form_auto_fill_upload as upload_gate
 from scripts.ops import hwpx_form_auto_fill_module_audit_history as history
 from scripts.ops import install_hwpx_form_auto_fill_persistent_gates as persistent
+from scripts.ops import plan_hwpx_repo_detailed_separation as separation_plan
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_fail_fast_gate"
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_FAIL_FAST_GATE"
@@ -88,7 +89,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     )
     steps.append(_step("persistent_gate_installation", persistent_payload["verdict"], "FAIL_PERSISTENT_GATE_INSTALLATION"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, None, None, None, None, None, None)
 
     module_ids = None if full_module_audit else {"field_mapping"}
     module_payload = module_audit.run_module_audits(
@@ -114,26 +115,37 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         )
     )
     if steps[-2]["status"] != "PASS" or steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, None, None, history_summary, None)
+        return _finish(report_dir, run_id, steps, module_payload, None, None, history_summary, None, None)
 
     zone_payload = _evaluate_zones_from_module_audit(module_payload)
     steps.append(_step("zone_gates_from_module_audit", zone_payload["verdict"], "FAIL_ZONE_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None)
 
     upload_payload = upload_gate.run_upload_gate_scenarios(
         report_dir=_output_dir(report_dir, "upload_gate", Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate")
     )
     steps.append(_step("upload_gate", upload_payload["verdict"], "FAIL_UPLOAD_GATE"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None)
 
     construction_payload = construction_audit.audit()
     steps.append(_step("construction_design_audit", construction_payload["verdict"], "FAIL_CONSTRUCTION_DESIGN_AUDIT"))
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None)
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None)
 
-    preliminary = _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None)
+    separation_payload = separation_plan.plan_detailed_separation(
+        report_dir=_output_dir(
+            report_dir,
+            "detailed_separation_plan",
+            Path("data") / "reports" / "hwpx_repo_detailed_separation_plan",
+        )
+    )
+    steps.append(_step("repo_detailed_separation_plan", separation_payload["verdict"], "FAIL_REPO_DETAILED_SEPARATION_PLAN"))
+    if steps[-1]["status"] != "PASS":
+        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None)
+
+    preliminary = _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None)
     dashboard = dashboard_builder.build_dashboard(
         preliminary,
         upload_payload,
@@ -141,7 +153,7 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         report_dir=_output_dir(report_dir, "gate_dashboard", Path("data") / "reports" / "hwpx_form_auto_fill_gate_dashboard"),
     )
     steps.append(_step("gate_dashboard", dashboard["verdict"], "FAIL_GATE_DASHBOARD"))
-    return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, dashboard)
+    return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, dashboard)
 
 
 def _finish(
@@ -152,6 +164,7 @@ def _finish(
     zone_payload: dict[str, Any] | None,
     upload_payload: dict[str, Any] | None,
     history_summary: dict[str, Any] | None,
+    separation_payload: dict[str, Any] | None,
     dashboard: dict[str, Any] | None,
 ) -> dict[str, Any]:
     failed = [step for step in steps if step["status"] != "PASS"]
@@ -172,6 +185,8 @@ def _finish(
         "zoneSummary": (zone_payload or {}).get("summary"),
         "uploadSummary": (upload_payload or {}).get("summary"),
         "historySummary": history_summary,
+        "separationSummary": (separation_payload or {}).get("summary"),
+        "separationVerdict": (separation_payload or {}).get("verdict"),
         "dashboardVerdict": (dashboard or {}).get("verdict"),
         "security": {
             "piiLeak": 0,

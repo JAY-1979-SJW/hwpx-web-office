@@ -1,0 +1,79 @@
+[
+  {
+    "zone": "batch_api_browser",
+    "fileCount": 9,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  },
+  {
+    "zone": "browser_ui",
+    "fileCount": 28,
+    "releaseGate": false,
+    "gateMode": "inventory_review_only",
+    "splitReadiness": "HOLD_FOR_REVIEW"
+  },
+  {
+    "zone": "closeout_security",
+    "fileCount": 146,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  },
+  {
+    "zone": "docs_reports",
+    "fileCount": 273,
+    "releaseGate": false,
+    "gateMode": "inventory_review_only",
+    "splitReadiness": "HOLD_FOR_REVIEW"
+  },
+  {
+    "zone": "download_export",
+    "fileCount": 4,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  },
+  {
+    "zone": "hwpx_core",
+    "fileCount": 207,
+    "releaseGate": false,
+    "gateMode": "inventory_review_only",
+    "splitReadiness": "HOLD_FOR_REVIEW"
+  },
+  {
+    "zone": "input_parse",
+    "fileCount": 12,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  },
+  {
+    "zone": "review_approval",
+    "fileCount": 4,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  },
+  {
+    "zone": "test_support",
+    "fileCount": 30,
+    "releaseGate": false,
+    "gateMode": "inventory_review_only",
+    "splitReadiness": "HOLD_FOR_REVIEW"
+  },
+  {
+    "zone": "unassigned",
+    "fileCount": 221,
+    "releaseGate": false,
+    "gateMode": "inventory_review_only",
+    "splitReadiness": "HOLD_FOR_REVIEW"
+  },
+  {
+    "zone": "writer_readback",
+    "fileCount": 4,
+    "releaseGate": true,
+    "gateMode": "module_audit_and_zone_gate",
+    "splitReadiness": "GATED"
+  }
+]

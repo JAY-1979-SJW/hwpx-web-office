@@ -141,9 +141,11 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
         "zone_gates_from_module_audit",
         "upload_gate",
         "construction_design_audit",
+        "repo_detailed_separation_plan",
         "gate_dashboard",
     ]:
         assert expected in step_names
+    assert result["separationVerdict"] == fail_fast.separation_plan.PASS_VERDICT
 
 
 def test_09_fail_fast_reports_have_no_leaks(tmp_path: Path) -> None:
@@ -159,4 +161,3 @@ def test_10_report_json_is_valid_after_smoke(tmp_path: Path) -> None:
     fail_fast.run_fail_fast_gate(report_dir=tmp_path, full_module_audit=False)
     json.loads((tmp_path / "fail_fast_gate_summary.json").read_text(encoding="utf-8"))
     json.loads((tmp_path / "fail_fast_gate_steps.json").read_text(encoding="utf-8"))
-

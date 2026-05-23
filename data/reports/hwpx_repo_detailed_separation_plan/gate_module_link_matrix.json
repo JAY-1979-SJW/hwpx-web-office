@@ -1,0 +1,158 @@
+{
+  "moduleCount": 10,
+  "communicationCount": 10,
+  "zoneCount": 6,
+  "releaseZones": [
+    "batch_api_browser",
+    "closeout_security",
+    "download_export",
+    "input_parse",
+    "review_approval",
+    "writer_readback"
+  ],
+  "zoneGateIds": [
+    "batch_api_browser",
+    "closeout_security",
+    "download_export",
+    "input_parse",
+    "review_approval",
+    "writer_readback"
+  ],
+  "allModulesHaveCommunication": true,
+  "allZoneModulesKnown": true,
+  "allReleaseZonesGated": true,
+  "unsafeModules": [],
+  "linkErrors": [],
+  "modules": [
+    {
+      "moduleId": "field_mapping",
+      "zone": "input_parse",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 0,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "review_panel",
+      "zone": "review_approval",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 0,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "approval_gate",
+      "zone": "review_approval",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 0,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "writer_sandbox",
+      "zone": "writer_readback",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": [
+        "write-sandbox"
+      ]
+    },
+    {
+      "moduleId": "readback_hardening",
+      "zone": "writer_readback",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "download_review",
+      "zone": "download_export",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "final_export_gate",
+      "zone": "download_export",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    },
+    {
+      "moduleId": "api_batch",
+      "zone": "batch_api_browser",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": [
+        "batch-health",
+        "batch-result",
+        "real-like-sandbox"
+      ]
+    },
+    {
+      "moduleId": "api_browser_e2e",
+      "zone": "batch_api_browser",
+      "sourceCount": 2,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": [
+        "batch-health",
+        "batch-result",
+        "real-like-sandbox"
+      ]
+    },
+    {
+      "moduleId": "user_flow_closeout",
+      "zone": "closeout_security",
+      "sourceCount": 1,
+      "testCount": 1,
+      "auditCount": 1,
+      "hasCommunication": true,
+      "hasZoneGate": true,
+      "linksKnown": true,
+      "safeContract": true,
+      "allowedEndpoints": []
+    }
+  ]
+}
