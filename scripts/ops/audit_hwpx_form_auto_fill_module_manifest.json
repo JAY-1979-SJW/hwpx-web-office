@@ -119,9 +119,39 @@
     {
       "id": "user_flow_closeout",
       "title": "User flow closeout",
-      "sourceFiles": ["docs/reports/HWPX_FORM_AUTO_FILL_USER_FLOW_CLOSEOUT_14.md"],
-      "testFiles": ["tests/test_hwpx_form_auto_fill_user_flow_closeout.py"],
-      "auditFiles": ["scripts/ops/audit_hwpx_form_auto_fill_user_flow_closeout.py"],
+      "sourceFiles": [
+        "docs/reports/HWPX_FORM_AUTO_FILL_USER_FLOW_CLOSEOUT_14.md",
+        "scripts/ops/gate_hwpx_form_auto_fill_fail_fast.py",
+        "scripts/ops/gate_hwpx_form_auto_fill_module_log_contract.py",
+        "scripts/ops/gate_hwpx_form_auto_fill_upload.py",
+        "scripts/ops/gate_hwpx_form_auto_fill_zones.py",
+        "scripts/ops/gate_hwpx_form_auto_fill_zones_manifest.json",
+        "scripts/ops/hwpx_form_auto_fill_module_audit_history.py",
+        "scripts/ops/hwpx_form_auto_fill_persistent_gate_installation.json",
+        "scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py"
+      ],
+      "testFiles": [
+        "tests/test_hwpx_form_auto_fill_user_flow_closeout.py",
+        "tests/test_hwpx_form_auto_fill_fail_fast_upload_dashboard.py",
+        "tests/test_hwpx_form_auto_fill_module_audits.py",
+        "tests/test_hwpx_form_auto_fill_module_log_contract.py",
+        "tests/test_hwpx_form_auto_fill_persistent_gates.py",
+        "tests/test_hwpx_form_auto_fill_zone_gates.py"
+      ],
+      "auditFiles": [
+        "scripts/ops/audit_hwpx_form_auto_fill_user_flow_closeout.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_construction_work_design.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_e2e_smoke.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_module_manifest.json",
+        "scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_real_file_preflight.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_real_like_browser_batch.py",
+        "scripts/ops/audit_hwpx_form_auto_fill_real_like_sandbox_batch.py",
+        "scripts/ops/audit_hwpx_form_autofill_api_route_and_frontend.py",
+        "scripts/ops/audit_hwpx_form_autofill_browser_smoke.py",
+        "scripts/ops/audit_hwpx_form_field_mapping.py",
+        "scripts/ops/audit_hwpx_form_writer_ui_connect.py"
+      ],
       "requiredTokens": ["SANDBOX_ONLY", "Prohibited Scope", "Promotion Criteria"]
     }
   ]

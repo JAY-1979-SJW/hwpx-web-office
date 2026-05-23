@@ -31,8 +31,8 @@ def test_02_real_repo_contract_passes(tmp_path: Path) -> None:
     assert result["verdict"] == gate.PASS_VERDICT
     assert result["existingVerdict"] == existing_gate.PASS_VERDICT
     assert result["newVerdict"] == new_gate.PASS_VERDICT
-    assert result["summary"]["stablePathMappedFiles"] == 24
-    assert result["summary"]["manifestPromotionCandidates"] == 24
+    assert result["summary"]["stablePathMappedFiles"] == 0
+    assert result["summary"]["manifestPromotionCandidates"] == 0
 
 
 def test_03_existing_failure_fails_contract(tmp_path: Path) -> None:
@@ -55,12 +55,9 @@ def test_04_new_failure_fails_contract(tmp_path: Path) -> None:
 
 def test_05_stable_mapping_candidates_are_reported(tmp_path: Path) -> None:
     result = gate.run_repo_classification_contract_gate(report_dir=tmp_path)
-    assert result["summary"]["stablePathMappedFiles"] >= 1
-    assert result["summary"]["manifestPromotionCandidates"] >= 1
-    assert all(item["moduleId"] for item in result["stablePathMappedFiles"])
-    assert all(item["moduleId"] != "field_mapping" for item in result["stablePathMappedFiles"])
-    assert all(item["moduleId"] != "api_batch" for item in result["stablePathMappedFiles"])
-    assert all(item["moduleId"] == "user_flow_closeout" for item in result["stablePathMappedFiles"])
+    assert result["summary"]["stablePathMappedFiles"] == 0
+    assert result["summary"]["manifestPromotionCandidates"] == 0
+    assert result["stablePathMappedFiles"] == []
 
 
 def test_06_manifest_declared_new_file_reduces_failure(tmp_path: Path) -> None:

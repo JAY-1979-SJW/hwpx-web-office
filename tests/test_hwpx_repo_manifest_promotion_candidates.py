@@ -22,8 +22,8 @@ def test_02_real_repo_candidates_pass(tmp_path: Path) -> None:
     result = builder.build_manifest_promotion_candidates(report_dir=tmp_path)
     assert result["verdict"] == builder.PASS_VERDICT
     assert result["contractVerdict"] == contract_gate.PASS_VERDICT
-    assert result["summary"]["stablePathMappedFiles"] == 24
-    assert result["summary"]["manifestPromotionCandidates"] == 24
+    assert result["summary"]["stablePathMappedFiles"] == 0
+    assert result["summary"]["manifestPromotionCandidates"] == 0
 
 
 def test_03_target_key_routing() -> None:
@@ -68,7 +68,7 @@ def test_06_field_mapping_candidates_removed_after_promotion(tmp_path: Path) -> 
     result = builder.build_manifest_promotion_candidates(report_dir=tmp_path)
     assert "field_mapping" not in result["moduleBreakdown"]
     assert "api_batch" not in result["moduleBreakdown"]
-    assert set(result["moduleBreakdown"]) == {"user_flow_closeout"}
+    assert result["moduleBreakdown"] == {}
 
 
 def test_07_reports_have_no_leaks(tmp_path: Path) -> None:
