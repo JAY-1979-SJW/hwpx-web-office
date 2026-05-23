@@ -1,0 +1,193 @@
+{
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN",
+  "checks": [
+    {
+      "code": "A00",
+      "desc": "design file exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A01",
+      "desc": "construction master design exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "baseline commit documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "SANDBOX_ONLY documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "project identity zone documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "parties and roles zone documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "schedule zone documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "quantity cost zone documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "attachment evidence zone documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "safety compliance gate documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "batch API browser gate documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "approval gate documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "source safety documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "module audits linked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "zone gates linked",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "real user file prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "production write prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "source overwrite prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "final deploy prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "AI fallback prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "OCR fallback prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "Hancom dependency prohibited",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "promotion criteria documented",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "no raw path leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "no raw filename leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "no PII leak",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "construction design tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "representative zone gate runner passes",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "representative module audit runner passes",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A29",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_CONSTRUCTION_POLICY_NOT_LEGAL_AUDIT",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}

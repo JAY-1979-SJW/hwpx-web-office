@@ -1,0 +1,42 @@
+# HWPX Form Auto Fill Construction Work Master Design Audit
+
+- verdict: PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN
+- baseline: d95dcac
+- construction zones: 7
+- construction design tests: PASS
+- zone gate runner: PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES
+- module audit runner: PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS
+- security: pii=0 rawPath=0 rawFilename=0
+- warnings: WARN_SANDBOX_ONLY, WARN_REAL_USER_FILE_NOT_TESTED, WARN_DEPLOY_NOT_PERFORMED, WARN_CONSTRUCTION_POLICY_NOT_LEGAL_AUDIT, WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED
+
+## Checks
+- PASS A00 design file exists
+- PASS A01 construction master design exists
+- PASS A02 baseline commit documented
+- PASS A03 SANDBOX_ONLY documented
+- PASS A04 project identity zone documented
+- PASS A05 parties and roles zone documented
+- PASS A06 schedule zone documented
+- PASS A07 quantity cost zone documented
+- PASS A08 attachment evidence zone documented
+- PASS A09 safety compliance gate documented
+- PASS A10 batch API browser gate documented
+- PASS A11 approval gate documented
+- PASS A12 source safety documented
+- PASS A13 module audits linked
+- PASS A14 zone gates linked
+- PASS A15 real user file prohibited
+- PASS A16 production write prohibited
+- PASS A17 source overwrite prohibited
+- PASS A18 final deploy prohibited
+- PASS A19 AI fallback prohibited
+- PASS A20 OCR fallback prohibited
+- PASS A21 Hancom dependency prohibited
+- PASS A22 promotion criteria documented
+- PASS A23 no raw path leak
+- PASS A24 no raw filename leak
+- PASS A25 no PII leak
+- PASS A26 construction design tests pass
+- PASS A27 representative zone gate runner passes
+- PASS A28 representative module audit runner passes
+- PASS A29 dirty baseline documented
