@@ -1,0 +1,268 @@
+{
+  "task": "HWPX-FORM-AUTO-FILL-WRITER-REAL-LIKE-BROWSER-BATCH-11",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_WRITER_REAL_LIKE_BROWSER_BATCH",
+  "dirtyBaseline": {
+    "documented": true,
+    "knownHold": [
+      "change_history_log_modified",
+      "devlog_untracked",
+      "reports_untracked"
+    ],
+    "knownHoldCounts": {
+      "changeHistoryLog": 1,
+      "devlogUntracked": 23,
+      "reportsUntracked": 1
+    },
+    "unexpectedOutsideScope": []
+  },
+  "browserRender": {
+    "batchSummary": true,
+    "limit1": true,
+    "limit5": true,
+    "limit10": true,
+    "fileResults": true,
+    "blockedResults": true,
+    "readbackSummary": true,
+    "sourceImmutability": true,
+    "securitySummary": true,
+    "sandboxWarning": true
+  },
+  "uiStateMatrix": {
+    "PASS batch": "PASS",
+    "blocked files": "WARN",
+    "readbackFail": "FAIL",
+    "unexpectedMutation": "FAIL",
+    "sourceMutation": "FAIL",
+    "non-sandbox mode": "FAIL",
+    "PII/path/filename leak": "FAIL"
+  },
+  "network": {
+    "productionWriteCalled": false,
+    "sourceOverwriteCalled": false,
+    "aiApiCalled": false,
+    "ocrCalled": false
+  },
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "hancomRequired": false
+  },
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "browser batch page exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "browser batch JS exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "batch summary visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "limit=1/5/10 visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "file results visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "blocked results visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "readback summary visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "source immutability visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "security summary visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "SANDBOX_ONLY warning visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "PASS batch shown as success",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "blocked files shown as WARN",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "readbackFail shown as FAIL",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "unexpectedMutation shown as FAIL",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "sourceMutation shown as FAIL",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A16",
+      "desc": "non-sandbox mode shown as FAIL",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A17",
+      "desc": "PII/path/filename leak shown as FAIL",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A18",
+      "desc": "no raw path visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A19",
+      "desc": "no raw filename visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A20",
+      "desc": "no PII visible",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A21",
+      "desc": "production write endpoint not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A22",
+      "desc": "source overwrite endpoint not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A23",
+      "desc": "AI API not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A24",
+      "desc": "OCR not called",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A25",
+      "desc": "Hancom not required",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A26",
+      "desc": "previous real-like batch tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A27",
+      "desc": "previous preflight/browser/API/E2E/writer tests pass",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A28",
+      "desc": "dirty baseline documented",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "runs": {
+    "browserBatch": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_like_browser_batch.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "24 passed in 2.29s"
+    },
+    "realLikeSandboxBatch": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_like_sandbox_batch.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "32 passed in 0.93s"
+    },
+    "regression": {
+      "paths": [
+        "tests/test_hwpx_form_auto_fill_real_file_preflight.py",
+        "tests/test_hwpx_form_autofill_browser_smoke.py",
+        "tests/test_hwpx_form_autofill_api_route.py",
+        "tests/test_hwpx_form_autofill_frontend_contract.py",
+        "tests/test_hwpx_form_auto_fill_e2e_smoke.py",
+        "tests/test_hwpx_form_writer_final_export_gate.py",
+        "tests/test_hwpx_form_writer_download_review.py",
+        "tests/test_hwpx_form_writer_ui_connect.py",
+        "tests/test_hwpx_form_writer_readback_hardening.py",
+        "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
+        "tests/test_hwpx_approval_gate.py",
+        "tests/test_hwpx_review_panel.py",
+        "tests/test_hwpx_form_field_mapping.py"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "summary": "346 passed in 262.76s (0:04:22)"
+    }
+  },
+  "warnings": [
+    "WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY",
+    "WARN_SANDBOX_ONLY",
+    "WARN_SOME_FILES_BLOCKED",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_EXISTING_DIRTY_BASELINE_DOCUMENTED"
+  ],
+  "failCodes": []
+}

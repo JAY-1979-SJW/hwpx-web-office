@@ -1,0 +1,9 @@
+{
+  "PASS batch": "PASS",
+  "blocked files": "WARN",
+  "readbackFail": "FAIL",
+  "unexpectedMutation": "FAIL",
+  "sourceMutation": "FAIL",
+  "non-sandbox mode": "FAIL",
+  "PII/path/filename leak": "FAIL"
+}

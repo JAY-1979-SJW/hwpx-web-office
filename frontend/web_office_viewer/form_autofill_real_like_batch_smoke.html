@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX Real-like Batch Browser Smoke</title>
+<style>
+  :root {
+    font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+    color: #1f2933;
+    background: #f6f7f9;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 18px 22px;
+    background: #ffffff;
+    border-bottom: 1px solid #d8dee8;
+  }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
+  h2 { margin: 0 0 12px; font-size: 15px; letter-spacing: 0; }
+  p { margin: 0; }
+  .sandbox-warning { margin-top: 8px; color: #8a4b00; font-size: 13px; }
+  .state {
+    min-width: 76px;
+    text-align: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #b7c2cf;
+    background: #ffffff;
+  }
+  .state-pass { color: #1f7a4d; border-color: #78b58f; background: #edf8f1; }
+  .state-warn { color: #8a4b00; border-color: #d3a95e; background: #fff7e6; }
+  .state-fail { color: #b42318; border-color: #dc7d73; background: #fff1f0; }
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(230px, 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+  .panel {
+    min-height: 140px;
+    padding: 14px;
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    background: #ffffff;
+  }
+  .kv,
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 28px;
+    font-size: 13px;
+  }
+  .kv span,
+  .row span { color: #52606d; }
+  .kv strong,
+  .row strong { overflow-wrap: anywhere; }
+  .ok { color: #1f7a4d; }
+  .bad { color: #b42318; }
+  .warn strong { color: #8a4b00; }
+  .muted { min-height: 24px; color: #66788a; font-size: 13px; }
+  @media (max-width: 900px) {
+    .topbar { flex-direction: column; }
+    .dashboard { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root" data-testid="real-like-batch-root">Loading</div>
+<script type="module">
+  import {
+    createBatchDashboardScenario,
+    renderRealLikeBatchDashboard,
+  } from "./form_autofill_real_like_batch_smoke.mjs";
+
+  const root = document.getElementById("root");
+  window.__realLikeBatchSmoke = {
+    render(overrides = {}) {
+      const scenario = createBatchDashboardScenario(overrides);
+      renderRealLikeBatchDashboard(root, scenario);
+      return scenario;
+    },
+  };
+  window.__realLikeBatchSmoke.render();
+</script>
+</body>
+</html>
