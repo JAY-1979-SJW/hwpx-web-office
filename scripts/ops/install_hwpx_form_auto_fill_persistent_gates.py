@@ -109,6 +109,7 @@ def validate_manifests(
         _check("A14", "repo classification contract gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_classification_contract.py").is_file()),
         _check("A15", "manifest promotion builder exists", (ROOT / "scripts" / "ops" / "build_hwpx_repo_manifest_promotion_candidates.py").is_file()),
         _check("A16", "manifest drift zero gate exists", (ROOT / "scripts" / "ops" / "gate_hwpx_repo_manifest_drift_zero.py").is_file()),
+        _check("A17", "repo guard hook installer exists", (ROOT / "scripts" / "ops" / "install_hwpx_repo_guard_hooks.py").is_file()),
     ]
 
     link_errors = []
@@ -133,8 +134,8 @@ def validate_manifests(
 
     checks.extend(
         [
-            _check("A17", "module links reference known modules", not link_errors),
-            _check("A18", "module communication remains sandbox and safe", not unsafe_modules),
+            _check("A18", "module links reference known modules", not link_errors),
+            _check("A19", "module communication remains sandbox and safe", not unsafe_modules),
         ]
     )
 
@@ -240,13 +241,13 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
         }
         checks.extend(
             [
-                _check("A19", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
-                _check("A20", "representative repo classification contract gate runs", repo_contract_result["verdict"] == repo_contract_gate.PASS_VERDICT),
-                _check("A21", "representative manifest promotion builder runs", manifest_promotion_result["verdict"] == manifest_promotion_builder.PASS_VERDICT),
-                _check("A22", "representative manifest drift zero gate runs", manifest_drift_zero_result["verdict"] == manifest_drift_zero_gate.PASS_VERDICT),
-                _check("A23", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
-                _check("A24", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
-                _check("A25", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
+                _check("A20", "representative module audit runs", module_result["verdict"] == module_audit.PASS_VERDICT),
+                _check("A21", "representative repo classification contract gate runs", repo_contract_result["verdict"] == repo_contract_gate.PASS_VERDICT),
+                _check("A22", "representative manifest promotion builder runs", manifest_promotion_result["verdict"] == manifest_promotion_builder.PASS_VERDICT),
+                _check("A23", "representative manifest drift zero gate runs", manifest_drift_zero_result["verdict"] == manifest_drift_zero_gate.PASS_VERDICT),
+                _check("A24", "representative new file classification gate runs", new_file_result["verdict"] == new_file_gate.PASS_VERDICT),
+                _check("A25", "representative existing file classification gate runs", existing_file_result["verdict"] == existing_file_gate.PASS_VERDICT),
+                _check("A26", "representative zone gate runs", zone_result["verdict"] == zone_gate.PASS_VERDICT),
             ]
         )
 
@@ -267,6 +268,7 @@ def install_persistent_gates(report_dir: Path = REPORT_DIR, run_smoke: bool = Tr
             "python scripts/ops/gate_hwpx_repo_classification_contract.py",
             "python scripts/ops/build_hwpx_repo_manifest_promotion_candidates.py",
             "python scripts/ops/gate_hwpx_repo_manifest_drift_zero.py",
+            "python scripts/ops/install_hwpx_repo_guard_hooks.py",
             "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
             "python scripts/ops/gate_hwpx_repo_existing_file_classification.py",
             "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",

@@ -16,6 +16,7 @@ def test_01_manifests_exist() -> None:
     assert installer.MODULE_MANIFEST.is_file()
     assert installer.ZONE_MANIFEST.is_file()
     assert installer.COMM_MANIFEST.is_file()
+    assert (ROOT / "scripts" / "ops" / "install_hwpx_repo_guard_hooks.py").is_file()
     assert (ROOT / "scripts" / "ops" / "gate_hwpx_repo_classification_contract.py").is_file()
     assert (ROOT / "scripts" / "ops" / "build_hwpx_repo_manifest_promotion_candidates.py").is_file()
     assert (ROOT / "scripts" / "ops" / "gate_hwpx_repo_manifest_drift_zero.py").is_file()
