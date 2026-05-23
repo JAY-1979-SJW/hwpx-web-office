@@ -1,0 +1,11 @@
+[
+  {
+    "label": "user_flow_closeout_audit",
+    "path": "scripts/ops/audit_hwpx_form_auto_fill_user_flow_closeout.py",
+    "status": "PASS",
+    "returncode": 0,
+    "durationSeconds": 186.975,
+    "attempts": 1,
+    "summary": "PASS_HWPX_FORM_AUTO_FILL_WRITER_USER_FLOW_CLOSEOUT; checks PASS=18 FAIL=0"
+  }
+]
