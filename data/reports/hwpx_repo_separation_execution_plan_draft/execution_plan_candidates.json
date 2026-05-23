@@ -1,0 +1,155 @@
+[
+  {
+    "packetId": "owner_review_runtime_autofill_line",
+    "areaId": "runtime_autofill_line",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/autofill/runtime",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_hwpx_core_library",
+    "areaId": "hwpx_core_library",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/hwpx/core",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_frontend_viewer_shell",
+    "areaId": "frontend_viewer_shell",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/frontend/viewer",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_audit_gate_layer",
+    "areaId": "audit_gate_layer",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/ops/gates",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_test_support_layer",
+    "areaId": "test_support_layer",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/tests/support",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_docs_reports_layer",
+    "areaId": "docs_reports_layer",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/docs/reports",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_legacy_experiment_quarantine",
+    "areaId": "legacy_experiment_quarantine",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/hold/legacy",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_config_root_layer",
+    "areaId": "config_root_layer",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/config/root",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  },
+  {
+    "packetId": "owner_review_manual_review_hold",
+    "areaId": "manual_review_hold",
+    "candidateStatus": "NO_EXECUTION_CANDIDATE",
+    "targetLayout": "planned/hold/manual",
+    "reviewApproved": false,
+    "executionAllowed": false,
+    "moveCommandGenerated": false,
+    "deleteCommandGenerated": false,
+    "archiveCommandGenerated": false,
+    "requiredNextChecks": [
+      "approved_execution_gate",
+      "import_impact_tests",
+      "owner_final_execution_approval",
+      "separate_commit_for_any_move"
+    ]
+  }
+]
