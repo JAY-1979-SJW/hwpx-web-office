@@ -153,16 +153,16 @@
   {
     "id": "audit_gate_layer",
     "title": "Audits, gates, installers, dashboards",
-    "fileCount": 119,
+    "fileCount": 120,
     "categories": [
       "AUDIT_GATE"
     ],
     "zones": {
-      "closeout_security": 119
+      "closeout_security": 120
     },
     "safetyClasses": {
       "HIGH_REVIEW": 50,
-      "LOW_REVIEW": 35,
+      "LOW_REVIEW": 36,
       "STANDARD_REVIEW": 34
     },
     "riskTags": {
@@ -206,30 +206,30 @@
   {
     "id": "test_support_layer",
     "title": "Tests and fixtures",
-    "fileCount": 166,
+    "fileCount": 168,
     "categories": [
       "TEST_FIXTURE",
       "TEST_ONLY"
     ],
     "zones": {
       "batch_api_browser": 4,
-      "closeout_security": 27,
+      "closeout_security": 28,
       "download_export": 2,
       "input_parse": 9,
       "review_approval": 2,
       "test_support": 30,
-      "unassigned": 90,
+      "unassigned": 91,
       "writer_readback": 2
     },
     "safetyClasses": {
       "HIGH_REVIEW": 86,
-      "LOW_REVIEW": 28,
-      "STANDARD_REVIEW": 52
+      "LOW_REVIEW": 29,
+      "STANDARD_REVIEW": 53
     },
     "riskTags": {
       "AI_API_REVIEW": 31,
-      "HANCOM_DEPENDENCY_REVIEW": 54,
-      "OCR_REVIEW": 32,
+      "HANCOM_DEPENDENCY_REVIEW": 55,
+      "OCR_REVIEW": 33,
       "PII_PATTERN_REVIEW": 45,
       "PRODUCTION_WRITE_REVIEW": 7,
       "RAW_FILENAME_PATTERN_REVIEW": 117,
@@ -267,27 +267,27 @@
   {
     "id": "docs_reports_layer",
     "title": "PII-safe reports and closeout docs",
-    "fileCount": 273,
+    "fileCount": 281,
     "categories": [
       "REPORT_DOC"
     ],
     "zones": {
-      "docs_reports": 273
+      "docs_reports": 281
     },
     "safetyClasses": {
       "HIGH_REVIEW": 142,
-      "LOW_REVIEW": 41,
-      "STANDARD_REVIEW": 90
+      "LOW_REVIEW": 47,
+      "STANDARD_REVIEW": 92
     },
     "riskTags": {
       "AI_API_REVIEW": 3,
-      "HANCOM_DEPENDENCY_REVIEW": 112,
-      "OCR_REVIEW": 48,
+      "HANCOM_DEPENDENCY_REVIEW": 114,
+      "OCR_REVIEW": 50,
       "PII_PATTERN_REVIEW": 109,
       "PRODUCTION_WRITE_REVIEW": 21,
       "RAW_FILENAME_PATTERN_REVIEW": 74,
       "RAW_PATH_PATTERN_REVIEW": 16,
-      "REAL_USER_FILE_REVIEW": 42,
+      "REAL_USER_FILE_REVIEW": 44,
       "SOURCE_MUTATION_REVIEW": 34
     },
     "reviewRequiredFiles": 142,
@@ -320,27 +320,27 @@
   {
     "id": "legacy_experiment_quarantine",
     "title": "Legacy and experimental scripts",
-    "fileCount": 147,
+    "fileCount": 148,
     "categories": [
       "LEGACY_EXPERIMENT"
     ],
     "zones": {
       "hwpx_core": 23,
-      "unassigned": 124
+      "unassigned": 125
     },
     "safetyClasses": {
-      "REVIEW_REQUIRED": 147
+      "REVIEW_REQUIRED": 148
     },
     "riskTags": {
       "AI_API_REVIEW": 1,
-      "HANCOM_DEPENDENCY_REVIEW": 36,
-      "OCR_REVIEW": 3,
+      "HANCOM_DEPENDENCY_REVIEW": 37,
+      "OCR_REVIEW": 4,
       "PII_PATTERN_REVIEW": 15,
       "RAW_FILENAME_PATTERN_REVIEW": 16,
       "RAW_PATH_PATTERN_REVIEW": 16,
       "SOURCE_MUTATION_REVIEW": 28
     },
-    "reviewRequiredFiles": 147,
+    "reviewRequiredFiles": 148,
     "action": "quarantine_before_any_archive_or_split",
     "gatePolicy": "manual_review_required",
     "movePolicy": "no_move_no_delete_without_owner_approval",

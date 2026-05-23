@@ -142,10 +142,12 @@ def test_08_fail_fast_smoke_runs_all_steps(tmp_path: Path) -> None:
         "upload_gate",
         "construction_design_audit",
         "repo_detailed_separation_plan",
+        "repo_separation_execution_gate",
         "gate_dashboard",
     ]:
         assert expected in step_names
     assert result["separationVerdict"] == fail_fast.separation_plan.PASS_VERDICT
+    assert result["separationExecutionVerdict"] == fail_fast.separation_execution_gate.PASS_VERDICT
 
 
 def test_09_fail_fast_reports_have_no_leaks(tmp_path: Path) -> None:

@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "hwpx_repo_separation_execution_gate_v1",
+  "verdict": "PASS_HWPX_REPO_SEPARATION_EXECUTION_GATE",
+  "baselineHead": "d5297ad",
+  "mode": "DRY_RUN_ONLY",
+  "requestExecution": false,
+  "ownerApproved": false,
+  "executionAllowed": false,
+  "summary": {
+    "packages": 9,
+    "dryRunPackages": 9,
+    "executionAllowedPackages": 0,
+    "holdPackages": 2,
+    "totalFiles": 950,
+    "releaseZonesGated": 6,
+    "holdZones": 5
+  },
+  "blockedReasons": [],
+  "failures": [],
+  "executionMatrix": [
+    {
+      "packageId": "pkg_runtime_autofill_line",
+      "areaId": "runtime_autofill_line",
+      "phase": "P1_GATE_PROTECTED_REFACTOR_PLAN",
+      "operation": "REVIEW_AND_GATE_ONLY",
+      "fileCount": 18,
+      "reviewRequiredFiles": 6,
+      "movePolicy": "no_move_until_gate_green",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_hwpx_core_library",
+      "areaId": "hwpx_core_library",
+      "phase": "P2_DEPENDENCY_IMPACT_REVIEW",
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "fileCount": 184,
+      "reviewRequiredFiles": 42,
+      "movePolicy": "no_move_until_import_impact_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_frontend_viewer_shell",
+      "areaId": "frontend_viewer_shell",
+      "phase": "P2_DEPENDENCY_IMPACT_REVIEW",
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "fileCount": 28,
+      "reviewRequiredFiles": 0,
+      "movePolicy": "no_move_until_route_contract_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_audit_gate_layer",
+      "areaId": "audit_gate_layer",
+      "phase": "P1_GATE_PROTECTED_REFACTOR_PLAN",
+      "operation": "REVIEW_AND_GATE_ONLY",
+      "fileCount": 120,
+      "reviewRequiredFiles": 50,
+      "movePolicy": "no_move_until_gate_bootstrap_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_test_support_layer",
+      "areaId": "test_support_layer",
+      "phase": "P2_DEPENDENCY_IMPACT_REVIEW",
+      "operation": "REVIEW_AND_IMPORT_IMPACT_ONLY",
+      "fileCount": 168,
+      "reviewRequiredFiles": 86,
+      "movePolicy": "no_move_until_test_owner_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_docs_reports_layer",
+      "areaId": "docs_reports_layer",
+      "phase": "P3_RETENTION_REVIEW",
+      "operation": "RETENTION_REVIEW_ONLY",
+      "fileCount": 281,
+      "reviewRequiredFiles": 142,
+      "movePolicy": "no_move_until_report_retention_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_legacy_experiment_quarantine",
+      "areaId": "legacy_experiment_quarantine",
+      "phase": "P0_HOLD",
+      "operation": "HOLD_ONLY",
+      "fileCount": 148,
+      "reviewRequiredFiles": 148,
+      "movePolicy": "no_move_no_delete_without_owner_approval",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_config_root_layer",
+      "areaId": "config_root_layer",
+      "phase": "P4_CONFIG_REVIEW",
+      "operation": "CONFIG_REVIEW_ONLY",
+      "fileCount": 2,
+      "reviewRequiredFiles": 1,
+      "movePolicy": "no_move_without_build_review",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    },
+    {
+      "packageId": "pkg_manual_review_hold",
+      "areaId": "manual_review_hold",
+      "phase": "P0_HOLD",
+      "operation": "HOLD_ONLY",
+      "fileCount": 1,
+      "reviewRequiredFiles": 1,
+      "movePolicy": "no_move_no_delete_without_owner_approval",
+      "requiresOwnerApprovalForMove": true,
+      "executionAllowedNow": false,
+      "dryRunOnly": true
+    }
+  ],
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "sourceMutationAllowed": false,
+    "productionWriteAllowed": false,
+    "fileMovePerformed": false,
+    "fileDeletePerformed": false
+  },
+  "warnings": [
+    "WARN_DRY_RUN_ONLY",
+    "WARN_NO_FILE_MOVE_PERFORMED",
+    "WARN_OWNER_REVIEW_REQUIRED_BEFORE_SPLIT"
+  ]
+}
