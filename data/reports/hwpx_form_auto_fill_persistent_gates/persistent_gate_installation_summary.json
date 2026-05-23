@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_persistent_gates_v1",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
+  "installation": {
+    "schemaVersion": "hwpx_form_auto_fill_persistent_gate_installation_v1",
+    "installationMode": "REPO_PERSISTENT_MANIFEST",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
+    "mode": "SANDBOX_ONLY",
+    "sourceMutationAllowed": false,
+    "moduleAuditManifest": "scripts/ops/audit_hwpx_form_auto_fill_module_manifest.json",
+    "zoneGateManifest": "scripts/ops/gate_hwpx_form_auto_fill_zones_manifest.json",
+    "moduleCommunicationManifest": "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
+    "commands": [
+      "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+      "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
+      "python scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py"
+    ],
+    "warnings": [
+      "WARN_SANDBOX_ONLY",
+      "WARN_REAL_USER_FILE_NOT_TESTED",
+      "WARN_DEPLOY_NOT_PERFORMED",
+      "WARN_REPO_PERSISTENT_GATE_CONFIG_ONLY"
+    ]
+  },
+  "summary": {
+    "modules": 10,
+    "zones": 6,
+    "communications": 10,
+    "failedChecks": 0
+  },
+  "checks": [
+    {
+      "code": "A01",
+      "desc": "module audit manifest exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A02",
+      "desc": "zone gate manifest exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A03",
+      "desc": "module communication manifest exists",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A04",
+      "desc": "all audited modules have communication settings",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A05",
+      "desc": "all zone modules exist in module audit manifest",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A06",
+      "desc": "communication zones exist in zone manifest",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A07",
+      "desc": "global mode is SANDBOX_ONLY",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A08",
+      "desc": "global source mutation is disabled",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A09",
+      "desc": "global raw payload is disabled",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A10",
+      "desc": "global PII payload is disabled",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A11",
+      "desc": "production and unsafe endpoints are globally forbidden",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A12",
+      "desc": "module links reference known modules",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A13",
+      "desc": "module communication remains sandbox and safe",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A14",
+      "desc": "representative module audit runs",
+      "status": "PASS",
+      "failCode": null
+    },
+    {
+      "code": "A15",
+      "desc": "representative zone gate runs",
+      "status": "PASS",
+      "failCode": null
+    }
+  ],
+  "communicationMatrix": {
+    "moduleCount": 10,
+    "zoneCount": 6,
+    "communicationCount": 10,
+    "moduleIds": [
+      "api_batch",
+      "api_browser_e2e",
+      "approval_gate",
+      "download_review",
+      "field_mapping",
+      "final_export_gate",
+      "readback_hardening",
+      "review_panel",
+      "user_flow_closeout",
+      "writer_sandbox"
+    ],
+    "zoneIds": [
+      "batch_api_browser",
+      "closeout_security",
+      "download_export",
+      "input_parse",
+      "review_approval",
+      "writer_readback"
+    ],
+    "linkErrors": [],
+    "unsafeModules": [],
+    "communications": [
+      {
+        "id": "field_mapping",
+        "zone": "input_parse",
+        "upstream": [],
+        "downstream": [
+          "review_panel"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "review_panel",
+        "zone": "review_approval",
+        "upstream": [
+          "field_mapping"
+        ],
+        "downstream": [
+          "approval_gate"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "approval_gate",
+        "zone": "review_approval",
+        "upstream": [
+          "review_panel"
+        ],
+        "downstream": [
+          "writer_sandbox"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "writer_sandbox",
+        "zone": "writer_readback",
+        "upstream": [
+          "approval_gate"
+        ],
+        "downstream": [
+          "readback_hardening"
+        ],
+        "allowedEndpoints": [
+          "write-sandbox"
+        ],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "readback_hardening",
+        "zone": "writer_readback",
+        "upstream": [
+          "writer_sandbox"
+        ],
+        "downstream": [
+          "download_review"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "download_review",
+        "zone": "download_export",
+        "upstream": [
+          "readback_hardening"
+        ],
+        "downstream": [
+          "final_export_gate"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "final_export_gate",
+        "zone": "download_export",
+        "upstream": [
+          "download_review"
+        ],
+        "downstream": [
+          "api_batch"
+        ],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "api_batch",
+        "zone": "batch_api_browser",
+        "upstream": [
+          "final_export_gate"
+        ],
+        "downstream": [
+          "api_browser_e2e"
+        ],
+        "allowedEndpoints": [
+          "batch-health",
+          "real-like-sandbox",
+          "batch-result"
+        ],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "api_browser_e2e",
+        "zone": "batch_api_browser",
+        "upstream": [
+          "api_batch"
+        ],
+        "downstream": [
+          "user_flow_closeout"
+        ],
+        "allowedEndpoints": [
+          "batch-health",
+          "real-like-sandbox",
+          "batch-result"
+        ],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      },
+      {
+        "id": "user_flow_closeout",
+        "zone": "closeout_security",
+        "upstream": [
+          "api_browser_e2e"
+        ],
+        "downstream": [],
+        "allowedEndpoints": [],
+        "mode": [
+          "SANDBOX_ONLY"
+        ],
+        "sourceMutationAllowed": false,
+        "rawPayloadAllowed": false,
+        "piiPayloadAllowed": false
+      }
+    ]
+  },
+  "smokeRuns": {
+    "enabled": true,
+    "moduleAudit": {
+      "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+      "summary": {
+        "modulesTotal": 1,
+        "modulesPassed": 1,
+        "modulesFailed": 0
+      }
+    },
+    "zoneGate": {
+      "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
+      "summary": {
+        "zonesTotal": 1,
+        "zonesPassed": 1,
+        "zonesFailed": 0
+      }
+    }
+  },
+  "security": {
+    "piiLeak": 0,
+    "rawPathLeak": 0,
+    "rawFilenameLeak": 0,
+    "aiApiCalled": false,
+    "ocrCalled": false,
+    "hancomRequired": false
+  },
+  "failCodes": [],
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_REPO_PERSISTENT_GATE_CONFIG_ONLY"
+  ]
+}

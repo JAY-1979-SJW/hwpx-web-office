@@ -1,0 +1,205 @@
+{
+  "moduleCount": 10,
+  "zoneCount": 6,
+  "communicationCount": 10,
+  "moduleIds": [
+    "api_batch",
+    "api_browser_e2e",
+    "approval_gate",
+    "download_review",
+    "field_mapping",
+    "final_export_gate",
+    "readback_hardening",
+    "review_panel",
+    "user_flow_closeout",
+    "writer_sandbox"
+  ],
+  "zoneIds": [
+    "batch_api_browser",
+    "closeout_security",
+    "download_export",
+    "input_parse",
+    "review_approval",
+    "writer_readback"
+  ],
+  "linkErrors": [],
+  "unsafeModules": [],
+  "communications": [
+    {
+      "id": "field_mapping",
+      "zone": "input_parse",
+      "upstream": [],
+      "downstream": [
+        "review_panel"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "review_panel",
+      "zone": "review_approval",
+      "upstream": [
+        "field_mapping"
+      ],
+      "downstream": [
+        "approval_gate"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "approval_gate",
+      "zone": "review_approval",
+      "upstream": [
+        "review_panel"
+      ],
+      "downstream": [
+        "writer_sandbox"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "writer_sandbox",
+      "zone": "writer_readback",
+      "upstream": [
+        "approval_gate"
+      ],
+      "downstream": [
+        "readback_hardening"
+      ],
+      "allowedEndpoints": [
+        "write-sandbox"
+      ],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "readback_hardening",
+      "zone": "writer_readback",
+      "upstream": [
+        "writer_sandbox"
+      ],
+      "downstream": [
+        "download_review"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "download_review",
+      "zone": "download_export",
+      "upstream": [
+        "readback_hardening"
+      ],
+      "downstream": [
+        "final_export_gate"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "final_export_gate",
+      "zone": "download_export",
+      "upstream": [
+        "download_review"
+      ],
+      "downstream": [
+        "api_batch"
+      ],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "api_batch",
+      "zone": "batch_api_browser",
+      "upstream": [
+        "final_export_gate"
+      ],
+      "downstream": [
+        "api_browser_e2e"
+      ],
+      "allowedEndpoints": [
+        "batch-health",
+        "real-like-sandbox",
+        "batch-result"
+      ],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "api_browser_e2e",
+      "zone": "batch_api_browser",
+      "upstream": [
+        "api_batch"
+      ],
+      "downstream": [
+        "user_flow_closeout"
+      ],
+      "allowedEndpoints": [
+        "batch-health",
+        "real-like-sandbox",
+        "batch-result"
+      ],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    },
+    {
+      "id": "user_flow_closeout",
+      "zone": "closeout_security",
+      "upstream": [
+        "api_browser_e2e"
+      ],
+      "downstream": [],
+      "allowedEndpoints": [],
+      "mode": [
+        "SANDBOX_ONLY"
+      ],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false
+    }
+  ]
+}

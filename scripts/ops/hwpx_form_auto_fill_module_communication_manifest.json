@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_module_communication_manifest_v1",
+  "mode": "SANDBOX_ONLY",
+  "globalContract": {
+    "sourceMutationAllowed": false,
+    "rawPayloadAllowed": false,
+    "piiPayloadAllowed": false,
+    "allowedPayloadKinds": [
+      "maskedValue",
+      "valueHash",
+      "displayName",
+      "outputFileId",
+      "finalExportId",
+      "batchId",
+      "status",
+      "blockedReason",
+      "summaryCounts"
+    ],
+    "forbiddenEndpoints": [
+      "production-write",
+      "source-overwrite",
+      "final-deploy",
+      "ai-api",
+      "ocr-api",
+      "hancom-only"
+    ]
+  },
+  "modules": [
+    {
+      "id": "field_mapping",
+      "zone": "input_parse",
+      "upstream": [],
+      "downstream": ["review_panel"],
+      "inboundEvents": ["PARSER_RESULT_READY"],
+      "outboundEvents": ["FIELD_MAPPING_CLASSIFIED"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "review_panel",
+      "zone": "review_approval",
+      "upstream": ["field_mapping"],
+      "downstream": ["approval_gate"],
+      "inboundEvents": ["FIELD_MAPPING_CLASSIFIED"],
+      "outboundEvents": ["REVIEW_DECISION_READY"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "approval_gate",
+      "zone": "review_approval",
+      "upstream": ["review_panel"],
+      "downstream": ["writer_sandbox"],
+      "inboundEvents": ["REVIEW_DECISION_READY"],
+      "outboundEvents": ["READY_FOR_WRITER"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "writer_sandbox",
+      "zone": "writer_readback",
+      "upstream": ["approval_gate"],
+      "downstream": ["readback_hardening"],
+      "inboundEvents": ["READY_FOR_WRITER"],
+      "outboundEvents": ["SANDBOX_WRITE_RESULT"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": ["write-sandbox"]
+    },
+    {
+      "id": "readback_hardening",
+      "zone": "writer_readback",
+      "upstream": ["writer_sandbox"],
+      "downstream": ["download_review"],
+      "inboundEvents": ["SANDBOX_WRITE_RESULT"],
+      "outboundEvents": ["READBACK_HARDENED"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "download_review",
+      "zone": "download_export",
+      "upstream": ["readback_hardening"],
+      "downstream": ["final_export_gate"],
+      "inboundEvents": ["READBACK_HARDENED"],
+      "outboundEvents": ["DOWNLOAD_REVIEW_READY"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "final_export_gate",
+      "zone": "download_export",
+      "upstream": ["download_review"],
+      "downstream": ["api_batch"],
+      "inboundEvents": ["DOWNLOAD_REVIEW_READY"],
+      "outboundEvents": ["FINAL_EXPORT_CANDIDATE"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    },
+    {
+      "id": "api_batch",
+      "zone": "batch_api_browser",
+      "upstream": ["final_export_gate"],
+      "downstream": ["api_browser_e2e"],
+      "inboundEvents": ["FINAL_EXPORT_CANDIDATE", "BATCH_RUN_REQUESTED"],
+      "outboundEvents": ["BATCH_API_RESULT"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": [
+        "batch-health",
+        "real-like-sandbox",
+        "batch-result"
+      ]
+    },
+    {
+      "id": "api_browser_e2e",
+      "zone": "batch_api_browser",
+      "upstream": ["api_batch"],
+      "downstream": ["user_flow_closeout"],
+      "inboundEvents": ["BATCH_API_RESULT"],
+      "outboundEvents": ["BROWSER_BATCH_RENDERED"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": [
+        "batch-health",
+        "real-like-sandbox",
+        "batch-result"
+      ]
+    },
+    {
+      "id": "user_flow_closeout",
+      "zone": "closeout_security",
+      "upstream": ["api_browser_e2e"],
+      "downstream": [],
+      "inboundEvents": ["BROWSER_BATCH_RENDERED"],
+      "outboundEvents": ["USER_FLOW_CLOSEOUT_READY"],
+      "allowedModes": ["SANDBOX_ONLY"],
+      "sourceMutationAllowed": false,
+      "rawPayloadAllowed": false,
+      "piiPayloadAllowed": false,
+      "allowedEndpoints": []
+    }
+  ]
+}
+

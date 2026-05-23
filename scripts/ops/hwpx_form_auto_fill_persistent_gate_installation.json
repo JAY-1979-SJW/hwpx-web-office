@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "hwpx_form_auto_fill_persistent_gate_installation_v1",
+  "installationMode": "REPO_PERSISTENT_MANIFEST",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
+  "mode": "SANDBOX_ONLY",
+  "sourceMutationAllowed": false,
+  "moduleAuditManifest": "scripts/ops/audit_hwpx_form_auto_fill_module_manifest.json",
+  "zoneGateManifest": "scripts/ops/gate_hwpx_form_auto_fill_zones_manifest.json",
+  "moduleCommunicationManifest": "scripts/ops/hwpx_form_auto_fill_module_communication_manifest.json",
+  "commands": [
+    "python scripts/ops/audit_hwpx_form_auto_fill_modules.py",
+    "python scripts/ops/gate_hwpx_form_auto_fill_zones.py",
+    "python scripts/ops/install_hwpx_form_auto_fill_persistent_gates.py"
+  ],
+  "warnings": [
+    "WARN_SANDBOX_ONLY",
+    "WARN_REAL_USER_FILE_NOT_TESTED",
+    "WARN_DEPLOY_NOT_PERFORMED",
+    "WARN_REPO_PERSISTENT_GATE_CONFIG_ONLY"
+  ]
+}
