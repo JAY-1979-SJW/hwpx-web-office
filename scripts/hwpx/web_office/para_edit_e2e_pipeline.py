@@ -252,6 +252,63 @@ def _readback_verify_paragraph(
     return out_meta
 
 
+def _align_verify7_with_readback(result: dict[str, Any]) -> None:
+    """E2E 결과에서 verify7 summary를 actual readback 결과와 정렬한다.
+
+    paragraph_save_verify7 는 하위 legacy gate라서 V1/V7 에 대해 아직
+    readback unsupported FAIL 을 유지할 수 있다. run_para_edit_e2e 는
+    실제 output reread 결과를 별도로 확보하므로, E2E summary 에서는 그
+    truth source 를 우선 반영한다.
+    """
+    verify7 = result.get("verify7")
+    readback = result.get("readback")
+    if not isinstance(verify7, dict) or not isinstance(readback, dict):
+        return
+
+    results = verify7.get("results")
+    findings = verify7.get("findings")
+    if not isinstance(results, dict):
+        return
+    if not isinstance(findings, list):
+        findings = []
+        verify7["findings"] = findings
+
+    overrides = {
+        "V1_RANGE_POSITION_OK": readback.get("V1_RANGE_POSITION_OK"),
+        "V4_CHARPR_PRESERVED": readback.get("V4_CHARPR_PRESERVED"),
+        "V7_READBACK_MATCH": readback.get("V7_READBACK_MATCH"),
+    }
+    aligned_keys: list[str] = []
+    for gate, value in overrides.items():
+        if isinstance(value, str) and value in {
+            READBACK_PASS, READBACK_FAIL, READBACK_DEFERRED, READBACK_SKIP,
+        }:
+            results[gate] = value
+            aligned_keys.append(gate)
+
+    if "V1_RANGE_POSITION_OK" in aligned_keys:
+        findings = [
+            f for f in findings
+            if not (
+                isinstance(f, dict)
+                and f.get("code") == "V1_READBACK_UNSUPPORTED"
+            )
+        ]
+        verify7["findings"] = findings
+
+    if aligned_keys:
+        notes = result.get("notes")
+        if not isinstance(notes, list):
+            notes = []
+            result["notes"] = notes
+        notes.append(
+            "verify7 aligned to readback for: " + ", ".join(aligned_keys)
+        )
+
+    verdict = "PASS" if all(v == "PASS" for v in results.values()) else "FAIL"
+    verify7["verdict"] = verdict
+
+
 def _ro_paragraph_to_model(ro_p: Any) -> Paragraph:
     """RO-VIEW WebOfficeParagraph → para_edit_model.Paragraph.
 
@@ -444,4 +501,5 @@ def run_para_edit_e2e(
         scenario=scenario,
         source_char_pr_set=source_char_pr_set,
     )
+    _align_verify7_with_readback(result)
     return result
