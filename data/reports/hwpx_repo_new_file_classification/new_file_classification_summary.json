@@ -9,10 +9,10 @@
   },
   "newFileResults": [
     {
-      "safePath": "frontend/web_office_viewer/editor_ui_bridge.mjs",
-      "category": "FRONTEND_VIEWER",
-      "zone": "browser_ui",
-      "separationPlan": "keep_frontend_viewer",
+      "safePath": "tests/test_web_office_editor_browser_smoke.py",
+      "category": "TEST_ONLY",
+      "zone": "batch_api_browser",
+      "separationPlan": "keep_test",
       "moduleDeclared": false,
       "status": "PASS",
       "failures": []
