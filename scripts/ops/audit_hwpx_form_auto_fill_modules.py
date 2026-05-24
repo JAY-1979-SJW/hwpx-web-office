@@ -163,7 +163,7 @@ def _dirty_baseline() -> dict[str, Any]:
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     return {
         "documented": True,
-        "trackedDirty": [line for line in lines if not line.startswith("?? ")],
+        "trackedDirty": [_safe_text(line) for line in lines if not line.startswith("?? ")],
         "untrackedCount": sum(1 for line in lines if line.startswith("?? ")),
     }
 

@@ -1,9 +1,9 @@
 # HWPX Repo New File Classification Gate
 
 - verdict: PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE
-- newFiles: 2
-- ignoredFiles: 0
-- passedFiles: 2
+- newFiles: 26
+- ignoredFiles: 8
+- passedFiles: 26
 - failedFiles: 0
 - security: pii=0 rawPath=0 rawFilename=0
 
