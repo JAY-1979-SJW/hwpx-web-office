@@ -1,11 +1,1 @@
-[
-  {
-    "safePath": "tests/test_web_office_editor_browser_smoke.py",
-    "category": "TEST_ONLY",
-    "zone": "batch_api_browser",
-    "separationPlan": "keep_test",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  }
-]
+[]

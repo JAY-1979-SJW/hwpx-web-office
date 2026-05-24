@@ -18,6 +18,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 URL_PATH = "/web-office/"
 PASS_STATUS = "Backend save apply completed."
+LOAD_FAIL_STATUS = "hwpx editor load failed: load rejected"
+SAVE_FAIL_STATUS = "cell save apply failed: save rejected"
+SAVE_BLOCKED_STATUS = "Save was blocked by backend validation."
 RAW_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
 RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
 PII_RE = re.compile(
@@ -52,13 +55,9 @@ def _has_leak(text: str) -> bool:
     return bool(RAW_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
 
 
-@pytest.fixture(scope="session")
-def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception as exc:  # pragma: no cover - environment failure path
-        pytest.fail(f"playwright import failed: {exc}")
-
+def _start_editor_server(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[subprocess.Popen[str], Any, str]:
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
     out_dir = tmp_path_factory.mktemp("web_office_editor_browser_outputs")
@@ -86,6 +85,28 @@ def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dic
         stderr=subprocess.STDOUT,
         text=True,
     )
+    _wait_health(base_url, proc)
+    return proc, log_handle, base_url
+
+
+def _stop_editor_server(proc: subprocess.Popen[str], log_handle: Any) -> None:
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=10)
+    log_handle.close()
+
+
+@pytest.fixture(scope="session")
+def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # pragma: no cover - environment failure path
+        pytest.fail(f"playwright import failed: {exc}")
+
+    proc, log_handle, base_url = _start_editor_server(tmp_path_factory)
 
     console_messages: list[str] = []
     page_errors: list[str] = []
@@ -94,7 +115,6 @@ def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dic
     observed: dict[str, Any] = {}
 
     try:
-        _wait_health(base_url, proc)
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
             page = browser.new_page()
@@ -144,13 +164,7 @@ def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dic
             }
             browser.close()
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
-        log_handle.close()
+        _stop_editor_server(proc, log_handle)
 
     return {
         "observed": observed,
@@ -159,6 +173,126 @@ def editor_browser_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dic
         "failedRequests": failed_requests,
         "apiResponses": api_responses,
     }
+
+
+@pytest.fixture(scope="session")
+def editor_failure_state_result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # pragma: no cover - environment failure path
+        pytest.fail(f"playwright import failed: {exc}")
+
+    proc, log_handle, base_url = _start_editor_server(tmp_path_factory)
+    result: dict[str, Any] = {
+        "pageErrors": [],
+        "failedRequests": [],
+        "scenarios": {},
+    }
+
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+
+            def new_page() -> Any:
+                page = browser.new_page()
+                page.on("pageerror", lambda exc: result["pageErrors"].append(str(exc)))
+                page.on("requestfailed", lambda req: result["failedRequests"].append(req.url))
+                return page
+
+            page = new_page()
+            page.route(
+                "**/api/web-office/hwpx-load",
+                lambda route: route.fulfill(
+                    status=500,
+                    content_type="application/json",
+                    body=json.dumps({
+                        "status": "FAILED",
+                        "errors": [{"message": "load rejected"}],
+                    }),
+                ),
+            )
+            page.goto(f"{base_url}{URL_PATH}", wait_until="networkidle")
+            page.get_by_role("button", name="Load sample").click()
+            page.wait_for_function(
+                f"() => document.querySelector('[data-role=\"status\"]')?.textContent === {json.dumps(LOAD_FAIL_STATUS)}",
+                timeout=10000,
+            )
+            result["scenarios"]["load_http_fail"] = {
+                "statusKind": page.locator("[data-role='status']").get_attribute("data-status"),
+                "statusText": page.locator("[data-role='status']").inner_text(),
+                "successShown": PASS_STATUS in page.locator("body").inner_text(),
+            }
+            page.close()
+
+            for scenario, response_status, response_body, expected_text in (
+                (
+                    "save_blocked",
+                    200,
+                    {
+                        "status": "SUCCESS",
+                        "mode": "SANDBOX_ONLY",
+                        "sourceMutationAllowed": False,
+                        "data": {"verdict": "REJECTED"},
+                        "errors": [],
+                    },
+                    SAVE_BLOCKED_STATUS,
+                ),
+                (
+                    "save_http_fail",
+                    500,
+                    {
+                        "status": "FAILED",
+                        "mode": "SANDBOX_ONLY",
+                        "sourceMutationAllowed": False,
+                        "errors": [{"message": "save rejected"}],
+                    },
+                    SAVE_FAIL_STATUS,
+                ),
+            ):
+                page = new_page()
+
+                def save_route(
+                    route: Any,
+                    _request: Any = None,
+                    *,
+                    status: int = response_status,
+                    body: dict[str, Any] = response_body,
+                ) -> None:
+                    route.fulfill(
+                        status=status,
+                        content_type="application/json",
+                        body=json.dumps(body),
+                    )
+
+                page.route("**/api/web-office/cell-save-apply", save_route)
+                page.goto(f"{base_url}{URL_PATH}", wait_until="networkidle")
+                page.get_by_role("button", name="Load sample").click()
+                page.wait_for_selector("[data-cell-id]", state="visible", timeout=30000)
+                page.locator("[data-cell-id]").nth(0).click()
+                page.locator("[data-role='cell-text']").fill(f"BROWSER_SMOKE_51_{scenario}")
+                page.get_by_role("button", name="Commit cell text").click()
+                page.wait_for_function(
+                    "() => document.querySelector('[data-role=\"command-count\"]')?.textContent === '1'",
+                    timeout=10000,
+                )
+                page.get_by_role("button", name="Save apply").click()
+                page.wait_for_function(
+                    f"() => document.querySelector('[data-role=\"status\"]')?.textContent === {json.dumps(expected_text)}",
+                    timeout=10000,
+                )
+                result["scenarios"][scenario] = {
+                    "statusKind": page.locator("[data-role='status']").get_attribute("data-status"),
+                    "statusText": page.locator("[data-role='status']").inner_text(),
+                    "successShown": PASS_STATUS in page.locator("body").inner_text(),
+                    "commandCount": page.locator("[data-role='command-count']").inner_text(),
+                }
+                page.close()
+
+            browser.close()
+    finally:
+        _stop_editor_server(proc, log_handle)
+
+    return result
 
 
 def test_editor_browser_smoke_load_edit_save(editor_browser_smoke_result: dict[str, Any]) -> None:
@@ -184,3 +318,24 @@ def test_editor_browser_smoke_has_no_browser_leaks(editor_browser_smoke_result: 
         assert "outputPath" not in repr(body)
         assert body.get("mode") in {None, "SANDBOX_ONLY"}
         assert body.get("sourceMutationAllowed") in {None, False}
+
+
+def test_editor_failure_states_are_not_success(editor_failure_state_result: dict[str, Any]) -> None:
+    scenarios = editor_failure_state_result["scenarios"]
+    assert scenarios["load_http_fail"] == {
+        "statusKind": "fail",
+        "statusText": LOAD_FAIL_STATUS,
+        "successShown": False,
+    }
+    assert scenarios["save_blocked"]["statusKind"] == "blocked"
+    assert scenarios["save_blocked"]["statusText"] == SAVE_BLOCKED_STATUS
+    assert scenarios["save_blocked"]["successShown"] is False
+    assert scenarios["save_blocked"]["commandCount"] == "1"
+    assert scenarios["save_http_fail"]["statusKind"] == "fail"
+    assert scenarios["save_http_fail"]["statusText"] == SAVE_FAIL_STATUS
+    assert scenarios["save_http_fail"]["successShown"] is False
+    assert scenarios["save_http_fail"]["commandCount"] == "1"
+
+
+def test_editor_failure_states_have_no_runtime_errors(editor_failure_state_result: dict[str, Any]) -> None:
+    assert editor_failure_state_result["pageErrors"] == []
