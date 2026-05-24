@@ -10,6 +10,7 @@ level writer bridge keeps outputPath for local tests; this route removes it.
 """
 from __future__ import annotations
 
+import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -85,7 +86,10 @@ def call_cell_save_apply(
 ) -> dict[str, Any]:
     out_dir = output_dir
     if out_dir is None:
-        out_dir = Path(tempfile.gettempdir()) / "hwpx_web_office_api_outputs"
+        configured = os.environ.get("HWPX_WEB_OFFICE_API_OUTPUT_DIR")
+        out_dir = (Path(configured) if configured
+                   else Path(tempfile.gettempdir())
+                   / "hwpx_web_office_api_outputs")
     result = apply_cell_save_request(
         request, project_root=project_root, output_dir=out_dir)
     public_result = _strip_public_paths(result)
