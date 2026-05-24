@@ -114,3 +114,12 @@ def test_fastapi_app_routes_when_dependency_available(tmp_path):
     })
     assert load.status_code == 200
     assert load.json()["status"] == "SUCCESS"
+
+    page = client.get("/web-office/")
+    assert page.status_code == 200
+    assert "HWPX Web Office" in page.text
+    assert "editor_ui_bridge.mjs" in page.text
+
+    bridge = client.get("/web-office/editor_ui_bridge.mjs")
+    assert bridge.status_code == 200
+    assert "postHwpxEditorLoad" in bridge.text

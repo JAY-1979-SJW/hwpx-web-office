@@ -2,42 +2,152 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>HWPX Web Office Viewer (RO)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX Web Office</title>
 <style>
-  body { font-family: "Malgun Gothic", sans-serif; margin: 0; }
-  .wo-toolbar { display: flex; gap: 16px; padding: 8px 16px;
-                            background: #1f2937; color: #fff; }
-  .wo-toolbar-title { flex: 1; font-weight: bold; }
-  .wo-toolbar-mode { background: #374151; padding: 2px 8px; border-radius: 4px; }
-  .wo-body { display: grid; grid-template-columns: 240px 1fr 280px;
-                      min-height: calc(100vh - 40px); }
-  .wo-left-panel, .wo-right-panel { background: #f3f4f6; padding: 12px;
-                                                          font-size: 13px; overflow: auto; }
-  .wo-center { padding: 16px 24px; background: #fff; overflow: auto; }
-  .wo-table { border-collapse: collapse; margin: 8px 0; }
-  .wo-cell { border: 1px solid #888; padding: 4px 6px; vertical-align: top;
-                    min-width: 32px; }
-  .wo-cell-merged-origin { background: #fef9c3; }
-  .wo-paragraph { padding: 4px 0; }
-  .wo-warnings-empty { color: #6b7280; font-style: italic; }
-  ul.wo-table-list { padding-left: 18px; }
+  :root {
+    color-scheme: light;
+    font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+    background: #f4f6f8;
+    color: #17202a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; }
+  button, textarea { font: inherit; }
+  button {
+    min-height: 34px;
+    border: 1px solid #9aa6b2;
+    background: #ffffff;
+    color: #17202a;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #eef3f8; }
+  button:disabled { color: #7c8792; cursor: not-allowed; }
+  .web-office-editor { min-height: 100vh; display: flex; flex-direction: column; }
+  .wo-appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    background: #26313d;
+    color: #ffffff;
+  }
+  .wo-appbar h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  .wo-appbar p { margin: 3px 0 0; font-size: 12px; color: #cdd6df; }
+  .wo-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .wo-actions button { border-color: #5f7081; }
+  .wo-status {
+    min-height: 32px;
+    padding: 8px 18px;
+    border-bottom: 1px solid #d7dde3;
+    background: #ffffff;
+    font-size: 13px;
+  }
+  .wo-status[data-status="success"] { color: #0b6b46; }
+  .wo-status[data-status="fail"], .wo-status[data-status="blocked"] { color: #9f2d20; }
+  .wo-status[data-status="loading"] { color: #2b5d94; }
+  .wo-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+  }
+  .wo-document {
+    padding: 18px;
+    overflow: auto;
+    background: #ffffff;
+  }
+  .wo-inspector {
+    border-left: 1px solid #d7dde3;
+    background: #f4f6f8;
+    padding: 14px;
+    overflow: auto;
+  }
+  .wo-empty {
+    display: grid;
+    min-height: 220px;
+    place-items: center;
+    color: #66717d;
+    border: 1px dashed #b8c2cc;
+    background: #fafbfc;
+  }
+  .wo-table-group { margin: 0 0 18px; }
+  .wo-table-group h2 { margin: 0 0 8px; font-size: 14px; color: #42505e; }
+  .wo-cell-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .wo-cell-button {
+    display: grid;
+    grid-template-rows: 18px minmax(42px, auto);
+    align-items: start;
+    gap: 4px;
+    min-height: 76px;
+    text-align: left;
+    overflow: hidden;
+  }
+  .wo-cell-button[data-active="true"] {
+    border-color: #2d6cdf;
+    box-shadow: 0 0 0 2px rgba(45, 108, 223, 0.16);
+  }
+  .wo-cell-button span { font-size: 12px; color: #66717d; }
+  .wo-cell-button strong {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .wo-metrics {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+  .wo-metrics span {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid #d7dde3;
+    background: #ffffff;
+    border-radius: 6px;
+  }
+  .wo-editor-panel {
+    display: grid;
+    gap: 10px;
+  }
+  .wo-editor-panel h2 { margin: 0; font-size: 15px; }
+  .wo-editor-panel textarea {
+    width: 100%;
+    min-height: 160px;
+    resize: vertical;
+    border: 1px solid #b8c2cc;
+    border-radius: 6px;
+    padding: 9px;
+    background: #ffffff;
+    color: #17202a;
+  }
+  .wo-editor-panel[data-enabled="false"] { opacity: 0.7; }
+  @media (max-width: 820px) {
+    .wo-appbar { align-items: flex-start; flex-direction: column; }
+    .wo-actions { justify-content: flex-start; }
+    .wo-layout { grid-template-columns: 1fr; }
+    .wo-inspector { border-left: 0; border-top: 1px solid #d7dde3; }
+  }
 </style>
 </head>
 <body>
-<div id="root">로딩 중…</div>
+<div id="root"></div>
 <script type="module">
-  import { renderPayloadToHTML } from "./viewer_core.mjs";
-  // payload.json 은 서버가 /document/load 응답으로 내려준다고 가정.
-  // 본 prototype 은 동일 경로의 정적 fixture 를 fetch.
-  const res = await fetch("./payload.json");
-  if (!res.ok) {
-    document.getElementById("root").textContent =
-      "payload.json 을 찾을 수 없습니다 (RO-VIEW prototype).";
-  } else {
-    const payload = await res.json();
-    document.getElementById("root").innerHTML =
-      renderPayloadToHTML(payload);
-  }
+  import { mountWebOfficeEditor } from "./editor_ui_bridge.mjs";
+
+  mountWebOfficeEditor(document.getElementById("root"));
 </script>
 </body>
 </html>

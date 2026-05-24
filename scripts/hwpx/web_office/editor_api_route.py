@@ -27,6 +27,7 @@ MODE = "SANDBOX_ONLY"
 try:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.staticfiles import StaticFiles
     from pydantic import BaseModel
 
     _FASTAPI_AVAILABLE = True
@@ -34,6 +35,9 @@ except ImportError:
     _FASTAPI_AVAILABLE = False
     FastAPI = object  # type: ignore
     BaseModel = object  # type: ignore
+
+
+FRONTEND_DIR = PROJECT_ROOT / "frontend" / "web_office_viewer"
 
 
 def _request_id() -> str:
@@ -138,6 +142,13 @@ def create_app() -> Any:
     @app.post("/api/web-office/cell-save-apply")
     def cell_save_apply(req: CellSaveApplyRequest) -> dict[str, Any]:
         return call_cell_save_apply(req.model_dump())
+
+    if FRONTEND_DIR.is_dir():
+        app.mount(
+            "/web-office",
+            StaticFiles(directory=str(FRONTEND_DIR), html=True),
+            name="web-office",
+        )
 
     return app
 
