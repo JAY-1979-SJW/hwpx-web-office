@@ -35,6 +35,8 @@ class WebOfficeCell:
     colSpan: int = 1
     isCoveredByMerge: bool = False
     isMergedOrigin: bool = False
+    header: str | None = None
+    headerCell: bool | None = None
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
 

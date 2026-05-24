@@ -189,6 +189,18 @@ def _find_cell_elem(
     return None
 
 
+def _normalize_header_flag(value: str | None) -> bool | None:
+    """hp:tc header attribute를 보수적으로 boolean으로 정규화한다."""
+    if value is None:
+        return None
+    v = value.strip().lower()
+    if v in {"1", "true", "yes"}:
+        return True
+    if v in {"0", "false", "no"}:
+        return False
+    return None
+
+
 def _iter_top_level_paragraphs_in_section(
     section_root: ET.Element,
 ) -> list[tuple[int, ET.Element]]:
@@ -319,6 +331,8 @@ def import_hwpx_as_ro_view(
             cell_id = _stable_cell_id(tid, c.row, c.col)
             cell_ids.append(cell_id)
             cell_pars: list[WebOfficeParagraph] = []
+            header_attr: str | None = None
+            header_cell: bool | None = None
 
             # ── XML 직접 파싱 시도 ──────────────────────────────
             par_elems: list[ET.Element] = []
@@ -327,6 +341,8 @@ def import_hwpx_as_ro_view(
                 cell_elem = _find_cell_elem(sec_root, c.row, c.col,
                                                               table_pos)
                 if cell_elem is not None:
+                    header_attr = cell_elem.attrib.get("header")
+                    header_cell = _normalize_header_flag(header_attr)
                     par_elems = _iter_paragraphs_in_cell_elem(cell_elem)
 
             if not par_elems and (c.paragraphs or []):
@@ -411,6 +427,8 @@ def import_hwpx_as_ro_view(
                 rowSpan=c.rowSpan or 1, colSpan=c.colSpan or 1,
                 isCoveredByMerge=bool(c.isCoveredByMerge),
                 isMergedOrigin=bool(c.isMergedOrigin),
+                header=header_attr,
+                headerCell=header_cell,
                 paragraphs=cell_pars,
                 text=c.normalizedText or ""))
         tables.append(WebOfficeTable(
