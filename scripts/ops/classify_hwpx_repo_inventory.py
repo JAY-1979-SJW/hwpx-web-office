@@ -187,7 +187,7 @@ def _infer_zone(path: str) -> str:
         return "input_parse"
     if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):
         return "review_approval"
-    if any(token in lower for token in ("writer_sandbox", "readback", "write_sandbox")):
+    if any(token in lower for token in ("writer_sandbox", "readback", "write_sandbox", "rwedit", "backend_rwedit")):
         return "writer_readback"
     if any(token in lower for token in ("download_review", "final_export")):
         return "download_export"
