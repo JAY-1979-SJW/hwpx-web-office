@@ -12,6 +12,7 @@ import {
   createEditorStateFromLoadResponse,
   postHwpxEditorLoad,
   postLoadedEditorSave,
+  unwrapBackendLoadResponse,
 } from "./real_file_load_save_bridge.mjs";
 
 const sourcePath = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
@@ -42,6 +43,10 @@ const loaded = createEditorStateFromLoadResponse(loadResponse);
 assert.equal(loaded.sourcePath, sourcePath);
 assert.equal(loaded.state.sourceDocumentHash, "sha-load-44");
 assert.equal(loaded.summary.headerCells, 1);
+assert.equal(unwrapBackendLoadResponse({
+  status: "SUCCESS",
+  data: loadResponse,
+}).verdict, "PASS");
 
 let state = selectCell(loaded.state, "cell_t_s0_000_r3_c0");
 state = enterCellEdit(state);
@@ -59,8 +64,14 @@ assert.equal(savePayload.commandLog[0].after, "after");
 const loadedViaPost = await postHwpxEditorLoad({
   sourcePath,
   fetchImpl: async (_url, options) => {
+    assert.equal(_url, "/api/web-office/hwpx-load");
     assert.equal(JSON.parse(options.body).operation, "HWPX_EDITOR_LOAD");
-    return { ok: true, async json() { return loadResponse; } };
+    return {
+      ok: true,
+      async json() {
+        return { status: "SUCCESS", data: loadResponse };
+      },
+    };
   },
 });
 assert.equal(loadedViaPost.state.documentModel.cells.length, 2);
@@ -69,15 +80,21 @@ const saveResult = await postLoadedEditorSave({
   loaded: edited,
   requestId: "load-save-44",
   fetchImpl: async (_url, options) => {
+    assert.equal(_url, "/api/web-office/cell-save-apply");
     const body = JSON.parse(options.body);
     assert.equal(body.operation, "CELL_SAVE_APPLY");
     assert.equal(body.commandLog[0].after, "after");
-    return { ok: true, async json() { return { verdict: "PASS" }; } };
+    return {
+      ok: true,
+      async json() {
+        return { status: "SUCCESS", data: { verdict: "PASS" } };
+      },
+    };
   },
 });
 assert.equal(saveResult.verdict, "PASS");
 
 console.log(JSON.stringify({
-  task: "HWPX-EDITOR-REAL-FILE-LOAD-SAVE-44",
+  task: "HWPX-EDITOR-FRONTEND-BACKEND-WIRE-47",
   verdict: "PASS",
 }));

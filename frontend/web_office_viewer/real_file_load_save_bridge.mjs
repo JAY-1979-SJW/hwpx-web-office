@@ -7,6 +7,11 @@ import {
 export const HWPX_EDITOR_LOAD_OPERATION = "HWPX_EDITOR_LOAD";
 export const DEFAULT_HWPX_LOAD_ENDPOINT = "/api/web-office/hwpx-load";
 
+export function unwrapBackendLoadResponse(body) {
+  if (body && body.status === "SUCCESS" && body.data) return body.data;
+  return body;
+}
+
 export function buildHwpxEditorLoadRequest({ sourcePath }) {
   if (!sourcePath || typeof sourcePath !== "string") {
     throw new Error("sourcePath is required");
@@ -49,10 +54,12 @@ export async function postHwpxEditorLoad({
   });
   const body = await response.json();
   if (!response.ok) {
-    const detail = body && body.reason ? body.reason : response.statusText;
+    const detail = body && (body.reason || body.errors?.[0]?.message)
+      ? (body.reason || body.errors[0].message)
+      : response.statusText;
     throw new Error(`hwpx editor load failed: ${detail}`);
   }
-  return createEditorStateFromLoadResponse(body);
+  return createEditorStateFromLoadResponse(unwrapBackendLoadResponse(body));
 }
 
 export function buildSaveRequestFromLoadedEditor({

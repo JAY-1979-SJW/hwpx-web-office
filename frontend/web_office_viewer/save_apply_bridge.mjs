@@ -1,6 +1,11 @@
 export const CELL_SAVE_APPLY_OPERATION = "CELL_SAVE_APPLY";
 export const DEFAULT_CELL_SAVE_ENDPOINT = "/api/web-office/cell-save-apply";
 
+export function unwrapBackendSaveApplyResponse(body) {
+  if (body && body.status === "SUCCESS" && body.data) return body.data;
+  return body;
+}
+
 export function buildCellSaveApplyRequest({
   state,
   sourcePath,
@@ -48,8 +53,10 @@ export async function postCellSaveApply({
   });
   const body = await response.json();
   if (!response.ok) {
-    const detail = body && body.reason ? body.reason : response.statusText;
+    const detail = body && (body.reason || body.errors?.[0]?.message)
+      ? (body.reason || body.errors[0].message)
+      : response.statusText;
     throw new Error(`cell save apply failed: ${detail}`);
   }
-  return body;
+  return unwrapBackendSaveApplyResponse(body);
 }
