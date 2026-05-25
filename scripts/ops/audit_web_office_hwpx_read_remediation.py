@@ -59,6 +59,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "paraPr",
     "borderFills",
     "borderFill",
+    "autoSpacing",
     "breakSetting",
     "fillBrush",
     "winBrush",
@@ -212,7 +213,7 @@ UNSUPPORTED_CATEGORY_META = {
     },
     "paragraph_layout": {
         "claimImpact": "Paragraph spacing, margin, alignment, tab, and break fidelity is incomplete.",
-        "nextAction": "Complete autoSpacing and lineBreak mapping into render payload.",
+        "nextAction": "Complete lineBreak mapping into render payload.",
     },
     "revision_tracking": {
         "claimImpact": "Revision tracking state is not represented.",

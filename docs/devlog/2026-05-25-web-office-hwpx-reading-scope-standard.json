@@ -47,7 +47,7 @@
     {
       "path": "scripts/hwpx/web_office/ro_view_importer.py",
       "status": "updated",
-      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, including breakSetting and resolved tabPr/tabItem definitions referenced by tabPrIDRef."
+      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, including autoSpacing, breakSetting, and resolved tabPr/tabItem definitions referenced by tabPrIDRef."
     },
     {
       "path": "scripts/hwpx/web_office/render_payload.py",
@@ -57,7 +57,7 @@
     {
       "path": "tests/test_web_office_para_pr_defs.py",
       "status": "added",
-      "change": "Added regression coverage for align, breakSetting, lineSpacing, margin, resolved tabPr/tabItem payload, and read-only payload exposure of paraPrDefs."
+      "change": "Added regression coverage for align, autoSpacing, breakSetting, lineSpacing, margin, resolved tabPr/tabItem payload, and read-only payload exposure of paraPrDefs."
     },
     {
       "path": "scripts/ops/classify_hwpx_repo_inventory.py",
@@ -122,13 +122,13 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs breakSetting/tabPr/tabItem extraction, 65 unsupported XML element families remain grouped into 13 categories; paragraph_layout still reports autoSpacing and lineBreak as open; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs autoSpacing/breakSetting/tabPr/tabItem extraction, 64 unsupported XML element families remain grouped into 13 categories; paragraph_layout still reports lineBreak as open; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "11 tests passed and 12 were skipped; paraPrDefs are extracted with breakSetting and resolved tabPr/tabItem payload and exposed read-only while existing paragraph/read-remediation contracts remain valid."
+      "evidence": "12 tests passed and 12 were skipped; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload and exposed read-only while existing paragraph/read-remediation contracts remain valid."
     },
     {
       "command": "python scripts/ops/gate_hwpx_repo_new_file_classification.py",

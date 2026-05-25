@@ -24,6 +24,7 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
         "paraPrId",
         "tabPrIDRef",
         "align",
+        "autoSpacing",
         "breakSetting",
         "lineSpacing",
         "margin",
@@ -31,10 +32,24 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
         "tabItems",
     } <= set(sample)
     assert any(item.get("align") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("autoSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("breakSetting") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("lineSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("margin") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("tabPr") for item in doc.styles.paraPrDefs.values())
+
+
+def test_para_pr_defs_extract_auto_spacing():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+
+    auto_spacing = [
+        item["autoSpacing"]
+        for item in doc.styles.paraPrDefs.values()
+        if item.get("autoSpacing")
+    ]
+    assert auto_spacing
+    sample = auto_spacing[0]
+    assert {"eAsianEng", "eAsianNum"} <= set(sample)
 
 
 def test_para_pr_defs_extract_break_setting():

@@ -296,13 +296,15 @@ Current `paragraph_layout` remediation status:
   with their raw HWPX `value` and `relative` attributes.
 - `tabPrIDRef`, resolved `tabPr` auto-tab flags, `tabItems`, and
   `tabItemCount` are exposed from the referenced tab stop definition.
+- `autoSpacing` is exposed with raw HWPX `eAsianEng` and `eAsianNum`
+  attributes.
 - `breakSetting` is exposed with raw HWPX line/word break and keep attributes.
 - Full visual rendering fidelity of tab stops is still not claimed until UI
   layout comparison fixtures cover the behavior.
 
 The next implementation priority after this first paragraph layout pass is:
 
-1. `paragraph_layout`: autoSpacing, lineBreak
+1. `paragraph_layout`: lineBreak
 2. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
 3. `table_layout`: cellMargin, inMargin, outMargin
 
