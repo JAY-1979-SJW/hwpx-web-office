@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.ops import gate_hwpx_form_auto_fill_fail_fast as fail_fast_gate  # noqa: E402
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_prepush_guard"
-TEMP_ROOT = Path("C:/tmp")
+TEMP_ROOT = ROOT / "data" / "tmp" / "hpg"
 
 PASS_VERDICT = "PASS_HWPX_REPO_PREPUSH_GUARD"
 FAIL_VERDICT = "FAIL_HWPX_REPO_PREPUSH_GUARD"
@@ -46,8 +46,9 @@ def evaluate_prepush_guard(fail_fast_payload: dict[str, Any]) -> dict[str, Any]:
 def run_prepush_guard(report_dir: Path | None = REPORT_DIR, temp_only: bool = False) -> dict[str, Any]:
     if temp_only:
         TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="hwpx_repo_prepush_guard_", dir=str(TEMP_ROOT)) as tmpdir:
-            return _run_core(Path(tmpdir))
+        tmpdir = TEMP_ROOT / uuid.uuid4().hex[:8]
+        tmpdir.mkdir(parents=True, exist_ok=False)
+        return _run_core(tmpdir)
     target = report_dir or REPORT_DIR
     target.mkdir(parents=True, exist_ok=True)
     return _run_core(target)

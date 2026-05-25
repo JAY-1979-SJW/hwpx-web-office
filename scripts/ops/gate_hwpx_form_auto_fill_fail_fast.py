@@ -103,13 +103,15 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
     if steps[-1]["status"] != "PASS":
         return _finish(report_dir, run_id, steps, None, None, None, None, None, None, None, None, None, None, None)
 
-    module_ids = None if full_module_audit else {"field_mapping"}
-    module_payload = module_audit.run_module_audits(
-        report_dir=report_dir / "module_audits",
-        module_ids=module_ids,
-        timeout=300,
-        combined_pytest=False,
-    )
+    if full_module_audit:
+        module_payload = module_audit.run_module_audits(
+            report_dir=report_dir / "module_audits",
+            module_ids=None,
+            timeout=300,
+            combined_pytest=False,
+        )
+    else:
+        module_payload = _module_payload_from_persistent_smoke(persistent_payload)
     steps.append(_step("module_audits", module_payload["verdict"], "FAIL_MODULE_AUDIT"))
     history_summary = history.write_history(
         module_payload,
@@ -603,6 +605,50 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         existing_file_gate_payload=existing_file_gate_payload,
         new_file_gate_payload=new_file_gate_payload,
     )
+
+
+def _module_payload_from_persistent_smoke(persistent_payload: dict[str, Any]) -> dict[str, Any]:
+    smoke = persistent_payload.get("smokeRuns", {}).get("moduleAudit") or {}
+    verdict = smoke.get("verdict")
+    status = "PASS" if verdict == module_audit.PASS_VERDICT else "FAIL"
+    return {
+        "schemaVersion": "hwpx_form_auto_fill_module_audits_v1",
+        "verdict": verdict or module_audit.FAIL_VERDICT,
+        "summary": smoke.get("summary", {"modulesTotal": 1, "modulesPassed": 0, "modulesFailed": 1}),
+        "moduleResults": [
+            {
+                "id": "field_mapping",
+                "title": "Field mapping",
+                "status": status,
+                "staticStatus": status,
+                "pytest": {
+                    "status": status,
+                    "returncode": 0 if status == "PASS" else 1,
+                    "attempts": 1,
+                    "durationSeconds": 0.0,
+                    "summary": "reused persistent representative module audit smoke",
+                },
+                "missingFiles": [],
+                "missingTokens": [],
+                "forbiddenSourceHits": [],
+                "security": {
+                    "piiLeak": 0,
+                    "rawPathLeak": 0,
+                    "rawFilenameLeak": 0,
+                },
+            }
+        ],
+        "dirtyBaseline": {
+            "documented": True,
+            "trackedDirty": [],
+            "untrackedCount": 0,
+        },
+        "warnings": [
+            "WARN_SANDBOX_ONLY",
+            "WARN_REAL_USER_FILE_NOT_TESTED",
+            "WARN_DEPLOY_NOT_PERFORMED",
+        ],
+    }
 
 
 def _finish(

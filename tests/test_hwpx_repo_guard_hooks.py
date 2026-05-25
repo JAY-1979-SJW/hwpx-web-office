@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import scripts.ops.install_hwpx_repo_guard_hooks as hook_installer  # noqa: E402
+import scripts.ops.gate_hwpx_form_auto_fill_fail_fast as fail_fast_gate  # noqa: E402
 import scripts.ops.run_hwpx_repo_commit_guard as commit_guard  # noqa: E402
 import scripts.ops.run_hwpx_repo_prepush_guard as prepush_guard  # noqa: E402
 
@@ -102,3 +103,23 @@ def test_09_json_report_valid(tmp_path: Path) -> None:
         json.loads((tmp_path / "repo_guard_hooks_installation_summary.json").read_text(encoding="utf-8"))
     finally:
         hook_installer.HOOKS_DIR = original_hooks_dir
+
+
+def test_10_prepush_temp_root_is_short_repo_local() -> None:
+    assert prepush_guard.TEMP_ROOT.name == "hpg"
+    assert prepush_guard.TEMP_ROOT.is_relative_to(ROOT / "data" / "tmp")
+
+
+def test_11_fail_fast_reuses_persistent_module_smoke() -> None:
+    payload = fail_fast_gate._module_payload_from_persistent_smoke(
+        {
+            "smokeRuns": {
+                "moduleAudit": {
+                    "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS",
+                    "summary": {"modulesTotal": 1, "modulesPassed": 1, "modulesFailed": 0},
+                }
+            }
+        }
+    )
+    assert payload["verdict"] == "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
+    assert payload["moduleResults"][0]["id"] == "field_mapping"

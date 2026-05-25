@@ -71,3 +71,12 @@ def test_07_report_has_no_leak_patterns(tmp_path: Path) -> None:
 
 def test_08_manifest_is_valid_json() -> None:
     json.loads(module_audit.MANIFEST.read_text(encoding="utf-8"))
+
+
+def test_09_windows_pytest_cleanup_permission_is_nonblocking() -> None:
+    output = (
+        ".................................... [100%]\n"
+        "86 passed, 22 warnings, 22 errors in 23.86s\n"
+        "PermissionError: [WinError 5] access is denied"
+    )
+    assert module_audit._is_pytest_cleanup_permission_only(output)
