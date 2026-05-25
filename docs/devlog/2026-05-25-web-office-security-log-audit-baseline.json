@@ -41,6 +41,26 @@
     {
       "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
       "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    },
+    {
+      "command": "git push",
+      "result": "PASS_HWPX_REPO_PREPUSH_GUARD"
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts\\ops\\deploy_web_office_to_server.ps1",
+      "result": "PASS"
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 scripts/ops/audit_web_office_security_logs.py --tail-lines 500\"",
+      "result": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT; suspiciousSignals=0; availableLogs=5; warnings=3"
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 -m pytest tests/test_web_office_security_log_audit.py -q\"",
+      "result": "4 passed"
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift\"",
+      "result": "HEALTHY with PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
     }
   ],
   "localVerification": {
@@ -49,8 +69,25 @@
   },
   "serverVerification": {
     "required": true,
-    "status": "PENDING",
-    "reason": "Security log audit must be run on the server before closeout."
+    "status": "PASS",
+    "serverAlias": "haehan-app",
+    "serverPath": "/home/ubuntu/apps/hwpx-web-office",
+    "deployedHead": "c4b0456",
+    "checks": {
+      "serverDeployVerifyOk": true,
+      "serverSecurityLogAuditOk": true,
+      "serverSuspiciousSignalsZero": true,
+      "serverSecurityLogTestsOk": true,
+      "serverHealthOk": true,
+      "serverStructureDriftOk": true
+    },
+    "summary": {
+      "securityLogVerdict": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT",
+      "availableLogs": 5,
+      "warnings": 3,
+      "suspiciousSignals": 0,
+      "note": "Journal showed unrelated non-Web-Office service restart errors; no configured intrusion/security pattern matched."
+    }
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-security-log-audit-baseline.json"
@@ -59,5 +96,5 @@
   "holdItems": [
     "Firewall changes, IP allowlists, port policy changes, and automatic blocking are outside this task."
   ],
-  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+  "finalStatus": "SERVER_VERIFIED_PASS"
 }
