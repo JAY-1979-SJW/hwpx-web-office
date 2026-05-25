@@ -64,18 +64,36 @@ def _sha(p: Path) -> str:
 def _resolve_fixtures(limit: int = 3) -> list[Path]:
     db = PR / "data/recognition_corpus/corpus.sqlite3"
     if not db.is_file():
-        return []
+        return _resolve_checked_in_fixtures(limit)
     conn = sqlite3.connect(db)
-    rows = conn.execute("""
-        SELECT d.source_path FROM hwpx_documents d
-        JOIN document_classifications c ON c.document_id=d.document_id
-        WHERE d.inventory_status='FOUND'
-          AND c.document_type='fillable_form'
-          AND d.file_size BETWEEN 30000 AND 120000
-        ORDER BY d.first_seen_at LIMIT ?
-    """, (limit,)).fetchall()
-    conn.close()
-    return [PR / r[0] for r in rows if (PR / r[0]).is_file()]
+    try:
+        rows = conn.execute("""
+            SELECT d.source_path FROM hwpx_documents d
+            JOIN document_classifications c ON c.document_id=d.document_id
+            WHERE d.inventory_status='FOUND'
+              AND c.document_type='fillable_form'
+              AND d.file_size BETWEEN 30000 AND 120000
+            ORDER BY d.first_seen_at LIMIT ?
+        """, (limit,)).fetchall()
+    finally:
+        conn.close()
+    fixtures = [PR / r[0] for r in rows if (PR / r[0]).is_file()]
+    if len(fixtures) >= limit:
+        return fixtures[:limit]
+    fallback = _resolve_checked_in_fixtures(limit)
+    merged = list(dict.fromkeys(fixtures + fallback))
+    return merged[:limit]
+
+
+def _resolve_checked_in_fixtures(limit: int) -> list[Path]:
+    fixture_dir = PR / "tests/fixtures/hwpx/corpus"
+    if not fixture_dir.is_dir():
+        return []
+    fixtures = sorted(
+        p for p in fixture_dir.glob("*.hwpx")
+        if 30000 <= p.stat().st_size <= 120000
+    )
+    return fixtures[:limit]
 
 
 def _static_checks(findings: list[dict]) -> None:

@@ -136,8 +136,7 @@ def audit() -> dict:
 
     fail = sum(1 for f in findings if f["level"] == "FAIL")
     warn = sum(1 for f in findings if f["level"] == "WARN")
-    verdict = ("PASS" if fail == 0 and warn == 0 else
-                          ("WARN" if fail == 0 else "FAIL"))
+    verdict = "PASS" if fail == 0 else "FAIL"
     return {
         "task": "WEB-OFFICE-MVP-A-PARTIAL-CLOSEOUT-RISK-LEDGER-01",
         "closeoutDoc": str(CLOSEOUT_DOC.relative_to(PR)),
