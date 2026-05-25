@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-HWPX-READING-SCOPE-STANDARD-20260525",
+  "baselineHead": "92b72f7",
+  "baselineTag": "baseline/web-office-operational-20260525",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+      "status": "created",
+      "change": "Defined HWPX reading levels R1-R4 and separated basic read, document model extraction, UI payload rendering, and full HWPX compatibility claims."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "status": "updated",
+      "change": "Linked the reading scope standard and added the current HWPX read claim boundary."
+    },
+    {
+      "path": "docs/architecture/web_office_app_structure_20260525.md",
+      "status": "updated",
+      "change": "Linked the reading scope standard from the app structure overview."
+    }
+  ],
+  "changedFiles": [
+    "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python -m json.tool docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "JSON parsed successfully."
+    },
+    {
+      "command": "rg -n \"HWPX Reading Scope|basic sandbox HWPX load/read|full HWPX specification|R1: Package|R4: Full\" docs/architecture",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Reading scope anchors found in the new standard and linked architecture documents."
+    }
+  ],
+  "localVerification": {
+    "repository": "hwpx-web-office",
+    "codeChanges": "none",
+    "documentationOnly": true
+  },
+  "serverVerification": {
+    "required": false,
+    "reason": "Documentation-only clarification after an already locked and server-verified baseline."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json"
+  ],
+  "unresolvedItems": [
+    {
+      "item": "Full HWPX semantic read compatibility",
+      "status": "not_claimed",
+      "requiredNextStep": "Representative corpus coverage audit."
+    },
+    {
+      "item": "Hancom-equivalent UI visual reproduction",
+      "status": "not_claimed",
+      "requiredNextStep": "UI fidelity coverage audit."
+    }
+  ],
+  "holdItems": [
+    "Do not describe HWPX read as complete without R4 coverage evidence.",
+    "Do not treat UI payload support as full visual fidelity."
+  ],
+  "finalStatus": "DOCUMENTATION_ONLY_RECORDED"
+}

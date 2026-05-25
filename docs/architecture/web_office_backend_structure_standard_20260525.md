@@ -28,6 +28,8 @@ The current Web Office editor line consists of:
 - backend route tests: `tests/test_web_office_writer_readback_backend_api_route.py`
 - frontend/backend wire tests: `tests/test_web_office_browser_smoke_frontend_backend_wire_baseline.py`
 - current app structure map: `docs/architecture/web_office_app_structure_20260525.md`
+- current HWPX reading scope standard:
+  `docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md`
 
 ## 3. Allowed Runtime Mode
 
@@ -59,6 +61,23 @@ reject absolute paths and unsupported source path forms.
 The save endpoint accepts a browser command log and writes only to sandbox output
 location configured by the backend runtime. The public response must not expose
 the internal output path.
+
+## 4A. HWPX Read Claim Boundary
+
+The current backend claim is:
+
+- basic sandbox HWPX load/read is verified for the Web Office document model and
+  UI payload used by the locked baseline
+- full HWPX specification read compatibility is not claimed
+- full Hancom-equivalent UI visual reproduction is not claimed
+
+The authoritative reading-scope distinction is maintained in:
+
+- `docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md`
+
+Future work must not describe HWPX read as "complete" unless the reading-scope
+standard is upgraded with corpus coverage evidence and matching regression
+gates.
 
 ## 5. Static Frontend Serving
 

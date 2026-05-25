@@ -14,6 +14,12 @@ which validation commands protect the structure.
 This document does not approve production write, arbitrary user upload, direct
 browser HWPX package parsing, or direct browser HWPX writing.
 
+HWPX reading scope is defined separately in
+`docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md`. The
+current app structure verifies basic sandbox load/read for the Web Office
+document model and UI payload, but does not claim full HWPX specification
+compatibility or complete Hancom-equivalent visual reproduction.
+
 ## 2. App Boundary
 
 The Web Office app is a sandbox-only browser editor for HWPX files.
