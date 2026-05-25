@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-APP-STRUCTURE-DOC-20260525",
+  "baselineHead": "07d4053",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_app_structure_20260525.md",
+      "updated": true,
+      "change": "Added current Web Office app structure map covering browser, backend, save pipelines, operational scripts, validation, and hold items."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "updated": true,
+      "change": "Added a reference to the current app structure map."
+    }
+  ],
+  "changedFiles": [
+    "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/devlog/2026-05-25-web-office-app-structure-doc.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python -m json.tool docs\\devlog\\2026-05-25-web-office-app-structure-doc.json",
+      "result": "PASS"
+    },
+    {
+      "command": "rg -n \"Web Office App Structure|Runtime Layers|Request Flow|/api/web-office/health|/api/web-office/hwpx-load|/api/web-office/cell-save-apply|SERVER_VERIFIED_PASS|web_office_app_structure_20260525\" docs\\architecture\\web_office_app_structure_20260525.md docs\\architecture\\web_office_backend_structure_standard_20260525.md docs\\devlog\\2026-05-25-web-office-app-structure-doc.json",
+      "result": "PASS"
+    },
+    {
+      "command": "rg -n \"SANDBOX_ONLY|sourceMutationAllowed|outputPath|/api/web-office/health|/api/web-office/hwpx-load|/api/web-office/cell-save-apply|app.mount\" scripts\\hwpx\\web_office\\editor_api_route.py frontend\\web_office_viewer\\real_file_load_save_bridge.mjs frontend\\web_office_viewer\\save_apply_bridge.mjs",
+      "result": "PASS"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_writer_readback_backend_api_route.py tests\\test_web_office_browser_smoke_frontend_backend_wire_baseline.py tests\\test_web_office_editor_browser_smoke.py -q",
+      "result": "15 passed"
+    },
+    {
+      "command": "python scripts\\ops\\verify_web_office_editor_backend_runtime_smoke.py",
+      "result": "PASS_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE"
+    },
+    {
+      "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
+      "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    }
+  ],
+  "localVerification": {
+    "status": "PASS",
+    "summary": "App structure anchors, API/static route signals, backend runtime smoke, browser/backend smoke, and commit guard passed."
+  },
+  "serverVerification": {
+    "required": true,
+    "status": "PENDING",
+    "reason": "Web Office architecture documentation changed; server verification is required before closeout."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-app-structure-doc.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "Production write, direct browser HWPX parsing, direct browser HWPX writing, uncontrolled upload, arbitrary source paths, and endpoint expansion remain on hold."
+  ],
+  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+}

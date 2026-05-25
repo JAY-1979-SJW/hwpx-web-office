@@ -27,6 +27,7 @@ The current Web Office editor line consists of:
 - browser smoke: `tests/test_web_office_editor_browser_smoke.py`
 - backend route tests: `tests/test_web_office_writer_readback_backend_api_route.py`
 - frontend/backend wire tests: `tests/test_web_office_browser_smoke_frontend_backend_wire_baseline.py`
+- current app structure map: `docs/architecture/web_office_app_structure_20260525.md`
 
 ## 3. Allowed Runtime Mode
 
