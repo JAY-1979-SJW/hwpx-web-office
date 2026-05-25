@@ -49,6 +49,8 @@ $ProjectRoot = Resolve-Path (Join-Path $ScriptPath "..\..")
 $BundleDir = Join-Path $ProjectRoot "data\audit\deploy_bundle"
 $ArchivePath = Join-Path $BundleDir "hwpx-web-office.tar"
 $RemoteArchive = "/home/ubuntu/apps/hwpx-web-office.tar"
+$FixtureCorpusDir = Join-Path $ProjectRoot "tests\fixtures\hwpx\corpus"
+$RemoteFixtureCorpusDir = "$ServerPath/tests/fixtures/hwpx/corpus"
 
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
 
@@ -58,18 +60,32 @@ if (-not $SkipLocalStatusCheck -and $status.Trim()) {
     throw "working tree is not clean; commit or stash changes before server deploy"
 }
 
+$fixtureFiles = @(Get-ChildItem -Path $FixtureCorpusDir -Filter "*.hwpx" -File | Sort-Object Name)
+if ($fixtureFiles.Count -lt 1) {
+    throw "fixture corpus has no .hwpx files: $FixtureCorpusDir"
+}
+
 Invoke-Checked -FilePath "git" -Arguments @("archive", "--format=tar", "-o", $ArchivePath, "HEAD") -Step "git archive" | Out-Null
 Invoke-Checked -FilePath "scp" -Arguments @($ArchivePath, "${ServerAlias}:${RemoteArchive}") -Step "scp archive" | Out-Null
+Invoke-Checked -FilePath "ssh" -Arguments @($ServerAlias, "mkdir", "-p", $RemoteFixtureCorpusDir) -Step "server fixture dir" | Out-Null
+$fixtureScpArgs = @()
+foreach ($fixture in $fixtureFiles) {
+    $fixtureScpArgs += $fixture.FullName
+}
+$fixtureScpArgs += "${ServerAlias}:${RemoteFixtureCorpusDir}/"
+Invoke-Checked -FilePath "scp" -Arguments $fixtureScpArgs -Step "scp fixture corpus" | Out-Null
 
 $serverScript = @"
 set -e
 mkdir -p "$ServerPath"
 tar -xf "$RemoteArchive" -C "$ServerPath"
 cd "$ServerPath"
-python3 -m py_compile scripts/ops/verify_web_office_server_monitor.py scripts/ops/install_web_office_server_monitor_cron.py scripts/ops/audit_web_office_app_structure_drift.py
+python3 -m py_compile scripts/ops/verify_web_office_server_monitor.py scripts/ops/install_web_office_server_monitor_cron.py scripts/ops/audit_web_office_app_structure_drift.py scripts/ops/audit_web_office_hwpx_read_remediation.py scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
 python3 scripts/ops/install_web_office_server_monitor_cron.py --port $Port --interval 30
 python3 scripts/ops/verify_web_office_server_monitor.py --once --port $Port --include-structure-drift
 python3 scripts/ops/audit_web_office_app_structure_drift.py
+python3 scripts/ops/audit_web_office_hwpx_read_remediation.py --no-write
+python3 scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
 pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval' | grep -v 'bash -lc' >/tmp/hwpx-web-office-monitor-process.txt
 crontab -l | grep 'hwpx-web-office-monitor' >/tmp/hwpx-web-office-monitor-cron.txt
 cat /tmp/hwpx-web-office-monitor-process.txt
@@ -90,8 +106,11 @@ $monitorProcessOk = $serverOutput -match "python3 scripts/ops/verify_web_office_
 $monitorCronOk = $serverOutput -match "hwpx-web-office-monitor"
 $ruleOk = $serverOutput -match "RULE-13"
 $operationalRuleOk = $serverOutput -match "Operational Completion Rule"
+$remediationAuditOk = $serverOutput -match "PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE"
+$runtimeSmokeOk = $serverOutput -match "PASS_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE"
+$fixtureCorpusOk = $serverOutput -match '"hwpxFileCount":\s*5'
 
-if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $structureDriftOk -and $monitorIncludesStructureDriftOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk)) {
+if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $structureDriftOk -and $monitorIncludesStructureDriftOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk -and $remediationAuditOk -and $runtimeSmokeOk -and $fixtureCorpusOk)) {
     throw "server validation output did not contain required pass signals`n$serverOutput"
 }
 
@@ -105,10 +124,14 @@ $payload = [ordered]@{
     checks = [ordered]@{
         localWorkingTreeClean = -not $status.Trim()
         archiveCreated = Test-Path $ArchivePath
+        fixtureCorpusFilesSynced = $fixtureFiles.Count
         serverHealthOk = $healthOk
         serverSandboxModeOk = $sandboxOk
         serverMutationBlockedOk = $mutationOk
         serverStructureDriftOk = $structureDriftOk
+        serverHwpxReadRemediationAuditOk = $remediationAuditOk
+        serverBackendRuntimeSmokeOk = $runtimeSmokeOk
+        serverFixtureCorpusOk = $fixtureCorpusOk
         serverMonitorIncludesStructureDriftOk = $monitorIncludesStructureDriftOk
         serverMonitorProcessOk = $monitorProcessOk
         serverMonitorCronOk = $monitorCronOk

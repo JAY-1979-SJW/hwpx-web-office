@@ -47,6 +47,24 @@ def test_deploy_verifier_requires_structure_drift_audit() -> None:
     assert "serverStructureDriftOk" in text
 
 
+def test_deploy_verifier_syncs_fixture_corpus_and_runs_read_audit() -> None:
+    text = _script_text()
+    assert "tests\\fixtures\\hwpx\\corpus" in text
+    assert "scp fixture corpus" in text
+    assert "audit_web_office_hwpx_read_remediation.py --no-write" in text
+    assert "PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE" in text
+    assert '"hwpxFileCount":\\s*5' in text
+    assert "serverHwpxReadRemediationAuditOk" in text
+    assert "serverFixtureCorpusOk" in text
+
+
+def test_deploy_verifier_runs_backend_runtime_smoke_on_server() -> None:
+    text = _script_text()
+    assert "verify_web_office_editor_backend_runtime_smoke.py" in text
+    assert "PASS_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE" in text
+    assert "serverBackendRuntimeSmokeOk" in text
+
+
 def test_deploy_verifier_requires_operating_rule_documents() -> None:
     text = _script_text()
     assert "RULE-13" in text

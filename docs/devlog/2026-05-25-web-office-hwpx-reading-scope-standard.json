@@ -20,6 +20,16 @@
       "change": "Added regression coverage for the remediation audit and its generated machine/human reports."
     },
     {
+      "path": "scripts/ops/deploy_web_office_to_server.ps1",
+      "status": "updated",
+      "change": "Added server fixture corpus sync and server-side HWPX read remediation audit/runtime smoke to deployment verification."
+    },
+    {
+      "path": "tests/test_web_office_server_deploy_verifier.py",
+      "status": "updated",
+      "change": "Locked deployment verifier expectations for fixture corpus sync, remediation audit, and backend runtime smoke."
+    },
+    {
       "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
       "status": "updated",
       "change": "Linked the reading scope standard and added the current HWPX read claim boundary."
@@ -36,7 +46,9 @@
     "docs/architecture/web_office_app_structure_20260525.md",
     "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
     "scripts/ops/audit_web_office_hwpx_read_remediation.py",
-    "tests/test_web_office_hwpx_read_remediation_audit.py"
+    "tests/test_web_office_hwpx_read_remediation_audit.py",
+    "scripts/ops/deploy_web_office_to_server.ps1",
+    "tests/test_web_office_server_deploy_verifier.py"
   ],
   "validationCommands": [
     {
@@ -86,6 +98,18 @@
       "location": "local repository",
       "result": "PASS",
       "evidence": "Backend runtime health/load/save/readback/source-immutability smoke passed."
+    },
+    {
+      "command": "python -m pytest tests/test_web_office_server_deploy_verifier.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Deployment verifier contract includes fixture sync, server remediation audit, and server runtime smoke checks."
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/ops/deploy_web_office_to_server.ps1 -SkipLocalStatusCheck",
+      "location": "server haehan-app",
+      "result": "PASS",
+      "evidence": "Deployment verifier synced 5 fixture HWPX files and passed server health, structure drift, remediation audit, backend runtime smoke, monitor process, and cron checks."
     }
   ],
   "localVerification": {
@@ -95,8 +119,8 @@
     "generatedReportDirectory": "data/reports/web_office_hwpx_read_remediation"
   },
   "serverVerification": {
-    "required": false,
-    "reason": "Documentation-only clarification after an already locked and server-verified baseline."
+    "required": true,
+    "reason": "Server is the final operating reference. Deployment verification now syncs fixture corpus and runs server-side HWPX read remediation audit and runtime smoke."
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
@@ -119,7 +143,8 @@
     "Do not describe HWPX read as complete without R4 coverage evidence.",
     "Do not treat UI payload support as full visual fidelity.",
     "Use BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED until R4 completion criteria pass.",
-    "Treat local validation as a precheck; server verification is required before upgrading the claim."
+    "Treat local validation as a precheck; server verification is required before upgrading the claim.",
+    "Do not rely on manual fixture copy for server validation; deploy verification must sync the fixture corpus."
   ],
   "finalStatus": "DOCUMENTATION_ONLY_RECORDED"
 }
