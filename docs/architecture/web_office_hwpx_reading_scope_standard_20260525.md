@@ -108,6 +108,40 @@ Approved shorter wording:
 
 > Basic HWPX read is verified; full compatibility and UI fidelity remain open.
 
+## 3A. Terminology Lock
+
+The following terms have fixed meanings in this project:
+
+| Term | Meaning | Current status |
+| --- | --- | --- |
+| Basic read | Backend can open HWPX, access required XML, and build the current Web Office model. | VERIFIED |
+| Server API read | `/api/web-office/hwpx-load` returns a safe public payload under sandbox rules. | VERIFIED |
+| Model read | Content is represented in `documentModel` for current workflows. | VERIFIED WITH LIMITS |
+| UI payload read | Backend model can be converted into browser state. | PARTIAL |
+| Visual read | Browser visually reproduces the original document layout. | NOT COMPLETE |
+| Semantic full read | HWPX elements are parsed into meaningful internal representation with unsupported items inventoried. | NOT CLAIMED |
+| Complete read | Semantic full read plus measured corpus coverage and regression gates. | FORBIDDEN TERM UNTIL R4 PASS |
+
+The word "complete" must not be used for HWPX reading unless all R4 completion
+criteria in this document are satisfied.
+
+## 3B. Current Guarantee Matrix
+
+| Capability | Guarantee level | Evidence required now | Current decision |
+| --- | --- | --- | --- |
+| Open HWPX package | Must work for verified fixture | Server load/health tests | PASS |
+| Reject unsafe source path | Must reject absolute path | Backend route tests | PASS |
+| Read package XML | Must work for required current paths | Load bridge/importer tests | PASS |
+| Extract table/cell model | Must support current editor path | Runtime smoke/readback tests | PASS |
+| Extract constrained paragraph model | Must support tested constrained paths | Paragraph tests where fixture exists | PARTIAL PASS |
+| Preserve source during read/save | Must not mutate source | Hash/mtime and sandbox tests | PASS |
+| Redact internal paths | Must hide raw output path | Route tests/runtime smoke | PASS |
+| Render complete page layout | Must visually match original | Visual corpus audit | NOT CLAIMED |
+| Render all styles | Must match style cascade | Style coverage audit | NOT CLAIMED |
+| Read embedded images/shapes/charts/equations | Must inventory and represent elements | Corpus element audit | NOT CLAIMED |
+| Read arbitrary user HWPX | Must pass representative corpus | Corpus matrix | NOT CLAIMED |
+| Read HWP binary | Must convert or parse HWP first | Separate HWP pipeline | OUT OF SCOPE |
+
 ## 4. Current Supported Read Surface
 
 Supported in the locked baseline:
@@ -158,6 +192,26 @@ Required output artifacts:
 - human-readable coverage report
 - tests or gates that fail when claimed coverage regresses
 
+Minimum R4 completion criteria:
+
+- at least one representative corpus with ordinary forms, table-heavy files,
+  paragraph-heavy files, style-heavy files, image-bearing files, header/footer
+  files, and known unsupported element fixtures
+- every package part must be classified as supported, ignored-by-policy, or
+  unsupported-with-warning
+- every observed HWPX XML element family must be classified as parsed,
+  preserved, displayed, ignored-by-policy, or unsupported-with-warning
+- unsupported element handling must be deterministic and visible in the audit
+  output
+- UI fidelity claims must be separated from semantic parse claims
+- regression tests must fail if a previously claimed supported category becomes
+  unsupported
+- the final report must state both coverage by category and residual risk
+
+Until these criteria pass, the only permitted status is:
+
+- `BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED`
+
 ## 7. Pass Criteria for Current Baseline
 
 The current baseline remains valid when:
@@ -171,6 +225,36 @@ The current baseline remains valid when:
 - `systemctl --failed` reports zero failed units
 - documentation continues to distinguish basic read support from full HWPX
   compatibility
+
+Current baseline status value:
+
+- `BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED`
+
+This status is intentionally stricter than saying "read complete". It means the
+system is good enough for the current sandbox Web Office load workflow, while
+remaining honest about missing full compatibility evidence.
+
+## 7A. Required Wording in Reports and User-Facing Notes
+
+Use:
+
+- "Basic HWPX read is verified."
+- "Server API load is verified."
+- "Current Web Office model extraction is verified with scope limits."
+- "Full HWPX compatibility is not claimed."
+- "UI visual fidelity remains open."
+
+Do not use:
+
+- "HWPX read is complete."
+- "All HWPX files are supported."
+- "The UI fully reproduces HWPX."
+- "The parser covers the whole HWPX spec."
+- "User uploads are fully compatible."
+
+If a short answer is required, use exactly:
+
+> Basic HWPX read is verified; full compatibility and UI fidelity remain open.
 
 ## 8. Change Control
 

@@ -6,8 +6,8 @@
   "standardDocuments": [
     {
       "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
-      "status": "created",
-      "change": "Defined HWPX reading levels R1-R4 and separated basic read, document model extraction, UI payload rendering, and full HWPX compatibility claims."
+      "status": "updated",
+      "change": "Defined HWPX reading levels R1-R4, added terminology lock, guarantee matrix, R4 minimum completion criteria, and required wording."
     },
     {
       "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
@@ -38,6 +38,12 @@
       "location": "local repository",
       "result": "PASS",
       "evidence": "Reading scope anchors found in the new standard and linked architecture documents."
+    },
+    {
+      "command": "rg -n \"Terminology Lock|Current Guarantee Matrix|Minimum R4 completion criteria|BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED|Required Wording\" docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Terminology lock, guarantee matrix, R4 criteria, status value, and required wording anchors found."
     }
   ],
   "localVerification": {
@@ -66,7 +72,8 @@
   ],
   "holdItems": [
     "Do not describe HWPX read as complete without R4 coverage evidence.",
-    "Do not treat UI payload support as full visual fidelity."
+    "Do not treat UI payload support as full visual fidelity.",
+    "Use BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED until R4 completion criteria pass."
   ],
   "finalStatus": "DOCUMENTATION_ONLY_RECORDED"
 }
