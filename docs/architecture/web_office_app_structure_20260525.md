@@ -204,6 +204,7 @@ Operational scripts:
 - `scripts/ops/install_web_office_server_monitor_cron.py`
 - `scripts/ops/start_web_office_server_monitor.ps1`
 - `scripts/ops/stop_web_office_server_monitor.ps1`
+- `scripts/ops/audit_web_office_security_logs.py`
 
 ## 10. Validation Commands
 
@@ -212,6 +213,7 @@ Local structure and runtime checks:
 ```powershell
 python -m pytest tests/test_web_office_writer_readback_backend_api_route.py tests/test_web_office_browser_smoke_frontend_backend_wire_baseline.py tests/test_web_office_editor_browser_smoke.py -q
 python scripts/ops/audit_web_office_app_structure_drift.py
+python scripts/ops/audit_web_office_security_logs.py --no-journal
 python scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
 python scripts/ops/run_hwpx_repo_commit_guard.py
 ```
@@ -242,6 +244,7 @@ The app structure is valid when:
 - browser bridges use fixed backend endpoints
 - app structure drift audit passes
 - runtime monitor includes structure drift when requested
+- read-only security log audit runs without firewall or allowlist changes
 - backend runtime smoke passes
 - frontend/backend wire smoke passes
 - server deploy verification passes
@@ -257,3 +260,5 @@ The following remain on hold:
 - uncontrolled user file upload
 - arbitrary source path selection
 - endpoint expansion beyond the approved API surface
+- automatic blocking, firewall changes, or IP/port allowlist changes before a
+  separate approved security policy task

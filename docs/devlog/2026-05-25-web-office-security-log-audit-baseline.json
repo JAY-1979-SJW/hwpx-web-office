@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-SECURITY-LOG-AUDIT-BASELINE",
+  "baselineHead": "44ed732",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_app_structure_20260525.md",
+      "updated": true,
+      "change": "Added read-only security log audit to operational files, validation commands, pass criteria, and hold items."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "updated": true,
+      "change": "Recorded that security log audit is read-only and firewall/IP/port policy changes require a separate task."
+    }
+  ],
+  "changedFiles": [
+    "scripts/ops/audit_web_office_security_logs.py",
+    "tests/test_web_office_security_log_audit.py",
+    "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/devlog/2026-05-25-web-office-security-log-audit-baseline.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python scripts\\ops\\audit_web_office_security_logs.py --no-journal --tail-lines 50",
+      "result": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_security_log_audit.py -q",
+      "result": "4 passed"
+    },
+    {
+      "command": "python -m json.tool docs\\devlog\\2026-05-25-web-office-security-log-audit-baseline.json",
+      "result": "PASS"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -c \"from scripts.ops import audit_web_office_security_logs as m; p=m.audit(tail_lines=20, include_journal=False); print(p['verdict']); print(p['logs'][0]['safePath'])\"",
+      "result": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT"
+    },
+    {
+      "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
+      "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    }
+  ],
+  "localVerification": {
+    "status": "PASS",
+    "summary": "Read-only security log audit, tests, JSON validation, import audit, and commit guard passed."
+  },
+  "serverVerification": {
+    "required": true,
+    "status": "PENDING",
+    "reason": "Security log audit must be run on the server before closeout."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-security-log-audit-baseline.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "Firewall changes, IP allowlists, port policy changes, and automatic blocking are outside this task."
+  ],
+  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+}

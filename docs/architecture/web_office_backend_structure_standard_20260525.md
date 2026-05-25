@@ -219,6 +219,8 @@ The implementation passes this standard when:
 - server response keeps `sourceMutationAllowed == false`
 - server monitor process or `@reboot` auto-start registration is present
 - server monitor can include app structure drift audit and reports it as pass
+- read-only security log audit can be run on the server without changing
+  firewall, IP allowlist, or port policy
 - operational report artifact is written with validation command results,
   server verification result, unresolved items, and final status
 
@@ -249,6 +251,7 @@ Changes to the following require a new task standard:
 - production mode changes
 - security exception changes
 - browser direct file access changes
+- firewall, IP allowlist, or port exposure policy changes
 
 This standard should be used as the review checklist for future Web Office
 backend and browser editor work.
