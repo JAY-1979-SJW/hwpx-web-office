@@ -1,9 +1,18 @@
 [
   {
-    "safePath": "scripts/ops/verify_web_office_server_monitor.py",
-    "category": "AUDIT_GATE",
-    "zone": "closeout_security",
-    "separationPlan": "keep_gate_audit",
+    "safePath": "scripts/ops/start_web_office_server_monitor.ps1",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_ops",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/ops/stop_web_office_server_monitor.ps1",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_ops",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
