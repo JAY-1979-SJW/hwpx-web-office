@@ -50,6 +50,22 @@
     {
       "command": "python -m pytest tests\\test_web_office_monitor_structure_drift.py tests\\test_hwpx_repo_guard_hooks.py -q",
       "result": "13 passed"
+    },
+    {
+      "command": "git push",
+      "result": "PASS_HWPX_REPO_PREPUSH_GUARD"
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts\\ops\\deploy_web_office_to_server.ps1",
+      "result": "PASS with serverStructureDriftOk and serverMonitorIncludesStructureDriftOk"
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift\"",
+      "result": "HEALTHY with PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "ssh haehan-app \"kill 580518; start monitor with --include-structure-drift\"",
+      "result": "running monitor pid 1374229 includes --include-structure-drift"
     }
   ],
   "localVerification": {
@@ -58,8 +74,19 @@
   },
   "serverVerification": {
     "required": true,
-    "status": "PENDING",
-    "reason": "Runtime monitor and deployment verification changed; server verification is required."
+    "status": "PASS",
+    "serverAlias": "haehan-app",
+    "serverPath": "/home/ubuntu/apps/hwpx-web-office",
+    "deployedHead": "c35246d",
+    "checks": {
+      "serverHealthOk": true,
+      "serverSandboxModeOk": true,
+      "serverMutationBlockedOk": true,
+      "serverStructureDriftOk": true,
+      "serverMonitorIncludesStructureDriftOk": true,
+      "serverMonitorProcessOk": true,
+      "serverMonitorCronOk": true
+    }
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-monitor-structure-drift-integration.json"
@@ -68,5 +95,5 @@
   "holdItems": [
     "Structure drift failures are logged as STRUCTURE_DRIFT_DETECTED and are not auto-recovered by restarting the server."
   ],
-  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+  "finalStatus": "SERVER_VERIFIED_PASS"
 }
