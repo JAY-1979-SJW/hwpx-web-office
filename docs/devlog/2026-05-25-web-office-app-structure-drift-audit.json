@@ -40,6 +40,18 @@
     {
       "command": "python -m pytest tests\\test_web_office_app_structure_drift.py tests\\test_hwpx_repo_guard_hooks.py -q",
       "result": "13 passed"
+    },
+    {
+      "command": "git push",
+      "result": "PASS_HWPX_REPO_PREPUSH_GUARD"
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts\\ops\\deploy_web_office_to_server.ps1",
+      "result": "PASS"
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 scripts/ops/audit_web_office_app_structure_drift.py && python3 -m pytest tests/test_web_office_app_structure_drift.py -q\"",
+      "result": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT; 4 passed"
     }
   ],
   "localVerification": {
@@ -48,8 +60,19 @@
   },
   "serverVerification": {
     "required": true,
-    "status": "PENDING",
-    "reason": "Web Office monitoring and structure validation changed; server verification is required before closeout."
+    "status": "PASS",
+    "serverAlias": "haehan-app",
+    "serverPath": "/home/ubuntu/apps/hwpx-web-office",
+    "deployedHead": "5c81f6b",
+    "checks": {
+      "serverHealthOk": true,
+      "serverSandboxModeOk": true,
+      "serverMutationBlockedOk": true,
+      "serverMonitorProcessOk": true,
+      "serverMonitorCronOk": true,
+      "serverAppStructureDriftAuditOk": true,
+      "serverAppStructureDriftTestsOk": true
+    }
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-app-structure-drift-audit.json"
@@ -58,5 +81,5 @@
   "holdItems": [
     "This drift audit is static and local/server executable. It does not replace the runtime health monitor or firewall/access-log monitoring."
   ],
-  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+  "finalStatus": "SERVER_VERIFIED_PASS"
 }
