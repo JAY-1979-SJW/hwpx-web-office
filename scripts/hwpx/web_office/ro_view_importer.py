@@ -80,12 +80,22 @@ def _stable_run_id(paragraph_id: str, run_index: int) -> str:
 # ── XML 직접 파싱 helper (read-only) ────────────────────────────────
 
 def _run_text_concat(run_elem: ET.Element) -> str:
-    """run 내 모든 hp:t 자손 텍스트를 concat (multi text node 안전)."""
+    """run inline text in document order, preserving hp:lineBreak as newline."""
     parts: list[str] = []
     for e in run_elem.iter():
-        if local_name(e.tag).lower() == "t":
+        local = local_name(e.tag).lower()
+        if local == "t":
             parts.append(e.text or "")
+        elif local == "linebreak":
+            parts.append("\n")
     return "".join(parts)
+
+
+def _has_readable_inline_text(elem: ET.Element) -> bool:
+    for e in elem.iter():
+        if local_name(e.tag).lower() in {"t", "linebreak"}:
+            return True
+    return False
 
 
 def _extract_runs_from_paragraph_elem(
@@ -104,12 +114,8 @@ def _extract_runs_from_paragraph_elem(
     run_elems = _paragraph_runs(paragraph_elem)
     if not run_elems:
         # hp:run 0개 — paragraph text 만 합성 run 1개로 fallback
-        # paragraph 내 hp:t 직접 수집
-        full_text_parts: list[str] = []
-        for e in paragraph_elem.iter():
-            if local_name(e.tag).lower() == "t":
-                full_text_parts.append(e.text or "")
-        full_text = "".join(full_text_parts)
+        # paragraph 내 hp:t / hp:lineBreak 직접 수집
+        full_text = _run_text_concat(paragraph_elem)
         return (
             [WebOfficeTextRun(runId="__run_idx_0__",
                                        text=full_text, charPrIDRef=None)],
@@ -119,9 +125,8 @@ def _extract_runs_from_paragraph_elem(
     runs: list[WebOfficeTextRun] = []
     any_text_node_seen = False
     for i, r in enumerate(run_elems):
-        # hp:t 자손이 있는지 확인
-        has_t = any(local_name(e.tag).lower() == "t" for e in r.iter())
-        if has_t:
+        # hp:t 또는 hp:lineBreak 자손이 있는지 확인
+        if _has_readable_inline_text(r):
             any_text_node_seen = True
         text = _run_text_concat(r)
         char_pr = r.attrib.get("charPrIDRef")

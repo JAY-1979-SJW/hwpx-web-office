@@ -26,6 +26,17 @@ def build_render_payload(
     textColor/bold/italic/underline 등) 을 브라우저 toolbar preview 에서
     참조하기 위함. 기본 None → 기존 schema 와 동일.
     """
+    def paragraph_payload(p) -> dict[str, Any]:
+        return {
+            "paragraphId": p.paragraphId,
+            "text": p.text,
+            "parPrIDRef": p.parPrIDRef,
+            "runs": [{"runId": r.runId, "text": r.text,
+                       "charPrIDRef": r.charPrIDRef} for r in p.runs],
+            "containerScope": p.containerScope,
+            "editable": False,
+        }
+
     cells_by_table: dict[str, list[dict[str, Any]]] = {}
     for c in doc.cells:
         cells_by_table.setdefault(c.tableId, []).append({
@@ -36,18 +47,12 @@ def build_render_payload(
             "isCoveredByMerge": c.isCoveredByMerge,
             "isMergedOrigin": c.isMergedOrigin,
             "text": c.text,
+            "paragraphs": [paragraph_payload(p) for p in c.paragraphs],
             "editable": False,
         })
 
-    paragraph_index = {p.paragraphId: {
-        "paragraphId": p.paragraphId,
-        "text": p.text,
-        "parPrIDRef": p.parPrIDRef,
-        "runs": [{"runId": r.runId, "text": r.text,
-                       "charPrIDRef": r.charPrIDRef} for r in p.runs],
-        "containerScope": p.containerScope,
-        "editable": False,
-    } for p in doc.paragraphs}
+    paragraph_index = {p.paragraphId: paragraph_payload(p)
+                       for p in doc.paragraphs}
 
     tables = []
     for t in doc.tables:

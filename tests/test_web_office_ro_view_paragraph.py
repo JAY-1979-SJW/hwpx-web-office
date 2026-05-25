@@ -202,6 +202,33 @@ def test_render_payload_paragraph_runs_and_container_scope():
 
 # ── 11: writer paragraph_edits plan validate_edit_plan PASS ────
 
+def test_line_break_is_preserved_as_inline_newline():
+    f = PR / "tests" / "fixtures" / "hwpx" / "corpus" / "fx_many_tables_page_marker.hwpx"
+    if not f.is_file():
+        pytest.skip("lineBreak fixture missing")
+    doc = import_hwpx_as_ro_view(f)
+    payload = build_render_payload(doc)
+
+    paragraphs_with_break = [p for p in doc.paragraphs if "\n" in p.text]
+    assert paragraphs_with_break, "expected hp:lineBreak to be preserved"
+    sample = paragraphs_with_break[0]
+    assert any("\n" in r.text for r in sample.runs)
+
+    payload_cell_paragraphs = [
+        paragraph
+        for table in payload.get("tables", [])
+        for cell in table.get("cells", [])
+        for paragraph in cell.get("paragraphs", [])
+    ]
+    payload_block_paragraphs = [
+        block["paragraph"]
+        for block in payload.get("blocks", [])
+        if block.get("type") == "paragraph" and "paragraph" in block
+    ]
+    assert any("\n" in p.get("text", "")
+               for p in payload_cell_paragraphs + payload_block_paragraphs)
+
+
 @NEED3
 def test_paragraph_edit_plan_validate_pass_with_ro_view_paragraph():
     f = FIXTURES[0]

@@ -86,6 +86,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "subList",
     "linesegarray",
     "lineseg",
+    "lineBreak",
 }
 
 IGNORED_BY_POLICY_XML_LOCALS = {

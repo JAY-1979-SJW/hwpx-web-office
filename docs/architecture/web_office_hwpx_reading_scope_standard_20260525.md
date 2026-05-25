@@ -275,7 +275,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 Current remediation audit category output:
 
 - `text_style`
-- `paragraph_layout`
 - `border_style`
 - `page_layout`
 - `numbering_outline`
@@ -299,14 +298,18 @@ Current `paragraph_layout` remediation status:
 - `autoSpacing` is exposed with raw HWPX `eAsianEng` and `eAsianNum`
   attributes.
 - `breakSetting` is exposed with raw HWPX line/word break and keep attributes.
+- Body inline `lineBreak` elements are preserved as newline text in paragraph
+  runs and exposed through the read-only render payload.
 - Full visual rendering fidelity of tab stops is still not claimed until UI
   layout comparison fixtures cover the behavior.
+- `paragraph_layout` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
 
 The next implementation priority after this first paragraph layout pass is:
 
-1. `paragraph_layout`: lineBreak
-2. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
-3. `table_layout`: cellMargin, inMargin, outMargin
+1. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
+2. `table_layout`: cellMargin, inMargin, outMargin
+3. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
 
 ## 7. Pass Criteria for Current Baseline
 

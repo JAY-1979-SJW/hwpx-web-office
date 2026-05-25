@@ -28,7 +28,7 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert payload["corpus"]["manifestFound"] is True
     assert payload["coverageSummary"]["unsupportedWithWarningCount"] >= 1
     assert category_summary["categoryCount"] >= 5
-    assert "paragraph_layout" in category_summary["categories"]
+    assert "paragraph_layout" not in category_summary["categories"]
     assert "text_style" in category_summary["categories"]
     assert "page_layout" in category_summary["categories"]
     assert "unknown_review_required" not in category_summary["categories"]
@@ -50,7 +50,7 @@ def test_read_remediation_audit_writes_machine_and_human_reports(tmp_path):
     md_text = md_path.read_text(encoding="utf-8")
     assert "Unsupported Element Families" in md_text
     assert "Unsupported Category Summary" in md_text
-    assert "paragraph_layout" in md_text
+    assert "text_style" in md_text
 
 
 def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_path):
