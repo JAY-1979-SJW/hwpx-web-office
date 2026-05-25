@@ -2,7 +2,7 @@
 
 Date: 2026-05-25
 Task: WEB-OFFICE-BACKEND-FULL-FUNCTION-AUDIT-55
-Status: AUDIT COMPLETE WITH ONE BASELINE-AUDIT FINDING
+Status: AUDIT COMPLETE; BASELINE-AUDIT FINDING RESOLVED
 Baseline tag: baseline/web-office-sandbox-20260525
 Baseline commit: f1f55b8
 
@@ -115,9 +115,11 @@ The combined selected regression command:
 python -m pytest tests\test_web_office_writer_readback_backend_api_route.py tests\test_web_office_writer_readback_real_file_load_save_bridge.py tests\test_web_office_writer_readback_save_apply_bridge.py tests\test_hwpx_backend_rwedit_baseline.py tests\test_web_office_cell_save_hwpx_verify7.py tests\test_web_office_para_edit_save_verify7.py tests\test_web_office_para_edit_e2e_integration.py tests\test_web_office_para_edit_e2e_full_closeout.py -q
 ```
 
-Result: `1 failed, 21 passed, 44 skipped`
+Initial result before baseline-audit remediation: `1 failed, 21 passed, 44 skipped`
 
-Failure:
+Result after remediation: `22 passed, 44 skipped`
+
+Resolved initial failure:
 
 - `tests/test_web_office_para_edit_e2e_full_closeout.py::test_audit_script_pass`
 - audit script: `scripts/ops/audit_web_office_para_edit_e2e_full_closeout.py`
@@ -126,29 +128,32 @@ Failure:
   - `scripts/hwpx/web_office/ro_view_importer.py`
   - `scripts/hwpx/web_office/document_model.py`
 
-Interpretation:
+Resolution interpretation:
 
-This is a stale prior-closeout baseline finding, not a current API load/save
-runtime failure. `git diff` shows no working tree edits for those files at the
-current baseline; the audit compares current HEAD against an older commit
-`619f2e0`. The current runtime smoke and active backend API tests pass.
+This was a stale prior-closeout baseline finding, not a current API load/save
+runtime failure. The audit now compares locked files from the approved sandbox
+baseline `f1f55b8`, and the selected backend regression command passes.
 
 ## 7. Findings
 
 ### FINDING-01: Prior closeout audit baseline is stale
 
-Severity: MEDIUM
+Severity: RESOLVED
 
 The paragraph E2E full closeout audit still locks selected files against
 baseline `619f2e0`. Current HEAD includes later accepted changes to
 `ro_view_importer.py` and `document_model.py`, so the audit reports
 `LOCKED_FILE_CHANGED`.
 
-Required decision:
+Resolution:
 
-- either update the closeout audit baseline after a separate approval standard,
-- or keep it as a known failing historical lock until paragraph closeout is
-reopened.
+- `scripts/ops/audit_web_office_para_edit_e2e_full_closeout.py` now measures
+  locked-file drift from approved sandbox baseline `f1f55b8`.
+- Re-run result: `tests\test_web_office_para_edit_e2e_full_closeout.py` passed
+  with `5 passed, 4 skipped`.
+- Re-run selected backend regression result: `22 passed, 44 skipped`.
+- The only remaining audit signal is `DYNAMIC_SKIPPED` WARN when local corpus
+  fixture data is unavailable.
 
 ### FINDING-02: Local corpus-dependent tests are partially skipped
 

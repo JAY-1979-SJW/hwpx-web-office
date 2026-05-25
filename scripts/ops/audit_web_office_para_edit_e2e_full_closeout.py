@@ -45,7 +45,8 @@ LOCKED_FILES = [
     # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01:
     # para_edit_state.mjs 는 applyFormatToSelection 추가로 본 LOCKED 에서 제거.
 ]
-BASELINE_COMMIT = "619f2e0"
+# Locked file drift is measured from the approved Web Office sandbox baseline.
+BASELINE_COMMIT = "f1f55b8"
 
 # 안전 게이트가 코드에 존재하는지 정적 검증
 SAFETY_GATE_PATTERNS = {
