@@ -198,6 +198,31 @@ def _find_cell_elem(
     return None
 
 
+def _find_table_elem(
+    section_root: ET.Element,
+    table_position_in_section: int | None,
+) -> ET.Element | None:
+    tables: list[ET.Element] = [
+        e for e in section_root.iter()
+        if local_name(e.tag).lower() == "tbl"
+    ]
+    if not tables:
+        return None
+    if table_position_in_section is not None:
+        if 0 <= table_position_in_section < len(tables):
+            return tables[table_position_in_section]
+    return tables[0]
+
+
+def _direct_child_attrs(elem: ET.Element | None, wanted: str) -> dict[str, Any]:
+    if elem is None:
+        return {}
+    for child in list(elem):
+        if local_name(child.tag).lower() == wanted.lower():
+            return dict(child.attrib)
+    return {}
+
+
 def _normalize_header_flag(value: str | None) -> bool | None:
     """hp:tc header attribute를 보수적으로 boolean으로 정규화한다."""
     if value is None:
@@ -457,12 +482,19 @@ def import_hwpx_as_ro_view(
         sec_path = section_xml_path_by_index.get(t.sectionIndex)
         sec_root = _section_root_for(sec_path)
         table_pos = table_section_order_idx.get(tid)
+        table_elem = (
+            _find_table_elem(sec_root, table_pos)
+            if sec_root is not None else None
+        )
+        in_margin = _direct_child_attrs(table_elem, "inMargin")
+        out_margin = _direct_child_attrs(table_elem, "outMargin")
         for c in t.cells or []:
             cell_id = _stable_cell_id(tid, c.row, c.col)
             cell_ids.append(cell_id)
             cell_pars: list[WebOfficeParagraph] = []
             header_attr: str | None = None
             header_cell: bool | None = None
+            cell_margin: dict[str, Any] = {}
 
             # ── XML 직접 파싱 시도 ──────────────────────────────
             par_elems: list[ET.Element] = []
@@ -473,6 +505,7 @@ def import_hwpx_as_ro_view(
                 if cell_elem is not None:
                     header_attr = cell_elem.attrib.get("header")
                     header_cell = _normalize_header_flag(header_attr)
+                    cell_margin = _direct_child_attrs(cell_elem, "cellMargin")
                     par_elems = _iter_paragraphs_in_cell_elem(cell_elem)
 
             if not par_elems and (c.paragraphs or []):
@@ -559,6 +592,7 @@ def import_hwpx_as_ro_view(
                 isMergedOrigin=bool(c.isMergedOrigin),
                 header=header_attr,
                 headerCell=header_cell,
+                cellMargin=cell_margin,
                 paragraphs=cell_pars,
                 text=c.normalizedText or ""))
         tables.append(WebOfficeTable(
@@ -569,6 +603,8 @@ def import_hwpx_as_ro_view(
             rowCount=t.rowCount, colCount=t.colCount,
             visualColCount=t.visualColCount,
             hasMergedCells=bool(t.hasMergedCells),
+            inMargin=in_margin,
+            outMargin=out_margin,
             cellIds=cell_ids))
 
     # ── body (top-level) paragraph 처리 ─────────────────────────────

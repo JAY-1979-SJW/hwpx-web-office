@@ -47,6 +47,7 @@ def build_render_payload(
             "isCoveredByMerge": c.isCoveredByMerge,
             "isMergedOrigin": c.isMergedOrigin,
             "text": c.text,
+            "cellMargin": c.cellMargin,
             "paragraphs": [paragraph_payload(p) for p in c.paragraphs],
             "editable": False,
         })
@@ -64,6 +65,8 @@ def build_render_payload(
             "colCount": t.colCount,
             "visualColCount": t.visualColCount,
             "hasMergedCells": t.hasMergedCells,
+            "inMargin": t.inMargin,
+            "outMargin": t.outMargin,
             "cells": cells_by_table.get(t.tableId, []),
             "editable": False,
         })

@@ -37,6 +37,7 @@ class WebOfficeCell:
     isMergedOrigin: bool = False
     header: str | None = None
     headerCell: bool | None = None
+    cellMargin: dict[str, Any] = field(default_factory=dict)
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
 
@@ -50,6 +51,8 @@ class WebOfficeTable:
     colCount: int
     visualColCount: int
     hasMergedCells: bool = False
+    inMargin: dict[str, Any] = field(default_factory=dict)
+    outMargin: dict[str, Any] = field(default_factory=dict)
     cellIds: list[str] = field(default_factory=list)
 
 

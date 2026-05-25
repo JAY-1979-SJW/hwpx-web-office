@@ -282,7 +282,6 @@ Current remediation audit category output:
 - `application_settings`
 - `metadata_properties`
 - `package_metadata`
-- `table_layout`
 - `embedded_control`
 - `style_catalog`
 - `revision_tracking`
@@ -317,12 +316,23 @@ Current `text_style` remediation status:
   `text_style` unsupported families are `case`, `default`, `fwSpace`,
   `language`, `offset`, `shadow`, `spacing`, `switch`, and `typeInfo`.
 
-The next implementation priority after the paragraph layout and first text
-style passes is:
+Current `table_layout` remediation status:
 
-1. `table_layout`: cellMargin, inMargin, outMargin
-2. `text_style`: case, default, fwSpace, language, offset, shadow, spacing, switch, typeInfo
-3. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
+- Table-level `inMargin` and `outMargin` are extracted from `hp:tbl` elements
+  into `documentModel.tables[]` and the read-only render payload.
+- Cell-level `cellMargin` is extracted from `hp:tc` elements into
+  `documentModel.cells[]` and the read-only render payload.
+- `table_layout` is no longer present in the current unsupported category output
+  for the checked-in fixture corpus.
+- Full table visual fidelity is still not claimed; border, fill, row/column
+  sizing, and page layout interactions remain separate coverage targets.
+
+The next implementation priority after the paragraph layout and first text
+style/table layout passes is:
+
+1. `text_style`: case, default, fwSpace, language, offset, shadow, spacing, switch, typeInfo
+2. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
+3. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
 
 ## 7. Pass Criteria for Current Baseline
 

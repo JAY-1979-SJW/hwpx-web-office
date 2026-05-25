@@ -137,3 +137,33 @@ def test_render_payload_exposes_char_pr_defs_read_only():
     sample = next(iter(char_defs.values()))
     assert {"fontRef", "ratio", "relSz", "underlineDef", "strikeoutDef"} <= set(sample)
     assert payload["editable"] is False
+
+
+def test_table_and_cell_margin_fields_are_extracted():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+
+    assert doc.tables
+    assert doc.cells
+    assert any(t.inMargin for t in doc.tables)
+    assert any(t.outMargin for t in doc.tables)
+    assert any(c.cellMargin for c in doc.cells)
+    table = next(t for t in doc.tables if t.inMargin and t.outMargin)
+    cell = next(c for c in doc.cells if c.cellMargin)
+    assert {"left", "right", "top", "bottom"} <= set(table.inMargin)
+    assert {"left", "right", "top", "bottom"} <= set(table.outMargin)
+    assert {"left", "right", "top", "bottom"} <= set(cell.cellMargin)
+
+
+def test_render_payload_exposes_table_and_cell_margins_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    tables = payload["tables"]
+    assert any(t.get("inMargin") for t in tables)
+    assert any(t.get("outMargin") for t in tables)
+    assert any(
+        cell.get("cellMargin")
+        for table in tables
+        for cell in table.get("cells", [])
+    )
+    assert payload["editable"] is False
