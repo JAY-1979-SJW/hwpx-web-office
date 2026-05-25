@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-BASELINE-LOCK-PRECHECK-20260525",
+  "baselineCandidate": "a3209b2",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/hwpx_work_execution_operating_rules_20260524.md",
+      "status": "already_updated",
+      "change": "Server completion criteria include zero failed systemd units and related operational dependency checks."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "status": "already_updated",
+      "change": "Server pass criteria include systemctl --failed and adjacent operational service readiness."
+    },
+    {
+      "path": "docs/reports/web_office_baseline_lock_precheck_20260525.md",
+      "status": "created",
+      "change": "Recorded final server audit results before baseline lock."
+    }
+  ],
+  "changedFiles": [
+    "docs/reports/web_office_baseline_lock_precheck_20260525.md",
+    "docs/devlog/2026-05-25-web-office-baseline-lock-precheck.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift",
+      "location": "haehan-app:/home/ubuntu/apps/hwpx-web-office",
+      "result": "PASS",
+      "evidence": "HEALTHY; structure drift PASS"
+    },
+    {
+      "command": "pgrep -af 'verify_web_office_server_monitor.py.*--interval'",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "monitor process present"
+    },
+    {
+      "command": "crontab -l | grep hwpx-web-office-monitor",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "@reboot monitor entry present with --include-structure-drift"
+    },
+    {
+      "command": "python3 scripts/ops/audit_web_office_security_logs.py --tail-lines 5000",
+      "location": "haehan-app:/home/ubuntu/apps/hwpx-web-office",
+      "result": "PASS",
+      "evidence": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT; suspiciousSignals=0"
+    },
+    {
+      "command": "python3 scripts/ops/audit_web_office_app_structure_drift.py",
+      "location": "haehan-app:/home/ubuntu/apps/hwpx-web-office",
+      "result": "PASS",
+      "evidence": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "systemctl --no-pager --failed",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "0 loaded units listed"
+    },
+    {
+      "command": "curl -fsS http://127.0.0.1:8767/api/web-office/health",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "SUCCESS; SANDBOX_ONLY; sourceMutationAllowed=false"
+    },
+    {
+      "command": "git status -sb",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "master...origin/master"
+    }
+  ],
+  "localVerification": {
+    "repository": "hwpx-web-office",
+    "gitStatus": "clean before precheck report creation",
+    "codeChanges": "none"
+  },
+  "serverVerification": {
+    "serverAlias": "haehan-app",
+    "webOfficeEndpoint": "http://127.0.0.1:8767/api/web-office/health",
+    "webOfficeHealth": "SUCCESS",
+    "webOfficeMode": "SANDBOX_ONLY",
+    "sourceMutationAllowed": false,
+    "pipelineReady": true,
+    "monitorOneShot": "HEALTHY",
+    "monitorProcess": "present",
+    "monitorCron": "present",
+    "structureDrift": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT",
+    "securityLogAudit": "PASS_WEB_OFFICE_SECURITY_LOG_AUDIT",
+    "suspiciousSignals": 0,
+    "failedSystemdUnits": 0
+  },
+  "warnings": [
+    {
+      "code": "MISSING_LOG_ACCEPTED",
+      "logs": [
+        "/var/log/secure",
+        "/var/log/apache2/access.log",
+        "/var/log/apache2/error.log"
+      ],
+      "reason": "Accepted for current Ubuntu/nginx server profile."
+    }
+  ],
+  "reportArtifacts": [
+    "docs/reports/web_office_baseline_lock_precheck_20260525.md",
+    "docs/devlog/2026-05-25-web-office-baseline-lock-precheck.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "Do not enable production write.",
+    "Do not expose new public ports.",
+    "Do not change firewall rules or IP allowlists without a separate approved task.",
+    "Do not copy server secret files into the repository."
+  ],
+  "finalStatus": "SERVER_VERIFIED_PASS"
+}
