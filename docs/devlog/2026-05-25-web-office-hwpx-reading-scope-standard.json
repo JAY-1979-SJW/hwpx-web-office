@@ -7,7 +7,7 @@
     {
       "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
       "status": "updated",
-      "change": "Defined HWPX reading levels R1-R4, added terminology lock, guarantee matrix, R4 minimum completion criteria, and required wording."
+      "change": "Defined HWPX reading levels R1-R4, added terminology lock, guarantee matrix, R4 minimum completion criteria, required wording, and mandatory remediation plan."
     },
     {
       "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
@@ -44,6 +44,12 @@
       "location": "local repository",
       "result": "PASS",
       "evidence": "Terminology lock, guarantee matrix, R4 criteria, status value, and required wording anchors found."
+    },
+    {
+      "command": "rg -n \"Required Remediation Plan|Limited corpus evidence|Unknown XML element coverage|Server/local drift|server is the final operating reference\" docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Mandatory remediation plan, remediation gaps, and server-final-reference rule found."
     }
   ],
   "localVerification": {
@@ -62,18 +68,19 @@
     {
       "item": "Full HWPX semantic read compatibility",
       "status": "not_claimed",
-      "requiredNextStep": "Representative corpus coverage audit."
+      "requiredNextStep": "Execute the mandatory remediation plan: corpus manifest, package/XML inventory, unsupported element report, regression gates, and server verification."
     },
     {
       "item": "Hancom-equivalent UI visual reproduction",
       "status": "not_claimed",
-      "requiredNextStep": "UI fidelity coverage audit."
+      "requiredNextStep": "Execute UI fidelity matrix verification with separated semantic-read and visual-render claims."
     }
   ],
   "holdItems": [
     "Do not describe HWPX read as complete without R4 coverage evidence.",
     "Do not treat UI payload support as full visual fidelity.",
-    "Use BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED until R4 completion criteria pass."
+    "Use BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED until R4 completion criteria pass.",
+    "Treat local validation as a precheck; server verification is required before upgrading the claim."
   ],
   "finalStatus": "DOCUMENTATION_ONLY_RECORDED"
 }

@@ -212,6 +212,35 @@ Until these criteria pass, the only permitted status is:
 
 - `BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED`
 
+## 6A. Required Remediation Plan
+
+The following remediation plan is mandatory before the project can upgrade the
+HWPX read claim beyond the current baseline.
+
+| Gap | Required remediation | Required artifact | Required gate |
+| --- | --- | --- | --- |
+| Limited corpus evidence | Build a representative HWPX corpus covering forms, tables, paragraphs, styles, images, headers/footers, and known unsupported cases. | corpus manifest JSON | Corpus manifest audit must pass. |
+| Unknown XML element coverage | Inventory every observed package part and XML element family. | element coverage JSON and human report | Unknown elements must be classified before release. |
+| Unsupported element visibility | Report unsupported or ignored-by-policy elements deterministically. | unsupported element report | No silent unsupported element loss in audit output. |
+| UI fidelity uncertainty | Separate semantic read coverage from visual rendering coverage. | UI fidelity matrix | Visual claims must have screenshot or DOM evidence. |
+| Regression risk | Convert newly approved coverage into automated tests. | regression tests and gate logs | Previously supported categories must fail the gate if regressed. |
+| Server/local drift | Verify the final result on the server after local validation. | server verification report | Server health, structure drift, and HWPX load smoke must pass. |
+| User-facing wording risk | Keep all reports aligned with the approved wording in section 7A. | report wording check | "Complete read" wording must remain blocked until R4 pass. |
+
+Minimum remediation sequence:
+
+1. Create or register the representative corpus.
+2. Run package/XML inventory against the corpus.
+3. Classify each observed package part and element family.
+4. Add deterministic warnings for unsupported categories.
+5. Add regression gates for every newly claimed supported category.
+6. Run local verification.
+7. Deploy or sync to the server only after local verification passes.
+8. Run server verification and attach the result to the report.
+
+The server is the final operating reference. A local pass is only a precheck;
+the claim must not be upgraded unless the same claim is verified on the server.
+
 ## 7. Pass Criteria for Current Baseline
 
 The current baseline remains valid when:
