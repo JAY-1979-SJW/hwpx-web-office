@@ -1,0 +1,52 @@
+"""Contract tests for the Web Office server deploy verifier."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "ops" / "deploy_web_office_to_server.ps1"
+
+
+def _script_text() -> str:
+    return SCRIPT.read_text(encoding="utf-8")
+
+
+def test_deploy_verifier_exists() -> None:
+    assert SCRIPT.is_file()
+
+
+def test_deploy_verifier_uses_server_as_final_authority() -> None:
+    text = _script_text()
+    assert "ssh" in text
+    assert "tar -xf" in text
+    assert "verify_web_office_server_monitor.py --once" in text
+    assert '"verdict":\\s*"(HEALTHY|RECOVERED)"' in text
+    assert '"sandboxMode":\\s*true' in text
+    assert '"sourceMutationBlocked":\\s*true' in text
+
+
+def test_deploy_verifier_requires_monitor_process_and_cron() -> None:
+    text = _script_text()
+    assert "pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval'" in text
+    assert "serverMonitorProcessOk" in text
+    assert "serverMonitorCronOk" in text
+    assert "hwpx-web-office-monitor" in text
+    assert "monitorProcessOk" in text
+    assert "monitorCronOk" in text
+
+
+def test_deploy_verifier_requires_operating_rule_documents() -> None:
+    text = _script_text()
+    assert "RULE-13" in text
+    assert "Operational Completion Rule" in text
+    assert "serverOperatingRulePresent" in text
+    assert "serverBackendStandardPresent" in text
+
+
+def test_deploy_verifier_blocks_dirty_local_tree_by_default() -> None:
+    text = _script_text()
+    assert "SkipLocalStatusCheck" in text
+    assert "working tree is not clean" in text
+    assert "localWorkingTreeClean" in text

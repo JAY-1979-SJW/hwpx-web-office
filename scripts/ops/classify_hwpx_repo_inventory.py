@@ -193,7 +193,7 @@ def _infer_zone(path: str) -> str:
         return "download_export"
     if any(token in lower for token in ("api_batch", "browser_batch", "api_browser", "real_like")):
         return "batch_api_browser"
-    if any(token in lower for token in ("closeout", "security", "audit", "gate", "dashboard", "history")):
+    if any(token in lower for token in ("closeout", "security", "audit", "gate", "dashboard", "history", "deploy_verifier", "server_deploy")):
         return "closeout_security"
     return "unassigned"
 

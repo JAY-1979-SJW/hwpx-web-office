@@ -68,8 +68,10 @@ tar -xf "$RemoteArchive" -C "$ServerPath"
 cd "$ServerPath"
 python3 -m py_compile scripts/ops/verify_web_office_server_monitor.py scripts/ops/install_web_office_server_monitor_cron.py
 python3 scripts/ops/verify_web_office_server_monitor.py --once --port $Port
-pgrep -af 'verify_web_office_server_monitor.py.*--interval' >/tmp/hwpx-web-office-monitor-process.txt || true
+pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval' | grep -v 'bash -lc' >/tmp/hwpx-web-office-monitor-process.txt
 crontab -l | grep 'hwpx-web-office-monitor' >/tmp/hwpx-web-office-monitor-cron.txt
+cat /tmp/hwpx-web-office-monitor-process.txt
+cat /tmp/hwpx-web-office-monitor-cron.txt
 grep -n 'RULE-13' docs/architecture/hwpx_work_execution_operating_rules_20260524.md
 grep -n 'Operational Completion Rule' docs/architecture/web_office_backend_structure_standard_20260525.md
 "@
@@ -80,10 +82,12 @@ $serverOutput = $serverResult.stdout
 $healthOk = $serverOutput -match '"verdict":\s*"(HEALTHY|RECOVERED)"'
 $sandboxOk = $serverOutput -match '"sandboxMode":\s*true'
 $mutationOk = $serverOutput -match '"sourceMutationBlocked":\s*true'
+$monitorProcessOk = $serverOutput -match "python3 scripts/ops/verify_web_office_server_monitor.py --interval"
+$monitorCronOk = $serverOutput -match "hwpx-web-office-monitor"
 $ruleOk = $serverOutput -match "RULE-13"
 $operationalRuleOk = $serverOutput -match "Operational Completion Rule"
 
-if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $ruleOk -and $operationalRuleOk)) {
+if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk)) {
     throw "server validation output did not contain required pass signals`n$serverOutput"
 }
 
@@ -100,6 +104,8 @@ $payload = [ordered]@{
         serverHealthOk = $healthOk
         serverSandboxModeOk = $sandboxOk
         serverMutationBlockedOk = $mutationOk
+        serverMonitorProcessOk = $monitorProcessOk
+        serverMonitorCronOk = $monitorCronOk
         serverOperatingRulePresent = $ruleOk
         serverBackendStandardPresent = $operationalRuleOk
     }
