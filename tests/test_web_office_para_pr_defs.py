@@ -24,15 +24,38 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
         "paraPrId",
         "tabPrIDRef",
         "align",
+        "breakSetting",
         "lineSpacing",
         "margin",
         "tabPr",
         "tabItems",
     } <= set(sample)
     assert any(item.get("align") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("breakSetting") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("lineSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("margin") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("tabPr") for item in doc.styles.paraPrDefs.values())
+
+
+def test_para_pr_defs_extract_break_setting():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+
+    break_settings = [
+        item["breakSetting"]
+        for item in doc.styles.paraPrDefs.values()
+        if item.get("breakSetting")
+    ]
+    assert break_settings
+    sample = break_settings[0]
+    assert {
+        "breakLatinWord",
+        "breakNonLatinWord",
+        "widowOrphan",
+        "keepWithNext",
+        "keepLines",
+        "pageBreakBefore",
+        "lineWrap",
+    } <= set(sample)
 
 
 def test_para_pr_defs_resolve_tab_items():

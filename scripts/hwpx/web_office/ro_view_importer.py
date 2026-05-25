@@ -327,6 +327,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         tab_pr_id = para_pr.attrib.get("tabPrIDRef")
         tab_pr = tab_pr_defs.get(str(tab_pr_id)) if tab_pr_id is not None else None
         align = _descendant_by_local(para_pr, "align")
+        break_setting = _descendant_by_local(para_pr, "breakSetting")
         line_spacing = _descendant_by_local(para_pr, "lineSpacing")
         margin = _descendant_by_local(para_pr, "margin")
         margin_payload: dict[str, dict[str, str | None]] = {}
@@ -343,6 +344,9 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
             "paraPrId": str(para_pr_id),
             "tabPrIDRef": tab_pr_id,
             "align": dict(align.attrib) if align is not None else {},
+            "breakSetting": (
+                dict(break_setting.attrib) if break_setting is not None else {}
+            ),
             "lineSpacing": (
                 dict(line_spacing.attrib) if line_spacing is not None else {}
             ),
