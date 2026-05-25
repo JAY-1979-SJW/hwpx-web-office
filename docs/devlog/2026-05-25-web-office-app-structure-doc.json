@@ -43,6 +43,14 @@
     {
       "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
       "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    },
+    {
+      "command": "git push",
+      "result": "PASS_HWPX_REPO_PREPUSH_GUARD"
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts\\ops\\deploy_web_office_to_server.ps1",
+      "result": "PASS"
     }
   ],
   "localVerification": {
@@ -51,8 +59,19 @@
   },
   "serverVerification": {
     "required": true,
-    "status": "PENDING",
-    "reason": "Web Office architecture documentation changed; server verification is required before closeout."
+    "status": "PASS",
+    "serverAlias": "haehan-app",
+    "serverPath": "/home/ubuntu/apps/hwpx-web-office",
+    "deployedHead": "99bb915",
+    "checks": {
+      "serverHealthOk": true,
+      "serverSandboxModeOk": true,
+      "serverMutationBlockedOk": true,
+      "serverMonitorProcessOk": true,
+      "serverMonitorCronOk": true,
+      "serverOperatingRulePresent": true,
+      "serverBackendStandardPresent": true
+    }
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-app-structure-doc.json"
@@ -61,5 +80,5 @@
   "holdItems": [
     "Production write, direct browser HWPX parsing, direct browser HWPX writing, uncontrolled upload, arbitrary source paths, and endpoint expansion remain on hold."
   ],
-  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+  "finalStatus": "SERVER_VERIFIED_PASS"
 }
