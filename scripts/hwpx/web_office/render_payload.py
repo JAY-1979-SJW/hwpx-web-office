@@ -105,23 +105,26 @@ def build_render_payload(
         ],
         "warnings": doc.warnings,
     }
+    styles_payload: dict[str, Any] = {}
+    if doc.styles.paraPrDefs:
+        styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-PREVIEW-01:
     # styles.charPrDefs 를 read-only additive 로 노출 (toolbar preview 용).
     if char_pr_defs is not None:
-        payload["styles"] = {
-            "charPrDefs": {
-                str(cid): {
-                    "charPrId": str(cid),
-                    "fontName": d.get("fontName"),
-                    "fontFace": d.get("fontFace"),
-                    "fontSizePt": d.get("fontSizePt"),
-                    "height": d.get("height"),
-                    "textColor": d.get("textColor") or None,
-                    "bold": bool(d.get("bold")),
-                    "italic": bool(d.get("italic")),
-                    "underline": bool(d.get("underline")),
-                }
-                for cid, d in char_pr_defs.items()
-            },
+        styles_payload["charPrDefs"] = {
+            str(cid): {
+                "charPrId": str(cid),
+                "fontName": d.get("fontName"),
+                "fontFace": d.get("fontFace"),
+                "fontSizePt": d.get("fontSizePt"),
+                "height": d.get("height"),
+                "textColor": d.get("textColor") or None,
+                "bold": bool(d.get("bold")),
+                "italic": bool(d.get("italic")),
+                "underline": bool(d.get("underline")),
+            }
+            for cid, d in char_pr_defs.items()
         }
+    if styles_payload:
+        payload["styles"] = styles_payload
     return payload

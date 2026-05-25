@@ -288,9 +288,19 @@ Current remediation audit category output:
 - `style_catalog`
 - `revision_tracking`
 
-The first implementation priority after this audit is:
+Current `paragraph_layout` remediation status:
 
-1. `paragraph_layout`: align, lineSpacing, margin, tabPr
+- `align`, `lineSpacing`, and `margin` are extracted from `Contents/header.xml`
+  `paraPr` definitions into the read-only render payload as `styles.paraPrDefs`.
+- margin child values `intent`, `left`, `right`, `prev`, and `next` are exposed
+  with their raw HWPX `value` and `relative` attributes.
+- `tabPrIDRef` and `tabItemCount` are exposed for inventory only. Full tab stop
+  semantics are not yet claimed.
+
+The next implementation priority after this first paragraph layout pass is:
+
+1. `paragraph_layout`: tabPr/tabItem semantics, breakSetting, autoSpacing,
+   lineBreak
 2. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
 3. `table_layout`: cellMargin, inMargin, outMargin
 

@@ -264,6 +264,72 @@ def _read_section_root(
         return None
 
 
+def _child_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
+    for child in list(elem):
+        if local_name(child.tag) == wanted:
+            return child
+    return None
+
+
+def _children_by_local(elem: ET.Element, wanted: str) -> list[ET.Element]:
+    return [child for child in list(elem) if local_name(child.tag) == wanted]
+
+
+def _descendant_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
+    for child in elem.iter():
+        if child is elem:
+            continue
+        if local_name(child.tag) == wanted:
+            return child
+    return None
+
+
+def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+
+    defs: dict[str, dict[str, Any]] = {}
+    for para_pr in header.iter():
+        if local_name(para_pr.tag) != "paraPr":
+            continue
+        para_pr_id = para_pr.attrib.get("id")
+        if para_pr_id is None:
+            continue
+
+        align = _descendant_by_local(para_pr, "align")
+        line_spacing = _descendant_by_local(para_pr, "lineSpacing")
+        margin = _descendant_by_local(para_pr, "margin")
+        margin_payload: dict[str, dict[str, str | None]] = {}
+        if margin is not None:
+            for key in ("intent", "left", "right", "prev", "next"):
+                item = _child_by_local(margin, key)
+                if item is not None:
+                    margin_payload[key] = {
+                        "value": item.attrib.get("value"),
+                        "relative": item.attrib.get("relative"),
+                    }
+
+        defs[str(para_pr_id)] = {
+            "paraPrId": str(para_pr_id),
+            "tabPrIDRef": para_pr.attrib.get("tabPrIDRef"),
+            "align": dict(align.attrib) if align is not None else {},
+            "lineSpacing": (
+                dict(line_spacing.attrib) if line_spacing is not None else {}
+            ),
+            "margin": margin_payload,
+            "tabItemCount": sum(
+                1
+                for tab_pr in _children_by_local(para_pr, "tabPr")
+                for _ in _children_by_local(tab_pr, "tabItem")
+            ),
+        }
+    return defs
+
+
 def import_hwpx_as_ro_view(
     source_hwpx: Path
 ) -> WebOfficeDocumentModel:
@@ -544,10 +610,12 @@ def import_hwpx_as_ro_view(
             placeholder=True))
 
     style_info = parsed.styles
+    para_pr_defs = _extract_para_pr_defs(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
-        borderFillCount=len(getattr(style_info, "borderFill", []) or []))
+        borderFillCount=len(getattr(style_info, "borderFill", []) or []),
+        paraPrDefs=para_pr_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

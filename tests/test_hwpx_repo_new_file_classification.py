@@ -82,14 +82,24 @@ def test_07_devlog_and_reports_hold_are_ignored(tmp_path: Path) -> None:
     assert result["summary"]["ignoredFiles"] == 2
 
 
-def test_08_results_are_written(tmp_path: Path) -> None:
+def test_08_web_office_test_file_is_classified(tmp_path: Path) -> None:
+    result = gate.run_new_file_classification_gate(
+        report_dir=tmp_path,
+        new_files=["tests/test_web_office_para_pr_defs.py"],
+    )
+    assert result["verdict"] == gate.PASS_VERDICT
+    assert result["newFileResults"][0]["category"] == "TEST_ONLY"
+    assert result["newFileResults"][0]["zone"] == "test_support"
+
+
+def test_09_results_are_written(tmp_path: Path) -> None:
     gate.run_new_file_classification_gate(report_dir=tmp_path, new_files=[])
     assert (tmp_path / "new_file_classification_summary.json").is_file()
     assert (tmp_path / "new_file_classification_results.json").is_file()
     assert (tmp_path / "new_file_classification_summary.md").is_file()
 
 
-def test_09_reports_have_no_leaks(tmp_path: Path) -> None:
+def test_10_reports_have_no_leaks(tmp_path: Path) -> None:
     gate.run_new_file_classification_gate(report_dir=tmp_path, new_files=["docs/devlog/2026-05-23-note.md"])
     for path in tmp_path.iterdir():
         text = path.read_text(encoding="utf-8")
@@ -98,7 +108,7 @@ def test_09_reports_have_no_leaks(tmp_path: Path) -> None:
         assert not gate.inventory.PII_RE.search(text)
 
 
-def test_10_json_reports_valid(tmp_path: Path) -> None:
+def test_11_json_reports_valid(tmp_path: Path) -> None:
     gate.run_new_file_classification_gate(report_dir=tmp_path, new_files=[])
     json.loads((tmp_path / "new_file_classification_summary.json").read_text(encoding="utf-8"))
     json.loads((tmp_path / "new_file_classification_results.json").read_text(encoding="utf-8"))

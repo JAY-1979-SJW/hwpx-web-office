@@ -43,6 +43,36 @@
       "path": "docs/architecture/web_office_app_structure_20260525.md",
       "status": "updated",
       "change": "Linked the reading scope standard from the app structure overview."
+    },
+    {
+      "path": "scripts/hwpx/web_office/ro_view_importer.py",
+      "status": "updated",
+      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields."
+    },
+    {
+      "path": "scripts/hwpx/web_office/render_payload.py",
+      "status": "updated",
+      "change": "Exposed paragraph layout definitions in the render payload under styles.paraPrDefs without changing writer behavior."
+    },
+    {
+      "path": "tests/test_web_office_para_pr_defs.py",
+      "status": "added",
+      "change": "Added regression coverage for align, lineSpacing, margin, and read-only payload exposure of paraPrDefs."
+    },
+    {
+      "path": "scripts/ops/classify_hwpx_repo_inventory.py",
+      "status": "updated",
+      "change": "Classified Web Office test files into the test_support zone so the new-file gate can validate them deterministically."
+    },
+    {
+      "path": "tests/test_hwpx_repo_new_file_classification.py",
+      "status": "updated",
+      "change": "Added regression coverage that new Web Office test files pass repo new-file classification."
+    },
+    {
+      "path": "scripts/ops/run_hwpx_repo_commit_guard.py",
+      "status": "updated",
+      "change": "Changed --temp-only commit guard execution to evaluate in memory without writing temporary report directories, avoiding host temp ACL failures."
     }
   ],
   "changedFiles": [
@@ -51,7 +81,14 @@
     "docs/architecture/web_office_app_structure_20260525.md",
     "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
     "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
+    "scripts/hwpx/web_office/document_model.py",
+    "scripts/hwpx/web_office/render_payload.py",
+    "scripts/hwpx/web_office/ro_view_importer.py",
+    "scripts/ops/classify_hwpx_repo_inventory.py",
     "scripts/ops/audit_web_office_hwpx_read_remediation.py",
+    "scripts/ops/run_hwpx_repo_commit_guard.py",
+    "tests/test_hwpx_repo_new_file_classification.py",
+    "tests/test_web_office_para_pr_defs.py",
     "tests/test_web_office_hwpx_read_remediation_audit.py",
     "scripts/ops/deploy_web_office_to_server.ps1",
     "tests/test_web_office_server_deploy_verifier.py"
@@ -85,7 +122,19 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; 76 unsupported XML element families grouped into 13 categories; Web Office model extraction and source immutability passed; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, 68 unsupported XML element families remain grouped into 13 categories; paragraph_layout still reports tabPr/tabItem, breakSetting, autoSpacing, and lineBreak as open; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+    },
+    {
+      "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "9 tests passed and 12 were skipped; paraPrDefs are extracted and exposed read-only while existing paragraph/read-remediation contracts remain valid."
+    },
+    {
+      "command": "python scripts/ops/gate_hwpx_repo_new_file_classification.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "New Web Office paraPr test file is classified as TEST_ONLY in the test_support zone."
     },
     {
       "command": "python -m pytest tests/test_web_office_hwpx_read_remediation_audit.py",

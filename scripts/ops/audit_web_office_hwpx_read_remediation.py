@@ -61,6 +61,14 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "borderFill",
     "fillBrush",
     "winBrush",
+    "align",
+    "intent",
+    "left",
+    "lineSpacing",
+    "margin",
+    "next",
+    "prev",
+    "right",
     "sec",
     "p",
     "run",
@@ -201,7 +209,7 @@ UNSUPPORTED_CATEGORY_META = {
     },
     "paragraph_layout": {
         "claimImpact": "Paragraph spacing, margin, alignment, tab, and break fidelity is incomplete.",
-        "nextAction": "Prioritize align, lineSpacing, margin, and tabPr mapping into render payload.",
+        "nextAction": "Complete tabPr/tabItem semantics, breakSetting, autoSpacing, and lineBreak mapping into render payload.",
     },
     "revision_tracking": {
         "claimImpact": "Revision tracking state is not represented.",
