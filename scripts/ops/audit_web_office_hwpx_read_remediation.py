@@ -282,6 +282,15 @@ def _classify_xml_local_with_context(
     contexts: Counter[str] | None = None,
 ) -> str:
     context_keys = set(contexts or {})
+    if local in {"case", "default"} and context_keys and all(
+        key.endswith("header.xml:switch") for key in context_keys
+    ):
+        return "parsed_for_current_model"
+    if local == "switch" and context_keys and all(
+        key.endswith(("header.xml:paraPr", "header.xml:tabPr"))
+        for key in context_keys
+    ):
+        return "parsed_for_current_model"
     if local == "offset" and context_keys and all(
         key.endswith("header.xml:charPr") for key in context_keys
     ):

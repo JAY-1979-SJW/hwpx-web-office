@@ -334,12 +334,42 @@ def _children_by_local(elem: ET.Element, wanted: str) -> list[ET.Element]:
 
 
 def _descendant_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
-    for child in elem.iter():
-        if child is elem:
-            continue
+    for child in _effective_descendants(elem):
         if local_name(child.tag) == wanted:
             return child
     return None
+
+
+def _selected_switch_branch(switch_elem: ET.Element) -> ET.Element | None:
+    """Select the effective branch for HWPX compatibility switch wrappers."""
+    default_branch: ET.Element | None = None
+    for child in list(switch_elem):
+        child_local = local_name(child.tag)
+        if child_local == "case":
+            return child
+        if child_local == "default" and default_branch is None:
+            default_branch = child
+    return default_branch
+
+
+def _effective_children(elem: ET.Element) -> list[ET.Element]:
+    children: list[ET.Element] = []
+    for child in list(elem):
+        if local_name(child.tag) == "switch":
+            branch = _selected_switch_branch(child)
+            if branch is not None:
+                children.extend(list(branch))
+        else:
+            children.append(child)
+    return children
+
+
+def _effective_descendants(elem: ET.Element) -> list[ET.Element]:
+    result: list[ET.Element] = []
+    for child in _effective_children(elem):
+        result.append(child)
+        result.extend(_effective_descendants(child))
+    return result
 
 
 def _extract_tab_pr_defs(header: ET.Element) -> dict[str, dict[str, Any]]:
@@ -352,8 +382,8 @@ def _extract_tab_pr_defs(header: ET.Element) -> dict[str, dict[str, Any]]:
             continue
         tab_items = [
             dict(item.attrib)
-            for item in tab_pr.iter()
-            if item is not tab_pr and local_name(item.tag) == "tabItem"
+            for item in _effective_descendants(tab_pr)
+            if local_name(item.tag) == "tabItem"
         ]
         defs[str(tab_pr_id)] = {
             "tabPrId": str(tab_pr_id),

@@ -92,6 +92,8 @@ def test_para_pr_defs_resolve_tab_items():
     assert first["tabPr"]["tabPrId"] == first["tabPrIDRef"]
     assert first["tabItemCount"] == len(first["tabItems"])
     assert {"pos", "type", "leader"} <= set(first["tabItems"][0])
+    assert first["tabItemCount"] == 4
+    assert all(item.get("unit") == "HWPUNIT" for item in first["tabItems"])
 
 
 def test_render_payload_exposes_para_pr_defs_read_only():

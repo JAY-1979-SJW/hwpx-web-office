@@ -284,7 +284,6 @@ Current remediation audit category output:
 - `package_metadata`
 - `embedded_control`
 - `style_catalog`
-- `style_compatibility`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -323,8 +322,10 @@ Current `text_style` remediation status:
   but the same local name is still reported under `page_layout` when it appears
   under page border structures.
 - `language` is classified as package metadata in the checked-in corpus.
-- `case`, `default`, and `switch` are classified as `style_compatibility`
-  because their compatibility branch-selection semantics are not yet claimed.
+- `case`, `default`, and `switch` are resolved for current header style
+  definitions by selecting the first `case` branch and falling back to
+  `default` when no case branch exists; this prevents duplicate tab/paragraph
+  style extraction from compatibility wrappers.
 - Current-corpus `text_style` no longer appears as an unsupported category.
   Full text visual fidelity is still not claimed because style cascade,
   compatibility selection, and UI rendering comparison remain open.
@@ -343,9 +344,9 @@ Current `table_layout` remediation status:
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `style_compatibility`: case, default, switch
-2. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
-3. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
+1. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
+2. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
+3. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
 
 ## 7. Pass Criteria for Current Baseline
 
