@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-SERVER-ERROR-REMEDIATION-20260525",
+  "baselineHead": "15f987a",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/hwpx_work_execution_operating_rules_20260524.md",
+      "status": "updated",
+      "change": "Added zero failed systemd units and related operational dependency checks to minimum server verification."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "status": "updated",
+      "change": "Added systemctl --failed to the server check command set and pass criteria."
+    },
+    {
+      "path": "docs/reports/web_office_server_error_remediation_20260525.md",
+      "status": "created",
+      "change": "Recorded server error findings, remediation, verification commands, and final decision."
+    }
+  ],
+  "changedFiles": [
+    "docs/architecture/hwpx_work_execution_operating_rules_20260524.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/reports/web_office_server_error_remediation_20260525.md",
+    "docs/devlog/2026-05-25-web-office-server-error-remediation.json"
+  ],
+  "serverChanges": [
+    {
+      "target": "haehan-app:/home/ubuntu/.secrets/price-reference-api.env",
+      "type": "server_runtime_env",
+      "status": "updated_with_backup",
+      "secretPolicy": "server-only; not copied into repository",
+      "result": "mart-price-reference-api.service health returned ok"
+    },
+    {
+      "target": "JAY-1979-SJW/risk-assessment-generator",
+      "type": "adjacent_repository_fix",
+      "commit": "7eb8d2a5",
+      "status": "pushed_and_server_synced",
+      "result": "risk-assessment queue builder dry-run paths passed"
+    }
+  ],
+  "validationCommands": [
+    {
+      "command": "systemctl --no-pager --failed",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "0 loaded units listed"
+    },
+    {
+      "command": "systemctl is-active mart-price-reference-api.service && curl -fsS http://127.0.0.1:8195/health",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "active; {\"status\":\"ok\"}"
+    },
+    {
+      "command": "curl -fsS http://127.0.0.1:8767/api/web-office/health",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "status SUCCESS, mode SANDBOX_ONLY, sourceMutationAllowed false"
+    },
+    {
+      "command": "docker exec risk-assessment-api python3 /app/scripts/ops/build_collection_queue.py --dry-run --only incremental",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "queue builder completed with zero added jobs"
+    },
+    {
+      "command": "docker exec risk-assessment-api python3 /app/scripts/ops/build_collection_queue.py --dry-run --only remap",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "queue builder completed with zero added jobs"
+    },
+    {
+      "command": "docker exec risk-assessment-api python3 /app/scripts/ops/build_collection_queue.py --dry-run --only kosha_redownload",
+      "location": "haehan-app",
+      "result": "PASS",
+      "evidence": "queue builder completed with zero added jobs"
+    },
+    {
+      "command": "python -m py_compile C:\\tmp\\risk-assessment-generator-push\\scripts\\ops\\build_collection_queue.py",
+      "location": "local temporary clone",
+      "result": "PASS",
+      "evidence": "syntax compile completed"
+    }
+  ],
+  "localVerification": {
+    "repository": "hwpx-web-office",
+    "gitStatus": "clean before documentation work; documentation changes pending after this report",
+    "codeChanges": "none"
+  },
+  "serverVerification": {
+    "serverAlias": "haehan-app",
+    "webOfficeEndpoint": "http://127.0.0.1:8767/api/web-office/health",
+    "webOfficeHealth": "SUCCESS",
+    "webOfficeMode": "SANDBOX_ONLY",
+    "sourceMutationAllowed": false,
+    "failedSystemdUnits": 0,
+    "priceReferenceApiHealth": "ok",
+    "riskAssessmentQueueDryRuns": "PASS"
+  },
+  "reportArtifacts": [
+    "docs/reports/web_office_server_error_remediation_20260525.md",
+    "docs/devlog/2026-05-25-web-office-server-error-remediation.json"
+  ],
+  "unresolvedItems": [
+    {
+      "item": "price reference API server environment contains secrets",
+      "status": "accepted_server_only",
+      "reason": "Secrets must not be copied into the repository."
+    }
+  ],
+  "holdItems": [
+    "Do not expose firewall, IP allowlist, or public port changes without a separate approved task.",
+    "Do not copy server secret files into the repository."
+  ],
+  "finalStatus": "SERVER_VERIFIED_PASS"
+}

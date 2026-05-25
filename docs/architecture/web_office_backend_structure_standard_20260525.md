@@ -194,6 +194,7 @@ cd /home/ubuntu/apps/hwpx-web-office
 python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift
 pgrep -af 'verify_web_office_server_monitor.py.*--interval'
 crontab -l | grep hwpx-web-office-monitor
+systemctl --no-pager --failed
 ```
 
 ## 12. Pass Criteria
@@ -221,6 +222,11 @@ The implementation passes this standard when:
 - server monitor can include app structure drift audit and reports it as pass
 - read-only security log audit can be run on the server without changing
   firewall, IP allowlist, or port policy
+- server failed unit list is empty: `systemctl --failed` reports zero failed
+  units
+- adjacent operational services are checked and remediated when their failure
+  affects server readiness, monitoring, recovery, or backend integration
+  assumptions
 - operational report artifact is written with validation command results,
   server verification result, unresolved items, and final status
 

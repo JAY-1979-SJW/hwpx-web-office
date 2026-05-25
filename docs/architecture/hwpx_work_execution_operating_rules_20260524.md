@@ -215,6 +215,10 @@ Server verification must include, at minimum:
 - `sourceMutationAllowed == false`
 - monitor process or auto-start registration present
 - relevant server logs checked for immediate errors
+- `systemctl --failed` returns zero failed units on the server
+- related operational dependency services checked when a Web Office task
+  touches server runtime, monitoring, recovery, deployment, or backend
+  integration assumptions
 
 Any Web Office task that changes runtime behavior, scripts, API routes, frontend
 serving, monitoring, recovery, or deployment must include the server verification
