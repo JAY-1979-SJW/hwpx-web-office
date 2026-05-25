@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-APP-STRUCTURE-DRIFT-AUDIT-20260525",
+  "baselineHead": "dcea8c5",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_app_structure_20260525.md",
+      "updated": true,
+      "change": "Added the dedicated app structure drift audit script to operational verification and pass criteria."
+    }
+  ],
+  "changedFiles": [
+    "scripts/ops/audit_web_office_app_structure_drift.py",
+    "tests/test_web_office_app_structure_drift.py",
+    "scripts/ops/classify_hwpx_repo_inventory.py",
+    "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/devlog/2026-05-25-web-office-app-structure-drift-audit.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python scripts\\ops\\audit_web_office_app_structure_drift.py",
+      "result": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_app_structure_drift.py tests\\test_web_office_server_deploy_verifier.py -q",
+      "result": "9 passed"
+    },
+    {
+      "command": "python -m json.tool docs\\devlog\\2026-05-25-web-office-app-structure-drift-audit.json",
+      "result": "PASS"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -c \"from scripts.ops import audit_web_office_app_structure_drift as m; payload=m.audit(); print(payload['verdict']); raise SystemExit(0 if payload['verdict']==m.PASS_VERDICT else 1)\"",
+      "result": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
+      "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_app_structure_drift.py tests\\test_hwpx_repo_guard_hooks.py -q",
+      "result": "13 passed"
+    }
+  ],
+  "localVerification": {
+    "status": "PASS",
+    "summary": "Structure drift audit, contract tests, JSON report validation, import audit, repo commit guard, and repo guard tests passed."
+  },
+  "serverVerification": {
+    "required": true,
+    "status": "PENDING",
+    "reason": "Web Office monitoring and structure validation changed; server verification is required before closeout."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-app-structure-drift-audit.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "This drift audit is static and local/server executable. It does not replace the runtime health monitor or firewall/access-log monitoring."
+  ],
+  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+}

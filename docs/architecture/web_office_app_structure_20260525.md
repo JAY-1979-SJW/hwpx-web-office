@@ -73,6 +73,7 @@ Operational verification
   scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
   scripts/ops/verify_web_office_server_monitor.py
   scripts/ops/deploy_web_office_to_server.ps1
+  scripts/ops/audit_web_office_app_structure_drift.py
 ```
 
 ## 4. Request Flow
@@ -198,6 +199,7 @@ Server baseline:
 Operational scripts:
 
 - `scripts/ops/deploy_web_office_to_server.ps1`
+- `scripts/ops/audit_web_office_app_structure_drift.py`
 - `scripts/ops/verify_web_office_server_monitor.py`
 - `scripts/ops/install_web_office_server_monitor_cron.py`
 - `scripts/ops/start_web_office_server_monitor.ps1`
@@ -209,6 +211,7 @@ Local structure and runtime checks:
 
 ```powershell
 python -m pytest tests/test_web_office_writer_readback_backend_api_route.py tests/test_web_office_browser_smoke_frontend_backend_wire_baseline.py tests/test_web_office_editor_browser_smoke.py -q
+python scripts/ops/audit_web_office_app_structure_drift.py
 python scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
 python scripts/ops/run_hwpx_repo_commit_guard.py
 ```
@@ -237,6 +240,7 @@ The app structure is valid when:
 - `editor_api_route.py` keeps `SANDBOX_ONLY`
 - public save responses hide `outputPath`
 - browser bridges use fixed backend endpoints
+- app structure drift audit passes
 - backend runtime smoke passes
 - frontend/backend wire smoke passes
 - server deploy verification passes
