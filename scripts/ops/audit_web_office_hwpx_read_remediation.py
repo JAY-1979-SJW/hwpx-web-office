@@ -87,6 +87,140 @@ IGNORED_BY_POLICY_XML_LOCALS = {
     "forbiddenStringList",
 }
 
+UNSUPPORTED_CATEGORY_BY_LOCAL = {
+    "CaretPosition": "application_settings",
+    "HWPApplicationSetting": "application_settings",
+    "align": "paragraph_layout",
+    "autoNumFormat": "numbering_outline",
+    "autoSpacing": "paragraph_layout",
+    "backSlash": "border_style",
+    "beginNum": "numbering_outline",
+    "bold": "text_style",
+    "border": "border_style",
+    "bottomBorder": "border_style",
+    "breakSetting": "paragraph_layout",
+    "case": "text_style",
+    "cellMargin": "table_layout",
+    "charProperties": "metadata_properties",
+    "colPr": "page_layout",
+    "compatibleDocument": "application_settings",
+    "ctrl": "embedded_control",
+    "default": "text_style",
+    "diagonal": "border_style",
+    "endNotePr": "note_annotation",
+    "fontRef": "text_style",
+    "footNotePr": "note_annotation",
+    "fwSpace": "text_style",
+    "grid": "page_layout",
+    "heading": "numbering_outline",
+    "hml": "package_metadata",
+    "inMargin": "table_layout",
+    "intent": "paragraph_layout",
+    "language": "text_style",
+    "layoutCompatibility": "application_settings",
+    "left": "paragraph_layout",
+    "leftBorder": "border_style",
+    "lineBreak": "paragraph_layout",
+    "lineNumberShape": "page_layout",
+    "lineSpacing": "paragraph_layout",
+    "linkinfo": "package_metadata",
+    "margin": "paragraph_layout",
+    "memoPr": "note_annotation",
+    "memoProperties": "note_annotation",
+    "meta": "package_metadata",
+    "next": "paragraph_layout",
+    "noteLine": "note_annotation",
+    "noteSpacing": "note_annotation",
+    "numbering": "numbering_outline",
+    "offset": "text_style",
+    "outMargin": "table_layout",
+    "outline": "numbering_outline",
+    "pageBorderFill": "page_layout",
+    "pagePr": "page_layout",
+    "paraProperties": "metadata_properties",
+    "placement": "embedded_control",
+    "pos": "embedded_control",
+    "prev": "paragraph_layout",
+    "ratio": "text_style",
+    "refList": "metadata_properties",
+    "relSz": "text_style",
+    "right": "paragraph_layout",
+    "rightBorder": "border_style",
+    "secPr": "page_layout",
+    "shadow": "text_style",
+    "slash": "border_style",
+    "spacing": "text_style",
+    "startNum": "numbering_outline",
+    "strikeout": "text_style",
+    "style": "style_catalog",
+    "switch": "text_style",
+    "sz": "page_layout",
+    "tabItem": "paragraph_layout",
+    "tabPr": "paragraph_layout",
+    "tabProperties": "metadata_properties",
+    "title": "package_metadata",
+    "topBorder": "border_style",
+    "trackchageConfig": "revision_tracking",
+    "typeInfo": "text_style",
+    "underline": "text_style",
+    "visibility": "application_settings",
+}
+
+UNSUPPORTED_CATEGORY_META = {
+    "application_settings": {
+        "claimImpact": "Application-specific settings are not represented in the Web Office model.",
+        "nextAction": "Keep as warning unless a user-visible setting changes read behavior.",
+    },
+    "border_style": {
+        "claimImpact": "Border visual fidelity is incomplete.",
+        "nextAction": "Map border side/style/diagonal fields into table/cell style payload.",
+    },
+    "embedded_control": {
+        "claimImpact": "Embedded controls are not semantically represented.",
+        "nextAction": "Inventory control kinds and add deterministic placeholders before visual claims.",
+    },
+    "metadata_properties": {
+        "claimImpact": "Some property containers are inventoried but not modeled.",
+        "nextAction": "Classify which properties affect visible rendering versus metadata-only behavior.",
+    },
+    "note_annotation": {
+        "claimImpact": "Footnote/endnote/memo rendering is not claimed.",
+        "nextAction": "Add note inventory and warning payload before supporting note display.",
+    },
+    "numbering_outline": {
+        "claimImpact": "Numbering and outline semantics are not fully reconstructed.",
+        "nextAction": "Map numbering/outline references into paragraph payload and regression fixtures.",
+    },
+    "package_metadata": {
+        "claimImpact": "Package metadata is not part of the current read guarantee.",
+        "nextAction": "Keep out of UI claims unless metadata display becomes a feature.",
+    },
+    "page_layout": {
+        "claimImpact": "Page/section layout fidelity is incomplete.",
+        "nextAction": "Add page/section layout model fields and visual comparison fixtures.",
+    },
+    "paragraph_layout": {
+        "claimImpact": "Paragraph spacing, margin, alignment, tab, and break fidelity is incomplete.",
+        "nextAction": "Prioritize align, lineSpacing, margin, and tabPr mapping into render payload.",
+    },
+    "revision_tracking": {
+        "claimImpact": "Revision tracking state is not represented.",
+        "nextAction": "Keep as warning until tracked-change display or preservation is required.",
+    },
+    "style_catalog": {
+        "claimImpact": "Full style cascade fidelity is not claimed.",
+        "nextAction": "Map style references and inheritance into a style coverage gate.",
+    },
+    "table_layout": {
+        "claimImpact": "Table/cell margin fidelity is incomplete.",
+        "nextAction": "Map cellMargin, inMargin, and outMargin into table/cell layout payload.",
+    },
+    "text_style": {
+        "claimImpact": "Font/text visual fidelity is incomplete.",
+        "nextAction": "Prioritize fontRef, ratio, relSz, underline, strikeout, and bold mapping.",
+    },
+}
+
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -115,6 +249,32 @@ def _classify_xml_local(local: str) -> str:
     if local in IGNORED_BY_POLICY_XML_LOCALS:
         return "ignored_by_policy"
     return "unsupported_with_warning"
+
+
+def _unsupported_category(local: str) -> str:
+    return UNSUPPORTED_CATEGORY_BY_LOCAL.get(local, "unknown_review_required")
+
+
+def _build_unsupported_category_summary(unsupported_locals: set[str]) -> dict[str, Any]:
+    categories: dict[str, dict[str, Any]] = {}
+    for local in sorted(unsupported_locals):
+        category = _unsupported_category(local)
+        meta = UNSUPPORTED_CATEGORY_META.get(category, {
+            "claimImpact": "Unsupported element category requires manual review.",
+            "nextAction": "Classify this element family before upgrading the read claim.",
+        })
+        bucket = categories.setdefault(category, {
+            "elementFamilies": [],
+            "count": 0,
+            "claimImpact": meta["claimImpact"],
+            "nextAction": meta["nextAction"],
+        })
+        bucket["elementFamilies"].append(local)
+        bucket["count"] += 1
+    return {
+        "categoryCount": len(categories),
+        "categories": dict(sorted(categories.items())),
+    }
 
 
 def _inspect_package(path: Path) -> dict[str, Any]:
@@ -146,9 +306,15 @@ def _inspect_package(path: Path) -> dict[str, Any]:
 
     classifications: dict[str, dict[str, Any]] = {}
     for local, count in sorted(element_counter.items()):
+        classification = _classify_xml_local(local)
         classifications[local] = {
             "count": count,
-            "classification": _classify_xml_local(local),
+            "classification": classification,
+            "unsupportedCategory": (
+                _unsupported_category(local)
+                if classification == "unsupported_with_warning"
+                else None
+            ),
         }
 
     unsupported = {
@@ -313,6 +479,9 @@ def run_audit(
             "ignoredByPolicyElementFamilies": sorted(ignored_locals),
             "unsupportedWithWarningElementFamilies": sorted(unsupported_locals),
             "unsupportedWithWarningCount": len(unsupported_locals),
+            "unsupportedCategorySummary": _build_unsupported_category_summary(
+                unsupported_locals
+            ),
         },
         "fixtures": fixture_results,
         "failures": failures,
@@ -364,6 +533,20 @@ def _format_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## Failures", ""])
     if payload["failures"]:
         lines.extend(f"- `{item['path']}`: `{item['findings']}`" for item in payload["failures"])
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Unsupported Category Summary", ""])
+    category_summary = coverage["unsupportedCategorySummary"]
+    categories = category_summary["categories"]
+    if categories:
+        lines.extend([
+            "| Category | Count | Claim impact | Next action |",
+            "| --- | ---: | --- | --- |",
+        ])
+        for category, item in categories.items():
+            lines.append(
+                f"| `{category}` | {item['count']} | {item['claimImpact']} | {item['nextAction']} |"
+            )
     else:
         lines.append("- none")
     return "\n".join(lines) + "\n"

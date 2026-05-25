@@ -18,6 +18,7 @@ from scripts.ops.audit_web_office_hwpx_read_remediation import (  # noqa: E402
 
 def test_read_remediation_audit_reports_current_scope(tmp_path):
     payload = run_audit(report_dir=tmp_path)
+    category_summary = payload["coverageSummary"]["unsupportedCategorySummary"]
 
     assert payload["verdict"] == PASS_VERDICT
     assert payload["statusValue"] == STATUS_VALUE
@@ -26,6 +27,11 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert payload["corpus"]["hwpxFileCount"] >= 3
     assert payload["corpus"]["manifestFound"] is True
     assert payload["coverageSummary"]["unsupportedWithWarningCount"] >= 1
+    assert category_summary["categoryCount"] >= 5
+    assert "paragraph_layout" in category_summary["categories"]
+    assert "text_style" in category_summary["categories"]
+    assert "page_layout" in category_summary["categories"]
+    assert "unknown_review_required" not in category_summary["categories"]
     assert payload["requiredWording"] == (
         "Basic HWPX read is verified; full compatibility and UI fidelity remain open."
     )
@@ -41,7 +47,28 @@ def test_read_remediation_audit_writes_machine_and_human_reports(tmp_path):
     assert md_path.is_file()
     written = json.loads(json_path.read_text(encoding="utf-8"))
     assert written["verdict"] == payload["verdict"]
-    assert "Unsupported Element Families" in md_path.read_text(encoding="utf-8")
+    md_text = md_path.read_text(encoding="utf-8")
+    assert "Unsupported Element Families" in md_text
+    assert "Unsupported Category Summary" in md_text
+    assert "paragraph_layout" in md_text
+
+
+def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_path):
+    payload = run_audit(report_dir=tmp_path)
+
+    for result in payload["fixtures"]:
+        classifications = result["packageInventory"]["elementClassifications"]
+        unsupported = [
+            item
+            for item in classifications.values()
+            if item["classification"] == "unsupported_with_warning"
+        ]
+        assert unsupported
+        assert all(item["unsupportedCategory"] for item in unsupported)
+        assert all(
+            item["unsupportedCategory"] != "unknown_review_required"
+            for item in unsupported
+        )
 
 
 def test_read_remediation_audit_does_not_mutate_fixtures(tmp_path):

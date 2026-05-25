@@ -261,6 +261,8 @@ The gate must verify:
 - observed XML element families are classified as parsed for the current model,
   ignored by policy, or unsupported with warning
 - unsupported element families are visible in the machine-readable report
+- unsupported element families are grouped into impact categories with next
+  actions
 - Web Office RO model extraction succeeds
 - render payload remains read-only
 - source HWPX hash and mtime remain unchanged
@@ -269,6 +271,28 @@ The gate must verify:
 
 Passing this gate is not an R4 pass. It is only evidence that the remediation
 plan is now executable and that unsupported coverage is no longer silent.
+
+Current remediation audit category output:
+
+- `text_style`
+- `paragraph_layout`
+- `border_style`
+- `page_layout`
+- `numbering_outline`
+- `note_annotation`
+- `application_settings`
+- `metadata_properties`
+- `package_metadata`
+- `table_layout`
+- `embedded_control`
+- `style_catalog`
+- `revision_tracking`
+
+The first implementation priority after this audit is:
+
+1. `paragraph_layout`: align, lineSpacing, margin, tabPr
+2. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
+3. `table_layout`: cellMargin, inMargin, outMargin
 
 ## 7. Pass Criteria for Current Baseline
 

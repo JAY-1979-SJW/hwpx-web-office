@@ -109,8 +109,9 @@ $operationalRuleOk = $serverOutput -match "Operational Completion Rule"
 $remediationAuditOk = $serverOutput -match "PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE"
 $runtimeSmokeOk = $serverOutput -match "PASS_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE"
 $fixtureCorpusOk = $serverOutput -match '"hwpxFileCount":\s*5'
+$unsupportedCategoryOk = $serverOutput -match '"unsupportedCategorySummary"'
 
-if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $structureDriftOk -and $monitorIncludesStructureDriftOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk -and $remediationAuditOk -and $runtimeSmokeOk -and $fixtureCorpusOk)) {
+if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $structureDriftOk -and $monitorIncludesStructureDriftOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk -and $remediationAuditOk -and $runtimeSmokeOk -and $fixtureCorpusOk -and $unsupportedCategoryOk)) {
     throw "server validation output did not contain required pass signals`n$serverOutput"
 }
 
@@ -132,6 +133,7 @@ $payload = [ordered]@{
         serverHwpxReadRemediationAuditOk = $remediationAuditOk
         serverBackendRuntimeSmokeOk = $runtimeSmokeOk
         serverFixtureCorpusOk = $fixtureCorpusOk
+        serverUnsupportedCategorySummaryOk = $unsupportedCategoryOk
         serverMonitorIncludesStructureDriftOk = $monitorIncludesStructureDriftOk
         serverMonitorProcessOk = $monitorProcessOk
         serverMonitorCronOk = $monitorCronOk

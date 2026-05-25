@@ -54,8 +54,10 @@ def test_deploy_verifier_syncs_fixture_corpus_and_runs_read_audit() -> None:
     assert "audit_web_office_hwpx_read_remediation.py --no-write" in text
     assert "PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE" in text
     assert '"hwpxFileCount":\\s*5' in text
+    assert '"unsupportedCategorySummary"' in text
     assert "serverHwpxReadRemediationAuditOk" in text
     assert "serverFixtureCorpusOk" in text
+    assert "serverUnsupportedCategorySummaryOk" in text
 
 
 def test_deploy_verifier_runs_backend_runtime_smoke_on_server() -> None:

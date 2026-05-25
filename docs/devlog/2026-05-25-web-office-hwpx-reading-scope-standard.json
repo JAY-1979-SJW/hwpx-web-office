@@ -12,7 +12,7 @@
     {
       "path": "scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "status": "added",
-      "change": "Added executable remediation audit for fixture manifest, package/XML inventory, unsupported element visibility, read-only payload, and source immutability."
+      "change": "Added executable remediation audit for fixture manifest, package/XML inventory, unsupported element visibility, unsupported category summary, read-only payload, and source immutability."
     },
     {
       "path": "tests/test_web_office_hwpx_read_remediation_audit.py",
@@ -35,6 +35,11 @@
       "change": "Linked the reading scope standard and added the current HWPX read claim boundary."
     },
     {
+      "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+      "status": "updated",
+      "change": "Recorded the current unsupported category output and next implementation priority."
+    },
+    {
       "path": "docs/architecture/web_office_app_structure_20260525.md",
       "status": "updated",
       "change": "Linked the reading scope standard from the app structure overview."
@@ -44,6 +49,7 @@
     "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
     "docs/architecture/web_office_backend_structure_standard_20260525.md",
     "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
     "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
     "scripts/ops/audit_web_office_hwpx_read_remediation.py",
     "tests/test_web_office_hwpx_read_remediation_audit.py",
@@ -79,13 +85,13 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; unsupported XML element families reported; Web Office model extraction and source immutability passed; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; 76 unsupported XML element families grouped into 13 categories; Web Office model extraction and source immutability passed; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_hwpx_read_remediation_audit.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "3 remediation audit tests passed."
+      "evidence": "4 remediation audit tests passed, including unsupported category summary and no unknown_review_required category."
     },
     {
       "command": "python scripts/ops/audit_web_office_ro_view_mvp.py",
@@ -109,7 +115,7 @@
       "command": "powershell -ExecutionPolicy Bypass -File scripts/ops/deploy_web_office_to_server.ps1 -SkipLocalStatusCheck",
       "location": "server haehan-app",
       "result": "PASS",
-      "evidence": "Deployment verifier synced 5 fixture HWPX files and passed server health, structure drift, remediation audit, backend runtime smoke, monitor process, and cron checks."
+      "evidence": "Deployment verifier synced 5 fixture HWPX files and passed server health, structure drift, remediation audit with unsupportedCategorySummary, backend runtime smoke, monitor process, and cron checks."
     }
   ],
   "localVerification": {
