@@ -47,17 +47,37 @@
     {
       "path": "scripts/hwpx/web_office/ro_view_importer.py",
       "status": "updated",
-      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, including autoSpacing, breakSetting, resolved tabPr/tabItem definitions referenced by tabPrIDRef, and inline lineBreak preservation as newline text in paragraph runs."
+      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, inline lineBreak preservation as newline text in paragraph runs, and charPr definition extraction for fontRef, ratio, relSz, bold, underline, and strikeout."
     },
     {
       "path": "scripts/hwpx/web_office/render_payload.py",
       "status": "updated",
-      "change": "Exposed paragraph layout definitions in the render payload under styles.paraPrDefs and exposed read-only cell paragraph payloads so preserved inline lineBreak text reaches the browser payload without changing writer behavior."
+      "change": "Exposed paragraph layout definitions and charPr text-style definitions in the render payload under styles.paraPrDefs and styles.charPrDefs, and exposed read-only cell paragraph payloads so preserved inline lineBreak text reaches the browser payload without changing writer behavior."
+    },
+    {
+      "path": "scripts/hwpx/parser/style_parser.py",
+      "status": "updated",
+      "change": "Extended parse_char_pr_defs to preserve raw fontRef, ratio, relSz, underline, and strikeout child attributes while keeping existing preview booleans."
+    },
+    {
+      "path": "scripts/hwpx/web_office/document_model.py",
+      "status": "updated",
+      "change": "Added styles.charPrDefs to the Web Office document model."
     },
     {
       "path": "tests/test_web_office_para_pr_defs.py",
       "status": "added",
-      "change": "Added regression coverage for align, autoSpacing, breakSetting, lineSpacing, margin, resolved tabPr/tabItem payload, and read-only payload exposure of paraPrDefs."
+      "change": "Added regression coverage for align, autoSpacing, breakSetting, lineSpacing, margin, resolved tabPr/tabItem payload, text-style charPrDefs, and read-only payload exposure of paraPrDefs and charPrDefs."
+    },
+    {
+      "path": "tests/test_web_office_para_edit_applyformat_toolbar_preview.py",
+      "status": "updated",
+      "change": "Updated toolbar preview expectations so styles.charPrDefs may be exposed by default from the document model while explicit char_pr_defs remains supported."
+    },
+    {
+      "path": "scripts/ops/audit_web_office_para_edit_applyformat_toolbar_preview.py",
+      "status": "updated",
+      "change": "Updated toolbar preview audit to use the current Web Office operational baseline and require default styles exposure."
     },
     {
       "path": "tests/test_web_office_ro_view_paragraph.py",
@@ -86,6 +106,7 @@
     "docs/architecture/web_office_app_structure_20260525.md",
     "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
     "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
+    "scripts/hwpx/parser/style_parser.py",
     "scripts/hwpx/web_office/document_model.py",
     "scripts/hwpx/web_office/render_payload.py",
     "scripts/hwpx/web_office/ro_view_importer.py",
@@ -94,8 +115,10 @@
     "scripts/ops/run_hwpx_repo_commit_guard.py",
     "tests/test_hwpx_repo_new_file_classification.py",
     "tests/test_web_office_para_pr_defs.py",
+    "tests/test_web_office_para_edit_applyformat_toolbar_preview.py",
     "tests/test_web_office_ro_view_paragraph.py",
     "tests/test_web_office_hwpx_read_remediation_audit.py",
+    "scripts/ops/audit_web_office_para_edit_applyformat_toolbar_preview.py",
     "scripts/ops/deploy_web_office_to_server.ps1",
     "tests/test_web_office_server_deploy_verifier.py"
   ],
@@ -128,13 +151,19 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs autoSpacing/breakSetting/tabPr/tabItem extraction and inline lineBreak preservation, 63 unsupported XML element families remain grouped into 12 categories; paragraph_layout is no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak preservation, and charPrDefs text-style extraction, 57 unsupported XML element families remain grouped into 12 categories; paragraph_layout is no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "13 tests passed and 12 were skipped; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload, hp:lineBreak is preserved as newline text in read-only paragraph payloads, and existing paragraph/read-remediation contracts remain valid."
+      "evidence": "charPrDefs expose fontRef, ratio, relSz, underline, strikeout, and bold; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload; hp:lineBreak is preserved as newline text in read-only paragraph payloads; existing paragraph/read-remediation contracts remain valid."
+    },
+    {
+      "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_hwpx_read_remediation_audit.py tests/test_web_office_para_edit_applyformat_toolbar_preview.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "17 tests passed and 4 were skipped; text-style charPrDefs and toolbar preview contracts passed with the current baseline."
     },
     {
       "command": "python scripts/ops/gate_hwpx_repo_new_file_classification.py",

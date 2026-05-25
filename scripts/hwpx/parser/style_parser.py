@@ -84,11 +84,18 @@ def parse_char_pr_defs(header_xml: bytes,
             if fr is not None:
                 font_face = fr.get("face", fr.get("hangul", ""))
                 font_name = _resolve_font_name(fr.attrib, font_table)
+        else:
+            fr = el.find(f"{{{NS_HH}}}fontRef")
+        ratio_el = el.find(f"{{{NS_HH}}}ratio")
+        rel_sz_el = el.find(f"{{{NS_HH}}}relSz")
         b_el = el.find(f"{{{NS_HH}}}bold")
         i_el = el.find(f"{{{NS_HH}}}italic")
         u_el = el.find(f"{{{NS_HH}}}underline")
+        s_el = el.find(f"{{{NS_HH}}}strikeout")
         u_type = u_el.get("type", "") if u_el is not None else ""
         underline_on = u_el is not None and u_type.upper() not in ("", "NONE")
+        s_shape = s_el.get("shape", "") if s_el is not None else ""
+        strikeout_on = s_el is not None and s_shape.upper() not in ("", "NONE")
         text_color_raw = el.get("textColor", "")
         result[cid] = {
             "height": height,
@@ -96,9 +103,15 @@ def parse_char_pr_defs(header_xml: bytes,
             "textColor": text_color_raw,
             "fontFace": font_face or None,
             "fontName": font_name,
+            "fontRef": dict(fr.attrib) if fr is not None else {},
+            "ratio": dict(ratio_el.attrib) if ratio_el is not None else {},
+            "relSz": dict(rel_sz_el.attrib) if rel_sz_el is not None else {},
             "bold": b_el is not None,
             "italic": i_el is not None,
             "underline": underline_on,
+            "underlineDef": dict(u_el.attrib) if u_el is not None else {},
+            "strikeout": strikeout_on,
+            "strikeoutDef": dict(s_el.attrib) if s_el is not None else {},
         }
     return result
 

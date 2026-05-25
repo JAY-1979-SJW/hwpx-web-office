@@ -102,3 +102,38 @@ def test_render_payload_exposes_para_pr_defs_read_only():
     assert para_defs == doc.styles.paraPrDefs
     assert payload["editable"] is False
     assert all(block["editable"] is False for block in payload["blocks"])
+
+
+def test_char_pr_defs_extract_text_style_fields():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+
+    assert doc.styles.charPrDefs
+    sample = next(iter(doc.styles.charPrDefs.values()))
+    assert {
+        "fontRef",
+        "ratio",
+        "relSz",
+        "bold",
+        "underline",
+        "underlineDef",
+        "strikeout",
+        "strikeoutDef",
+    } <= set(sample)
+    assert any(item.get("fontRef") for item in doc.styles.charPrDefs.values())
+    assert any(item.get("ratio") for item in doc.styles.charPrDefs.values())
+    assert any(item.get("relSz") for item in doc.styles.charPrDefs.values())
+    assert any("type" in item.get("underlineDef", {})
+               for item in doc.styles.charPrDefs.values())
+    assert any("shape" in item.get("strikeoutDef", {})
+               for item in doc.styles.charPrDefs.values())
+
+
+def test_render_payload_exposes_char_pr_defs_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    char_defs = payload["styles"]["charPrDefs"]
+    assert set(char_defs) == set(doc.styles.charPrDefs)
+    sample = next(iter(char_defs.values()))
+    assert {"fontRef", "ratio", "relSz", "underlineDef", "strikeoutDef"} <= set(sample)
+    assert payload["editable"] is False

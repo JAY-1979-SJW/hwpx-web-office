@@ -305,10 +305,23 @@ Current `paragraph_layout` remediation status:
 - `paragraph_layout` is no longer present in the current unsupported category
   output for the checked-in fixture corpus.
 
-The next implementation priority after this first paragraph layout pass is:
+Current `text_style` remediation status:
 
-1. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
-2. `table_layout`: cellMargin, inMargin, outMargin
+- `fontRef`, `ratio`, `relSz`, `bold`, `underline`, and `strikeout` are
+  extracted from `Contents/header.xml` `charPr` definitions into
+  `documentModel.styles.charPrDefs`.
+- The read-only render payload exposes `styles.charPrDefs` by default, including
+  raw `fontRef`, `ratio`, `relSz`, `underlineDef`, and `strikeoutDef` values
+  plus boolean preview fields.
+- Full text visual fidelity is still not claimed; remaining current-corpus
+  `text_style` unsupported families are `case`, `default`, `fwSpace`,
+  `language`, `offset`, `shadow`, `spacing`, `switch`, and `typeInfo`.
+
+The next implementation priority after the paragraph layout and first text
+style passes is:
+
+1. `table_layout`: cellMargin, inMargin, outMargin
+2. `text_style`: case, default, fwSpace, language, offset, shadow, spacing, switch, typeInfo
 3. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
 
 ## 7. Pass Criteria for Current Baseline

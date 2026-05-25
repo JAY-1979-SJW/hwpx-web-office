@@ -23,6 +23,10 @@ if str(_PR / "scripts/hwpx") not in sys.path:
     sys.path.insert(0, str(_PR / "scripts/hwpx"))
 
 from scripts.hwpx.parser.parser_engine import parse_hwpx_v2  # noqa: E402
+from scripts.hwpx.parser.style_parser import (  # noqa: E402
+    parse_char_pr_defs,
+    parse_font_face_table,
+)
 from hwpx_package import HwpxPackage, local_name  # noqa: E402
 from hwpx_paragraph_ops import (  # noqa: E402
     find_paragraph_in_cell,
@@ -269,6 +273,18 @@ def _read_section_root(
         return None
 
 
+def _read_header_bytes(package: HwpxPackage | None) -> bytes | None:
+    if package is None:
+        return None
+    for entry in ("Contents/header.xml", "Contents\\header.xml"):
+        if entry in package.entries:
+            return package.entries[entry]
+    for name, data in package.entries.items():
+        if name.replace("\\", "/").endswith("Contents/header.xml"):
+            return data
+    return None
+
+
 def _child_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
     for child in list(elem):
         if local_name(child.tag) == wanted:
@@ -365,6 +381,17 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
             "tabItemCount": int(tab_pr.get("tabItemCount", 0)) if tab_pr else 0,
         }
     return defs
+
+
+def _extract_char_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    header_bytes = _read_header_bytes(package)
+    if header_bytes is None:
+        return {}
+    try:
+        return parse_char_pr_defs(
+            header_bytes, parse_font_face_table(header_bytes))
+    except Exception:
+        return {}
 
 
 def import_hwpx_as_ro_view(
@@ -647,11 +674,13 @@ def import_hwpx_as_ro_view(
             placeholder=True))
 
     style_info = parsed.styles
+    char_pr_defs = _extract_char_pr_defs(package)
     para_pr_defs = _extract_para_pr_defs(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
         borderFillCount=len(getattr(style_info, "borderFill", []) or []),
+        charPrDefs=char_pr_defs,
         paraPrDefs=para_pr_defs)
 
     for w in (parsed.warnings or []):

@@ -115,18 +115,26 @@ def build_render_payload(
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-PREVIEW-01:
     # styles.charPrDefs 를 read-only additive 로 노출 (toolbar preview 용).
+    if char_pr_defs is None and doc.styles.charPrDefs:
+        char_pr_defs = doc.styles.charPrDefs
     if char_pr_defs is not None:
         styles_payload["charPrDefs"] = {
             str(cid): {
                 "charPrId": str(cid),
                 "fontName": d.get("fontName"),
                 "fontFace": d.get("fontFace"),
+                "fontRef": d.get("fontRef") or {},
                 "fontSizePt": d.get("fontSizePt"),
                 "height": d.get("height"),
                 "textColor": d.get("textColor") or None,
+                "ratio": d.get("ratio") or {},
+                "relSz": d.get("relSz") or {},
                 "bold": bool(d.get("bold")),
                 "italic": bool(d.get("italic")),
                 "underline": bool(d.get("underline")),
+                "underlineDef": d.get("underlineDef") or {},
+                "strikeout": bool(d.get("strikeout")),
+                "strikeoutDef": d.get("strikeoutDef") or {},
             }
             for cid, d in char_pr_defs.items()
         }

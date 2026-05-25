@@ -22,7 +22,7 @@ if str(PR) not in sys.path:
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 RENDER_PAYLOAD = (PR / "scripts/hwpx/web_office/render_payload.py")
-BASELINE_COMMIT = "619f2e0"  # PARA_INSERT 준공 후 갱신 (dc9e6ad → 1f442ec)
+BASELINE_COMMIT = "3323eda"  # Web Office operational baseline before text-style read expansion.
 
 # dc9e6ad ApplyFormat closeout 의 시공 자재 — 본 공정에서 무수정
 # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01: para_edit_state /
@@ -230,12 +230,13 @@ def _check_dynamic(dyn: dict) -> list[dict]:
             findings.append({"code": "PAYLOAD_KEY_REMOVED",
                               "level": "FAIL",
                               "detail": f"with_defs missing {key}"})
-    # additive 동작 검증
-    if dyn["styles_present_baseline"]:
-        findings.append({"code": "STYLES_NOT_ADDITIVE",
+    # styles are now part of the read model; explicit char_pr_defs remains
+    # supported for older toolbar callers.
+    if not dyn["styles_present_baseline"]:
+        findings.append({"code": "STYLES_NOT_EXPOSED_BY_DEFAULT",
                           "level": "FAIL",
                           "detail":
-                              "char_pr_defs=None 인 경우에도 styles 키 존재"})
+                              "document styles must be present by default"})
     if not dyn["styles_present_with_defs"]:
         findings.append({"code": "STYLES_NOT_EXPOSED",
                           "level": "FAIL",

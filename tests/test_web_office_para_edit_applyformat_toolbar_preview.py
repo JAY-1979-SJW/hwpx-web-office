@@ -27,7 +27,7 @@ from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
 
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "619f2e0"  # PARA_INSERT 준공 후 갱신 (dc9e6ad → 1f442ec)
+BASELINE_COMMIT = "3323eda"  # Web Office operational baseline before text-style read expansion.
 
 
 def _sha(p: Path) -> str:
@@ -60,13 +60,14 @@ need_fx = pytest.mark.skipif(
     FIXTURE is None, reason="fixture missing")
 
 
-# ── 1. payload additive — char_pr_defs=None 시 styles 미출현 ─────
+# ── 1. payload additive — char_pr_defs=None 시 문서 styles 기본 노출 ─────
 
 @need_fx
-def test_payload_baseline_no_styles_when_defs_omitted():
+def test_payload_baseline_exposes_document_style_defs():
     doc = import_hwpx_as_ro_view(FIXTURE)
     payload = build_render_payload(doc)
-    assert "styles" not in payload, payload.keys()
+    assert "styles" in payload, payload.keys()
+    assert payload["styles"].get("charPrDefs")
 
 
 # ── 2. payload additive — char_pr_defs 전달 시 styles.charPrDefs ─
@@ -82,7 +83,10 @@ def test_payload_with_defs_exposes_styles_char_pr_defs():
     sample = next(iter(cpr.values()))
     for field in ("charPrId", "fontName", "fontSizePt",
                               "textColor", "bold", "italic",
-                              "underline", "fontFace", "height"):
+                              "underline", "fontFace", "height",
+                              "fontRef", "ratio", "relSz",
+                              "underlineDef", "strikeout",
+                              "strikeoutDef"):
         assert field in sample, field
 
 
