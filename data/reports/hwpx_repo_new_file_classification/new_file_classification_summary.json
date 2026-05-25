@@ -2,12 +2,22 @@
   "schemaVersion": "hwpx_repo_new_file_classification_gate_v1",
   "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
   "summary": {
-    "newFiles": 0,
+    "newFiles": 1,
     "ignoredFiles": 0,
-    "passedFiles": 0,
+    "passedFiles": 1,
     "failedFiles": 0
   },
-  "newFileResults": [],
+  "newFileResults": [
+    {
+      "safePath": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "category": "REPORT_DOC",
+      "zone": "docs_reports",
+      "separationPlan": "keep_documentation",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    }
+  ],
   "ignoredSafePaths": [],
   "failures": [],
   "security": {

@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "safePath": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "category": "REPORT_DOC",
+    "zone": "docs_reports",
+    "separationPlan": "keep_documentation",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  }
+]
