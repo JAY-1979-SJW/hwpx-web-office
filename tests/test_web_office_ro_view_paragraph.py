@@ -229,6 +229,32 @@ def test_line_break_is_preserved_as_inline_newline():
                for p in payload_cell_paragraphs + payload_block_paragraphs)
 
 
+def test_fw_space_is_preserved_with_tail_text():
+    f = PR / "tests" / "fixtures" / "hwpx" / "corpus" / "fx_many_tables_page_marker.hwpx"
+    if not f.is_file():
+        pytest.skip("fwSpace fixture missing")
+    doc = import_hwpx_as_ro_view(f)
+    payload = build_render_payload(doc)
+
+    assert any("경유  [ ]기타" in p.text for p in doc.paragraphs)
+
+    payload_cell_paragraphs = [
+        paragraph
+        for table in payload.get("tables", [])
+        for cell in table.get("cells", [])
+        for paragraph in cell.get("paragraphs", [])
+    ]
+    payload_block_paragraphs = [
+        block["paragraph"]
+        for block in payload.get("blocks", [])
+        if block.get("type") == "paragraph" and "paragraph" in block
+    ]
+    assert any(
+        "경유  [ ]기타" in p.get("text", "")
+        for p in payload_cell_paragraphs + payload_block_paragraphs
+    )
+
+
 @NEED3
 def test_paragraph_edit_plan_validate_pass_with_ro_view_paragraph():
     f = FIXTURES[0]

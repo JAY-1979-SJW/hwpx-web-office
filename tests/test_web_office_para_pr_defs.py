@@ -147,6 +147,19 @@ def test_render_payload_exposes_char_pr_defs_read_only():
     assert payload["editable"] is False
 
 
+def test_font_face_defs_extract_type_info():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert doc.styles.fontFaceDefs
+    assert any(
+        font.get("typeInfo")
+        for fonts_by_id in doc.styles.fontFaceDefs.values()
+        for font in fonts_by_id.values()
+    )
+    assert payload["styles"]["fontFaceDefs"] == doc.styles.fontFaceDefs
+
+
 def test_table_and_cell_margin_fields_are_extracted():
     doc = import_hwpx_as_ro_view(FIXTURE)
 

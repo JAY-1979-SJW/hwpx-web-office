@@ -116,6 +116,8 @@ def build_render_payload(
     styles_payload: dict[str, Any] = {}
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
+    if doc.styles.fontFaceDefs:
+        styles_payload["fontFaceDefs"] = doc.styles.fontFaceDefs
     # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-PREVIEW-01:
     # styles.charPrDefs 를 read-only additive 로 노출 (toolbar preview 용).
     if char_pr_defs is None and doc.styles.charPrDefs:

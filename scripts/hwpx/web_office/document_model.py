@@ -86,6 +86,7 @@ class WebOfficeStyles:
     borderFillCount: int = 0
     charPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     paraPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    fontFaceDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

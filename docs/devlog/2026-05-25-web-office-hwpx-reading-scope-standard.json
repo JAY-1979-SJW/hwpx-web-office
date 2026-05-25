@@ -151,13 +151,13 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak preservation, charPrDefs text-style extraction including spacing/shadow, and table/cell margin extraction, 52 unsupported XML element families remain grouped into 11 categories; paragraph_layout and table_layout are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak/fwSpace preservation, charPrDefs text-style extraction including spacing/shadow, fontFaceDefs typeInfo extraction, and table/cell margin extraction, 50 unsupported XML element families remain grouped into 11 categories; paragraph_layout and table_layout are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "charPrDefs expose fontRef, ratio, spacing, relSz, offset, underline, strikeout, shadow, and bold; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload; table/cell margins expose inMargin, outMargin, and cellMargin; hp:lineBreak is preserved as newline text in read-only paragraph payloads; existing paragraph/read-remediation contracts remain valid."
+      "evidence": "charPrDefs expose fontRef, ratio, spacing, relSz, offset, underline, strikeout, shadow, and bold; fontFaceDefs expose font typeInfo; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload; table/cell margins expose inMargin, outMargin, and cellMargin; hp:lineBreak is preserved as newline text and hp:fwSpace as fixed-space text in read-only paragraph payloads; existing paragraph/read-remediation contracts remain valid."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_hwpx_read_remediation_audit.py tests/test_web_office_para_edit_applyformat_toolbar_preview.py",

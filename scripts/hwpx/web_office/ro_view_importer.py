@@ -25,6 +25,7 @@ if str(_PR / "scripts/hwpx") not in sys.path:
 from scripts.hwpx.parser.parser_engine import parse_hwpx_v2  # noqa: E402
 from scripts.hwpx.parser.style_parser import (  # noqa: E402
     parse_char_pr_defs,
+    parse_font_face_defs,
     parse_font_face_table,
 )
 from hwpx_package import HwpxPackage, local_name  # noqa: E402
@@ -83,21 +84,32 @@ def _stable_run_id(paragraph_id: str, run_index: int) -> str:
 
 # ── XML 직접 파싱 helper (read-only) ────────────────────────────────
 
+def _inline_text_content(elem: ET.Element) -> str:
+    local = local_name(elem.tag).lower()
+    if local == "linebreak":
+        parts = ["\n"]
+    elif local == "fwspace":
+        parts = [" "]
+    else:
+        parts = [elem.text or ""]
+    for child in list(elem):
+        parts.append(_inline_text_content(child))
+        parts.append(child.tail or "")
+    return "".join(parts)
+
+
 def _run_text_concat(run_elem: ET.Element) -> str:
-    """run inline text in document order, preserving hp:lineBreak as newline."""
+    """run inline text in document order, preserving line/fixed spaces."""
     parts: list[str] = []
-    for e in run_elem.iter():
-        local = local_name(e.tag).lower()
-        if local == "t":
-            parts.append(e.text or "")
-        elif local == "linebreak":
-            parts.append("\n")
+    for child in list(run_elem):
+        parts.append(_inline_text_content(child))
+        parts.append(child.tail or "")
     return "".join(parts)
 
 
 def _has_readable_inline_text(elem: ET.Element) -> bool:
     for e in elem.iter():
-        if local_name(e.tag).lower() in {"t", "linebreak"}:
+        if local_name(e.tag).lower() in {"t", "linebreak", "fwspace"}:
             return True
     return False
 
@@ -419,6 +431,16 @@ def _extract_char_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         return {}
 
 
+def _extract_font_face_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    header_bytes = _read_header_bytes(package)
+    if header_bytes is None:
+        return {}
+    try:
+        return parse_font_face_defs(header_bytes)
+    except Exception:
+        return {}
+
+
 def import_hwpx_as_ro_view(
     source_hwpx: Path
 ) -> WebOfficeDocumentModel:
@@ -712,12 +734,14 @@ def import_hwpx_as_ro_view(
     style_info = parsed.styles
     char_pr_defs = _extract_char_pr_defs(package)
     para_pr_defs = _extract_para_pr_defs(package)
+    font_face_defs = _extract_font_face_defs(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
         borderFillCount=len(getattr(style_info, "borderFill", []) or []),
         charPrDefs=char_pr_defs,
-        paraPrDefs=para_pr_defs)
+        paraPrDefs=para_pr_defs,
+        fontFaceDefs=font_face_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

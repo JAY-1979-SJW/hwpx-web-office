@@ -54,6 +54,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "fontfaces",
     "fontface",
     "font",
+    "typeInfo",
     "styles",
     "charPr",
     "paraPr",
@@ -98,6 +99,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "linesegarray",
     "lineseg",
     "lineBreak",
+    "fwSpace",
 }
 
 IGNORED_BY_POLICY_XML_LOCALS = {
@@ -241,7 +243,7 @@ UNSUPPORTED_CATEGORY_META = {
     },
     "text_style": {
         "claimImpact": "Font/text visual fidelity is incomplete.",
-        "nextAction": "Prioritize remaining case/default/switch compatibility handling, fwSpace, language, offset, and typeInfo mapping.",
+        "nextAction": "Prioritize remaining case/default/switch compatibility handling, language, and offset mapping.",
     },
 }
 

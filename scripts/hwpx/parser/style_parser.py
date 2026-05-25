@@ -41,6 +41,33 @@ def parse_font_face_table(header_xml: bytes) -> dict[str, dict[str, str]]:
     return result
 
 
+def parse_font_face_defs(header_xml: bytes) -> dict[str, dict[str, dict]]:
+    """Return header fontface definitions with optional typeInfo attributes."""
+    try:
+        root = ET.fromstring(header_xml)
+    except ET.ParseError:
+        return {}
+    result: dict[str, dict[str, dict]] = {}
+    for ff in root.iter(f"{{{NS_HH}}}fontface"):
+        lang = (ff.get("lang", "") or "").upper()
+        if not lang:
+            continue
+        bucket: dict[str, dict] = result.setdefault(lang, {})
+        for font in ff.findall(f"{{{NS_HH}}}font"):
+            fid = font.get("id", "")
+            if not fid:
+                continue
+            type_info = font.find(f"{{{NS_HH}}}typeInfo")
+            bucket[fid] = {
+                "id": fid,
+                "face": font.get("face", "") or font.get("name", ""),
+                "type": font.get("type", ""),
+                "isEmbedded": font.get("isEmbedded", ""),
+                "typeInfo": dict(type_info.attrib) if type_info is not None else {},
+            }
+    return result
+
+
 def _resolve_font_name(fr_attribs: dict, font_table: dict[str, dict[str, str]]) -> str | None:
     """fontRef attr 딕셔너리에서 hangul → latin 순서로 실제 폰트명 lookup."""
     if not font_table:
