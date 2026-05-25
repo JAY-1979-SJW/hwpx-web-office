@@ -21,6 +21,10 @@ PASS_STATUS = "Backend save apply completed."
 LOAD_FAIL_STATUS = "hwpx editor load failed: load rejected"
 SAVE_FAIL_STATUS = "cell save apply failed: save rejected"
 SAVE_BLOCKED_STATUS = "Save was blocked by backend validation."
+VIEWPORTS = {
+    "desktop": {"width": 1366, "height": 900},
+    "mobile": {"width": 390, "height": 844},
+}
 RAW_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
 RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
 PII_RE = re.compile(
@@ -53,6 +57,15 @@ def _wait_health(base_url: str, proc: subprocess.Popen[str]) -> None:
 
 def _has_leak(text: str) -> bool:
     return bool(RAW_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+
+
+def _overlap(a: dict[str, float], b: dict[str, float]) -> bool:
+    return not (
+        a["x"] + a["width"] <= b["x"]
+        or b["x"] + b["width"] <= a["x"]
+        or a["y"] + a["height"] <= b["y"]
+        or b["y"] + b["height"] <= a["y"]
+    )
 
 
 def _start_editor_server(
@@ -295,6 +308,84 @@ def editor_failure_state_result(tmp_path_factory: pytest.TempPathFactory) -> dic
     return result
 
 
+@pytest.fixture(scope="session")
+def editor_visual_smoke_result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # pragma: no cover - environment failure path
+        pytest.fail(f"playwright import failed: {exc}")
+
+    proc, log_handle, base_url = _start_editor_server(tmp_path_factory)
+    result: dict[str, Any] = {
+        "pageErrors": [],
+        "failedRequests": [],
+        "viewports": {},
+    }
+
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            for name, viewport in VIEWPORTS.items():
+                page = browser.new_page(viewport=viewport)
+                page.on("pageerror", lambda exc: result["pageErrors"].append(str(exc)))
+                page.on("requestfailed", lambda req: result["failedRequests"].append(req.url))
+                page.goto(f"{base_url}{URL_PATH}", wait_until="networkidle")
+                page.get_by_role("button", name="Load sample").click()
+                page.wait_for_selector("[data-cell-id]", state="visible", timeout=30000)
+
+                appbar = page.locator(".wo-appbar").bounding_box()
+                status = page.locator("[data-role='status']").bounding_box()
+                document = page.locator("[data-role='cell-list']").bounding_box()
+                inspector = page.locator(".wo-inspector").bounding_box()
+                first_cell = page.locator("[data-cell-id]").nth(0)
+                first_cell_box = first_cell.bounding_box()
+                screenshot = page.screenshot(full_page=False)
+                body_text = page.locator("body").inner_text()
+                required_visible = {
+                    "title": page.get_by_text("HWPX Web Office").first.is_visible(),
+                    "load": page.get_by_role("button", name="Load sample").is_visible(),
+                    "save": page.get_by_role("button", name="Save apply").is_visible(),
+                    "status": page.locator("[data-role='status']").is_visible(),
+                    "document": page.locator("[data-role='cell-list']").is_visible(),
+                    "inspector": page.locator(".wo-inspector").is_visible(),
+                    "firstCell": first_cell.is_visible(),
+                }
+                boxes_present = all(box is not None for box in (appbar, status, document, inspector, first_cell_box))
+                layout_ok = False
+                if boxes_present:
+                    if name == "desktop":
+                        layout_ok = (
+                            status["y"] >= appbar["y"] + appbar["height"]
+                            and document["y"] >= status["y"] + status["height"]
+                            and inspector["y"] >= status["y"] + status["height"]
+                            and not _overlap(document, inspector)
+                            and first_cell_box["width"] > 40
+                            and first_cell_box["height"] > 40
+                        )
+                    else:
+                        layout_ok = (
+                            status["y"] >= appbar["y"] + appbar["height"]
+                            and document["y"] >= status["y"] + status["height"]
+                            and inspector["y"] >= document["y"] + document["height"]
+                            and not _overlap(document, inspector)
+                            and first_cell_box["width"] > 40
+                            and first_cell_box["height"] > 40
+                        )
+                result["viewports"][name] = {
+                    "requiredVisible": required_visible,
+                    "boxesPresent": boxes_present,
+                    "layoutOk": layout_ok,
+                    "nonBlankScreenshot": len(set(screenshot[:2048])) > 1,
+                    "domLeak": _has_leak(body_text),
+                }
+                page.close()
+            browser.close()
+    finally:
+        _stop_editor_server(proc, log_handle)
+
+    return result
+
+
 def test_editor_browser_smoke_load_edit_save(editor_browser_smoke_result: dict[str, Any]) -> None:
     observed = editor_browser_smoke_result["observed"]
     assert observed["url"].endswith(URL_PATH)
@@ -339,3 +430,18 @@ def test_editor_failure_states_are_not_success(editor_failure_state_result: dict
 
 def test_editor_failure_states_have_no_runtime_errors(editor_failure_state_result: dict[str, Any]) -> None:
     assert editor_failure_state_result["pageErrors"] == []
+
+
+def test_editor_visual_smoke_desktop_and_mobile(editor_visual_smoke_result: dict[str, Any]) -> None:
+    assert set(editor_visual_smoke_result["viewports"]) == {"desktop", "mobile"}
+    for item in editor_visual_smoke_result["viewports"].values():
+        assert all(item["requiredVisible"].values())
+        assert item["boxesPresent"] is True
+        assert item["layoutOk"] is True
+        assert item["nonBlankScreenshot"] is True
+        assert item["domLeak"] is False
+
+
+def test_editor_visual_smoke_has_no_runtime_errors(editor_visual_smoke_result: dict[str, Any]) -> None:
+    assert editor_visual_smoke_result["pageErrors"] == []
+    assert editor_visual_smoke_result["failedRequests"] == []
