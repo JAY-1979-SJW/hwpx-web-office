@@ -2,26 +2,17 @@
   "schemaVersion": "hwpx_repo_new_file_classification_gate_v1",
   "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
   "summary": {
-    "newFiles": 2,
+    "newFiles": 1,
     "ignoredFiles": 0,
-    "passedFiles": 2,
+    "passedFiles": 1,
     "failedFiles": 0
   },
   "newFileResults": [
     {
-      "safePath": "scripts/ops/start_web_office_server_monitor.ps1",
-      "category": "LEGACY_EXPERIMENT",
-      "zone": "unassigned",
-      "separationPlan": "review_legacy_ops",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "scripts/ops/stop_web_office_server_monitor.ps1",
-      "category": "LEGACY_EXPERIMENT",
-      "zone": "unassigned",
-      "separationPlan": "review_legacy_ops",
+      "safePath": "scripts/ops/install_web_office_server_monitor_cron.py",
+      "category": "AUDIT_GATE",
+      "zone": "closeout_security",
+      "separationPlan": "keep_gate_audit",
       "moduleDeclared": false,
       "status": "PASS",
       "failures": []
