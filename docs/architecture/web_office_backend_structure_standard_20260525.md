@@ -191,7 +191,7 @@ The minimum server check is:
 
 ```bash
 cd /home/ubuntu/apps/hwpx-web-office
-python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767
+python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift
 pgrep -af 'verify_web_office_server_monitor.py.*--interval'
 crontab -l | grep hwpx-web-office-monitor
 ```
@@ -218,6 +218,7 @@ The implementation passes this standard when:
 - server response keeps `mode == SANDBOX_ONLY`
 - server response keeps `sourceMutationAllowed == false`
 - server monitor process or `@reboot` auto-start registration is present
+- server monitor can include app structure drift audit and reports it as pass
 - operational report artifact is written with validation command results,
   server verification result, unresolved items, and final status
 

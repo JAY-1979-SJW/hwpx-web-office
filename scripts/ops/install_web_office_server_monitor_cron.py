@@ -36,24 +36,35 @@ def _install(lines: list[str]) -> None:
     )
 
 
-def build_reboot_line(project_root: Path, port: int, interval: int) -> str:
+def build_reboot_line(
+    project_root: Path,
+    port: int,
+    interval: int,
+    include_structure_drift: bool = True,
+) -> str:
     monitor_log = "data/audit/web_office_server_monitor/web_office_server_monitor.log"
     monitor_err = "data/audit/web_office_server_monitor/web_office_server_monitor.err.log"
+    drift_arg = " --include-structure-drift" if include_structure_drift else ""
     return (
         "@reboot /usr/bin/flock -n /tmp/hwpx_web_office_monitor.lock "
         "bash -lc "
         f"'cd {project_root} && "
         "mkdir -p data/audit/web_office_server_monitor && "
         "python3 scripts/ops/verify_web_office_server_monitor.py "
-        f"--interval {interval} --port {port} "
+        f"--interval {interval} --port {port}{drift_arg} "
         f">> {monitor_log} 2>> {monitor_err}' "
         f"# {MARKER}"
     )
 
 
-def install(project_root: Path, port: int, interval: int) -> dict:
+def install(
+    project_root: Path,
+    port: int,
+    interval: int,
+    include_structure_drift: bool = True,
+) -> dict:
     project_root = project_root.resolve()
-    line = build_reboot_line(project_root, port, interval)
+    line = build_reboot_line(project_root, port, interval, include_structure_drift)
     existing = [
         item for item in _current_crontab()
         if MARKER not in item
@@ -67,6 +78,7 @@ def install(project_root: Path, port: int, interval: int) -> dict:
         "projectRoot": str(project_root),
         "port": port,
         "interval": interval,
+        "includeStructureDrift": include_structure_drift,
         "line": line,
     }
 
@@ -76,9 +88,17 @@ def main() -> int:
     parser.add_argument("--project-root", default=str(ROOT))
     parser.add_argument("--port", type=int, default=8767)
     parser.add_argument("--interval", type=int, default=30)
+    parser.add_argument("--no-structure-drift", dest="include_structure_drift",
+                        action="store_false")
+    parser.set_defaults(include_structure_drift=True)
     args = parser.parse_args()
     import json
-    payload = install(Path(args.project_root), args.port, args.interval)
+    payload = install(
+        Path(args.project_root),
+        args.port,
+        args.interval,
+        args.include_structure_drift,
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

@@ -66,8 +66,10 @@ set -e
 mkdir -p "$ServerPath"
 tar -xf "$RemoteArchive" -C "$ServerPath"
 cd "$ServerPath"
-python3 -m py_compile scripts/ops/verify_web_office_server_monitor.py scripts/ops/install_web_office_server_monitor_cron.py
-python3 scripts/ops/verify_web_office_server_monitor.py --once --port $Port
+python3 -m py_compile scripts/ops/verify_web_office_server_monitor.py scripts/ops/install_web_office_server_monitor_cron.py scripts/ops/audit_web_office_app_structure_drift.py
+python3 scripts/ops/install_web_office_server_monitor_cron.py --port $Port --interval 30
+python3 scripts/ops/verify_web_office_server_monitor.py --once --port $Port --include-structure-drift
+python3 scripts/ops/audit_web_office_app_structure_drift.py
 pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval' | grep -v 'bash -lc' >/tmp/hwpx-web-office-monitor-process.txt
 crontab -l | grep 'hwpx-web-office-monitor' >/tmp/hwpx-web-office-monitor-cron.txt
 cat /tmp/hwpx-web-office-monitor-process.txt
@@ -82,12 +84,14 @@ $serverOutput = $serverResult.stdout
 $healthOk = $serverOutput -match '"verdict":\s*"(HEALTHY|RECOVERED)"'
 $sandboxOk = $serverOutput -match '"sandboxMode":\s*true'
 $mutationOk = $serverOutput -match '"sourceMutationBlocked":\s*true'
+$structureDriftOk = $serverOutput -match '"verdict":\s*"PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"'
+$monitorIncludesStructureDriftOk = $serverOutput -match "--include-structure-drift"
 $monitorProcessOk = $serverOutput -match "python3 scripts/ops/verify_web_office_server_monitor.py --interval"
 $monitorCronOk = $serverOutput -match "hwpx-web-office-monitor"
 $ruleOk = $serverOutput -match "RULE-13"
 $operationalRuleOk = $serverOutput -match "Operational Completion Rule"
 
-if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk)) {
+if (-not ($healthOk -and $sandboxOk -and $mutationOk -and $structureDriftOk -and $monitorIncludesStructureDriftOk -and $monitorProcessOk -and $monitorCronOk -and $ruleOk -and $operationalRuleOk)) {
     throw "server validation output did not contain required pass signals`n$serverOutput"
 }
 
@@ -104,6 +108,8 @@ $payload = [ordered]@{
         serverHealthOk = $healthOk
         serverSandboxModeOk = $sandboxOk
         serverMutationBlockedOk = $mutationOk
+        serverStructureDriftOk = $structureDriftOk
+        serverMonitorIncludesStructureDriftOk = $monitorIncludesStructureDriftOk
         serverMonitorProcessOk = $monitorProcessOk
         serverMonitorCronOk = $monitorCronOk
         serverOperatingRulePresent = $ruleOk

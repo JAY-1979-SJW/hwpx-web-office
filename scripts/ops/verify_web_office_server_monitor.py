@@ -30,6 +30,7 @@ DEFAULT_PORT = 8767
 SCHEMA_VERSION = "web_office_server_monitor_v1"
 PASS_HEALTHY = "HEALTHY"
 PASS_RECOVERED = "RECOVERED"
+FAIL_STRUCTURE_DRIFT = "STRUCTURE_DRIFT_DETECTED"
 FAIL_DOWN = "DOWN"
 FAIL_BLOCKED = "BLOCKED_PORT_LISTENING"
 FAIL_START_TIMEOUT = "START_TIMEOUT"
@@ -136,18 +137,68 @@ def _start_server(
     }
 
 
+def _check_structure_drift(project_root: Path) -> dict[str, Any]:
+    script = project_root / "scripts" / "ops" / "audit_web_office_app_structure_drift.py"
+    if not script.is_file():
+        return {
+            "ok": False,
+            "verdict": "AUDIT_SCRIPT_MISSING",
+            "error": str(script),
+            "payload": None,
+        }
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    payload: dict[str, Any] | None = None
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        payload = None
+    verdict = (payload or {}).get("verdict") or "STRUCTURE_DRIFT_AUDIT_FAILED"
+    return {
+        "ok": result.returncode == 0 and verdict == "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT",
+        "verdict": verdict,
+        "exitCode": result.returncode,
+        "payload": payload,
+        "stderr": result.stderr.strip(),
+    }
+
+
+def _attach_structure_drift(
+    payload: dict[str, Any],
+    *,
+    project_root: Path,
+    include_structure_drift: bool,
+) -> dict[str, Any]:
+    if not include_structure_drift:
+        return payload
+    structure_drift = _check_structure_drift(project_root)
+    payload["structureDrift"] = structure_drift
+    if (
+        payload.get("verdict") in {PASS_HEALTHY, PASS_RECOVERED}
+        and not structure_drift["ok"]
+    ):
+        payload["verdict"] = FAIL_STRUCTURE_DRIFT
+    return payload
+
+
 def check_and_recover(args: argparse.Namespace) -> dict[str, Any]:
     project_root = Path(args.project_root).resolve()
     health = _check_health(args.host, args.port, args.timeout)
     if health["ok"]:
-        return {
+        return _attach_structure_drift({
             "schemaVersion": SCHEMA_VERSION,
             "verdict": PASS_HEALTHY,
             "host": args.host,
             "port": args.port,
             "health": health,
             "recovery": None,
-        }
+        }, project_root=project_root, include_structure_drift=args.include_structure_drift)
 
     listening = _port_listening(args.host, args.port)
     if not args.recover:
@@ -186,14 +237,14 @@ def check_and_recover(args: argparse.Namespace) -> dict[str, Any]:
         time.sleep(args.poll_delay)
         recovered_health = _check_health(args.host, args.port, args.timeout)
         if recovered_health["ok"]:
-            return {
+            return _attach_structure_drift({
                 "schemaVersion": SCHEMA_VERSION,
                 "verdict": PASS_RECOVERED,
                 "host": args.host,
                 "port": args.port,
                 "health": recovered_health,
                 "recovery": {"attempted": True, **recovery},
-            }
+            }, project_root=project_root, include_structure_drift=args.include_structure_drift)
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -219,6 +270,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-checks", type=int, default=0,
                         help="0 means run until interrupted.")
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--include-structure-drift", action="store_true",
+                        help="Also run the app structure drift audit on healthy checks.")
     parser.add_argument("--no-recover", dest="recover", action="store_false")
     parser.set_defaults(recover=True)
     return parser

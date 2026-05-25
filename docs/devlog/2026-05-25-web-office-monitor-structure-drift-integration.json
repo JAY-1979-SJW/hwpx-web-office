@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-MONITOR-STRUCTURE-DRIFT-INTEGRATION",
+  "baselineHead": "5514da7",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_app_structure_20260525.md",
+      "updated": true,
+      "change": "Recorded structure drift monitoring in runtime monitor validation."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "updated": true,
+      "change": "Updated server monitor check to include structure drift audit."
+    }
+  ],
+  "changedFiles": [
+    "scripts/ops/verify_web_office_server_monitor.py",
+    "scripts/ops/install_web_office_server_monitor_cron.py",
+    "scripts/ops/start_web_office_server_monitor.ps1",
+    "scripts/ops/deploy_web_office_to_server.ps1",
+    "scripts/ops/classify_hwpx_repo_inventory.py",
+    "tests/test_web_office_monitor_structure_drift.py",
+    "tests/test_web_office_server_deploy_verifier.py",
+    "docs/architecture/web_office_app_structure_20260525.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/devlog/2026-05-25-web-office-monitor-structure-drift-integration.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python scripts\\ops\\verify_web_office_server_monitor.py --once --port 8767 --no-recover --include-structure-drift",
+      "result": "HEALTHY with PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_monitor_structure_drift.py tests\\test_web_office_app_structure_drift.py tests\\test_web_office_server_deploy_verifier.py -q",
+      "result": "14 passed"
+    },
+    {
+      "command": "python -m json.tool docs\\devlog\\2026-05-25-web-office-monitor-structure-drift-integration.json",
+      "result": "PASS"
+    },
+    {
+      "command": "python scripts\\ops\\audit_web_office_app_structure_drift.py",
+      "result": "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT"
+    },
+    {
+      "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
+      "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    },
+    {
+      "command": "python -m pytest tests\\test_web_office_monitor_structure_drift.py tests\\test_hwpx_repo_guard_hooks.py -q",
+      "result": "13 passed"
+    }
+  ],
+  "localVerification": {
+    "status": "PASS",
+    "summary": "Runtime monitor includes structure drift audit, drift audit passes, tests pass, and report JSON is valid."
+  },
+  "serverVerification": {
+    "required": true,
+    "status": "PENDING",
+    "reason": "Runtime monitor and deployment verification changed; server verification is required."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-monitor-structure-drift-integration.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "Structure drift failures are logged as STRUCTURE_DRIFT_DETECTED and are not auto-recovered by restarting the server."
+  ],
+  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+}

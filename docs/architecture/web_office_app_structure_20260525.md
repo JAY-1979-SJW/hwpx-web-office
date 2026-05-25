@@ -71,7 +71,7 @@ Backend edit/save pipelines
 
 Operational verification
   scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
-  scripts/ops/verify_web_office_server_monitor.py
+  scripts/ops/verify_web_office_server_monitor.py --include-structure-drift
   scripts/ops/deploy_web_office_to_server.ps1
   scripts/ops/audit_web_office_app_structure_drift.py
 ```
@@ -226,7 +226,7 @@ Minimum direct server check:
 
 ```bash
 cd /home/ubuntu/apps/hwpx-web-office
-python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767
+python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767 --include-structure-drift
 pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval'
 crontab -l | grep hwpx-web-office-monitor
 ```
@@ -241,6 +241,7 @@ The app structure is valid when:
 - public save responses hide `outputPath`
 - browser bridges use fixed backend endpoints
 - app structure drift audit passes
+- runtime monitor includes structure drift when requested
 - backend runtime smoke passes
 - frontend/backend wire smoke passes
 - server deploy verification passes

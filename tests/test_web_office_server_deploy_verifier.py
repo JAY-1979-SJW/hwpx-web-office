@@ -29,12 +29,22 @@ def test_deploy_verifier_uses_server_as_final_authority() -> None:
 
 def test_deploy_verifier_requires_monitor_process_and_cron() -> None:
     text = _script_text()
+    assert "install_web_office_server_monitor_cron.py --port" in text
+    assert "--include-structure-drift" in text
     assert "pgrep -af 'python3 scripts/ops/verify_web_office_server_monitor.py --interval'" in text
     assert "serverMonitorProcessOk" in text
     assert "serverMonitorCronOk" in text
+    assert "serverMonitorIncludesStructureDriftOk" in text
     assert "hwpx-web-office-monitor" in text
     assert "monitorProcessOk" in text
     assert "monitorCronOk" in text
+
+
+def test_deploy_verifier_requires_structure_drift_audit() -> None:
+    text = _script_text()
+    assert "audit_web_office_app_structure_drift.py" in text
+    assert "PASS_WEB_OFFICE_APP_STRUCTURE_DRIFT_AUDIT" in text
+    assert "serverStructureDriftOk" in text
 
 
 def test_deploy_verifier_requires_operating_rule_documents() -> None:

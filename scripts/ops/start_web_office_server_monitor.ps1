@@ -1,7 +1,8 @@
 param(
     [int]$Port = 8767,
     [int]$IntervalSeconds = 30,
-    [string]$HostName = "127.0.0.1"
+    [string]$HostName = "127.0.0.1",
+    [switch]$SkipStructureDrift
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,6 +44,9 @@ $ArgsList = @(
     "--interval", "$IntervalSeconds",
     "--project-root", "`"$ProjectRoot`""
 )
+if (-not $SkipStructureDrift) {
+    $ArgsList += "--include-structure-drift"
+}
 
 $Process = Start-Process -FilePath "python" `
     -ArgumentList $ArgsList `
@@ -60,6 +64,7 @@ $payload = [ordered]@{
     pid = $Process.Id
     port = $Port
     intervalSeconds = $IntervalSeconds
+    includeStructureDrift = -not $SkipStructureDrift
     pidFile = "data/audit/web_office_server_monitor/web_office_server_monitor.pid"
     logFile = "data/audit/web_office_server_monitor/web_office_server_monitor.log"
     errorLogFile = "data/audit/web_office_server_monitor/web_office_server_monitor.err.log"
