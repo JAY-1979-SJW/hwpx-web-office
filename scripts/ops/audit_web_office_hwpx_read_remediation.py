@@ -69,6 +69,8 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "next",
     "prev",
     "right",
+    "tabItem",
+    "tabPr",
     "sec",
     "p",
     "run",
@@ -209,7 +211,7 @@ UNSUPPORTED_CATEGORY_META = {
     },
     "paragraph_layout": {
         "claimImpact": "Paragraph spacing, margin, alignment, tab, and break fidelity is incomplete.",
-        "nextAction": "Complete tabPr/tabItem semantics, breakSetting, autoSpacing, and lineBreak mapping into render payload.",
+        "nextAction": "Complete breakSetting, autoSpacing, and lineBreak mapping into render payload.",
     },
     "revision_tracking": {
         "claimImpact": "Revision tracking state is not represented.",

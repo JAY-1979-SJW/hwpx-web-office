@@ -284,6 +284,29 @@ def _descendant_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
     return None
 
 
+def _extract_tab_pr_defs(header: ET.Element) -> dict[str, dict[str, Any]]:
+    defs: dict[str, dict[str, Any]] = {}
+    for tab_pr in header.iter():
+        if local_name(tab_pr.tag) != "tabPr":
+            continue
+        tab_pr_id = tab_pr.attrib.get("id")
+        if tab_pr_id is None:
+            continue
+        tab_items = [
+            dict(item.attrib)
+            for item in tab_pr.iter()
+            if item is not tab_pr and local_name(item.tag) == "tabItem"
+        ]
+        defs[str(tab_pr_id)] = {
+            "tabPrId": str(tab_pr_id),
+            "autoTabLeft": tab_pr.attrib.get("autoTabLeft"),
+            "autoTabRight": tab_pr.attrib.get("autoTabRight"),
+            "tabItems": tab_items,
+            "tabItemCount": len(tab_items),
+        }
+    return defs
+
+
 def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
     if package is None or "Contents/header.xml" not in package.entries:
         return {}
@@ -292,6 +315,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
     except Exception:
         return {}
 
+    tab_pr_defs = _extract_tab_pr_defs(header)
     defs: dict[str, dict[str, Any]] = {}
     for para_pr in header.iter():
         if local_name(para_pr.tag) != "paraPr":
@@ -300,6 +324,8 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         if para_pr_id is None:
             continue
 
+        tab_pr_id = para_pr.attrib.get("tabPrIDRef")
+        tab_pr = tab_pr_defs.get(str(tab_pr_id)) if tab_pr_id is not None else None
         align = _descendant_by_local(para_pr, "align")
         line_spacing = _descendant_by_local(para_pr, "lineSpacing")
         margin = _descendant_by_local(para_pr, "margin")
@@ -315,17 +341,15 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
 
         defs[str(para_pr_id)] = {
             "paraPrId": str(para_pr_id),
-            "tabPrIDRef": para_pr.attrib.get("tabPrIDRef"),
+            "tabPrIDRef": tab_pr_id,
             "align": dict(align.attrib) if align is not None else {},
             "lineSpacing": (
                 dict(line_spacing.attrib) if line_spacing is not None else {}
             ),
             "margin": margin_payload,
-            "tabItemCount": sum(
-                1
-                for tab_pr in _children_by_local(para_pr, "tabPr")
-                for _ in _children_by_local(tab_pr, "tabItem")
-            ),
+            "tabPr": tab_pr or {},
+            "tabItems": list(tab_pr.get("tabItems", [])) if tab_pr else [],
+            "tabItemCount": int(tab_pr.get("tabItemCount", 0)) if tab_pr else 0,
         }
     return defs
 

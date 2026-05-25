@@ -294,13 +294,14 @@ Current `paragraph_layout` remediation status:
   `paraPr` definitions into the read-only render payload as `styles.paraPrDefs`.
 - margin child values `intent`, `left`, `right`, `prev`, and `next` are exposed
   with their raw HWPX `value` and `relative` attributes.
-- `tabPrIDRef` and `tabItemCount` are exposed for inventory only. Full tab stop
-  semantics are not yet claimed.
+- `tabPrIDRef`, resolved `tabPr` auto-tab flags, `tabItems`, and
+  `tabItemCount` are exposed from the referenced tab stop definition.
+- Full visual rendering fidelity of tab stops is still not claimed until UI
+  layout comparison fixtures cover the behavior.
 
 The next implementation priority after this first paragraph layout pass is:
 
-1. `paragraph_layout`: tabPr/tabItem semantics, breakSetting, autoSpacing,
-   lineBreak
+1. `paragraph_layout`: breakSetting, autoSpacing, lineBreak
 2. `text_style`: fontRef, ratio, relSz, underline, strikeout, bold
 3. `table_layout`: cellMargin, inMargin, outMargin
 

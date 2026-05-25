@@ -20,10 +20,40 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
 
     assert doc.styles.paraPrDefs
     sample = next(iter(doc.styles.paraPrDefs.values()))
-    assert {"paraPrId", "tabPrIDRef", "align", "lineSpacing", "margin"} <= set(sample)
+    assert {
+        "paraPrId",
+        "tabPrIDRef",
+        "align",
+        "lineSpacing",
+        "margin",
+        "tabPr",
+        "tabItems",
+    } <= set(sample)
     assert any(item.get("align") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("lineSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("margin") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("tabPr") for item in doc.styles.paraPrDefs.values())
+
+
+def test_para_pr_defs_resolve_tab_items():
+    doc = import_hwpx_as_ro_view(
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "hwpx"
+        / "corpus"
+        / "fx_many_tables_page_marker.hwpx"
+    )
+
+    tabbed = [
+        item for item in doc.styles.paraPrDefs.values()
+        if item.get("tabItems")
+    ]
+    assert tabbed
+    first = tabbed[0]
+    assert first["tabPr"]["tabPrId"] == first["tabPrIDRef"]
+    assert first["tabItemCount"] == len(first["tabItems"])
+    assert {"pos", "type", "leader"} <= set(first["tabItems"][0])
 
 
 def test_render_payload_exposes_para_pr_defs_read_only():
