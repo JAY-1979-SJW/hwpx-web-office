@@ -241,6 +241,35 @@ Minimum remediation sequence:
 The server is the final operating reference. A local pass is only a precheck;
 the claim must not be upgraded unless the same claim is verified on the server.
 
+## 6B. Current Remediation Audit Gate
+
+The current remediation audit gate is:
+
+- `scripts/ops/audit_web_office_hwpx_read_remediation.py`
+- `tests/test_web_office_hwpx_read_remediation_audit.py`
+
+The gate produces:
+
+- `data/reports/web_office_hwpx_read_remediation/reading_remediation_report.json`
+- `data/reports/web_office_hwpx_read_remediation/reading_remediation_summary.md`
+
+The gate must verify:
+
+- fixture corpus manifest exists
+- checked-in HWPX fixtures are opened as ZIP packages
+- XML entries are inventoried
+- observed XML element families are classified as parsed for the current model,
+  ignored by policy, or unsupported with warning
+- unsupported element families are visible in the machine-readable report
+- Web Office RO model extraction succeeds
+- render payload remains read-only
+- source HWPX hash and mtime remain unchanged
+- the report keeps `fullCompatibilityClaimed=false`
+- the status remains `BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED`
+
+Passing this gate is not an R4 pass. It is only evidence that the remediation
+plan is now executable and that unsupported coverage is no longer silent.
+
 ## 7. Pass Criteria for Current Baseline
 
 The current baseline remains valid when:

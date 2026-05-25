@@ -7,7 +7,17 @@
     {
       "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
       "status": "updated",
-      "change": "Defined HWPX reading levels R1-R4, added terminology lock, guarantee matrix, R4 minimum completion criteria, required wording, and mandatory remediation plan."
+      "change": "Defined HWPX reading levels R1-R4, added terminology lock, guarantee matrix, R4 minimum completion criteria, required wording, mandatory remediation plan, and the current remediation audit gate."
+    },
+    {
+      "path": "scripts/ops/audit_web_office_hwpx_read_remediation.py",
+      "status": "added",
+      "change": "Added executable remediation audit for fixture manifest, package/XML inventory, unsupported element visibility, read-only payload, and source immutability."
+    },
+    {
+      "path": "tests/test_web_office_hwpx_read_remediation_audit.py",
+      "status": "added",
+      "change": "Added regression coverage for the remediation audit and its generated machine/human reports."
     },
     {
       "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
@@ -24,7 +34,9 @@
     "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
     "docs/architecture/web_office_backend_structure_standard_20260525.md",
     "docs/architecture/web_office_app_structure_20260525.md",
-    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json"
+    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
+    "scripts/ops/audit_web_office_hwpx_read_remediation.py",
+    "tests/test_web_office_hwpx_read_remediation_audit.py"
   ],
   "validationCommands": [
     {
@@ -50,19 +62,46 @@
       "location": "local repository",
       "result": "PASS",
       "evidence": "Mandatory remediation plan, remediation gaps, and server-final-reference rule found."
+    },
+    {
+      "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "5 checked-in HWPX fixtures inventoried; unsupported XML element families reported; Web Office model extraction and source immutability passed; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+    },
+    {
+      "command": "python -m pytest tests/test_web_office_hwpx_read_remediation_audit.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "3 remediation audit tests passed."
+    },
+    {
+      "command": "python scripts/ops/audit_web_office_ro_view_mvp.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Existing RO-VIEW MVP audit passed for 3 samples."
+    },
+    {
+      "command": "python scripts/ops/verify_web_office_editor_backend_runtime_smoke.py",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Backend runtime health/load/save/readback/source-immutability smoke passed."
     }
   ],
   "localVerification": {
     "repository": "hwpx-web-office",
-    "codeChanges": "none",
-    "documentationOnly": true
+    "codeChanges": "audit_script_and_tests",
+    "documentationOnly": false,
+    "generatedReportDirectory": "data/reports/web_office_hwpx_read_remediation"
   },
   "serverVerification": {
     "required": false,
     "reason": "Documentation-only clarification after an already locked and server-verified baseline."
   },
   "reportArtifacts": [
-    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json"
+    "docs/devlog/2026-05-25-web-office-hwpx-reading-scope-standard.json",
+    "data/reports/web_office_hwpx_read_remediation/reading_remediation_report.json",
+    "data/reports/web_office_hwpx_read_remediation/reading_remediation_summary.md"
   ],
   "unresolvedItems": [
     {
