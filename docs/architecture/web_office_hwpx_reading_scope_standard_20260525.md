@@ -312,9 +312,14 @@ Current `text_style` remediation status:
 - The read-only render payload exposes `styles.charPrDefs` by default, including
   raw `fontRef`, `ratio`, `relSz`, `underlineDef`, and `strikeoutDef` values
   plus boolean preview fields.
+- `spacing` and `shadow` are also preserved from `charPr` definitions in
+  `styles.charPrDefs`.
+- `offset` is preserved in `styles.charPrDefs` when it appears under `charPr`,
+  but the element family is still reported as unsupported because the same
+  local name also appears under page layout structures in the current corpus.
 - Full text visual fidelity is still not claimed; remaining current-corpus
   `text_style` unsupported families are `case`, `default`, `fwSpace`,
-  `language`, `offset`, `shadow`, `spacing`, `switch`, and `typeInfo`.
+  `language`, `offset`, `switch`, and `typeInfo`.
 
 Current `table_layout` remediation status:
 
@@ -330,7 +335,7 @@ Current `table_layout` remediation status:
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `text_style`: case, default, fwSpace, language, offset, shadow, spacing, switch, typeInfo
+1. `text_style`: case, default, fwSpace, language, offset, switch, typeInfo
 2. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
 3. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
 

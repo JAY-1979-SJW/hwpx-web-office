@@ -87,11 +87,14 @@ def parse_char_pr_defs(header_xml: bytes,
         else:
             fr = el.find(f"{{{NS_HH}}}fontRef")
         ratio_el = el.find(f"{{{NS_HH}}}ratio")
+        spacing_el = el.find(f"{{{NS_HH}}}spacing")
         rel_sz_el = el.find(f"{{{NS_HH}}}relSz")
+        offset_el = el.find(f"{{{NS_HH}}}offset")
         b_el = el.find(f"{{{NS_HH}}}bold")
         i_el = el.find(f"{{{NS_HH}}}italic")
         u_el = el.find(f"{{{NS_HH}}}underline")
         s_el = el.find(f"{{{NS_HH}}}strikeout")
+        shadow_el = el.find(f"{{{NS_HH}}}shadow")
         u_type = u_el.get("type", "") if u_el is not None else ""
         underline_on = u_el is not None and u_type.upper() not in ("", "NONE")
         s_shape = s_el.get("shape", "") if s_el is not None else ""
@@ -105,13 +108,16 @@ def parse_char_pr_defs(header_xml: bytes,
             "fontName": font_name,
             "fontRef": dict(fr.attrib) if fr is not None else {},
             "ratio": dict(ratio_el.attrib) if ratio_el is not None else {},
+            "spacing": dict(spacing_el.attrib) if spacing_el is not None else {},
             "relSz": dict(rel_sz_el.attrib) if rel_sz_el is not None else {},
+            "offset": dict(offset_el.attrib) if offset_el is not None else {},
             "bold": b_el is not None,
             "italic": i_el is not None,
             "underline": underline_on,
             "underlineDef": dict(u_el.attrib) if u_el is not None else {},
             "strikeout": strikeout_on,
             "strikeoutDef": dict(s_el.attrib) if s_el is not None else {},
+            "shadow": dict(shadow_el.attrib) if shadow_el is not None else {},
         }
     return result
 

@@ -131,13 +131,16 @@ def build_render_payload(
                 "height": d.get("height"),
                 "textColor": d.get("textColor") or None,
                 "ratio": d.get("ratio") or {},
+                "spacing": d.get("spacing") or {},
                 "relSz": d.get("relSz") or {},
+                "offset": d.get("offset") or {},
                 "bold": bool(d.get("bold")),
                 "italic": bool(d.get("italic")),
                 "underline": bool(d.get("underline")),
                 "underlineDef": d.get("underlineDef") or {},
                 "strikeout": bool(d.get("strikeout")),
                 "strikeoutDef": d.get("strikeoutDef") or {},
+                "shadow": d.get("shadow") or {},
             }
             for cid, d in char_pr_defs.items()
         }

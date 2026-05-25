@@ -112,16 +112,21 @@ def test_char_pr_defs_extract_text_style_fields():
     assert {
         "fontRef",
         "ratio",
+        "spacing",
         "relSz",
+        "offset",
         "bold",
         "underline",
         "underlineDef",
         "strikeout",
         "strikeoutDef",
+        "shadow",
     } <= set(sample)
     assert any(item.get("fontRef") for item in doc.styles.charPrDefs.values())
     assert any(item.get("ratio") for item in doc.styles.charPrDefs.values())
     assert any(item.get("relSz") for item in doc.styles.charPrDefs.values())
+    assert any(item.get("spacing") for item in doc.styles.charPrDefs.values())
+    assert any(item.get("shadow") for item in doc.styles.charPrDefs.values())
     assert any("type" in item.get("underlineDef", {})
                for item in doc.styles.charPrDefs.values())
     assert any("shape" in item.get("strikeoutDef", {})
@@ -135,7 +140,10 @@ def test_render_payload_exposes_char_pr_defs_read_only():
     char_defs = payload["styles"]["charPrDefs"]
     assert set(char_defs) == set(doc.styles.charPrDefs)
     sample = next(iter(char_defs.values()))
-    assert {"fontRef", "ratio", "relSz", "underlineDef", "strikeoutDef"} <= set(sample)
+    assert {
+        "fontRef", "ratio", "spacing", "relSz", "offset",
+        "underlineDef", "strikeoutDef", "shadow",
+    } <= set(sample)
     assert payload["editable"] is False
 
 
