@@ -51,6 +51,7 @@ class WebOfficeTable:
     colCount: int
     visualColCount: int
     hasMergedCells: bool = False
+    tableSize: dict[str, Any] = field(default_factory=dict)
     inMargin: dict[str, Any] = field(default_factory=dict)
     outMargin: dict[str, Any] = field(default_factory=dict)
     cellIds: list[str] = field(default_factory=list)
@@ -69,6 +70,11 @@ class WebOfficeBlock:
 class WebOfficeSection:
     sectionIndex: int
     sourceXmlPath: str | None = None
+    secPr: dict[str, Any] = field(default_factory=dict)
+    pagePr: dict[str, Any] = field(default_factory=dict)
+    grid: dict[str, Any] = field(default_factory=dict)
+    lineNumberShape: dict[str, Any] = field(default_factory=dict)
+    pageBorderFills: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

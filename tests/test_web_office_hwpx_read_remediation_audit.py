@@ -31,7 +31,8 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert "paragraph_layout" not in category_summary["categories"]
     assert "text_style" not in category_summary["categories"]
     assert "style_compatibility" not in category_summary["categories"]
-    assert "page_layout" in category_summary["categories"]
+    assert "page_layout" not in category_summary["categories"]
+    assert "embedded_control" in category_summary["categories"]
     assert "unknown_review_required" not in category_summary["categories"]
     assert payload["requiredWording"] == (
         "Basic HWPX read is verified; full compatibility and UI fidelity remain open."

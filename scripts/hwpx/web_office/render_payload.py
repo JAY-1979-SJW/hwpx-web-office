@@ -65,6 +65,7 @@ def build_render_payload(
             "colCount": t.colCount,
             "visualColCount": t.visualColCount,
             "hasMergedCells": t.hasMergedCells,
+            "tableSize": t.tableSize,
             "inMargin": t.inMargin,
             "outMargin": t.outMargin,
             "cells": cells_by_table.get(t.tableId, []),
@@ -87,6 +88,11 @@ def build_render_payload(
     pages = [
         {"sectionIndex": s.sectionIndex,
             "sourceXmlPath": s.sourceXmlPath,
+            "secPr": s.secPr,
+            "pagePr": s.pagePr,
+            "grid": s.grid,
+            "lineNumberShape": s.lineNumberShape,
+            "pageBorderFills": s.pageBorderFills,
             "editable": False}
         for s in doc.sections
     ]

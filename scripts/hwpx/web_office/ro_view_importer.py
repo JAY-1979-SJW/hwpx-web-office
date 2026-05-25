@@ -235,6 +235,30 @@ def _direct_child_attrs(elem: ET.Element | None, wanted: str) -> dict[str, Any]:
     return {}
 
 
+def _section_layout_attrs(section_root: ET.Element | None) -> dict[str, Any]:
+    if section_root is None:
+        return {}
+    sec_pr = _descendant_by_local(section_root, "secPr")
+    if sec_pr is None:
+        return {}
+    page_border_fills: list[dict[str, Any]] = []
+    for child in list(sec_pr):
+        if local_name(child.tag) != "pageBorderFill":
+            continue
+        payload = dict(child.attrib)
+        offset = _direct_child_attrs(child, "offset")
+        if offset:
+            payload["offset"] = offset
+        page_border_fills.append(payload)
+    return {
+        "secPr": dict(sec_pr.attrib),
+        "pagePr": _direct_child_attrs(sec_pr, "pagePr"),
+        "grid": _direct_child_attrs(sec_pr, "grid"),
+        "lineNumberShape": _direct_child_attrs(sec_pr, "lineNumberShape"),
+        "pageBorderFills": page_border_fills,
+    }
+
+
 def _normalize_header_flag(value: str | None) -> bool | None:
     """hp:tc header attribute를 보수적으로 boolean으로 정규화한다."""
     if value is None:
@@ -499,9 +523,16 @@ def import_hwpx_as_ro_view(
 
     sections: list[WebOfficeSection] = []
     for i, sec_path in enumerate(parsed.sections or []):
+        sec_root = _section_root_for(str(sec_path) if sec_path is not None else None)
+        layout = _section_layout_attrs(sec_root)
         sections.append(WebOfficeSection(
             sectionIndex=i,
-            sourceXmlPath=str(sec_path) if sec_path is not None else None))
+            sourceXmlPath=str(sec_path) if sec_path is not None else None,
+            secPr=layout.get("secPr", {}),
+            pagePr=layout.get("pagePr", {}),
+            grid=layout.get("grid", {}),
+            lineNumberShape=layout.get("lineNumberShape", {}),
+            pageBorderFills=layout.get("pageBorderFills", [])))
 
     section_xml_path_by_index: dict[int, str | None] = {
         i: s.sourceXmlPath for i, s in enumerate(sections)
@@ -538,6 +569,7 @@ def import_hwpx_as_ro_view(
             _find_table_elem(sec_root, table_pos)
             if sec_root is not None else None
         )
+        table_size = _direct_child_attrs(table_elem, "sz")
         in_margin = _direct_child_attrs(table_elem, "inMargin")
         out_margin = _direct_child_attrs(table_elem, "outMargin")
         for c in t.cells or []:
@@ -655,6 +687,7 @@ def import_hwpx_as_ro_view(
             rowCount=t.rowCount, colCount=t.colCount,
             visualColCount=t.visualColCount,
             hasMergedCells=bool(t.hasMergedCells),
+            tableSize=table_size,
             inMargin=in_margin,
             outMargin=out_margin,
             cellIds=cell_ids))

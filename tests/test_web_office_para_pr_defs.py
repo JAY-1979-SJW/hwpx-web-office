@@ -190,3 +190,32 @@ def test_render_payload_exposes_table_and_cell_margins_read_only():
         for cell in table.get("cells", [])
     )
     assert payload["editable"] is False
+
+
+def test_section_page_layout_fields_are_extracted():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    section = doc.sections[0]
+    assert section.secPr
+    assert section.pagePr
+    assert section.grid
+    assert section.lineNumberShape
+    assert section.pageBorderFills
+    assert {"width", "height", "landscape"} <= set(section.pagePr)
+    assert any(item.get("offset") for item in section.pageBorderFills)
+
+    page = payload["pages"][0]
+    assert page["pagePr"] == section.pagePr
+    assert page["pageBorderFills"] == section.pageBorderFills
+
+
+def test_table_size_field_is_extracted():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert any(t.tableSize for t in doc.tables)
+    table = next(t for t in doc.tables if t.tableSize)
+    assert {"width", "height"} <= set(table.tableSize)
+    payload_table = next(t for t in payload["tables"] if t["tableId"] == table.tableId)
+    assert payload_table["tableSize"] == table.tableSize

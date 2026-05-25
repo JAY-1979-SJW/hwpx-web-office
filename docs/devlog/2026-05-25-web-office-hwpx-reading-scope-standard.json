@@ -151,7 +151,7 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak/fwSpace preservation, charPrDefs text-style extraction including spacing/shadow, fontFaceDefs typeInfo extraction, table/cell margin extraction, context-aware unsupported category classification, and compatibility switch branch selection, 47 unsupported XML element families remain grouped into 10 categories; paragraph_layout, table_layout, text_style, and style_compatibility are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak/fwSpace preservation, charPrDefs text-style extraction including spacing/shadow, fontFaceDefs typeInfo extraction, table/cell margin and size extraction, section page-layout extraction, context-aware unsupported category classification, and compatibility switch branch selection, 40 unsupported XML element families remain grouped into 9 categories; paragraph_layout, table_layout, text_style, style_compatibility, and page_layout are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",

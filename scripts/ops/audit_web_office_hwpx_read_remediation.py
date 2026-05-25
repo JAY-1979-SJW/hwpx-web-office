@@ -291,8 +291,21 @@ def _classify_xml_local_with_context(
         for key in context_keys
     ):
         return "parsed_for_current_model"
+    if local in {"grid", "lineNumberShape", "pageBorderFill", "pagePr"} and context_keys and all(
+        key.endswith("section0.xml:secPr") for key in context_keys
+    ):
+        return "parsed_for_current_model"
+    if local == "secPr" and context_keys and all(
+        key.endswith("section0.xml:run") for key in context_keys
+    ):
+        return "parsed_for_current_model"
+    if local == "sz" and context_keys and all(
+        key.endswith("section0.xml:tbl") for key in context_keys
+    ):
+        return "parsed_for_current_model"
     if local == "offset" and context_keys and all(
-        key.endswith("header.xml:charPr") for key in context_keys
+        key.endswith(("header.xml:charPr", "section0.xml:pageBorderFill"))
+        for key in context_keys
     ):
         return "parsed_for_current_model"
     return _classify_xml_local(local)
@@ -315,6 +328,10 @@ def _unsupported_category(
         if context_keys and all(key.endswith("header.xml:charPr")
                                 for key in context_keys):
             return "text_style"
+    if local == "colPr" and any(
+        key.endswith("section0.xml:ctrl") for key in context_keys
+    ):
+        return "embedded_control"
     return UNSUPPORTED_CATEGORY_BY_LOCAL.get(local, "unknown_review_required")
 
 

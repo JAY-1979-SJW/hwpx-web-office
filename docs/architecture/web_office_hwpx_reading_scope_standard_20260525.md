@@ -319,8 +319,8 @@ Current `text_style` remediation status:
 - Header font `typeInfo` is preserved in `documentModel.styles.fontFaceDefs`
   and exposed in the read-only render payload as `styles.fontFaceDefs`.
 - `offset` is preserved in `styles.charPrDefs` when it appears under `charPr`,
-  but the same local name is still reported under `page_layout` when it appears
-  under page border structures.
+  and in section `pageBorderFill.offset` when it appears under page border
+  structures.
 - `language` is classified as package metadata in the checked-in corpus.
 - `case`, `default`, and `switch` are resolved for current header style
   definitions by selecting the first `case` branch and falling back to
@@ -341,12 +341,27 @@ Current `table_layout` remediation status:
 - Full table visual fidelity is still not claimed; border, fill, row/column
   sizing, and page layout interactions remain separate coverage targets.
 
+Current `page_layout` remediation status:
+
+- Section-level `secPr`, `pagePr`, `grid`, `lineNumberShape`, and
+  `pageBorderFill` definitions are extracted into `documentModel.sections[]`
+  and the read-only page payload.
+- `pageBorderFill.offset` is preserved in each `pageBorderFills[]` item.
+- Table `tbl > sz` is extracted into `documentModel.tables[].tableSize` and
+  the read-only table payload.
+- `colPr` currently appears under embedded `ctrl` elements in the checked-in
+  corpus, so it remains classified with `embedded_control`, not `page_layout`.
+- `page_layout` is no longer present in the current unsupported category output
+  for the checked-in fixture corpus.
+- Full page visual fidelity is still not claimed; pagination, column controls,
+  headers/footers, and rendered page comparison remain open.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
-2. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
-3. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
+1. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
+2. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
+3. `embedded_control`: colPr, ctrl, placement, pos
 
 ## 7. Pass Criteria for Current Baseline
 
