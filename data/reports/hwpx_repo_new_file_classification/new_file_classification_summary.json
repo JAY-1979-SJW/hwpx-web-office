@@ -9,10 +9,10 @@
   },
   "newFileResults": [
     {
-      "safePath": "scripts/ops/install_web_office_server_monitor_cron.py",
-      "category": "AUDIT_GATE",
-      "zone": "closeout_security",
-      "separationPlan": "keep_gate_audit",
+      "safePath": "scripts/ops/deploy_web_office_to_server.ps1",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_ops",
       "moduleDeclared": false,
       "status": "PASS",
       "failures": []
