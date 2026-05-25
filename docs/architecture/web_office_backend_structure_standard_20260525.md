@@ -177,6 +177,24 @@ For a combined local regression check:
 python -m pytest tests/test_web_office_editor_browser_smoke.py tests/test_web_office_writer_readback_backend_api_route.py tests/test_web_office_browser_smoke_frontend_backend_wire_baseline.py -q
 ```
 
+Server validation is mandatory before Web Office work is reported complete.
+The current server baseline is:
+
+- server alias: `haehan-app`
+- server path: `/home/ubuntu/apps/hwpx-web-office`
+- health endpoint: `http://127.0.0.1:8767/api/web-office/health`
+- monitor script: `scripts/ops/verify_web_office_server_monitor.py`
+- monitor auto-start marker: `hwpx-web-office-monitor`
+
+The minimum server check is:
+
+```bash
+cd /home/ubuntu/apps/hwpx-web-office
+python3 scripts/ops/verify_web_office_server_monitor.py --once --port 8767
+pgrep -af 'verify_web_office_server_monitor.py.*--interval'
+crontab -l | grep hwpx-web-office-monitor
+```
+
 ## 12. Pass Criteria
 
 The implementation passes this standard when:
@@ -194,6 +212,14 @@ The implementation passes this standard when:
 - browser visual smoke passes for desktop and mobile
 - repo new file classification gate passes
 - commit and push guards pass
+- verified changes are present on `haehan-app`
+- server health check returns `HEALTHY`, or `RECOVERED` followed by `HEALTHY`
+- server response keeps `mode == SANDBOX_ONLY`
+- server response keeps `sourceMutationAllowed == false`
+- server monitor process or `@reboot` auto-start registration is present
+
+Local validation alone is not sufficient for Web Office completion. Completion
+requires successful server validation.
 
 ## 13. Hold Items
 
@@ -222,3 +248,18 @@ Changes to the following require a new task standard:
 
 This standard should be used as the review checklist for future Web Office
 backend and browser editor work.
+
+## 15. Operational Completion Rule
+
+For all future Web Office tasks:
+
+- local development and local tests are pre-deployment checks
+- server verification is the final acceptance check
+- a task is incomplete until the server baseline passes
+- completion reports must state both local validation and server validation
+
+If local validation passes but the server is not checked, the correct status is
+`LOCAL_VERIFIED_SERVER_PENDING`.
+
+If server validation fails, the correct status is
+`SERVER_VERIFICATION_FAILED`, even if all local checks passed.

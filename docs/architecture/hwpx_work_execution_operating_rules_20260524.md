@@ -183,3 +183,39 @@ They serve as:
 - completion reporting baseline
 
 Any work performed outside this structure should be treated as non-compliant process.
+
+## RULE-13: Server verification is the final completion authority for Web Office work
+
+For Web Office work, local verification is a required pre-deployment filter, but
+it is not the final completion authority.
+
+Required Web Office execution sequence:
+1. implement or update locally
+2. run local tests, local smoke checks, and local commit/push guards
+3. transfer or deploy the verified change to the server
+4. verify the server runtime, monitor, logs, and health endpoint
+5. report completion only after the server passes
+
+Current Web Office server baseline:
+- server alias: `haehan-app`
+- server path: `/home/ubuntu/apps/hwpx-web-office`
+- health endpoint: `http://127.0.0.1:8767/api/web-office/health`
+- runtime mode: `SANDBOX_ONLY`
+- monitor: `scripts/ops/verify_web_office_server_monitor.py`
+- auto-start: current user crontab `@reboot` entry marked `hwpx-web-office-monitor`
+
+Completion rule:
+- local pass + server not checked = incomplete
+- local pass + server fail = incomplete
+- local pass + server pass = complete
+
+Server verification must include, at minimum:
+- health verdict `HEALTHY` or an expected `RECOVERED` followed by `HEALTHY`
+- backend response mode `SANDBOX_ONLY`
+- `sourceMutationAllowed == false`
+- monitor process or auto-start registration present
+- relevant server logs checked for immediate errors
+
+Any Web Office task that changes runtime behavior, scripts, API routes, frontend
+serving, monitoring, recovery, or deployment must include the server verification
+result in its completion report.
