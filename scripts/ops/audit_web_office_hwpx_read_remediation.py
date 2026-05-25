@@ -237,13 +237,13 @@ UNSUPPORTED_CATEGORY_META = {
         "claimImpact": "Full style cascade fidelity is not claimed.",
         "nextAction": "Map style references and inheritance into a style coverage gate.",
     },
+    "style_compatibility": {
+        "claimImpact": "Compatibility switch/case/default wrappers are inventoried, but branch selection semantics are not claimed.",
+        "nextAction": "Resolve HWPX compatibility switch branches before claiming tab/paragraph style equivalence.",
+    },
     "table_layout": {
         "claimImpact": "Table/cell margin fidelity is incomplete.",
         "nextAction": "Map cellMargin, inMargin, and outMargin into table/cell layout payload.",
-    },
-    "text_style": {
-        "claimImpact": "Font/text visual fidelity is incomplete.",
-        "nextAction": "Prioritize remaining case/default/switch compatibility handling, language, and offset mapping.",
     },
 }
 
@@ -277,14 +277,45 @@ def _classify_xml_local(local: str) -> str:
     return "unsupported_with_warning"
 
 
-def _unsupported_category(local: str) -> str:
+def _classify_xml_local_with_context(
+    local: str,
+    contexts: Counter[str] | None = None,
+) -> str:
+    context_keys = set(contexts or {})
+    if local == "offset" and context_keys and all(
+        key.endswith("header.xml:charPr") for key in context_keys
+    ):
+        return "parsed_for_current_model"
+    return _classify_xml_local(local)
+
+
+def _unsupported_category(
+    local: str,
+    contexts: Counter[str] | None = None,
+) -> str:
+    context_keys = set(contexts or {})
+    if local in {"case", "default", "switch"}:
+        return "style_compatibility"
+    if local == "language" and any(
+        key.endswith("content.hpf:metadata") for key in context_keys
+    ):
+        return "package_metadata"
+    if local == "offset":
+        if any(key.endswith("section0.xml:pageBorderFill") for key in context_keys):
+            return "page_layout"
+        if context_keys and all(key.endswith("header.xml:charPr")
+                                for key in context_keys):
+            return "text_style"
     return UNSUPPORTED_CATEGORY_BY_LOCAL.get(local, "unknown_review_required")
 
 
-def _build_unsupported_category_summary(unsupported_locals: set[str]) -> dict[str, Any]:
+def _build_unsupported_category_summary(
+    unsupported_locals: set[str],
+    category_by_local: dict[str, str] | None = None,
+) -> dict[str, Any]:
     categories: dict[str, dict[str, Any]] = {}
     for local in sorted(unsupported_locals):
-        category = _unsupported_category(local)
+        category = (category_by_local or {}).get(local) or _unsupported_category(local)
         meta = UNSUPPORTED_CATEGORY_META.get(category, {
             "claimImpact": "Unsupported element category requires manual review.",
             "nextAction": "Classify this element family before upgrading the read claim.",
@@ -308,6 +339,7 @@ def _inspect_package(path: Path) -> dict[str, Any]:
     xml_entries: list[str] = []
     non_xml_entries: list[str] = []
     element_counter: Counter[str] = Counter()
+    element_contexts: dict[str, Counter[str]] = {}
     package_findings: list[dict[str, Any]] = []
 
     with zipfile.ZipFile(path) as zf:
@@ -325,22 +357,36 @@ def _inspect_package(path: Path) -> dict[str, Any]:
                         "message": str(exc),
                     })
                     continue
-                for elem in root.iter():
-                    element_counter[_local_name(elem.tag)] += 1
+                stack: list[ET.Element] = []
+
+                def walk(elem: ET.Element) -> None:
+                    local = _local_name(elem.tag)
+                    parent = _local_name(stack[-1].tag) if stack else "<root>"
+                    element_counter[local] += 1
+                    context_key = f"{name}:{parent}"
+                    element_contexts.setdefault(local, Counter())[context_key] += 1
+                    stack.append(elem)
+                    for child in list(elem):
+                        walk(child)
+                    stack.pop()
+
+                walk(root)
             else:
                 non_xml_entries.append(name)
 
     classifications: dict[str, dict[str, Any]] = {}
     for local, count in sorted(element_counter.items()):
-        classification = _classify_xml_local(local)
+        contexts = element_contexts.get(local)
+        classification = _classify_xml_local_with_context(local, contexts)
         classifications[local] = {
             "count": count,
             "classification": classification,
             "unsupportedCategory": (
-                _unsupported_category(local)
+                _unsupported_category(local, contexts)
                 if classification == "unsupported_with_warning"
                 else None
             ),
+            "contexts": dict(sorted((contexts or {}).items())),
         }
 
     unsupported = {
@@ -450,6 +496,7 @@ def run_audit(
 
     fixture_results = [_audit_fixture(path, manifest_by_name) for path in files]
     unsupported_locals: set[str] = set()
+    unsupported_category_by_local: dict[str, str] = {}
     ignored_locals: set[str] = set()
     parsed_locals: set[str] = set()
     for result in fixture_results:
@@ -457,6 +504,11 @@ def run_audit(
         unsupported_locals.update(inventory.get("unsupportedElementLocals") or [])
         ignored_locals.update(inventory.get("ignoredElementLocals") or [])
         classifications = inventory.get("elementClassifications") or {}
+        for local, item in classifications.items():
+            if item.get("classification") == "unsupported_with_warning":
+                category = item.get("unsupportedCategory")
+                if category:
+                    unsupported_category_by_local[local] = str(category)
         parsed_locals.update(
             local
             for local, item in classifications.items()
@@ -506,7 +558,8 @@ def run_audit(
             "unsupportedWithWarningElementFamilies": sorted(unsupported_locals),
             "unsupportedWithWarningCount": len(unsupported_locals),
             "unsupportedCategorySummary": _build_unsupported_category_summary(
-                unsupported_locals
+                unsupported_locals,
+                unsupported_category_by_local,
             ),
         },
         "fixtures": fixture_results,

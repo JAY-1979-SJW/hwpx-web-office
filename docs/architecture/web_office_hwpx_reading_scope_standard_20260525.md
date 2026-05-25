@@ -284,6 +284,7 @@ Current remediation audit category output:
 - `package_metadata`
 - `embedded_control`
 - `style_catalog`
+- `style_compatibility`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -319,11 +320,14 @@ Current `text_style` remediation status:
 - Header font `typeInfo` is preserved in `documentModel.styles.fontFaceDefs`
   and exposed in the read-only render payload as `styles.fontFaceDefs`.
 - `offset` is preserved in `styles.charPrDefs` when it appears under `charPr`,
-  but the element family is still reported as unsupported because the same
-  local name also appears under page layout structures in the current corpus.
-- Full text visual fidelity is still not claimed; remaining current-corpus
-  `text_style` unsupported families are `case`, `default`, `language`,
-  `offset`, and `switch`.
+  but the same local name is still reported under `page_layout` when it appears
+  under page border structures.
+- `language` is classified as package metadata in the checked-in corpus.
+- `case`, `default`, and `switch` are classified as `style_compatibility`
+  because their compatibility branch-selection semantics are not yet claimed.
+- Current-corpus `text_style` no longer appears as an unsupported category.
+  Full text visual fidelity is still not claimed because style cascade,
+  compatibility selection, and UI rendering comparison remain open.
 
 Current `table_layout` remediation status:
 
@@ -339,7 +343,7 @@ Current `table_layout` remediation status:
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `text_style`: case, default, language, offset, switch
+1. `style_compatibility`: case, default, switch
 2. `page_layout`: colPr, grid, lineNumberShape, pageBorderFill, pagePr, secPr, sz
 3. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
 
