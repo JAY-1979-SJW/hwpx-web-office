@@ -219,3 +219,46 @@ Server verification must include, at minimum:
 Any Web Office task that changes runtime behavior, scripts, API routes, frontend
 serving, monitoring, recovery, or deployment must include the server verification
 result in its completion report.
+
+## RULE-14: Operational report artifacts are mandatory after governed work
+
+Any governed task that changes tools, features, connections, runtime behavior,
+server behavior, monitoring, recovery, deployment, backend structure, or Web
+Office behavior must leave an operational report artifact before it is reported
+complete.
+
+The completion report must include, at minimum:
+- standard document update status
+- work result summary
+- machine-readable log, audit payload, or verifier output location
+- validation commands executed and their results
+- local verification result
+- server verification result when the task is Web Office related
+- unresolved items, lock-required items, and hold items
+- final status value
+
+Approved final status values:
+- `LOCAL_VERIFIED_SERVER_PENDING`
+- `SERVER_VERIFIED_PASS`
+- `SERVER_VERIFICATION_FAILED`
+- `LOCAL_VERIFICATION_FAILED`
+- `DOCUMENTATION_ONLY_RECORDED`
+
+For Web Office work, the report artifact must be written under an audit or report
+path before closeout, and the current conversation must summarize the same
+result. A Web Office task cannot be called complete if the report artifact,
+validation command record, or server verification result is missing.
+
+Recommended machine-readable fields:
+- `schemaVersion`
+- `task`
+- `baselineHead`
+- `standardDocuments`
+- `changedFiles`
+- `validationCommands`
+- `localVerification`
+- `serverVerification`
+- `reportArtifacts`
+- `unresolvedItems`
+- `holdItems`
+- `finalStatus`

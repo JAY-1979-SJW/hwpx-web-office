@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "web_office_operational_report_rule_v1",
+  "task": "WEB-OFFICE-OPERATIONAL-REPORT-RULE-20260525",
+  "baselineHead": "fd976d8",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/hwpx_work_execution_operating_rules_20260524.md",
+      "updated": true,
+      "change": "Added RULE-14 requiring operational report artifacts for governed work."
+    },
+    {
+      "path": "docs/architecture/web_office_backend_structure_standard_20260525.md",
+      "updated": true,
+      "change": "Added operational report artifact requirements to pass criteria and completion rules."
+    }
+  ],
+  "changedFiles": [
+    "docs/architecture/hwpx_work_execution_operating_rules_20260524.md",
+    "docs/architecture/web_office_backend_structure_standard_20260525.md",
+    "docs/devlog/2026-05-25-web-office-operational-report-rule.json"
+  ],
+  "validationCommands": [
+    {
+      "command": "python -m json.tool docs\\devlog\\2026-05-25-web-office-operational-report-rule.json",
+      "result": "PASS"
+    },
+    {
+      "command": "rg -n \"RULE-14|Operational Report Artifact Rule|SERVER_VERIFIED_PASS|docs/devlog/2026-05-25-web-office-operational-report-rule.json\" docs\\architecture docs\\devlog\\2026-05-25-web-office-operational-report-rule.json",
+      "result": "PASS"
+    },
+    {
+      "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
+      "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    }
+  ],
+  "localVerification": {
+    "status": "PASS",
+    "summary": "JSON report, RULE-14 document anchors, backend standard anchors, and commit guard passed."
+  },
+  "serverVerification": {
+    "required": true,
+    "status": "PENDING",
+    "reason": "Web Office operating standard changed; server verification is required before final closeout."
+  },
+  "reportArtifacts": [
+    "docs/devlog/2026-05-25-web-office-operational-report-rule.json"
+  ],
+  "unresolvedItems": [],
+  "holdItems": [
+    "Ignored runtime copies may exist under data/reports or docs/reports for local audit use; docs/devlog is the committed artifact."
+  ],
+  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+}

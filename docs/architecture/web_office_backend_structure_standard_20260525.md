@@ -217,6 +217,8 @@ The implementation passes this standard when:
 - server response keeps `mode == SANDBOX_ONLY`
 - server response keeps `sourceMutationAllowed == false`
 - server monitor process or `@reboot` auto-start registration is present
+- operational report artifact is written with validation command results,
+  server verification result, unresolved items, and final status
 
 Local validation alone is not sufficient for Web Office completion. Completion
 requires successful server validation.
@@ -263,3 +265,46 @@ If local validation passes but the server is not checked, the correct status is
 
 If server validation fails, the correct status is
 `SERVER_VERIFICATION_FAILED`, even if all local checks passed.
+
+## 16. Operational Report Artifact Rule
+
+Every Web Office backend task that changes backend modules, API routes, runtime
+scripts, monitoring, recovery, deployment, server state, validation gates, or
+backend structure must write a completion report artifact before closeout.
+
+The artifact must be machine-readable when practical, preferably JSON, and must
+record:
+
+- `schemaVersion`
+- `task`
+- `baselineHead`
+- `standardDocuments`
+- `changedFiles`
+- `validationCommands`
+- `localVerification`
+- `serverVerification`
+- `reportArtifacts`
+- `unresolvedItems`
+- `holdItems`
+- `finalStatus`
+
+The report must explicitly state whether the backend standard document was
+updated, whether the work result was deployed to `haehan-app`, and whether the
+server health, sandbox mode, source mutation block, monitor process, and
+monitor auto-start registration passed.
+
+Allowed final status values for Web Office backend work:
+
+- `LOCAL_VERIFIED_SERVER_PENDING`
+- `SERVER_VERIFIED_PASS`
+- `SERVER_VERIFICATION_FAILED`
+- `LOCAL_VERIFICATION_FAILED`
+- `DOCUMENTATION_ONLY_RECORDED`
+
+Completion is invalid if:
+
+- validation commands are not recorded
+- local verification result is missing
+- server verification is required but missing
+- unresolved or hold items are omitted
+- the final status value is absent
