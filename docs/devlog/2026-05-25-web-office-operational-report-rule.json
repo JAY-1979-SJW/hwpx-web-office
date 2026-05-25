@@ -31,6 +31,14 @@
     {
       "command": "python scripts\\ops\\run_hwpx_repo_commit_guard.py",
       "result": "PASS_HWPX_REPO_COMMIT_GUARD"
+    },
+    {
+      "command": "git push",
+      "result": "PASS_HWPX_REPO_PREPUSH_GUARD"
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts\\ops\\deploy_web_office_to_server.ps1",
+      "result": "PASS"
     }
   ],
   "localVerification": {
@@ -39,8 +47,19 @@
   },
   "serverVerification": {
     "required": true,
-    "status": "PENDING",
-    "reason": "Web Office operating standard changed; server verification is required before final closeout."
+    "status": "PASS",
+    "serverAlias": "haehan-app",
+    "serverPath": "/home/ubuntu/apps/hwpx-web-office",
+    "deployedHead": "410f45f",
+    "checks": {
+      "serverHealthOk": true,
+      "serverSandboxModeOk": true,
+      "serverMutationBlockedOk": true,
+      "serverMonitorProcessOk": true,
+      "serverMonitorCronOk": true,
+      "serverOperatingRulePresent": true,
+      "serverBackendStandardPresent": true
+    }
   },
   "reportArtifacts": [
     "docs/devlog/2026-05-25-web-office-operational-report-rule.json"
@@ -49,5 +68,5 @@
   "holdItems": [
     "Ignored runtime copies may exist under data/reports or docs/reports for local audit use; docs/devlog is the committed artifact."
   ],
-  "finalStatus": "LOCAL_VERIFIED_SERVER_PENDING"
+  "finalStatus": "SERVER_VERIFIED_PASS"
 }
