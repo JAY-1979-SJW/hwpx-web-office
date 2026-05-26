@@ -191,6 +191,21 @@ python scripts/ops/verify_web_office_editor_backend_runtime_smoke.py
 python scripts/ops/gate_hwpx_repo_new_file_classification.py
 ```
 
+Repository governance gates are tiered:
+
+- `pre-commit`: `.githooks/pre-commit` runs
+  `python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only`.
+- `pre-push`: `.githooks/pre-push` runs
+  `python scripts/ops/run_hwpx_repo_prepush_guard.py --temp-only`.
+- `full module audit`: `python scripts/ops/audit_hwpx_form_auto_fill_modules.py`
+  is a longer module-by-module audit and is not the same as the pre-push
+  fail-fast smoke path.
+
+The full module audit must convert pytest timeouts into structured FAIL report
+entries. It must not terminate as an unhandled Python traceback. A timeout
+result blocks a "full module audit passed" claim, but it must be distinguished
+from the faster pre-push smoke gate result.
+
 For a combined local regression check:
 
 ```powershell
@@ -338,3 +353,22 @@ Completion is invalid if:
 - server verification is required but missing
 - unresolved or hold items are omitted
 - the final status value is absent
+
+## 17. Server-Final Gate Interpretation
+
+For Web Office work, the final verdict is the server verdict.
+
+The minimum server-final evidence is:
+
+- deployed server artifact reports the expected commit head
+- `/api/web-office/health` returns `SUCCESS`
+- server response mode remains `SANDBOX_ONLY`
+- `sourceMutationAllowed == false`
+- server app structure drift audit passes
+- server HWPX read remediation audit passes
+- server backend runtime smoke passes
+- monitor process or reboot registration remains present
+
+Local hook or local test success can only produce
+`LOCAL_VERIFIED_SERVER_PENDING`. The status may become `SERVER_VERIFIED_PASS`
+only after the server-side checks above pass.

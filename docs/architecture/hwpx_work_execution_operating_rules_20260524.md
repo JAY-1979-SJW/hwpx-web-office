@@ -266,3 +266,53 @@ Recommended machine-readable fields:
 - `unresolvedItems`
 - `holdItems`
 - `finalStatus`
+
+## RULE-15: Gate tiers and timeout reporting are fixed
+
+Repository and Web Office gates are tiered. A pass at a lower tier does not
+replace the higher tier.
+
+Gate tiers:
+
+1. `pre-commit`
+   - hook path: `.githooks/pre-commit`
+   - command: `python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only`
+   - purpose: fast repo classification, manifest promotion, and manifest drift
+     checks before a commit is created
+   - failure meaning: do not commit until the repo classification or drift issue
+     is fixed
+
+2. `pre-push`
+   - hook path: `.githooks/pre-push`
+   - command: `python scripts/ops/run_hwpx_repo_prepush_guard.py --temp-only`
+   - purpose: fail-fast smoke gate for the governed HWPX form auto-fill and repo
+     separation controls
+   - failure meaning: do not push until the fail-fast report is clean
+
+3. `full module audit`
+   - command: `python scripts/ops/audit_hwpx_form_auto_fill_modules.py`
+   - purpose: full module-by-module pytest and static audit across the module
+     manifest
+   - expected behavior: this is allowed to take longer than pre-push and may be
+     run separately from the fast path
+   - timeout rule: pytest timeout must be reported as a structured FAIL payload,
+     not as an unhandled traceback
+   - failure meaning: module audit is not clean; this does not invalidate a
+     previously passing pre-push smoke gate, but it blocks claims that the full
+     module audit passed
+
+4. `server final`
+   - command family: deploy verifier plus server-side structure drift, HWPX read
+     audit, runtime smoke, health, monitor, and operational checks
+   - purpose: final acceptance for Web Office work
+   - failure meaning: Web Office work is incomplete even if all local hooks and
+     local tests passed
+
+Reporting rules:
+
+- Completion reports must name which gate tier was run.
+- `pre-push` PASS must not be described as full module audit PASS.
+- A full module audit timeout must be recorded with status `FAIL`, return code
+  `-9`, timeout seconds, affected test count, and a sanitized summary.
+- Generated report churn from gate runs must not be committed unless the task
+  explicitly approves report artifact updates.
