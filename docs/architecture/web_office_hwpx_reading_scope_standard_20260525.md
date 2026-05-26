@@ -274,7 +274,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `border_style`
 - `numbering_outline`
 - `note_annotation`
 - `application_settings`
@@ -366,12 +365,29 @@ Current `style_catalog` remediation status:
   paragraph/run cascade application, and UI visual comparison remain separate
   coverage targets.
 
+Current `border_style` remediation status:
+
+- Header `borderFills/borderFill` definitions are extracted from
+  `Contents/header.xml` into `documentModel.styles.borderFillDefs`.
+- The read-only render payload exposes `styles.borderFillDefs`, including raw
+  `borderFill` attributes, side border definitions, `diagonal`, `slash`, and
+  `backSlash` attributes.
+- Paragraph property `border` references are exposed in `styles.paraPrDefs[]`
+  with the referenced `borderFill` definition attached.
+- Cell `borderFillIDRef` values are extracted from `hp:tc` elements and exposed
+  on read-only table cell payloads with the referenced `borderFill` definition.
+- `border_style` is no longer present in the current unsupported category output
+  for the checked-in fixture corpus.
+- Full border visual fidelity is still not claimed; CSS/layout rendering,
+  diagonal stroke drawing, and rendered visual comparison remain separate
+  coverage targets.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `border_style`: backSlash, border, bottomBorder, diagonal, leftBorder, rightBorder, slash, topBorder
-2. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
-3. `embedded_control`: colPr, ctrl, placement, pos
+1. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
+2. `embedded_control`: colPr, ctrl, placement, pos
+3. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
 
 ## 7. Pass Criteria for Current Baseline
 

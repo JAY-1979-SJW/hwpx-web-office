@@ -419,6 +419,44 @@ def _extract_tab_pr_defs(header: ET.Element) -> dict[str, dict[str, Any]]:
     return defs
 
 
+def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
+    defs: dict[str, dict[str, Any]] = {}
+    for border_fill in header.iter():
+        if local_name(border_fill.tag) != "borderFill":
+            continue
+        border_fill_id = border_fill.attrib.get("id")
+        if border_fill_id is None:
+            continue
+        payload: dict[str, Any] = {
+            "borderFillId": str(border_fill_id),
+            "rawAttrs": dict(border_fill.attrib),
+            "sides": {},
+            "diagonal": {},
+            "slash": {},
+            "backSlash": {},
+        }
+        sides: dict[str, dict[str, Any]] = {}
+        for child in list(border_fill):
+            child_name = local_name(child.tag)
+            if child_name in {"leftBorder", "rightBorder", "topBorder", "bottomBorder"}:
+                sides[child_name] = dict(child.attrib)
+            elif child_name in {"diagonal", "slash", "backSlash"}:
+                payload[child_name] = dict(child.attrib)
+        payload["sides"] = sides
+        defs[str(border_fill_id)] = payload
+    return defs
+
+
+def _extract_border_fill_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+    return _extract_border_fill_defs_from_header(header)
+
+
 def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
     if package is None or "Contents/header.xml" not in package.entries:
         return {}
@@ -428,6 +466,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         return {}
 
     tab_pr_defs = _extract_tab_pr_defs(header)
+    border_fill_defs = _extract_border_fill_defs_from_header(header)
     defs: dict[str, dict[str, Any]] = {}
     for para_pr in header.iter():
         if local_name(para_pr.tag) != "paraPr":
@@ -442,6 +481,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         auto_spacing = _descendant_by_local(para_pr, "autoSpacing")
         break_setting = _descendant_by_local(para_pr, "breakSetting")
         line_spacing = _descendant_by_local(para_pr, "lineSpacing")
+        border = _descendant_by_local(para_pr, "border")
         margin = _descendant_by_local(para_pr, "margin")
         margin_payload: dict[str, dict[str, str | None]] = {}
         if margin is not None:
@@ -465,6 +505,12 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
             ),
             "lineSpacing": (
                 dict(line_spacing.attrib) if line_spacing is not None else {}
+            ),
+            "border": dict(border.attrib) if border is not None else {},
+            "borderFill": (
+                border_fill_defs.get(str(border.attrib.get("borderFillIDRef")), {})
+                if border is not None and border.attrib.get("borderFillIDRef") is not None
+                else {}
             ),
             "margin": margin_payload,
             "tabPr": tab_pr or {},
@@ -541,6 +587,7 @@ def import_hwpx_as_ro_view(
 
     # HwpxPackage 는 read-only 로만 사용 — write_xml / save 호출 0건.
     package = _load_package_safely(source_hwpx)
+    border_fill_defs = _extract_border_fill_defs(package)
     section_roots_cache: dict[str, ET.Element | None] = {}
 
     def _section_root_for(path: str | None) -> ET.Element | None:
@@ -609,6 +656,8 @@ def import_hwpx_as_ro_view(
             cell_pars: list[WebOfficeParagraph] = []
             header_attr: str | None = None
             header_cell: bool | None = None
+            border_fill_id_ref: str | None = None
+            border_fill: dict[str, Any] = {}
             cell_margin: dict[str, Any] = {}
 
             # ── XML 직접 파싱 시도 ──────────────────────────────
@@ -620,6 +669,9 @@ def import_hwpx_as_ro_view(
                 if cell_elem is not None:
                     header_attr = cell_elem.attrib.get("header")
                     header_cell = _normalize_header_flag(header_attr)
+                    border_fill_id_ref = cell_elem.attrib.get("borderFillIDRef")
+                    if border_fill_id_ref is not None:
+                        border_fill = border_fill_defs.get(str(border_fill_id_ref), {})
                     cell_margin = _direct_child_attrs(cell_elem, "cellMargin")
                     par_elems = _iter_paragraphs_in_cell_elem(cell_elem)
 
@@ -707,6 +759,8 @@ def import_hwpx_as_ro_view(
                 isMergedOrigin=bool(c.isMergedOrigin),
                 header=header_attr,
                 headerCell=header_cell,
+                borderFillIDRef=border_fill_id_ref,
+                borderFill=border_fill,
                 cellMargin=cell_margin,
                 paragraphs=cell_pars,
                 text=c.normalizedText or ""))
@@ -838,7 +892,8 @@ def import_hwpx_as_ro_view(
         charPrDefs=char_pr_defs,
         paraPrDefs=para_pr_defs,
         fontFaceDefs=font_face_defs,
-        styleDefs=style_defs)
+        styleDefs=style_defs,
+        borderFillDefs=border_fill_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

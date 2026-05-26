@@ -37,6 +37,8 @@ class WebOfficeCell:
     isMergedOrigin: bool = False
     header: str | None = None
     headerCell: bool | None = None
+    borderFillIDRef: str | None = None
+    borderFill: dict[str, Any] = field(default_factory=dict)
     cellMargin: dict[str, Any] = field(default_factory=dict)
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
@@ -95,6 +97,7 @@ class WebOfficeStyles:
     paraPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     fontFaceDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     styleDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    borderFillDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

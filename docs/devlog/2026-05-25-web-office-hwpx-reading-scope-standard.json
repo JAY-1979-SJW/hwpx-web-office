@@ -47,12 +47,12 @@
     {
       "path": "scripts/hwpx/web_office/ro_view_importer.py",
       "status": "updated",
-      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, inline lineBreak preservation as newline text in paragraph runs, charPr definition extraction for fontRef, ratio, relSz, bold, underline, and strikeout, table/cell margin extraction for inMargin, outMargin, and cellMargin, and style catalog extraction into styles.styleDefs."
+      "change": "Added read-only paraPr definition extraction from Contents/header.xml for paragraph layout fields, inline lineBreak preservation as newline text in paragraph runs, charPr definition extraction for fontRef, ratio, relSz, bold, underline, and strikeout, table/cell margin extraction for inMargin, outMargin, and cellMargin, style catalog extraction into styles.styleDefs, and borderFill side/diagonal extraction into styles.borderFillDefs."
     },
     {
       "path": "scripts/hwpx/web_office/render_payload.py",
       "status": "updated",
-      "change": "Exposed paragraph layout definitions, charPr text-style definitions, style catalog definitions, table/cell margin fields, and read-only cell paragraph payloads in the render payload without changing writer behavior."
+      "change": "Exposed paragraph layout definitions, charPr text-style definitions, style catalog definitions, borderFill definitions, table/cell margin and border fields, and read-only cell paragraph payloads in the render payload without changing writer behavior."
     },
     {
       "path": "scripts/hwpx/parser/style_parser.py",
@@ -62,12 +62,12 @@
     {
       "path": "scripts/hwpx/web_office/document_model.py",
       "status": "updated",
-      "change": "Added styles.charPrDefs, styles.styleDefs, table inMargin/outMargin, and cell cellMargin fields to the Web Office document model."
+      "change": "Added styles.charPrDefs, styles.styleDefs, styles.borderFillDefs, table inMargin/outMargin, and cell cellMargin/borderFill fields to the Web Office document model."
     },
     {
       "path": "tests/test_web_office_para_pr_defs.py",
       "status": "added",
-      "change": "Added regression coverage for align, autoSpacing, breakSetting, lineSpacing, margin, resolved tabPr/tabItem payload, text-style charPrDefs, styleDefs, table/cell margin fields, and read-only payload exposure."
+      "change": "Added regression coverage for align, autoSpacing, breakSetting, lineSpacing, border, margin, resolved tabPr/tabItem payload, text-style charPrDefs, styleDefs, borderFillDefs, table/cell margin and border fields, and read-only payload exposure."
     },
     {
       "path": "tests/test_web_office_para_edit_applyformat_toolbar_preview.py",
@@ -151,13 +151,13 @@
       "command": "python scripts/ops/audit_web_office_hwpx_read_remediation.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak/fwSpace preservation, charPrDefs text-style extraction including spacing/shadow, fontFaceDefs typeInfo extraction, styleDefs catalog extraction, table/cell margin and size extraction, section page-layout extraction, context-aware unsupported category classification, and compatibility switch branch selection, 39 unsupported XML element families remain grouped into 8 categories; paragraph_layout, table_layout, text_style, style_compatibility, page_layout, and style_catalog are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
+      "evidence": "5 checked-in HWPX fixtures inventoried; after paraPrDefs extraction, inline lineBreak/fwSpace preservation, charPrDefs text-style extraction including spacing/shadow, fontFaceDefs typeInfo extraction, styleDefs catalog extraction, borderFillDefs extraction, table/cell margin and size extraction, section page-layout extraction, context-aware unsupported category classification, and compatibility switch branch selection, 31 unsupported XML element families remain grouped into 7 categories; paragraph_layout, table_layout, text_style, style_compatibility, page_layout, style_catalog, and border_style are no longer present in the unsupported category output; verdict PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_ro_view_paragraph.py tests/test_web_office_hwpx_read_remediation_audit.py",
       "location": "local repository",
       "result": "PASS",
-      "evidence": "charPrDefs expose fontRef, ratio, spacing, relSz, offset, underline, strikeout, shadow, and bold; fontFaceDefs expose font typeInfo; styleDefs expose style catalog ids/names and style references; paraPrDefs are extracted with autoSpacing, breakSetting, and resolved tabPr/tabItem payload; table/cell margins expose inMargin, outMargin, and cellMargin; hp:lineBreak is preserved as newline text and hp:fwSpace as fixed-space text in read-only paragraph payloads; existing paragraph/read-remediation contracts remain valid."
+      "evidence": "charPrDefs expose fontRef, ratio, spacing, relSz, offset, underline, strikeout, shadow, and bold; fontFaceDefs expose font typeInfo; styleDefs expose style catalog ids/names and style references; borderFillDefs expose side and diagonal border metadata; paraPrDefs are extracted with autoSpacing, breakSetting, border, and resolved tabPr/tabItem payload; table/cell margins and borderFill references expose inMargin, outMargin, cellMargin, and borderFill; hp:lineBreak is preserved as newline text and hp:fwSpace as fixed-space text in read-only paragraph payloads; existing paragraph/read-remediation contracts remain valid."
     },
     {
       "command": "python -m pytest tests/test_web_office_para_pr_defs.py tests/test_web_office_hwpx_read_remediation_audit.py tests/test_web_office_para_edit_applyformat_toolbar_preview.py",

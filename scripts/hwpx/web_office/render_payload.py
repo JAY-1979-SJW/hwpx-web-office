@@ -47,6 +47,8 @@ def build_render_payload(
             "isCoveredByMerge": c.isCoveredByMerge,
             "isMergedOrigin": c.isMergedOrigin,
             "text": c.text,
+            "borderFillIDRef": c.borderFillIDRef,
+            "borderFill": c.borderFill,
             "cellMargin": c.cellMargin,
             "paragraphs": [paragraph_payload(p) for p in c.paragraphs],
             "editable": False,
@@ -122,6 +124,8 @@ def build_render_payload(
     styles_payload: dict[str, Any] = {}
     if doc.styles.styleDefs:
         styles_payload["styleDefs"] = doc.styles.styleDefs
+    if doc.styles.borderFillDefs:
+        styles_payload["borderFillDefs"] = doc.styles.borderFillDefs
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     if doc.styles.fontFaceDefs:

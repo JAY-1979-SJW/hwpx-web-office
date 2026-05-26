@@ -27,6 +27,8 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
         "autoSpacing",
         "breakSetting",
         "lineSpacing",
+        "border",
+        "borderFill",
         "margin",
         "tabPr",
         "tabItems",
@@ -35,6 +37,8 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
     assert any(item.get("autoSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("breakSetting") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("lineSpacing") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("border") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("borderFill") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("margin") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("tabPr") for item in doc.styles.paraPrDefs.values())
 
@@ -187,16 +191,33 @@ def test_style_defs_extract_style_catalog_refs():
     assert payload["styles"]["styleDefs"] == doc.styles.styleDefs
 
 
+def test_border_fill_defs_extract_sides_and_diagonals():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert doc.styles.borderFillDefs
+    assert doc.styles.borderFillCount >= len(doc.styles.borderFillDefs)
+    sample = next(iter(doc.styles.borderFillDefs.values()))
+    assert {"borderFillId", "rawAttrs", "sides", "diagonal", "slash", "backSlash"} <= set(sample)
+    assert {"leftBorder", "rightBorder", "topBorder", "bottomBorder"} <= set(sample["sides"])
+    assert {"type", "width", "color"} <= set(sample["sides"]["leftBorder"])
+    assert payload["styles"]["borderFillDefs"] == doc.styles.borderFillDefs
+
+
 def test_table_and_cell_margin_fields_are_extracted():
     doc = import_hwpx_as_ro_view(FIXTURE)
 
     assert doc.tables
     assert doc.cells
+    assert any(c.borderFillIDRef for c in doc.cells)
+    assert any(c.borderFill for c in doc.cells)
     assert any(t.inMargin for t in doc.tables)
     assert any(t.outMargin for t in doc.tables)
     assert any(c.cellMargin for c in doc.cells)
     table = next(t for t in doc.tables if t.inMargin and t.outMargin)
     cell = next(c for c in doc.cells if c.cellMargin)
+    bordered_cell = next(c for c in doc.cells if c.borderFill)
+    assert bordered_cell.borderFillIDRef in doc.styles.borderFillDefs
     assert {"left", "right", "top", "bottom"} <= set(table.inMargin)
     assert {"left", "right", "top", "bottom"} <= set(table.outMargin)
     assert {"left", "right", "top", "bottom"} <= set(cell.cellMargin)
@@ -211,6 +232,11 @@ def test_render_payload_exposes_table_and_cell_margins_read_only():
     assert any(t.get("outMargin") for t in tables)
     assert any(
         cell.get("cellMargin")
+        for table in tables
+        for cell in table.get("cells", [])
+    )
+    assert any(
+        cell.get("borderFillIDRef") and cell.get("borderFill")
         for table in tables
         for cell in table.get("cells", [])
     )
