@@ -258,6 +258,8 @@ def _section_layout_attrs(section_root: ET.Element | None) -> dict[str, Any]:
         note_numbering[note_name] = {
             "rawAttrs": dict(note_pr.attrib),
             "autoNumFormat": _direct_child_attrs(note_pr, "autoNumFormat"),
+            "noteLine": _direct_child_attrs(note_pr, "noteLine"),
+            "noteSpacing": _direct_child_attrs(note_pr, "noteSpacing"),
             "numbering": _direct_child_attrs(note_pr, "numbering"),
             "placement": _direct_child_attrs(note_pr, "placement"),
         }
@@ -505,6 +507,35 @@ def _extract_numbering_defs(package: HwpxPackage | None) -> dict[str, dict[str, 
     except Exception:
         return {}
     return _extract_numbering_defs_from_header(header)
+
+
+def _extract_memo_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+
+    defs: dict[str, dict[str, Any]] = {}
+    for memo_pr in header.iter():
+        if local_name(memo_pr.tag) != "memoPr":
+            continue
+        memo_id = memo_pr.attrib.get("id")
+        if memo_id is None:
+            continue
+        defs[str(memo_id)] = {
+            "memoPrId": str(memo_id),
+            "rawAttrs": dict(memo_pr.attrib),
+            "width": memo_pr.attrib.get("width"),
+            "lineWidth": memo_pr.attrib.get("lineWidth"),
+            "lineType": memo_pr.attrib.get("lineType"),
+            "lineColor": memo_pr.attrib.get("lineColor"),
+            "fillColor": memo_pr.attrib.get("fillColor"),
+            "activeColor": memo_pr.attrib.get("activeColor"),
+            "memoType": memo_pr.attrib.get("memoType"),
+        }
+    return defs
 
 
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
@@ -994,6 +1025,7 @@ def import_hwpx_as_ro_view(
     para_pr_defs = _extract_para_pr_defs(package)
     font_face_defs = _extract_font_face_defs(package)
     style_defs = _extract_style_defs(package)
+    memo_pr_defs = _extract_memo_pr_defs(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
@@ -1005,7 +1037,8 @@ def import_hwpx_as_ro_view(
         styleDefs=style_defs,
         borderFillDefs=border_fill_defs,
         beginNum=begin_num,
-        numberingDefs=numbering_defs)
+        numberingDefs=numbering_defs,
+        memoPrDefs=memo_pr_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

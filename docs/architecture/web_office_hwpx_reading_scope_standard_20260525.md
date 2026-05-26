@@ -274,7 +274,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `note_annotation`
 - `application_settings`
 - `metadata_properties`
 - `package_metadata`
@@ -414,12 +413,29 @@ Current `embedded_control` remediation status:
   anchor behavior, non-column controls, and rendered visual comparison remain
   separate coverage targets.
 
+Current `note_annotation` remediation status:
+
+- Section `footNotePr` and `endNotePr` wrappers are exposed in read-only page
+  metadata as `noteNumbering[]` items with raw attributes.
+- Note `autoNumFormat`, `noteLine`, `noteSpacing`, `numbering`, and
+  `placement` child attributes are preserved under each note metadata entry.
+- Header `memoProperties/memoPr` definitions are extracted into
+  `documentModel.styles.memoPrDefs`.
+- The read-only render payload exposes `styles.memoPrDefs`, including memo
+  width, line style, line color, fill color, active color, memo type, and raw
+  attributes.
+- `note_annotation` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full note/memo rendering is still not claimed; note body resolution, note
+  anchors, memo display, and rendered visual comparison remain separate
+  coverage targets.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
-2. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
-3. `package_metadata`: hml, language, linkinfo, meta, title
+1. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
+2. `package_metadata`: hml, language, linkinfo, meta, title
+3. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
 
 ## 7. Pass Criteria for Current Baseline
 

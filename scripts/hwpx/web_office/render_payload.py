@@ -137,6 +137,8 @@ def build_render_payload(
         styles_payload["beginNum"] = doc.styles.beginNum
     if doc.styles.numberingDefs:
         styles_payload["numberingDefs"] = doc.styles.numberingDefs
+    if doc.styles.memoPrDefs:
+        styles_payload["memoPrDefs"] = doc.styles.memoPrDefs
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     if doc.styles.fontFaceDefs:

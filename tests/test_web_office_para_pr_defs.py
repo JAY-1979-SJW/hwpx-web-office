@@ -241,11 +241,40 @@ def test_section_start_num_and_note_numbering_are_extracted():
     assert section.noteNumbering
     assert {"footNotePr", "endNotePr"} <= set(section.noteNumbering)
     assert section.noteNumbering["footNotePr"]["autoNumFormat"]
+    assert section.noteNumbering["footNotePr"]["noteLine"]
+    assert section.noteNumbering["footNotePr"]["noteSpacing"]
     assert section.noteNumbering["footNotePr"]["numbering"]
     assert section.noteNumbering["footNotePr"]["placement"]
     page = payload["pages"][0]
     assert page["startNum"] == section.startNum
     assert page["noteNumbering"] == section.noteNumbering
+
+
+def test_memo_pr_defs_are_extracted_read_only():
+    doc = import_hwpx_as_ro_view(
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "hwpx"
+        / "corpus"
+        / "fx_many_tables_page_marker.hwpx"
+    )
+    payload = build_render_payload(doc)
+
+    assert doc.styles.memoPrDefs
+    sample = next(iter(doc.styles.memoPrDefs.values()))
+    assert {
+        "memoPrId",
+        "rawAttrs",
+        "width",
+        "lineWidth",
+        "lineType",
+        "lineColor",
+        "fillColor",
+        "activeColor",
+        "memoType",
+    } <= set(sample)
+    assert payload["styles"]["memoPrDefs"] == doc.styles.memoPrDefs
 
 
 def test_embedded_control_metadata_is_extracted_as_read_only_objects():
