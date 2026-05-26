@@ -68,6 +68,7 @@ def build_render_payload(
             "visualColCount": t.visualColCount,
             "hasMergedCells": t.hasMergedCells,
             "tableSize": t.tableSize,
+            "position": t.position,
             "inMargin": t.inMargin,
             "outMargin": t.outMargin,
             "cells": cells_by_table.get(t.tableId, []),
@@ -118,6 +119,10 @@ def build_render_payload(
             {"objectId": o.objectId, "kind": o.kind,
                 "sectionIndex": o.sectionIndex,
                 "placeholder": o.placeholder,
+                "rawAttrs": o.rawAttrs,
+                "position": o.position,
+                "colPr": o.colPr,
+                "containerScope": o.containerScope,
                 "editable": False}
             for o in doc.objects
         ],

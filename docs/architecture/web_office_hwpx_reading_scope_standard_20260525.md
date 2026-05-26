@@ -278,7 +278,6 @@ Current remediation audit category output:
 - `application_settings`
 - `metadata_properties`
 - `package_metadata`
-- `embedded_control`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -344,8 +343,6 @@ Current `page_layout` remediation status:
 - `pageBorderFill.offset` is preserved in each `pageBorderFills[]` item.
 - Table `tbl > sz` is extracted into `documentModel.tables[].tableSize` and
   the read-only table payload.
-- `colPr` currently appears under embedded `ctrl` elements in the checked-in
-  corpus, so it remains classified with `embedded_control`, not `page_layout`.
 - `page_layout` is no longer present in the current unsupported category output
   for the checked-in fixture corpus.
 - Full page visual fidelity is still not claimed; pagination, column controls,
@@ -401,12 +398,28 @@ Current `numbering_outline` remediation status:
   labels, restart behavior, nested list rendering, and rendered visual
   comparison remain separate coverage targets.
 
+Current `embedded_control` remediation status:
+
+- Inline `ctrl` elements are inventoried as read-only placeholder objects in
+  `documentModel.objects[]`.
+- `ctrl` raw attributes, child `colPr`, child `pos`, and stable
+  `containerScope` metadata are exposed on the object payload.
+- Table `pos` metadata is extracted into `documentModel.tables[].position` and
+  the read-only table payload.
+- Note `placement` metadata under `footNotePr` and `endNotePr` is exposed with
+  section note numbering metadata.
+- `embedded_control` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full embedded control rendering is still not claimed; column layout effects,
+  anchor behavior, non-column controls, and rendered visual comparison remain
+  separate coverage targets.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `embedded_control`: colPr, ctrl, placement, pos
-2. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
-3. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
+1. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
+2. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
+3. `package_metadata`: hml, language, linkinfo, meta, title
 
 ## 7. Pass Criteria for Current Baseline
 

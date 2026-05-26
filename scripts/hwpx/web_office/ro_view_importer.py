@@ -259,6 +259,7 @@ def _section_layout_attrs(section_root: ET.Element | None) -> dict[str, Any]:
             "rawAttrs": dict(note_pr.attrib),
             "autoNumFormat": _direct_child_attrs(note_pr, "autoNumFormat"),
             "numbering": _direct_child_attrs(note_pr, "numbering"),
+            "placement": _direct_child_attrs(note_pr, "placement"),
         }
     return {
         "secPr": dict(sec_pr.attrib),
@@ -316,6 +317,35 @@ def _iter_top_level_paragraphs_in_section(
                 result.append((idx, child))
                 idx += 1
     return result
+
+
+def _extract_ctrl_objects_from_section(
+    section_root: ET.Element | None,
+    section_index: int,
+) -> list[WebOfficeObject]:
+    if section_root is None:
+        return []
+    objects: list[WebOfficeObject] = []
+    for index, ctrl in enumerate(
+        e for e in section_root.iter() if local_name(e.tag) == "ctrl"
+    ):
+        col_pr = _direct_child_attrs(ctrl, "colPr")
+        position = _direct_child_attrs(ctrl, "pos")
+        objects.append(WebOfficeObject(
+            objectId=_stable_object_id(section_index, index),
+            sectionIndex=section_index,
+            kind="ctrl",
+            placeholder=True,
+            rawAttrs=dict(ctrl.attrib),
+            position=position,
+            colPr=col_pr,
+            containerScope={
+                "kind": "embeddedControl",
+                "sectionIndex": section_index,
+                "controlIndex": index,
+            },
+        ))
+    return objects
 
 
 def _load_package_safely(source_hwpx: Path) -> HwpxPackage | None:
@@ -720,6 +750,7 @@ def import_hwpx_as_ro_view(
             if sec_root is not None else None
         )
         table_size = _direct_child_attrs(table_elem, "sz")
+        table_position = _direct_child_attrs(table_elem, "pos")
         in_margin = _direct_child_attrs(table_elem, "inMargin")
         out_margin = _direct_child_attrs(table_elem, "outMargin")
         for c in t.cells or []:
@@ -845,6 +876,7 @@ def import_hwpx_as_ro_view(
             visualColCount=t.visualColCount,
             hasMergedCells=bool(t.hasMergedCells),
             tableSize=table_size,
+            position=table_position,
             inMargin=in_margin,
             outMargin=out_margin,
             cellIds=cell_ids))
@@ -941,12 +973,18 @@ def import_hwpx_as_ro_view(
             ref=ref))
 
     objects: list[WebOfficeObject] = []
+    for section in sections:
+        sec_root = _section_root_for(section.sourceXmlPath)
+        objects.extend(
+            _extract_ctrl_objects_from_section(sec_root, section.sectionIndex)
+        )
+    object_offset = len(objects)
     for oi, obj in enumerate(parsed.objects or []):
         kind = getattr(obj, "type", None) or getattr(obj, "kind",
                                                                             "unknown")
         sec_idx = getattr(obj, "sectionIndex", 0) or 0
         objects.append(WebOfficeObject(
-            objectId=_stable_object_id(sec_idx, oi),
+            objectId=_stable_object_id(sec_idx, object_offset + oi),
             sectionIndex=sec_idx,
             kind=str(kind),
             placeholder=True))

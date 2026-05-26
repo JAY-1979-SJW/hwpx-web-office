@@ -54,6 +54,7 @@ class WebOfficeTable:
     visualColCount: int
     hasMergedCells: bool = False
     tableSize: dict[str, Any] = field(default_factory=dict)
+    position: dict[str, Any] = field(default_factory=dict)
     inMargin: dict[str, Any] = field(default_factory=dict)
     outMargin: dict[str, Any] = field(default_factory=dict)
     cellIds: list[str] = field(default_factory=list)
@@ -87,6 +88,10 @@ class WebOfficeObject:
     sectionIndex: int
     kind: str         # "image" | "shape" | "ole" | "unknown"
     placeholder: bool = True
+    rawAttrs: dict[str, Any] = field(default_factory=dict)
+    position: dict[str, Any] = field(default_factory=dict)
+    colPr: dict[str, Any] = field(default_factory=dict)
+    containerScope: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

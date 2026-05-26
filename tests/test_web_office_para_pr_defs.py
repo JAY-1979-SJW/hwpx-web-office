@@ -242,9 +242,50 @@ def test_section_start_num_and_note_numbering_are_extracted():
     assert {"footNotePr", "endNotePr"} <= set(section.noteNumbering)
     assert section.noteNumbering["footNotePr"]["autoNumFormat"]
     assert section.noteNumbering["footNotePr"]["numbering"]
+    assert section.noteNumbering["footNotePr"]["placement"]
     page = payload["pages"][0]
     assert page["startNum"] == section.startNum
     assert page["noteNumbering"] == section.noteNumbering
+
+
+def test_embedded_control_metadata_is_extracted_as_read_only_objects():
+    doc = import_hwpx_as_ro_view(
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "hwpx"
+        / "corpus"
+        / "fx_many_tables_page_marker.hwpx"
+    )
+    payload = build_render_payload(doc)
+
+    assert doc.objects
+    ctrl = next(o for o in doc.objects if o.kind == "ctrl")
+    assert ctrl.placeholder is True
+    assert ctrl.colPr
+    assert ctrl.containerScope["kind"] == "embeddedControl"
+    payload_ctrl = next(o for o in payload["objects"] if o["objectId"] == ctrl.objectId)
+    assert payload_ctrl["editable"] is False
+    assert payload_ctrl["colPr"] == ctrl.colPr
+    assert payload_ctrl["containerScope"] == ctrl.containerScope
+
+
+def test_table_position_metadata_is_extracted_read_only():
+    doc = import_hwpx_as_ro_view(
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "hwpx"
+        / "corpus"
+        / "fx_many_tables_page_marker.hwpx"
+    )
+    payload = build_render_payload(doc)
+
+    assert any(t.position for t in doc.tables)
+    table = next(t for t in doc.tables if t.position)
+    assert {"treatAsChar", "vertRelTo", "horzRelTo"} <= set(table.position)
+    payload_table = next(t for t in payload["tables"] if t["tableId"] == table.tableId)
+    assert payload_table["position"] == table.position
 
 
 def test_table_and_cell_margin_fields_are_extracted():
