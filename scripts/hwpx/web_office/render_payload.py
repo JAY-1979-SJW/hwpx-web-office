@@ -120,6 +120,8 @@ def build_render_payload(
         "warnings": doc.warnings,
     }
     styles_payload: dict[str, Any] = {}
+    if doc.styles.styleDefs:
+        styles_payload["styleDefs"] = doc.styles.styleDefs
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     if doc.styles.fontFaceDefs:

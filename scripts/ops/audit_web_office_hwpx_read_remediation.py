@@ -77,6 +77,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "ratio",
     "relSz",
     "strikeout",
+    "style",
     "shadow",
     "spacing",
     "tabItem",
@@ -284,6 +285,10 @@ def _classify_xml_local_with_context(
     context_keys = set(contexts or {})
     if local in {"case", "default"} and context_keys and all(
         key.endswith("header.xml:switch") for key in context_keys
+    ):
+        return "parsed_for_current_model"
+    if local == "style" and context_keys and all(
+        key.endswith("header.xml:styles") for key in context_keys
     ):
         return "parsed_for_current_model"
     if local == "switch" and context_keys and all(

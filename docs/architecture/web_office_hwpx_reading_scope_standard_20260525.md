@@ -274,16 +274,13 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `text_style`
 - `border_style`
-- `page_layout`
 - `numbering_outline`
 - `note_annotation`
 - `application_settings`
 - `metadata_properties`
 - `package_metadata`
 - `embedded_control`
-- `style_catalog`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -355,6 +352,19 @@ Current `page_layout` remediation status:
   for the checked-in fixture corpus.
 - Full page visual fidelity is still not claimed; pagination, column controls,
   headers/footers, and rendered page comparison remain open.
+
+Current `style_catalog` remediation status:
+
+- Header `styles/style` catalog entries are extracted from `Contents/header.xml`
+  into `documentModel.styles.styleDefs`.
+- The read-only render payload exposes `styles.styleDefs`, including
+  `styleId`, `type`, `name`, `engName`, `paraPrIDRef`, `charPrIDRef`,
+  `nextStyleIDRef`, `langID`, `lockForm`, and raw HWPX attributes.
+- `style_catalog` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full style cascade fidelity is still not claimed; inheritance resolution,
+  paragraph/run cascade application, and UI visual comparison remain separate
+  coverage targets.
 
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:

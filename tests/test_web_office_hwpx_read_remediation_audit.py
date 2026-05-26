@@ -32,6 +32,7 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert "text_style" not in category_summary["categories"]
     assert "style_compatibility" not in category_summary["categories"]
     assert "page_layout" not in category_summary["categories"]
+    assert "style_catalog" not in category_summary["categories"]
     assert "embedded_control" in category_summary["categories"]
     assert "unknown_review_required" not in category_summary["categories"]
     assert payload["requiredWording"] == (
@@ -53,6 +54,7 @@ def test_read_remediation_audit_writes_machine_and_human_reports(tmp_path):
     assert "Unsupported Element Families" in md_text
     assert "Unsupported Category Summary" in md_text
     assert "style_compatibility" not in md_text
+    assert "style_catalog" not in md_text
 
 
 def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_path):

@@ -90,9 +90,11 @@ class WebOfficeStyles:
     charPrCount: int = 0
     parPrCount: int = 0
     borderFillCount: int = 0
+    styleCount: int = 0
     charPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     paraPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     fontFaceDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    styleDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

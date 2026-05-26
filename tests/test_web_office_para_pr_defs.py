@@ -162,6 +162,31 @@ def test_font_face_defs_extract_type_info():
     assert payload["styles"]["fontFaceDefs"] == doc.styles.fontFaceDefs
 
 
+def test_style_defs_extract_style_catalog_refs():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert doc.styles.styleDefs
+    assert doc.styles.styleCount == len(doc.styles.styleDefs)
+    sample = next(iter(doc.styles.styleDefs.values()))
+    assert {
+        "styleId",
+        "type",
+        "name",
+        "engName",
+        "paraPrIDRef",
+        "charPrIDRef",
+        "nextStyleIDRef",
+        "langID",
+        "lockForm",
+        "rawAttrs",
+    } <= set(sample)
+    assert any(item.get("type") == "PARA" for item in doc.styles.styleDefs.values())
+    assert any(item.get("paraPrIDRef") for item in doc.styles.styleDefs.values())
+    assert any(item.get("charPrIDRef") for item in doc.styles.styleDefs.values())
+    assert payload["styles"]["styleDefs"] == doc.styles.styleDefs
+
+
 def test_table_and_cell_margin_fields_are_extracted():
     doc = import_hwpx_as_ro_view(FIXTURE)
 

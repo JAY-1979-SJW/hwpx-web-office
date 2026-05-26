@@ -495,6 +495,37 @@ def _extract_font_face_defs(package: HwpxPackage | None) -> dict[str, dict[str, 
         return {}
 
 
+def _extract_style_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+
+    defs: dict[str, dict[str, Any]] = {}
+    for style in header.iter():
+        if local_name(style.tag) != "style":
+            continue
+        style_id = style.attrib.get("id")
+        if style_id is None:
+            continue
+        payload = {
+            "styleId": str(style_id),
+            "type": style.attrib.get("type"),
+            "name": style.attrib.get("name"),
+            "engName": style.attrib.get("engName"),
+            "paraPrIDRef": style.attrib.get("paraPrIDRef"),
+            "charPrIDRef": style.attrib.get("charPrIDRef"),
+            "nextStyleIDRef": style.attrib.get("nextStyleIDRef"),
+            "langID": style.attrib.get("langID"),
+            "lockForm": style.attrib.get("lockForm"),
+            "rawAttrs": dict(style.attrib),
+        }
+        defs[str(style_id)] = payload
+    return defs
+
+
 def import_hwpx_as_ro_view(
     source_hwpx: Path
 ) -> WebOfficeDocumentModel:
@@ -798,13 +829,16 @@ def import_hwpx_as_ro_view(
     char_pr_defs = _extract_char_pr_defs(package)
     para_pr_defs = _extract_para_pr_defs(package)
     font_face_defs = _extract_font_face_defs(package)
+    style_defs = _extract_style_defs(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
         borderFillCount=len(getattr(style_info, "borderFill", []) or []),
+        styleCount=len(style_defs),
         charPrDefs=char_pr_defs,
         paraPrDefs=para_pr_defs,
-        fontFaceDefs=font_face_defs)
+        fontFaceDefs=font_face_defs,
+        styleDefs=style_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):
