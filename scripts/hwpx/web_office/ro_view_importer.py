@@ -538,6 +538,40 @@ def _extract_memo_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
     return defs
 
 
+def _extract_metadata_containers(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+
+    wanted = {
+        "refList",
+        "charProperties",
+        "paraProperties",
+        "tabProperties",
+    }
+    containers: dict[str, dict[str, Any]] = {}
+    for elem in header.iter():
+        name = local_name(elem.tag)
+        if name not in wanted:
+            continue
+        children = list(elem)
+        child_counts: dict[str, int] = {}
+        for child in children:
+            child_name = local_name(child.tag)
+            child_counts[child_name] = child_counts.get(child_name, 0) + 1
+        containers[name] = {
+            "container": name,
+            "rawAttrs": dict(elem.attrib),
+            "itemCnt": elem.attrib.get("itemCnt"),
+            "childCount": len(children),
+            "childCounts": child_counts,
+        }
+    return containers
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -1026,6 +1060,7 @@ def import_hwpx_as_ro_view(
     font_face_defs = _extract_font_face_defs(package)
     style_defs = _extract_style_defs(package)
     memo_pr_defs = _extract_memo_pr_defs(package)
+    metadata_containers = _extract_metadata_containers(package)
     styles = WebOfficeStyles(
         charPrCount=len(getattr(style_info, "charPr", []) or []),
         parPrCount=len(getattr(style_info, "parPr", []) or []),
@@ -1038,7 +1073,8 @@ def import_hwpx_as_ro_view(
         borderFillDefs=border_fill_defs,
         beginNum=begin_num,
         numberingDefs=numbering_defs,
-        memoPrDefs=memo_pr_defs)
+        memoPrDefs=memo_pr_defs,
+        metadataContainers=metadata_containers)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

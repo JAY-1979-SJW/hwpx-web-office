@@ -108,6 +108,7 @@ class WebOfficeStyles:
     beginNum: dict[str, Any] = field(default_factory=dict)
     numberingDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     memoPrDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    metadataContainers: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

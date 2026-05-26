@@ -275,7 +275,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 Current remediation audit category output:
 
 - `application_settings`
-- `metadata_properties`
 - `package_metadata`
 - `revision_tracking`
 
@@ -430,12 +429,26 @@ Current `note_annotation` remediation status:
   anchors, memo display, and rendered visual comparison remain separate
   coverage targets.
 
+Current `metadata_properties` remediation status:
+
+- Header metadata wrapper containers are inventoried into
+  `documentModel.styles.metadataContainers`.
+- `refList`, `charProperties`, `paraProperties`, and `tabProperties` expose raw
+  container attributes, `itemCnt`, child count, and child element counts.
+- The read-only render payload exposes `styles.metadataContainers` alongside
+  the already extracted concrete definitions.
+- `metadata_properties` is no longer present in the current unsupported
+  category output for the checked-in fixture corpus.
+- Full metadata semantics are still not claimed; this only locks visibility of
+  the wrapper inventory and keeps semantic interpretation with each concrete
+  feature area.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
-2. `package_metadata`: hml, language, linkinfo, meta, title
-3. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
+1. `package_metadata`: hml, language, linkinfo, meta, title
+2. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
+3. `revision_tracking`: trackchageConfig
 
 ## 7. Pass Criteria for Current Baseline
 

@@ -277,6 +277,24 @@ def test_memo_pr_defs_are_extracted_read_only():
     assert payload["styles"]["memoPrDefs"] == doc.styles.memoPrDefs
 
 
+def test_metadata_container_inventory_is_extracted_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert doc.styles.metadataContainers
+    assert {"refList", "charProperties", "paraProperties", "tabProperties"} <= set(
+        doc.styles.metadataContainers
+    )
+    ref_list = doc.styles.metadataContainers["refList"]
+    assert ref_list["container"] == "refList"
+    assert ref_list["childCount"] >= 1
+    assert ref_list["childCounts"].get("charProperties", 0) >= 1
+    char_props = doc.styles.metadataContainers["charProperties"]
+    assert char_props["itemCnt"] is not None
+    assert char_props["childCounts"].get("charPr", 0) >= 1
+    assert payload["styles"]["metadataContainers"] == doc.styles.metadataContainers
+
+
 def test_embedded_control_metadata_is_extracted_as_read_only_objects():
     doc = import_hwpx_as_ro_view(
         PROJECT_ROOT

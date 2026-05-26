@@ -139,6 +139,8 @@ def build_render_payload(
         styles_payload["numberingDefs"] = doc.styles.numberingDefs
     if doc.styles.memoPrDefs:
         styles_payload["memoPrDefs"] = doc.styles.memoPrDefs
+    if doc.styles.metadataContainers:
+        styles_payload["metadataContainers"] = doc.styles.metadataContainers
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     if doc.styles.fontFaceDefs:

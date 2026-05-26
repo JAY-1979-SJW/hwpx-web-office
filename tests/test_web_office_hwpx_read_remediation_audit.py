@@ -27,7 +27,7 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert payload["corpus"]["hwpxFileCount"] >= 3
     assert payload["corpus"]["manifestFound"] is True
     assert payload["coverageSummary"]["unsupportedWithWarningCount"] >= 1
-    assert category_summary["categoryCount"] >= 4
+    assert category_summary["categoryCount"] >= 3
     assert "paragraph_layout" not in category_summary["categories"]
     assert "text_style" not in category_summary["categories"]
     assert "style_compatibility" not in category_summary["categories"]
@@ -37,6 +37,7 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert "numbering_outline" not in category_summary["categories"]
     assert "embedded_control" not in category_summary["categories"]
     assert "note_annotation" not in category_summary["categories"]
+    assert "metadata_properties" not in category_summary["categories"]
     assert "unknown_review_required" not in category_summary["categories"]
     assert payload["requiredWording"] == (
         "Basic HWPX read is verified; full compatibility and UI fidelity remain open."
@@ -62,6 +63,7 @@ def test_read_remediation_audit_writes_machine_and_human_reports(tmp_path):
     assert "numbering_outline" not in md_text
     assert "embedded_control" not in md_text
     assert "note_annotation" not in md_text
+    assert "metadata_properties" not in md_text
 
 
 def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_path):
