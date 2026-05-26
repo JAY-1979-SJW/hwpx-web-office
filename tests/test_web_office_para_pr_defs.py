@@ -310,6 +310,21 @@ def test_package_metadata_is_extracted_read_only():
     assert payload["packageMetadata"] == metadata
 
 
+def test_application_settings_are_extracted_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    settings = doc.applicationSettings
+    assert settings["hwpApplicationSetting"]["entry"].endswith("settings.xml")
+    assert settings["hwpApplicationSetting"]["rootLocalName"] == "HWPApplicationSetting"
+    assert settings["caretPosition"]["rawAttrs"]
+    assert settings["compatibleDocument"]["rawAttrs"]
+    assert settings["layoutCompatibility"]["entry"].endswith("Contents/header.xml")
+    assert "rawAttrs" in settings["layoutCompatibility"]
+    assert settings["sectionVisibility"]
+    assert payload["applicationSettings"] == settings
+
+
 def test_embedded_control_metadata_is_extracted_as_read_only_objects():
     doc = import_hwpx_as_ro_view(
         PROJECT_ROOT

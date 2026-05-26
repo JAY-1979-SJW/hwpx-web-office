@@ -112,6 +112,7 @@ def build_render_payload(
             "path": doc.sourceDocumentPath,
         },
         "packageMetadata": doc.packageMetadata,
+        "applicationSettings": doc.applicationSettings,
         "editable": False,
         "pages": pages,
         "blocks": blocks,

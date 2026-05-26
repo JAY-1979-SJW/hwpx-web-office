@@ -44,6 +44,8 @@ DEFAULT_REPORT_DIR = (
 
 SUPPORTED_CURRENT_XML_LOCALS = {
     "HCFVersion",
+    "CaretPosition",
+    "HWPApplicationSetting",
     "package",
     "metadata",
     "manifest",
@@ -124,6 +126,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "cellMargin",
     "cellSpan",
     "cellSz",
+    "compatibleDocument",
     "colPr",
     "ctrl",
     "inMargin",
@@ -135,6 +138,8 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "linesegarray",
     "lineseg",
     "lineBreak",
+    "layoutCompatibility",
+    "visibility",
     "fwSpace",
 }
 

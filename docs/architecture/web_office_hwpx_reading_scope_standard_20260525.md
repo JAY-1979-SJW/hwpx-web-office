@@ -274,7 +274,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `application_settings`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -460,11 +459,27 @@ Current `package_metadata` remediation status:
 - Full package metadata semantics are still not claimed; this only makes the
   metadata visible and auditable for the current read model.
 
+Current `application_settings` remediation status:
+
+- `settings.xml` application settings are inventoried into
+  `documentModel.applicationSettings.hwpApplicationSetting`.
+- `CaretPosition` is exposed as
+  `documentModel.applicationSettings.caretPosition`.
+- Header `compatibleDocument` and child `layoutCompatibility` are exposed as
+  read-only application settings metadata.
+- Section `visibility` attributes are exposed as
+  `documentModel.applicationSettings.sectionVisibility[]`, including section
+  index, source entry, and raw HWPX attributes.
+- The read-only render payload exposes `applicationSettings` at the top level.
+- `application_settings` is no longer present in the current unsupported
+  category output for the checked-in fixture corpus.
+- Full application behavior equivalence is still not claimed; this only locks
+  settings visibility and does not apply Hancom application runtime behavior.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
-2. `revision_tracking`: trackchageConfig
+1. `revision_tracking`: trackchageConfig
 
 ## 7. Pass Criteria for Current Baseline
 

@@ -651,6 +651,74 @@ def _extract_package_metadata(package: HwpxPackage | None) -> dict[str, Any]:
     return payload
 
 
+def _extract_application_settings(package: HwpxPackage | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "hwpApplicationSetting": {},
+        "caretPosition": {},
+        "compatibleDocument": {},
+        "layoutCompatibility": {},
+        "sectionVisibility": [],
+    }
+    if package is None:
+        return payload
+
+    settings_entry = _find_package_entry(package, "settings.xml")
+    if settings_entry is not None:
+        try:
+            settings_root = package.read_xml(settings_entry)
+        except Exception:
+            settings_root = None
+        if settings_root is not None:
+            payload["hwpApplicationSetting"] = {
+                "entry": settings_entry,
+                "rootLocalName": local_name(settings_root.tag),
+                "rawAttrs": dict(settings_root.attrib),
+            }
+            caret = _descendant_by_local(settings_root, "CaretPosition")
+            if caret is not None:
+                payload["caretPosition"] = {
+                    "entry": settings_entry,
+                    "rawAttrs": dict(caret.attrib),
+                }
+
+    header_entry = _find_package_entry(package, "Contents/header.xml")
+    if header_entry is not None:
+        try:
+            header = package.read_xml(header_entry)
+        except Exception:
+            header = None
+        if header is not None:
+            compatible = _descendant_by_local(header, "compatibleDocument")
+            if compatible is not None:
+                payload["compatibleDocument"] = {
+                    "entry": header_entry,
+                    "rawAttrs": dict(compatible.attrib),
+                }
+                layout = _descendant_by_local(compatible, "layoutCompatibility")
+                if layout is not None:
+                    payload["layoutCompatibility"] = {
+                        "entry": header_entry,
+                        "rawAttrs": dict(layout.attrib),
+                    }
+
+    section_visibility: list[dict[str, Any]] = []
+    for section_index, section_entry in enumerate(package.section_entries()):
+        try:
+            section_root = package.read_xml(section_entry)
+        except Exception:
+            continue
+        sec_pr = _descendant_by_local(section_root, "secPr")
+        visibility = _child_by_local(sec_pr, "visibility") if sec_pr is not None else None
+        if visibility is not None:
+            section_visibility.append({
+                "sectionIndex": section_index,
+                "entry": section_entry,
+                "rawAttrs": dict(visibility.attrib),
+            })
+    payload["sectionVisibility"] = section_visibility
+    return payload
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -833,6 +901,7 @@ def import_hwpx_as_ro_view(
     begin_num = _extract_begin_num(package)
     numbering_defs = _extract_numbering_defs(package)
     package_metadata = _extract_package_metadata(package)
+    application_settings = _extract_application_settings(package)
     section_roots_cache: dict[str, ET.Element | None] = {}
 
     def _section_root_for(path: str | None) -> ET.Element | None:
@@ -1171,6 +1240,7 @@ def import_hwpx_as_ro_view(
         sourceDocumentHash=sha,
         sourceDocumentPath=str(source_hwpx),
         packageMetadata=package_metadata,
+        applicationSettings=application_settings,
         sections=sections, blocks=blocks,
         paragraphs=paragraphs, tables=tables,
         cells=cells, objects=objects, styles=styles,
