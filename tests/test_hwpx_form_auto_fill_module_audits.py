@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -80,3 +81,30 @@ def test_09_windows_pytest_cleanup_permission_is_nonblocking() -> None:
         "PermissionError: [WinError 5] access is denied"
     )
     assert module_audit._is_pytest_cleanup_permission_only(output)
+
+
+def test_10_pytest_timeout_is_structured_failure(monkeypatch) -> None:
+    def timeout_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", "pytest"), timeout=1)
+
+    monkeypatch.setattr(module_audit.subprocess, "run", timeout_run)
+    result = module_audit._run_pytest(["tests/test_hwpx_approval_gate.py"], timeout=1)
+
+    assert result["status"] == "FAIL"
+    assert result["returncode"] == -9
+    assert "timed out" in result["summary"]
+
+
+def test_11_combined_pytest_timeout_is_structured_failure(monkeypatch) -> None:
+    def timeout_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", "pytest"), timeout=1)
+
+    monkeypatch.setattr(module_audit.subprocess, "run", timeout_run)
+    result = module_audit._run_pytest_combined(
+        ["tests/test_hwpx_approval_gate.py"],
+        timeout=1,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["returncode"] == -9
+    assert "timed out" in result["summary"]

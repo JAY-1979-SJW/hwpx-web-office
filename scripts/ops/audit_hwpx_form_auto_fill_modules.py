@@ -54,13 +54,22 @@ def _run_pytest(paths: list[str], timeout: int) -> dict[str, Any]:
         safe_name = "_".join(Path(path).stem for path in paths)[:80]
         basetemp = _safe_pytest_basetemp(attempt, safe_name)
         cmd = [sys.executable, "-m", "pytest", *paths, "-q", "--tb=short", f"--basetemp={basetemp}"]
-        result = subprocess.run(
-            cmd,
-            cwd=str(ROOT),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "FAIL",
+                "returncode": -9,
+                "attempts": attempts,
+                "durationSeconds": round(time.perf_counter() - started, 3),
+                "summary": f"pytest timed out after {timeout} seconds for {len(paths)} files",
+            }
         output = result.stdout + "\n" + result.stderr
         lines = [line.strip() for line in output.splitlines() if line.strip()]
         summary = _safe_text(lines[-1] if lines else "no output")
@@ -89,11 +98,20 @@ def _safe_pytest_basetemp(attempt: int, safe_name: str) -> Path:
 
 def _run_pytest_combined(paths: list[str], timeout: int) -> dict[str, Any]:
     started = time.perf_counter()
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", *paths, "-q", "--tb=short"],
-        cwd=str(ROOT),
-        timeout=timeout,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", *paths, "-q", "--tb=short"],
+            cwd=str(ROOT),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "FAIL",
+            "returncode": -9,
+            "attempts": 1,
+            "durationSeconds": round(time.perf_counter() - started, 3),
+            "summary": f"combined pytest timed out after {timeout} seconds for {len(paths)} files",
+        }
     return {
         "status": "PASS" if result.returncode == 0 else "FAIL",
         "returncode": result.returncode,
