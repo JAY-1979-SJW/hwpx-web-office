@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "web_office_commit_work_record_v1",
+  "task": "CURRENT-COMMIT-WORK-RECORD-20260526",
+  "recordedAt": "2026-05-26T16:00:00+09:00",
+  "repositoryState": {
+    "head": "cef129f",
+    "originMaster": "cef129f",
+    "workingTree": "clean",
+    "serverIsFinal": true
+  },
+  "recentCommits": [
+    {
+      "commit": "cef129f",
+      "subject": "feat: add hwpx candidate server pipeline",
+      "summary": "Added one-command local candidate upload plus server background scan pipeline with approval-required policy."
+    },
+    {
+      "commit": "ba15862",
+      "subject": "feat: add hwpx candidate server upload",
+      "summary": "Added hash-name HWPX candidate upload to the server candidate folder without automatic corpus promotion."
+    },
+    {
+      "commit": "f79fb5c",
+      "subject": "feat: add hwpx corpus candidate scan",
+      "summary": "Added safe HWPX corpus candidate scanner, background server execution, manifest draft output, and approval gate."
+    },
+    {
+      "commit": "77ae6a1",
+      "subject": "docs: define gate tiers and server final standard",
+      "summary": "Documented gate tiers and server-final completion requirements."
+    },
+    {
+      "commit": "86c0afe",
+      "subject": "fix: report module audit pytest timeouts",
+      "summary": "Converted module audit pytest timeouts into structured FAIL results instead of tracebacks."
+    },
+    {
+      "commit": "ac0c252",
+      "subject": "feat: expose hwpx revision tracking metadata",
+      "summary": "Exposed HWPX revision tracking metadata in the read-only Web Office model."
+    },
+    {
+      "commit": "884b8ea",
+      "subject": "feat: expose hwpx application settings",
+      "summary": "Exposed HWPX application settings metadata in the read-only Web Office model."
+    },
+    {
+      "commit": "c4c333a",
+      "subject": "feat: expose hwpx package metadata",
+      "summary": "Exposed HWPX package metadata in the read-only Web Office model."
+    }
+  ],
+  "latestValidation": {
+    "local": [
+      "python -m pytest tests/test_web_office_hwpx_candidate_server_pipeline.py tests/test_web_office_hwpx_candidate_upload_script.py -q --tb=short",
+      "python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only",
+      "python scripts/ops/run_hwpx_repo_prepush_guard.py --temp-only"
+    ],
+    "server": [
+      "powershell -ExecutionPolicy Bypass -File scripts/ops/deploy_web_office_to_server.ps1",
+      "server health, structure drift, HWPX read remediation audit, and backend runtime smoke",
+      "powershell -ExecutionPolicy Bypass -File scripts/ops/run_hwpx_candidate_server_pipeline.ps1"
+    ],
+    "status": "PASS"
+  },
+  "currentCandidateState": {
+    "localCandidateDir": "data/local_corpus_candidates",
+    "serverCandidateDir": "data/local_corpus_candidates",
+    "uploaded": 0,
+    "scanned": 0,
+    "candidateCount": 0,
+    "promotionRequiresApproval": true
+  },
+  "claimBoundary": "Basic HWPX read is verified; full compatibility and UI fidelity remain open.",
+  "nextWork": [
+    "Place real HWPX candidates under data/local_corpus_candidates when ready.",
+    "Run scripts/ops/run_hwpx_candidate_server_pipeline.ps1.",
+    "Review candidate_manifest_draft.json before any fixture corpus promotion."
+  ],
+  "finalStatus": "RECORDED_AT_CEF129F"
+}
