@@ -135,7 +135,7 @@ def classify_path(path: str) -> tuple[str, str, str]:
             return "ACTIVE_AUTOFILL", "batch_api_browser", "keep_active_autofill_frontend"
         return "FRONTEND_VIEWER", "browser_ui", "keep_frontend_viewer"
     if lower.startswith("scripts/ops/"):
-        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan")):
+        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates")):
             return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
         if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
             return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"

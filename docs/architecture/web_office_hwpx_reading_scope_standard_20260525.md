@@ -503,6 +503,10 @@ Approved scanner:
 
 - `scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py`
 
+Approved uploader:
+
+- `scripts/ops/upload_hwpx_candidates_to_server.ps1`
+
 Default server/local paths:
 
 - candidate root: `data/local_corpus_candidates`
@@ -518,10 +522,18 @@ The scanner may be started in the background:
 python3 scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py --background
 ```
 
+Local candidate files may be uploaded to the server candidate folder with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/ops/upload_hwpx_candidates_to_server.ps1
+```
+
 Required behavior:
 
 - The scan is read-only.
 - Raw candidate files are not copied into `tests/fixtures/hwpx/corpus`.
+- Uploaded server candidate files must use hash-derived names rather than raw
+  original file names.
 - Candidate promotion is blocked until explicit approval.
 - Candidate reports must mark `promotionRequiresApproval=true`.
 - The generated manifest is only a draft and must not be treated as the locked

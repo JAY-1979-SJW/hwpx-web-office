@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-HWPX-CANDIDATE-UPLOAD-20260526",
+  "changedFiles": [
+    "scripts/ops/upload_hwpx_candidates_to_server.ps1",
+    "tests/test_web_office_hwpx_candidate_upload_script.py",
+    "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+    "docs/devlog/2026-05-26-web-office-hwpx-candidate-upload.json"
+  ],
+  "capability": {
+    "purpose": "Upload local HWPX candidate files to the server candidate folder without preserving raw original file names.",
+    "sourceDir": "data/local_corpus_candidates",
+    "serverCandidateDir": "data/local_corpus_candidates",
+    "remoteNamePolicy": "sha256-prefix.hwpx",
+    "automaticPromotionAllowed": false,
+    "promotionRequiresApproval": true
+  },
+  "validationCommands": [
+    {
+      "command": "python -m pytest tests/test_web_office_hwpx_candidate_upload_script.py -q --tb=short",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "2 tests passed."
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/ops/upload_hwpx_candidates_to_server.ps1",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "Returned NO_LOCAL_CANDIDATE_DIR with uploaded 0 and promotionRequiresApproval true, which is the expected safe idle state before candidate files are supplied."
+    }
+  ],
+  "serverVerification": {
+    "required": true,
+    "status": "PASS",
+    "reason": "Server is the final operating reference for Web Office work."
+  },
+  "holdItems": [
+    "No upload was performed because the current local and server candidate folders contain zero HWPX candidates.",
+    "Uploading candidates does not promote them into the checked-in fixture corpus."
+  ],
+  "finalStatus": "SERVER_READY_NO_CANDIDATES"
+}
