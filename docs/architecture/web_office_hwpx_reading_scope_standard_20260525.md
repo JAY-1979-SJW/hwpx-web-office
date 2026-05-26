@@ -507,6 +507,10 @@ Approved uploader:
 
 - `scripts/ops/upload_hwpx_candidates_to_server.ps1`
 
+Approved upload-and-scan pipeline:
+
+- `scripts/ops/run_hwpx_candidate_server_pipeline.ps1`
+
 Default server/local paths:
 
 - candidate root: `data/local_corpus_candidates`
@@ -527,6 +531,16 @@ Local candidate files may be uploaded to the server candidate folder with:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/ops/upload_hwpx_candidates_to_server.ps1
 ```
+
+The full candidate server pipeline may be run with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/ops/run_hwpx_candidate_server_pipeline.ps1
+```
+
+The pipeline uploads local candidates when present, starts the server scanner in
+background mode, and reads the server report summary. It must still end with
+`promotionRequiresApproval=true`.
 
 Required behavior:
 

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-HWPX-CANDIDATE-SERVER-PIPELINE-20260526",
+  "changedFiles": [
+    "scripts/ops/run_hwpx_candidate_server_pipeline.ps1",
+    "tests/test_web_office_hwpx_candidate_server_pipeline.py",
+    "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+    "docs/devlog/2026-05-26-web-office-hwpx-candidate-server-pipeline.json"
+  ],
+  "capability": {
+    "purpose": "Run one command that uploads local HWPX candidates when present, starts the server candidate scanner in background mode, and returns the server scan summary.",
+    "automaticPromotionAllowed": false,
+    "promotionRequiresApproval": true,
+    "serverIsFinal": true
+  },
+  "validationCommands": [
+    {
+      "command": "python -m pytest tests/test_web_office_hwpx_candidate_server_pipeline.py tests/test_web_office_hwpx_candidate_upload_script.py -q --tb=short",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "4 tests passed."
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/ops/run_hwpx_candidate_server_pipeline.ps1",
+      "location": "server haehan-app",
+      "result": "PASS",
+      "evidence": "Pipeline returned PASS, uploadVerdict NO_LOCAL_CANDIDATE_DIR, uploaded 0, serverScan.reportVerdict PASS, serverScan.finalStatus CANDIDATE_SCAN_PASS_REVIEW_REQUIRED, promotionRequiresApproval true."
+    }
+  ],
+  "claimBoundary": "Basic HWPX read is verified; full compatibility and UI fidelity remain open.",
+  "holdItems": [
+    "Pipeline success does not promote candidate files into the checked-in corpus.",
+    "Candidate promotion remains a separate explicit approval step."
+  ],
+  "finalStatus": "SERVER_PIPELINE_PASS_NO_CANDIDATES"
+}
