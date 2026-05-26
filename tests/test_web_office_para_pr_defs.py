@@ -295,6 +295,21 @@ def test_metadata_container_inventory_is_extracted_read_only():
     assert payload["styles"]["metadataContainers"] == doc.styles.metadataContainers
 
 
+def test_package_metadata_is_extracted_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    metadata = doc.packageMetadata
+    assert metadata["contentPackage"]["entry"].endswith("Contents/content.hpf")
+    assert metadata["metadata"]["language"]["text"]
+    assert "title" in metadata["metadata"]
+    assert metadata["metaItems"]
+    assert any(item["rawAttrs"].get("name") for item in metadata["metaItems"])
+    assert "linkInfo" in metadata
+    assert metadata["sectionRoots"]
+    assert payload["packageMetadata"] == metadata
+
+
 def test_embedded_control_metadata_is_extracted_as_read_only_objects():
     doc = import_hwpx_as_ro_view(
         PROJECT_ROOT

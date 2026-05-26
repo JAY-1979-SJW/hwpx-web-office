@@ -390,6 +390,19 @@ def _read_header_bytes(package: HwpxPackage | None) -> bytes | None:
     return None
 
 
+def _find_package_entry(package: HwpxPackage | None, suffix: str) -> str | None:
+    if package is None:
+        return None
+    normalized_suffix = suffix.replace("\\", "/")
+    for name in package.entries:
+        if name.replace("\\", "/") == normalized_suffix:
+            return name
+    for name in package.entries:
+        if name.replace("\\", "/").endswith(normalized_suffix):
+            return name
+    return None
+
+
 def _child_by_local(elem: ET.Element, wanted: str) -> ET.Element | None:
     for child in list(elem):
         if local_name(child.tag) == wanted:
@@ -570,6 +583,72 @@ def _extract_metadata_containers(package: HwpxPackage | None) -> dict[str, dict[
             "childCounts": child_counts,
         }
     return containers
+
+
+def _extract_package_metadata(package: HwpxPackage | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "contentPackage": {},
+        "metadata": {},
+        "metaItems": [],
+        "linkInfo": {},
+        "sectionRoots": [],
+    }
+    if package is None:
+        return payload
+
+    content_entry = _find_package_entry(package, "Contents/content.hpf")
+    if content_entry is not None:
+        try:
+            content_root = package.read_xml(content_entry)
+        except Exception:
+            content_root = None
+        if content_root is not None:
+            payload["contentPackage"] = {
+                "entry": content_entry,
+                "rawAttrs": dict(content_root.attrib),
+            }
+            metadata = _child_by_local(content_root, "metadata")
+            if metadata is not None:
+                metadata_payload: dict[str, Any] = {"rawAttrs": dict(metadata.attrib)}
+                meta_items: list[dict[str, Any]] = []
+                for child in list(metadata):
+                    child_name = local_name(child.tag)
+                    child_payload = {
+                        "name": child_name,
+                        "text": child.text or "",
+                        "rawAttrs": dict(child.attrib),
+                    }
+                    if child_name == "meta":
+                        meta_items.append(child_payload)
+                    else:
+                        metadata_payload[child_name] = child_payload
+                payload["metadata"] = metadata_payload
+                payload["metaItems"] = meta_items
+
+    header_entry = _find_package_entry(package, "Contents/header.xml")
+    if header_entry is not None:
+        try:
+            header = package.read_xml(header_entry)
+        except Exception:
+            header = None
+        if header is not None:
+            linkinfo = _descendant_by_local(header, "linkinfo")
+            if linkinfo is not None:
+                payload["linkInfo"] = dict(linkinfo.attrib)
+
+    section_roots: list[dict[str, Any]] = []
+    for section_entry in package.section_entries():
+        try:
+            section_root = package.read_xml(section_entry)
+        except Exception:
+            continue
+        section_roots.append({
+            "entry": section_entry,
+            "rootLocalName": local_name(section_root.tag),
+            "rawAttrs": dict(section_root.attrib),
+        })
+    payload["sectionRoots"] = section_roots
+    return payload
 
 
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
@@ -753,6 +832,7 @@ def import_hwpx_as_ro_view(
     border_fill_defs = _extract_border_fill_defs(package)
     begin_num = _extract_begin_num(package)
     numbering_defs = _extract_numbering_defs(package)
+    package_metadata = _extract_package_metadata(package)
     section_roots_cache: dict[str, ET.Element | None] = {}
 
     def _section_root_for(path: str | None) -> ET.Element | None:
@@ -1090,6 +1170,7 @@ def import_hwpx_as_ro_view(
         documentId=document_id,
         sourceDocumentHash=sha,
         sourceDocumentPath=str(source_hwpx),
+        packageMetadata=package_metadata,
         sections=sections, blocks=blocks,
         paragraphs=paragraphs, tables=tables,
         cells=cells, objects=objects, styles=styles,

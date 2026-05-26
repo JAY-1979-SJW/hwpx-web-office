@@ -111,6 +111,7 @@ def build_render_payload(
             "sha256": doc.sourceDocumentHash,
             "path": doc.sourceDocumentPath,
         },
+        "packageMetadata": doc.packageMetadata,
         "editable": False,
         "pages": pages,
         "blocks": blocks,

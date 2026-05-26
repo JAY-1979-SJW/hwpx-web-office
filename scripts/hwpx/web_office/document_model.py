@@ -119,6 +119,7 @@ class WebOfficeDocumentModel:
     documentId: str
     sourceDocumentHash: str
     sourceDocumentPath: str
+    packageMetadata: dict[str, Any] = field(default_factory=dict)
     sections: list[WebOfficeSection] = field(default_factory=list)
     blocks: list[WebOfficeBlock] = field(default_factory=list)
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)

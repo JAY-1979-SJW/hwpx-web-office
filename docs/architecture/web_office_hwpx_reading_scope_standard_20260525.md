@@ -275,7 +275,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 Current remediation audit category output:
 
 - `application_settings`
-- `package_metadata`
 - `revision_tracking`
 
 Current `paragraph_layout` remediation status:
@@ -443,12 +442,29 @@ Current `metadata_properties` remediation status:
   the wrapper inventory and keeps semantic interpretation with each concrete
   feature area.
 
+Current `package_metadata` remediation status:
+
+- `Contents/content.hpf` package attributes are extracted into
+  `documentModel.packageMetadata.contentPackage`.
+- `content.hpf` metadata children are exposed through
+  `documentModel.packageMetadata.metadata`; repeated `meta` entries are exposed
+  as `packageMetadata.metaItems`.
+- Header `docOption/linkinfo` attributes are exposed as
+  `packageMetadata.linkInfo`.
+- Section root wrappers are inventoried as `packageMetadata.sectionRoots`,
+  including source entry, root local name such as `sec`/`hml`, and raw
+  attributes.
+- The read-only render payload exposes `packageMetadata` at the top level.
+- `package_metadata` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full package metadata semantics are still not claimed; this only makes the
+  metadata visible and auditable for the current read model.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `package_metadata`: hml, language, linkinfo, meta, title
-2. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
-3. `revision_tracking`: trackchageConfig
+1. `application_settings`: CaretPosition, HWPApplicationSetting, compatibleDocument, layoutCompatibility, visibility
+2. `revision_tracking`: trackchageConfig
 
 ## 7. Pass Criteria for Current Baseline
 
