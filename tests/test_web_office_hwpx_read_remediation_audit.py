@@ -26,8 +26,8 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert payload["serverFinalReferenceRequired"] is True
     assert payload["corpus"]["hwpxFileCount"] >= 3
     assert payload["corpus"]["manifestFound"] is True
-    assert payload["coverageSummary"]["unsupportedWithWarningCount"] >= 1
-    assert category_summary["categoryCount"] >= 1
+    assert payload["coverageSummary"]["unsupportedWithWarningCount"] == 0
+    assert category_summary["categoryCount"] == 0
     assert "paragraph_layout" not in category_summary["categories"]
     assert "text_style" not in category_summary["categories"]
     assert "style_compatibility" not in category_summary["categories"]
@@ -40,6 +40,7 @@ def test_read_remediation_audit_reports_current_scope(tmp_path):
     assert "metadata_properties" not in category_summary["categories"]
     assert "package_metadata" not in category_summary["categories"]
     assert "application_settings" not in category_summary["categories"]
+    assert "revision_tracking" not in category_summary["categories"]
     assert "unknown_review_required" not in category_summary["categories"]
     assert payload["requiredWording"] == (
         "Basic HWPX read is verified; full compatibility and UI fidelity remain open."
@@ -68,6 +69,7 @@ def test_read_remediation_audit_writes_machine_and_human_reports(tmp_path):
     assert "metadata_properties" not in md_text
     assert "package_metadata" not in md_text
     assert "application_settings" not in md_text
+    assert "revision_tracking" not in md_text
 
 
 def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_path):
@@ -80,7 +82,6 @@ def test_read_remediation_audit_attaches_category_to_unsupported_elements(tmp_pa
             for item in classifications.values()
             if item["classification"] == "unsupported_with_warning"
         ]
-        assert unsupported
         assert all(item["unsupportedCategory"] for item in unsupported)
         assert all(
             item["unsupportedCategory"] != "unknown_review_required"

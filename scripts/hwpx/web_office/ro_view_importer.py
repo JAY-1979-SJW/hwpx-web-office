@@ -719,6 +719,30 @@ def _extract_application_settings(package: HwpxPackage | None) -> dict[str, Any]
     return payload
 
 
+def _extract_revision_tracking(package: HwpxPackage | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "trackchageConfig": {},
+    }
+    if package is None:
+        return payload
+
+    header_entry = _find_package_entry(package, "Contents/header.xml")
+    if header_entry is None:
+        return payload
+    try:
+        header = package.read_xml(header_entry)
+    except Exception:
+        return payload
+
+    config = _descendant_by_local(header, "trackchageConfig")
+    if config is not None:
+        payload["trackchageConfig"] = {
+            "entry": header_entry,
+            "rawAttrs": dict(config.attrib),
+        }
+    return payload
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -902,6 +926,7 @@ def import_hwpx_as_ro_view(
     numbering_defs = _extract_numbering_defs(package)
     package_metadata = _extract_package_metadata(package)
     application_settings = _extract_application_settings(package)
+    revision_tracking = _extract_revision_tracking(package)
     section_roots_cache: dict[str, ET.Element | None] = {}
 
     def _section_root_for(path: str | None) -> ET.Element | None:
@@ -1241,6 +1266,7 @@ def import_hwpx_as_ro_view(
         sourceDocumentPath=str(source_hwpx),
         packageMetadata=package_metadata,
         applicationSettings=application_settings,
+        revisionTracking=revision_tracking,
         sections=sections, blocks=blocks,
         paragraphs=paragraphs, tables=tables,
         cells=cells, objects=objects, styles=styles,

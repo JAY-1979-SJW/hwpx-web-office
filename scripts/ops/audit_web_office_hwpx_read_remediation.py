@@ -139,6 +139,7 @@ SUPPORTED_CURRENT_XML_LOCALS = {
     "lineseg",
     "lineBreak",
     "layoutCompatibility",
+    "trackchageConfig",
     "visibility",
     "fwSpace",
 }

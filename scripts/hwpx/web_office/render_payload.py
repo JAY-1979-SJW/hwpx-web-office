@@ -113,6 +113,7 @@ def build_render_payload(
         },
         "packageMetadata": doc.packageMetadata,
         "applicationSettings": doc.applicationSettings,
+        "revisionTracking": doc.revisionTracking,
         "editable": False,
         "pages": pages,
         "blocks": blocks,

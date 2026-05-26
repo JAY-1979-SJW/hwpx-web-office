@@ -325,6 +325,18 @@ def test_application_settings_are_extracted_read_only():
     assert payload["applicationSettings"] == settings
 
 
+def test_revision_tracking_is_extracted_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    revision_tracking = doc.revisionTracking
+    assert revision_tracking["trackchageConfig"]["entry"].endswith(
+        "Contents/header.xml"
+    )
+    assert "rawAttrs" in revision_tracking["trackchageConfig"]
+    assert payload["revisionTracking"] == revision_tracking
+
+
 def test_embedded_control_metadata_is_extracted_as_read_only_objects():
     doc = import_hwpx_as_ro_view(
         PROJECT_ROOT

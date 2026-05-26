@@ -274,7 +274,8 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `revision_tracking`
+- No unsupported-with-warning categories remain for the checked-in fixture
+  corpus.
 
 Current `paragraph_layout` remediation status:
 
@@ -476,10 +477,22 @@ Current `application_settings` remediation status:
 - Full application behavior equivalence is still not claimed; this only locks
   settings visibility and does not apply Hancom application runtime behavior.
 
-The next implementation priority after the paragraph layout and first text
-style/table layout passes is:
+Current `revision_tracking` remediation status:
 
-1. `revision_tracking`: trackchageConfig
+- Header `trackchageConfig` is extracted from `Contents/header.xml` into
+  `documentModel.revisionTracking.trackchageConfig`.
+- The read-only render payload exposes `revisionTracking` at the top level.
+- `revision_tracking` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full tracked-change rendering or editing is still not claimed; this only
+  preserves revision tracking configuration visibility for audit and future
+  UI work.
+
+The next implementation priority after the current XML-family warning pass is:
+
+1. Expand the checked-in HWPX fixture corpus and compare the zero-warning result
+   against broader real documents.
+2. Start UI fidelity verification separately from the semantic read model.
 
 ## 7. Pass Criteria for Current Baseline
 
