@@ -27,6 +27,8 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
         "autoSpacing",
         "breakSetting",
         "lineSpacing",
+        "heading",
+        "numbering",
         "border",
         "borderFill",
         "margin",
@@ -37,6 +39,7 @@ def test_para_pr_defs_extract_paragraph_layout_fields():
     assert any(item.get("autoSpacing") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("breakSetting") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("lineSpacing") for item in doc.styles.paraPrDefs.values())
+    assert any(item.get("heading") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("border") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("borderFill") for item in doc.styles.paraPrDefs.values())
     assert any(item.get("margin") for item in doc.styles.paraPrDefs.values())
@@ -126,6 +129,7 @@ def test_char_pr_defs_extract_text_style_fields():
         "underlineDef",
         "strikeout",
         "strikeoutDef",
+        "outline",
         "shadow",
     } <= set(sample)
     assert any(item.get("fontRef") for item in doc.styles.charPrDefs.values())
@@ -136,6 +140,8 @@ def test_char_pr_defs_extract_text_style_fields():
     assert any("type" in item.get("underlineDef", {})
                for item in doc.styles.charPrDefs.values())
     assert any("shape" in item.get("strikeoutDef", {})
+               for item in doc.styles.charPrDefs.values())
+    assert any("type" in item.get("outline", {})
                for item in doc.styles.charPrDefs.values())
 
 
@@ -148,7 +154,7 @@ def test_render_payload_exposes_char_pr_defs_read_only():
     sample = next(iter(char_defs.values()))
     assert {
         "fontRef", "ratio", "spacing", "relSz", "offset",
-        "underlineDef", "strikeoutDef", "shadow",
+        "underlineDef", "strikeoutDef", "outline", "shadow",
     } <= set(sample)
     assert payload["editable"] is False
 
@@ -202,6 +208,43 @@ def test_border_fill_defs_extract_sides_and_diagonals():
     assert {"leftBorder", "rightBorder", "topBorder", "bottomBorder"} <= set(sample["sides"])
     assert {"type", "width", "color"} <= set(sample["sides"]["leftBorder"])
     assert payload["styles"]["borderFillDefs"] == doc.styles.borderFillDefs
+
+
+def test_numbering_outline_metadata_is_extracted_read_only():
+    doc = import_hwpx_as_ro_view(FIXTURE)
+    payload = build_render_payload(doc)
+
+    assert doc.styles.beginNum
+    assert {"page", "footnote", "endnote", "pic", "tbl", "equation"} <= set(doc.styles.beginNum)
+    assert payload["styles"]["beginNum"] == doc.styles.beginNum
+    assert payload["styles"].get("numberingDefs", {}) == doc.styles.numberingDefs
+    assert any(item.get("heading") for item in doc.styles.paraPrDefs.values())
+    assert all(
+        "numbering" in item
+        for item in doc.styles.paraPrDefs.values()
+    )
+
+
+def test_section_start_num_and_note_numbering_are_extracted():
+    doc = import_hwpx_as_ro_view(
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "hwpx"
+        / "corpus"
+        / "fx_many_tables_page_marker.hwpx"
+    )
+    payload = build_render_payload(doc)
+
+    section = doc.sections[0]
+    assert section.startNum
+    assert section.noteNumbering
+    assert {"footNotePr", "endNotePr"} <= set(section.noteNumbering)
+    assert section.noteNumbering["footNotePr"]["autoNumFormat"]
+    assert section.noteNumbering["footNotePr"]["numbering"]
+    page = payload["pages"][0]
+    assert page["startNum"] == section.startNum
+    assert page["noteNumbering"] == section.noteNumbering
 
 
 def test_table_and_cell_margin_fields_are_extracted():

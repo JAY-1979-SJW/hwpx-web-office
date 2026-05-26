@@ -91,10 +91,12 @@ def build_render_payload(
         {"sectionIndex": s.sectionIndex,
             "sourceXmlPath": s.sourceXmlPath,
             "secPr": s.secPr,
+            "startNum": s.startNum,
             "pagePr": s.pagePr,
             "grid": s.grid,
             "lineNumberShape": s.lineNumberShape,
             "pageBorderFills": s.pageBorderFills,
+            "noteNumbering": s.noteNumbering,
             "editable": False}
         for s in doc.sections
     ]
@@ -126,6 +128,10 @@ def build_render_payload(
         styles_payload["styleDefs"] = doc.styles.styleDefs
     if doc.styles.borderFillDefs:
         styles_payload["borderFillDefs"] = doc.styles.borderFillDefs
+    if doc.styles.beginNum:
+        styles_payload["beginNum"] = doc.styles.beginNum
+    if doc.styles.numberingDefs:
+        styles_payload["numberingDefs"] = doc.styles.numberingDefs
     if doc.styles.paraPrDefs:
         styles_payload["paraPrDefs"] = doc.styles.paraPrDefs
     if doc.styles.fontFaceDefs:
@@ -154,6 +160,7 @@ def build_render_payload(
                 "underlineDef": d.get("underlineDef") or {},
                 "strikeout": bool(d.get("strikeout")),
                 "strikeoutDef": d.get("strikeoutDef") or {},
+                "outline": d.get("outline") or {},
                 "shadow": d.get("shadow") or {},
             }
             for cid, d in char_pr_defs.items()

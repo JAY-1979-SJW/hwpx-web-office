@@ -250,12 +250,24 @@ def _section_layout_attrs(section_root: ET.Element | None) -> dict[str, Any]:
         if offset:
             payload["offset"] = offset
         page_border_fills.append(payload)
+    note_numbering: dict[str, Any] = {}
+    for note_name in ("footNotePr", "endNotePr"):
+        note_pr = _child_by_local(sec_pr, note_name)
+        if note_pr is None:
+            continue
+        note_numbering[note_name] = {
+            "rawAttrs": dict(note_pr.attrib),
+            "autoNumFormat": _direct_child_attrs(note_pr, "autoNumFormat"),
+            "numbering": _direct_child_attrs(note_pr, "numbering"),
+        }
     return {
         "secPr": dict(sec_pr.attrib),
+        "startNum": _direct_child_attrs(sec_pr, "startNum"),
         "pagePr": _direct_child_attrs(sec_pr, "pagePr"),
         "grid": _direct_child_attrs(sec_pr, "grid"),
         "lineNumberShape": _direct_child_attrs(sec_pr, "lineNumberShape"),
         "pageBorderFills": page_border_fills,
+        "noteNumbering": note_numbering,
     }
 
 
@@ -419,6 +431,52 @@ def _extract_tab_pr_defs(header: ET.Element) -> dict[str, dict[str, Any]]:
     return defs
 
 
+def _extract_begin_num(package: HwpxPackage | None) -> dict[str, Any]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+    begin_num = _descendant_by_local(header, "beginNum")
+    return dict(begin_num.attrib) if begin_num is not None else {}
+
+
+def _extract_numbering_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
+    defs: dict[str, dict[str, Any]] = {}
+    for numbering in header.iter():
+        if local_name(numbering.tag) != "numbering":
+            continue
+        numbering_id = numbering.attrib.get("id")
+        if numbering_id is None:
+            continue
+        levels: list[dict[str, Any]] = []
+        for child in _effective_descendants(numbering):
+            child_name = local_name(child.tag)
+            if child_name in {"paraHead", "level"}:
+                levels.append({
+                    "kind": child_name,
+                    "rawAttrs": dict(child.attrib),
+                })
+        defs[str(numbering_id)] = {
+            "numberingId": str(numbering_id),
+            "rawAttrs": dict(numbering.attrib),
+            "levels": levels,
+            "levelCount": len(levels),
+        }
+    return defs
+
+
+def _extract_numbering_defs(package: HwpxPackage | None) -> dict[str, dict[str, Any]]:
+    if package is None or "Contents/header.xml" not in package.entries:
+        return {}
+    try:
+        header = package.read_xml("Contents/header.xml")
+    except Exception:
+        return {}
+    return _extract_numbering_defs_from_header(header)
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -467,6 +525,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
 
     tab_pr_defs = _extract_tab_pr_defs(header)
     border_fill_defs = _extract_border_fill_defs_from_header(header)
+    numbering_defs = _extract_numbering_defs_from_header(header)
     defs: dict[str, dict[str, Any]] = {}
     for para_pr in header.iter():
         if local_name(para_pr.tag) != "paraPr":
@@ -481,6 +540,7 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
         auto_spacing = _descendant_by_local(para_pr, "autoSpacing")
         break_setting = _descendant_by_local(para_pr, "breakSetting")
         line_spacing = _descendant_by_local(para_pr, "lineSpacing")
+        heading = _descendant_by_local(para_pr, "heading")
         border = _descendant_by_local(para_pr, "border")
         margin = _descendant_by_local(para_pr, "margin")
         margin_payload: dict[str, dict[str, str | None]] = {}
@@ -505,6 +565,14 @@ def _extract_para_pr_defs(package: HwpxPackage | None) -> dict[str, dict[str, An
             ),
             "lineSpacing": (
                 dict(line_spacing.attrib) if line_spacing is not None else {}
+            ),
+            "heading": dict(heading.attrib) if heading is not None else {},
+            "numbering": (
+                numbering_defs.get(str(heading.attrib.get("idRef")), {})
+                if heading is not None
+                and heading.attrib.get("idRef") is not None
+                and heading.attrib.get("type") != "NONE"
+                else {}
             ),
             "border": dict(border.attrib) if border is not None else {},
             "borderFill": (
@@ -588,6 +656,8 @@ def import_hwpx_as_ro_view(
     # HwpxPackage 는 read-only 로만 사용 — write_xml / save 호출 0건.
     package = _load_package_safely(source_hwpx)
     border_fill_defs = _extract_border_fill_defs(package)
+    begin_num = _extract_begin_num(package)
+    numbering_defs = _extract_numbering_defs(package)
     section_roots_cache: dict[str, ET.Element | None] = {}
 
     def _section_root_for(path: str | None) -> ET.Element | None:
@@ -607,10 +677,12 @@ def import_hwpx_as_ro_view(
             sectionIndex=i,
             sourceXmlPath=str(sec_path) if sec_path is not None else None,
             secPr=layout.get("secPr", {}),
+            startNum=layout.get("startNum", {}),
             pagePr=layout.get("pagePr", {}),
             grid=layout.get("grid", {}),
             lineNumberShape=layout.get("lineNumberShape", {}),
-            pageBorderFills=layout.get("pageBorderFills", [])))
+            pageBorderFills=layout.get("pageBorderFills", []),
+            noteNumbering=layout.get("noteNumbering", {})))
 
     section_xml_path_by_index: dict[int, str | None] = {
         i: s.sourceXmlPath for i, s in enumerate(sections)
@@ -893,7 +965,9 @@ def import_hwpx_as_ro_view(
         paraPrDefs=para_pr_defs,
         fontFaceDefs=font_face_defs,
         styleDefs=style_defs,
-        borderFillDefs=border_fill_defs)
+        borderFillDefs=border_fill_defs,
+        beginNum=begin_num,
+        numberingDefs=numbering_defs)
 
     for w in (parsed.warnings or []):
         if isinstance(w, dict):

@@ -121,6 +121,7 @@ def parse_char_pr_defs(header_xml: bytes,
         i_el = el.find(f"{{{NS_HH}}}italic")
         u_el = el.find(f"{{{NS_HH}}}underline")
         s_el = el.find(f"{{{NS_HH}}}strikeout")
+        outline_el = el.find(f"{{{NS_HH}}}outline")
         shadow_el = el.find(f"{{{NS_HH}}}shadow")
         u_type = u_el.get("type", "") if u_el is not None else ""
         underline_on = u_el is not None and u_type.upper() not in ("", "NONE")
@@ -144,6 +145,7 @@ def parse_char_pr_defs(header_xml: bytes,
             "underlineDef": dict(u_el.attrib) if u_el is not None else {},
             "strikeout": strikeout_on,
             "strikeoutDef": dict(s_el.attrib) if s_el is not None else {},
+            "outline": dict(outline_el.attrib) if outline_el is not None else {},
             "shadow": dict(shadow_el.attrib) if shadow_el is not None else {},
         }
     return result

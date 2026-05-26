@@ -73,10 +73,12 @@ class WebOfficeSection:
     sectionIndex: int
     sourceXmlPath: str | None = None
     secPr: dict[str, Any] = field(default_factory=dict)
+    startNum: dict[str, Any] = field(default_factory=dict)
     pagePr: dict[str, Any] = field(default_factory=dict)
     grid: dict[str, Any] = field(default_factory=dict)
     lineNumberShape: dict[str, Any] = field(default_factory=dict)
     pageBorderFills: list[dict[str, Any]] = field(default_factory=list)
+    noteNumbering: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -98,6 +100,8 @@ class WebOfficeStyles:
     fontFaceDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     styleDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
     borderFillDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    beginNum: dict[str, Any] = field(default_factory=dict)
+    numberingDefs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

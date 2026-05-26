@@ -274,7 +274,6 @@ plan is now executable and that unsupported coverage is no longer silent.
 
 Current remediation audit category output:
 
-- `numbering_outline`
 - `note_annotation`
 - `application_settings`
 - `metadata_properties`
@@ -382,12 +381,32 @@ Current `border_style` remediation status:
   diagonal stroke drawing, and rendered visual comparison remain separate
   coverage targets.
 
+Current `numbering_outline` remediation status:
+
+- Header `beginNum` values are extracted from `Contents/header.xml` into
+  `documentModel.styles.beginNum`.
+- Header `numberings/numbering` definitions are extracted, when present, into
+  `documentModel.styles.numberingDefs` with raw numbering attributes and level
+  metadata.
+- Paragraph property `heading` references are exposed in
+  `styles.paraPrDefs[]`; referenced numbering definitions are attached when the
+  heading is not `NONE` and the referenced definition is available.
+- Character property `outline` attributes are preserved in
+  `styles.charPrDefs[]`.
+- Section `startNum` and note `autoNumFormat`/`numbering` metadata under
+  `footNotePr` and `endNotePr` are exposed in the read-only page payload.
+- `numbering_outline` is no longer present in the current unsupported category
+  output for the checked-in fixture corpus.
+- Full list/outline visual fidelity is still not claimed; computed numbering
+  labels, restart behavior, nested list rendering, and rendered visual
+  comparison remain separate coverage targets.
+
 The next implementation priority after the paragraph layout and first text
 style/table layout passes is:
 
-1. `numbering_outline`: autoNumFormat, beginNum, heading, numbering, outline, startNum
-2. `embedded_control`: colPr, ctrl, placement, pos
-3. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
+1. `embedded_control`: colPr, ctrl, placement, pos
+2. `note_annotation`: endNotePr, footNotePr, memoPr, memoProperties, noteLine, noteSpacing
+3. `metadata_properties`: charProperties, paraProperties, refList, tabProperties
 
 ## 7. Pass Criteria for Current Baseline
 
