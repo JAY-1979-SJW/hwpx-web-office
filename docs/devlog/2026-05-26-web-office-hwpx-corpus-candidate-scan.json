@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "web_office_operational_report_v1",
+  "task": "WEB-OFFICE-HWPX-CORPUS-CANDIDATE-SCAN-20260526",
+  "standardDocuments": [
+    {
+      "path": "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+      "status": "updated",
+      "change": "Added the candidate corpus background scan standard, including server/local paths, approval policy, and claim boundary."
+    }
+  ],
+  "changedFiles": [
+    "scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py",
+    "scripts/ops/classify_hwpx_repo_inventory.py",
+    "tests/test_web_office_hwpx_corpus_candidate_scan.py",
+    "docs/architecture/web_office_hwpx_reading_scope_standard_20260525.md",
+    "docs/devlog/2026-05-26-web-office-hwpx-corpus-candidate-scan.json"
+  ],
+  "capability": {
+    "serverBackgroundWorkSupported": true,
+    "defaultCandidateRoot": "data/local_corpus_candidates",
+    "defaultReportDirectory": "data/reports/web_office_hwpx_corpus_candidates",
+    "automaticPromotionAllowed": false,
+    "promotionRequiresApproval": true
+  },
+  "validationCommands": [
+    {
+      "command": "python -m pytest tests/test_web_office_hwpx_corpus_candidate_scan.py tests/test_hwpx_corpus_profiler.py -q --tb=short",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "15 tests passed."
+    },
+    {
+      "command": "python scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py --candidate-root data/local_corpus_candidates --report-dir data/reports/web_office_hwpx_corpus_candidates",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "candidate_scan_report.json written with verdict PASS and promotionRequiresApproval=true."
+    },
+    {
+      "command": "python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "PASS_HWPX_REPO_COMMIT_GUARD."
+    },
+    {
+      "command": "python scripts/ops/run_hwpx_repo_prepush_guard.py --temp-only",
+      "location": "local repository",
+      "result": "PASS",
+      "evidence": "PASS_HWPX_REPO_PREPUSH_GUARD with 19 steps and 0 failures."
+    },
+    {
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/ops/deploy_web_office_to_server.ps1",
+      "location": "server haehan-app",
+      "result": "PASS",
+      "evidence": "Deployed head passed server health, sandbox, mutation block, structure drift, HWPX read remediation audit, backend runtime smoke, monitor process, and cron checks."
+    },
+    {
+      "command": "ssh haehan-app \"cd /home/ubuntu/apps/hwpx-web-office && python3 scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py --candidate-root data/local_corpus_candidates --report-dir data/reports/web_office_hwpx_corpus_candidates --background\"",
+      "location": "server haehan-app",
+      "result": "PASS",
+      "evidence": "Server returned BACKGROUND_STARTED, then candidate_scan_report.json parsed with verdict PASS, finalStatus CANDIDATE_SCAN_PASS_REVIEW_REQUIRED, scanned 0, candidateCount 0, promotionRequiresApproval true."
+    }
+  ],
+  "localVerification": {
+    "required": true,
+    "status": "PASS"
+  },
+  "serverVerification": {
+    "required": true,
+    "reason": "Server is the final operating reference for Web Office work.",
+    "status": "PASS"
+  },
+  "claimBoundary": "Basic HWPX read is verified; full compatibility and UI fidelity remain open.",
+  "holdItems": [
+    "Candidate scan success must not be described as full HWPX compatibility.",
+    "Candidate HWPX files must not be copied into the checked-in corpus without explicit approval."
+  ],
+  "finalStatus": "SERVER_VERIFIED_PASS"
+}

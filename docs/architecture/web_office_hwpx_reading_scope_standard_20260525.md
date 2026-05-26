@@ -494,6 +494,46 @@ The next implementation priority after the current XML-family warning pass is:
    against broader real documents.
 2. Start UI fidelity verification separately from the semantic read model.
 
+## 6C. Candidate Corpus Background Scan Standard
+
+The project may run a background scan against a server-side candidate HWPX
+folder before any file is promoted into the checked-in fixture corpus.
+
+Approved scanner:
+
+- `scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py`
+
+Default server/local paths:
+
+- candidate root: `data/local_corpus_candidates`
+- report directory: `data/reports/web_office_hwpx_corpus_candidates`
+- candidate manifest draft:
+  `data/reports/web_office_hwpx_corpus_candidates/candidate_manifest_draft.json`
+- scan report:
+  `data/reports/web_office_hwpx_corpus_candidates/candidate_scan_report.json`
+
+The scanner may be started in the background:
+
+```bash
+python3 scripts/ops/run_web_office_hwpx_corpus_candidate_scan.py --background
+```
+
+Required behavior:
+
+- The scan is read-only.
+- Raw candidate files are not copied into `tests/fixtures/hwpx/corpus`.
+- Candidate promotion is blocked until explicit approval.
+- Candidate reports must mark `promotionRequiresApproval=true`.
+- The generated manifest is only a draft and must not be treated as the locked
+  corpus manifest.
+- Server execution is allowed, but server scan success does not upgrade the
+  HWPX read claim.
+- After any approved promotion, local gates and server-final verification must
+  pass before the baseline can be updated.
+
+This scanner supports the R4 remediation sequence by finding and classifying
+candidate documents. It does not prove full compatibility by itself.
+
 ## 7. Pass Criteria for Current Baseline
 
 The current baseline remains valid when:
