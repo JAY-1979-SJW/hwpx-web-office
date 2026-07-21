@@ -11,7 +11,7 @@ from pathlib import Path
 
 PR = Path(__file__).parents[1]
 
-BASELINE_COMMIT = "4b0515f"
+BASELINE_COMMIT = "15364fe"
 
 SCOPE_REASON_CONSTANTS = [
     "REASON_HEADER_SCOPE_NOT_SUPPORTED",

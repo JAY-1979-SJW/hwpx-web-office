@@ -46,7 +46,7 @@ LOCKED_FILES = [
     # para_edit_state.mjs 는 applyFormatToSelection 추가로 본 LOCKED 에서 제거.
 ]
 # Locked file drift is measured from the approved Web Office sandbox baseline.
-BASELINE_COMMIT = "4b0515f"
+BASELINE_COMMIT = "15364fe"
 
 # 안전 게이트가 코드에 존재하는지 정적 검증
 SAFETY_GATE_PATTERNS = {

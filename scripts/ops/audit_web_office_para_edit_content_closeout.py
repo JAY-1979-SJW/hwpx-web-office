@@ -21,7 +21,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_content_closeout.md")
-BASELINE_COMMIT = "4b0515f"
+BASELINE_COMMIT = "15364fe"
 
 # 회귀 자재 (테스트 파일) — 모두 존재해야 한다.
 REQUIRED_TESTS = [
