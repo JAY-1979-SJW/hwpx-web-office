@@ -50,6 +50,9 @@ def build_render_payload(
             "borderFillIDRef": c.borderFillIDRef,
             "borderFill": c.borderFill,
             "cellMargin": c.cellMargin,
+            # WEB-OFFICE-RO-VIEW-TABLE-FORMAT-PRECISION-01
+            "cellSize": c.cellSize,
+            "vertAlign": c.vertAlign,
             "paragraphs": [paragraph_payload(p) for p in c.paragraphs],
             "editable": False,
         })

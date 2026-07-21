@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 웹 편집기 — 문서 뷰</title>
+<style>
+  :root{ color-scheme:light; font-family:"Malgun Gothic","Segoe UI",sans-serif; background:#e9edf1; color:#1a2530; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; }
+  .app{ display:flex; flex-direction:column; min-height:100vh; }
+  .bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px 14px; background:#26313d; color:#fff; }
+  .bar h1{ font-size:15px; margin:0 8px 0 0; }
+  .bar .sp{ flex:1; } .bar .div{ width:1px; height:22px; background:#4a5967; margin:0 4px; }
+  button{ font:inherit; min-height:31px; border:1px solid #9aa6b2; background:#fff; color:#1a2530; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button:hover:not(:disabled){ background:#eef3f8; }
+  button:disabled{ color:#9aa6b2; cursor:not-allowed; opacity:.6; }
+  .bar button{ border-color:#5f7081; }
+  .chk{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:#cdd6df; }
+  .status{ padding:7px 14px; font-size:13px; background:#fff; border-bottom:1px solid #d7dde3; min-height:32px; }
+  .status[data-k="ok"]{ color:#0b6b46; } .status[data-k="fail"]{ color:#9f2d20; } .status[data-k="load"]{ color:#2b5d94; }
+  .wrap{ display:flex; flex:1; min-height:0; }
+  .page{ flex:1; overflow:auto; padding:26px; background:#f4f6f8; }
+  .sheet{ background:#fff; margin:0 auto; padding:34px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:60vh; }
+  .side{ width:290px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:13px; overflow:auto; }
+  .side h3{ font-size:13px; margin:0 0 7px; color:#42505e; }
+  .drop{ border:2px dashed #b8c2cc; border-radius:10px; padding:16px; text-align:center; color:#66717d; background:#fafbfc; margin-bottom:14px; font-size:13px; }
+  .drop.over{ border-color:#2d6cdf; background:#f0f6ff; color:#1e4fa3; }
+  .metrics{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .metrics span{ font-size:12px; background:#eef2f5; border:1px solid #dfe5ea; border-radius:6px; padding:3px 7px; }
+  table.doc{ border-collapse:collapse; margin:12px auto; table-layout:fixed; }
+  table.doc td{ vertical-align:middle; overflow:hidden; }
+  td.editing{ padding:0 !important; }
+  .cell-inp{ width:100%; min-width:40px; border:2px solid #2d6cdf; padding:2px 4px; font:inherit; }
+  td[data-cell-id]{ cursor:text; }
+  td[data-cell-id].sel{ box-shadow:inset 0 0 0 2px #2d6cdf; }
+  .cp{ line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+  .body-para{ line-height:1.7; margin:6px 0; white-space:pre-wrap; word-break:break-word; }
+  .log{ list-style:none; margin:0; padding:0; font-size:12px; max-height:200px; overflow:auto; }
+  .log li{ padding:4px 6px; border-bottom:1px solid #eef1f4; }
+  .log .ct{ font-weight:700; color:#1e4fa3; }
+  .muted{ color:#8a94a0; font-size:12px; }
+  .feat{ font-size:12px; line-height:1.7; color:#42505e; margin:0; padding-left:16px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <h1>HWPX 웹 편집기</h1>
+    <input id="fileInput" type="file" accept=".hwpx" hidden />
+    <button id="pickBtn" type="button">파일 열기</button>
+    <button id="sampleBtn" type="button">샘플</button>
+    <span class="div"></span>
+    <button id="undoBtn" type="button" disabled>↶ 실행취소</button>
+    <button id="redoBtn" type="button" disabled>↷ 재실행</button>
+    <span class="div"></span>
+    <label class="chk"><input id="guides" type="checkbox" checked /> 박스선</label>
+    <span class="sp"></span>
+    <button id="saveBtn" type="button" disabled>저장(sandbox)</button>
+    <button id="dlBtn" type="button" disabled>편집본 다운로드</button>
+  </div>
+  <div id="status" class="status" data-k="">HWPX를 열거나 «샘플»을 누르세요. 원본은 절대 수정되지 않습니다(sandbox 저장).</div>
+  <div class="wrap">
+    <div class="page">
+      <div id="drop" class="drop">여기로 <b>.hwpx</b> 드래그 · 또는 «파일 열기»</div>
+      <div id="sheet" class="sheet" style="max-width:900px"><p class="muted">문서 없음.</p></div>
+    </div>
+    <aside class="side">
+      <h3>편집 상태</h3>
+      <div class="metrics" id="metrics"><span>cells <b>0</b></span></div>
+      <h3>웹 편집기 기능</h3>
+      <ul class="feat">
+        <li>셀 클릭 → 인라인 텍스트 편집</li>
+        <li>실행취소/재실행(command 기반)</li>
+        <li>박스선 표시 토글</li>
+        <li>sandbox 저장 + readback 검증</li>
+        <li>편집본 HWPX 다운로드</li>
+        <li class="muted">문단 서식/다중 run 편집 — 로드맵</li>
+      </ul>
+      <h3>Command Log <span class="muted">(원본 무수정)</span></h3>
+      <ul class="log" id="log"><li class="muted">편집 없음</li></ul>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+import {
+  makeEditorState, selectCell, enterCellEdit, cancelCellEdit, commitCellText, undo, redo,
+} from "./cell_edit_state.mjs";
+import { postCellSaveApply } from "./save_apply_bridge.mjs";
+
+const $=(id)=>document.getElementById(id);
+let loaded=null, cellState=null, charPrDefs={}, paraPrDefs={}, editedIds=new Set(), lastOutput=null, selCellId=null;
+
+const esc=(s)=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function setStatus(k,msg){ const e=$("status"); e.dataset.k=k; e.textContent=msg; }
+const hupx=(v)=>{ const n=parseFloat(v); return isFinite(n)?n*0.01333:0; };
+
+/* 폰트/charPr → CSS (원본 서식 유지) */
+function fontFamily(name){
+  if(!name) return "";
+  const serif=/바탕|명조|Batang|Myeongjo|serif/i.test(name);
+  const tail=serif?"'함초롬바탕','바탕','Batang',serif"
+                  :"'맑은 고딕','함초롬돋움','돋움','Dotum',sans-serif";
+  return `font-family:'${name}',${tail};`;
+}
+function _truthy(v){ return !(v===undefined||v===null||v===false||v==="0"||v==="NONE"||v===0); }
+function cpStyle(cid){
+  const d=charPrDefs[cid]; if(!d) return "font-size:10pt;";
+  let s=fontFamily(d.fontName);
+  if(d.fontSizePt) s+=`font-size:${d.fontSizePt}pt;`;
+  if(d.textColor && d.textColor.toLowerCase()!=="#000000") s+=`color:${d.textColor};`;
+  if(d.bold) s+="font-weight:700;";
+  if(d.italic) s+="font-style:italic;";
+  const deco=[];
+  if(d.underline) deco.push("underline");
+  if(_truthy(d.strikeout)) deco.push("line-through");
+  if(deco.length) s+=`text-decoration:${deco.join(" ")};`;
+  // 자간(spacing.hangul, % of em)
+  const sp=d.spacing&&parseFloat(d.spacing.hangul||"0");
+  if(sp) s+=`letter-spacing:${(sp/100).toFixed(3)}em;`;
+  // 위/아래 첨자(offset)
+  const off=d.offset&&parseFloat(d.offset.hangul||"0");
+  if(off>0) s+="vertical-align:super;font-size:0.8em;";
+  else if(off<0) s+="vertical-align:sub;font-size:0.8em;";
+  return s;
+}
+/* 문단서식(paraPr) → CSS: 정렬 + 줄간격 + 들여쓰기/여백 (원본 유지) */
+function ppStyle(parPrId){
+  const pp=paraPrDefs[parPrId]; if(!pp) return "text-align:left;";
+  let s="";
+  const h=pp.align?.horizontal;
+  s+=`text-align:${h==="RIGHT"?"right":h==="CENTER"?"center":(h==="JUSTIFY"||h==="DISTRIBUTE")?"justify":h==="LEFT"?"left":"left"};`;
+  const ls=pp.lineSpacing;
+  if(ls?.type==="PERCENT" && ls.value) s+=`line-height:${(parseFloat(ls.value)/100).toFixed(2)};`;
+  const m=pp.margin;
+  if(m){
+    const L=hupx(m.left?.value), R=hupx(m.right?.value), IN=hupx(m.intent?.value);
+    if(L>0) s+=`padding-left:${Math.round(L)}px;`;
+    if(R>0) s+=`padding-right:${Math.round(R)}px;`;
+    if(IN>0) s+=`text-indent:${Math.round(IN)}px;`;
+    else if(IN<0) s+=`text-indent:${Math.round(IN)}px;`;
+  }
+  return s;
+}
+/* 테두리 (박스선 옵션) */
+function mm(w){ const m=/([\d.]+)\s*mm/.exec(w||""); return m?parseFloat(m[1])*3.7795:0; }
+function sideCss(sd,guides){
+  if(sd && sd.type && sd.type!=="NONE") return `${Math.max(0.8,mm(sd.width)).toFixed(2)}px solid ${sd.color||"#333"}`;
+  return guides?"1px solid #ccd3da":"none";
+}
+function cellBox(bf,guides){ const s=(bf&&bf.sides)||{};
+  return `border-left:${sideCss(s.leftBorder,guides)};border-right:${sideCss(s.rightBorder,guides)};border-top:${sideCss(s.topBorder,guides)};border-bottom:${sideCss(s.bottomBorder,guides)};`; }
+function cellPad(cm){ if(!cm) return "padding:2px 5px;"; const p=(v)=>Math.max(2,hupx(v)); return `padding:${p(cm.top)}px ${p(cm.right)}px ${p(cm.bottom)}px ${p(cm.left)}px;`; }
+
+function firstCharPr(rc){ return rc?.paragraphs?.[0]?.runs?.[0]?.charPrIDRef ?? null; }
+function firstParPr(rc){ return rc?.paragraphs?.[0]?.parPrIDRef ?? null; }
+function curText(id){ const c=cellState?.documentModel.cells.find(x=>x.cellId===id); return c?c.text:""; }
+function cellHtml(rc){
+  const id=rc.cellId;
+  if(editedIds.has(id)) return `<div class="cp" style="${ppStyle(firstParPr(rc))}${cpStyle(firstCharPr(rc))}">${esc(curText(id))}</div>`;
+  const paras=rc.paragraphs||[];
+  if(!paras.length) return `<div class="cp" style="${ppStyle(firstParPr(rc))}">${esc(rc.text||"")}</div>`;
+  return paras.map(p=>{
+    const inner=(p.runs||[]).map(r=>`<span style="${cpStyle(r.charPrIDRef)}">${esc(r.text)}</span>`).join("");
+    return `<div class="cp" style="${ppStyle(p.parPrIDRef)}">${inner||"&nbsp;"}</div>`;
+  }).join("");
+}
+
+function renderDoc(){
+  const rp=loaded?.renderPayload; const sheet=$("sheet");
+  if(!rp){ sheet.innerHTML='<p class="muted">문서 없음.</p>'; return; }
+  const guides=$("guides").checked;
+  const tById={}; for(const t of rp.tables) tById[t.tableId]=t;
+  const parts=[];
+  for(const b of rp.blocks){
+    if(b.type==="table" && b.ref && tById[b.ref]) parts.push(renderTable(tById[b.ref],guides));
+    else if(b.type==="paragraph" && b.paragraph) parts.push(renderPara(b.paragraph));
+  }
+  sheet.innerHTML=parts.join("")||'<p class="muted">표시할 내용 없음.</p>';
+  sheet.querySelectorAll("td[data-cell-id]").forEach(td=>{
+    if(td.dataset.cellId===selCellId) td.classList.add("sel");
+    td.addEventListener("click",()=>startEdit(td.dataset.cellId,td));
+  });
+  renderSide();
+}
+function renderPara(p){
+  const inner=(p.runs||[]).map(r=>`<span style="${cpStyle(r.charPrIDRef)}">${esc(r.text)}</span>`).join("")||esc(p.text||"");
+  return `<div class="body-para" style="${ppStyle(p.parPrIDRef)}">${inner||"&nbsp;"}</div>`;
+}
+function renderTable(t,guides){
+  const w=hupx(t.tableSize?.width); const wcss=w?`width:${Math.round(w)}px;`:"width:100%;";
+  const byRow={}; for(const c of t.cells){ if(c.isCoveredByMerge) continue; (byRow[c.row]=byRow[c.row]||[]).push(c); }
+  const rows=Object.keys(byRow).map(Number).sort((a,b)=>a-b);
+  const cols=t.visualColCount||t.colCount||1;
+  let html=`<table class="doc" style="${wcss}max-width:100%"><colgroup>`;
+  for(let i=0;i<cols;i++) html+=`<col style="width:${(100/cols).toFixed(2)}%">`;
+  html+="</colgroup>";
+  for(const r of rows){
+    html+="<tr>";
+    for(const c of byRow[r].sort((a,b)=>a.col-b.col)){
+      const rs=c.rowSpan>1?` rowspan="${c.rowSpan}"`:"", cs=c.colSpan>1?` colspan="${c.colSpan}"`:"";
+      html+=`<td data-cell-id="${esc(c.cellId)}"${rs}${cs} style="${cellBox(c.borderFill,guides)}${cellPad(c.cellMargin)}">${cellHtml(c)}</td>`;
+    }
+    html+="</tr>";
+  }
+  return html+"</table>";
+}
+
+/* 인라인 편집 */
+function startEdit(cellId,td){
+  const cell=cellState.documentModel.cells.find(c=>c.cellId===cellId); if(!cell) return;
+  selCellId=cellId;
+  cellState=enterCellEdit(selectCell(cellState,cellId));
+  const inp=document.createElement("input"); inp.className="cell-inp"; inp.value=cell.text||"";
+  td.classList.add("editing"); td.innerHTML=""; td.appendChild(inp); inp.focus(); inp.select();
+  let done=false;
+  const commit=()=>{ if(done)return; done=true;
+    const r=commitCellText(cellState,cellId,inp.value); cellState=r.state;
+    if(r.command) editedIds.add(cellId);
+    renderDoc(); syncBtns(); };
+  inp.addEventListener("keydown",(e)=>{
+    if(e.key==="Enter"){ e.preventDefault(); commit(); }
+    else if(e.key==="Escape"){ done=true; cellState=cancelCellEdit(cellState); renderDoc(); } });
+  inp.addEventListener("blur",commit);
+}
+function doUndo(){ const r=undo(cellState); if(r.command){ cellState=r.state; renderDoc(); syncBtns(); } }
+function doRedo(){ const r=redo(cellState); if(r.command){ cellState=r.state; editedIds.add(r.command.targetId); renderDoc(); syncBtns(); } }
+
+function renderSide(){
+  const n=cellState?cellState.documentModel.cells.length:0, cmds=cellState?cellState.commandLog.length:0;
+  $("metrics").innerHTML=`<span>cells <b>${n}</b></span><span>편집 <b>${cmds}</b></span><span>dirty <b>${cellState?cellState.dirty:false}</b></span>`;
+  const log=cellState?cellState.commandLog:[];
+  $("log").innerHTML=log.length?log.map(c=>`<li><span class="ct">${esc(c.commandType)}</span> <span class="muted">${esc((c.before||"").slice(0,12))}→${esc((c.after||"").slice(0,12))}</span></li>`).join(""):'<li class="muted">편집 없음</li>';
+}
+function syncBtns(){
+  const has=cellState&&cellState.commandLog.length>0;
+  $("saveBtn").disabled=!has;
+  $("undoBtn").disabled=!(cellState&&cellState.undoStack.length>0);
+  $("redoBtn").disabled=!(cellState&&cellState.redoStack.length>0);
+  $("dlBtn").disabled=!lastOutput;
+}
+
+function applyLoaded(env){
+  const d=env.data||env;
+  if((env.status&&env.status!=="SUCCESS")||d.verdict!=="PASS"){ setStatus("fail","로드 실패: "+(env.errors?.[0]?.message||d.reason||"UNKNOWN")); return; }
+  loaded=d; const st=d.renderPayload?.styles||{}; charPrDefs=st.charPrDefs||{}; paraPrDefs=st.paraPrDefs||{};
+  editedIds=new Set(); lastOutput=null; selCellId=null;
+  cellState=makeEditorState(d.documentModel);
+  setStatus("ok",`불러옴 · 표 ${d.summary?.tables??"?"} · 셀 ${d.summary?.cells??"?"} · 원본 무수정`);
+  renderDoc(); syncBtns();
+}
+async function uploadFile(file){
+  if(!file) return;
+  if(!file.name.toLowerCase().endsWith(".hwpx")){ setStatus("fail","HWPX 파일만 가능합니다."); return; }
+  setStatus("load",`업로드 중: ${esc(file.name)} …`);
+  const fd=new FormData(); fd.append("file",file);
+  try{ const res=await fetch("/api/web-office/hwpx-upload",{method:"POST",body:fd}); applyLoaded(await res.json()); }
+  catch(e){ setStatus("fail","업로드 실패: "+e.message); }
+}
+async function loadSample(){
+  setStatus("load","샘플 로드 중 …");
+  try{ const res=await fetch("/api/web-office/hwpx-load",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({operation:"HWPX_EDITOR_LOAD",sourcePath:"tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx"})});
+    applyLoaded(await res.json()); }
+  catch(e){ setStatus("fail","샘플 로드 실패: "+e.message); }
+}
+async function save(){
+  if(!cellState||!loaded) return;
+  setStatus("load","저장 중(sandbox 사본 + readback 검증) …");
+  try{
+    const r=await postCellSaveApply({ state:cellState, sourcePath:loaded.sourcePath, requestId:"clean-"+Date.now() });
+    if(r && r.status==="FAILED"){ setStatus("fail","저장 거부: "+(r.errors?.[0]?.code||"")); return; }
+    const d=r.data||r;
+    lastOutput=d.outputFileName||null;
+    setStatus("ok","저장 완료 — verify7 통과 · sandbox 사본 생성 · 원본 무수정. 편집본 다운로드 가능.");
+    syncBtns();
+  }catch(e){ setStatus("fail","저장 실패: "+e.message); }
+}
+function download(){ if(lastOutput) window.location="/api/web-office/download/"+encodeURIComponent(lastOutput); }
+
+$("pickBtn").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=(e)=>uploadFile(e.target.files[0]);
+$("sampleBtn").onclick=loadSample;
+$("saveBtn").onclick=save;
+$("dlBtn").onclick=download;
+$("undoBtn").onclick=doUndo;
+$("redoBtn").onclick=doRedo;
+$("guides").onchange=renderDoc;
+const drop=$("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",(e)=>{ const f=e.dataTransfer?.files?.[0]; if(f) uploadFile(f); });
+window.__cleanReady=true;
+</script>
+</body>
+</html>

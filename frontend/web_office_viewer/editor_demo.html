@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 편집기 데모 (백엔드 무의존)</title>
+<style>
+  :root { color-scheme: light; font-family: "Malgun Gothic","Segoe UI",sans-serif;
+          background:#eef1f5; color:#17202a; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:18px; }
+  h1 { font-size:19px; margin:0 0 2px; }
+  .sub { color:#5b6773; font-size:12.5px; margin:0 0 14px; }
+  .grid { display:grid; grid-template-columns: minmax(0,1fr) 340px; gap:16px; align-items:start; }
+  .card { background:#fff; border:1px solid #d7dde3; border-radius:10px; padding:14px 16px;
+          box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:14px; }
+  .card h2 { font-size:14px; margin:0 0 10px; color:#33404d; }
+  .hint { font-size:12px; color:#66717d; margin:0 0 10px; }
+  /* paragraph editor */
+  #paraEditor { outline:none; }
+  .pe-para { padding:7px 9px; border:1px solid transparent; border-radius:6px;
+             line-height:2.1; cursor:text; min-height:34px; white-space:pre-wrap;
+             word-break:break-all; }
+  .pe-para.active { border-color:#2d6cdf; background:#f5f9ff; }
+  .pe-para[data-kind="header"], .pe-para[data-kind="footer"] {
+             background:#fbf3f2; border-style:dashed; border-color:#e3b9b4; }
+  .pe-scope-badge { font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:999px;
+             margin-right:8px; vertical-align:2px; }
+  .badge-block { background:#e6f0ff; color:#1e4fa3; }
+  .badge-header,.badge-footer { background:#f6dedb; color:#a23b2e; }
+  .pe-ch { position:relative; }
+  .pe-ch.sel { background:#bcd4ff; }
+  .pe-caret { display:inline-block; width:0; border-left:2px solid #2d6cdf;
+              height:1.15em; vertical-align:-0.2em; animation:blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  .toolbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  button { font:inherit; min-height:30px; border:1px solid #9aa6b2; background:#fff;
+           border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button:hover:not(:disabled){ background:#eef3f8; }
+  button:disabled{ color:#9aa6b2; cursor:not-allowed; }
+  button.on { border-color:#2d6cdf; color:#1e4fa3; font-weight:700; }
+  .swatch { width:20px; height:20px; padding:0; border-radius:5px; }
+  .status { font-size:12px; padding:7px 9px; border-radius:6px; background:#f2f5f8;
+            border:1px solid #e0e6eb; min-height:32px; }
+  .status.ok { color:#0b6b46; } .status.rej { color:#9f2d20; background:#fbf1f0; border-color:#eccbc6; }
+  .metrics { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .metrics span { font-size:12px; background:#f2f5f8; border:1px solid #e0e6eb;
+            border-radius:6px; padding:4px 8px; }
+  pre { margin:0; font-size:11.5px; background:#0f1720; color:#cfe3ff; padding:10px;
+        border-radius:8px; max-height:260px; overflow:auto; }
+  .log { list-style:none; margin:0; padding:0; font-size:12px; max-height:210px; overflow:auto; }
+  .log li { padding:5px 7px; border-bottom:1px solid #eef1f4; display:flex; gap:8px; }
+  .log .ct { font-weight:700; color:#1e4fa3; min-width:132px; }
+  .cellgrid { border-collapse:collapse; }
+  .cellgrid td { border:1px solid #cdd6df; padding:0; }
+  .cellgrid button.cell { border:0; border-radius:0; min-width:120px; min-height:40px;
+            text-align:left; padding:6px 8px; background:#fff; }
+  .cellgrid button.cell.active { background:#eaf1ff; box-shadow: inset 0 0 0 2px #2d6cdf; }
+  .cellgrid input { width:120px; min-height:40px; border:2px solid #2d6cdf; padding:6px 8px; }
+  kbd { background:#eceff2; border:1px solid #cfd6dd; border-bottom-width:2px; border-radius:4px;
+        padding:0 5px; font-size:11px; }
+</style>
+</head>
+<body>
+<h1>HWPX 편집기 데모 <span style="font-size:12px;color:#8a94a0;">· 백엔드 무의존 · 원본 무수정</span></h1>
+<p class="sub">실제 편집 모듈(<code>para_edit_state / para_edit_runtime / format_charpr_matcher / cell_edit_state</code>)을
+그대로 임포트합니다. 모든 편집은 EditCommand로만 포착되며 writer/save를 호출하지 않습니다.</p>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <h2>문단 편집기 (paragraph)</h2>
+      <p class="hint">문단을 <b>클릭</b>→캐럿 배치, 바로 타이핑. <kbd>←</kbd><kbd>→</kbd> 이동,
+        <kbd>Shift</kbd>+화살표/클릭 선택, <kbd>Backspace</kbd>/<kbd>Delete</kbd>,
+        <kbd>Enter</kbd> 문단분할, <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 실행취소/재실행.
+        <b>서식은 선택 후</b> 아래 버튼(문서에 이미 존재하는 charPr만 매칭).
+        빨간 점선 <b>머리말</b>은 편집 거부(§4 가드) 확인용.</p>
+      <div class="toolbar" id="fmtbar"></div>
+      <div id="paraEditor" tabindex="0"></div>
+      <div id="paraStatus" class="status">문단을 클릭해 캐럿을 놓으세요.</div>
+      <div class="metrics" id="paraMetrics"></div>
+    </div>
+
+    <div class="card">
+      <h2>표 셀 편집기 (cell)</h2>
+      <p class="hint">셀 클릭→선택, 다시 클릭 또는 <kbd>Enter</kbd>로 편집. 입력 후 <kbd>Enter</kbd> 확정,
+        <kbd>Esc</kbd> 취소. 값이 같으면 command 미생성.</p>
+      <table class="cellgrid" id="cellGrid"><tbody></tbody></table>
+      <div class="metrics" id="cellMetrics"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Command Log (append-only)</h2>
+      <div class="metrics"><span>문단 <b id="mParaCmd">0</b></span><span>셀 <b id="mCellCmd">0</b></span></div>
+      <ul class="log" id="cmdLog"></ul>
+    </div>
+    <div class="card">
+      <h2>Save dry-run payload <span style="font-weight:400;color:#8a94a0;font-size:11px;">(전송 안 함)</span></h2>
+      <pre id="dryrun">{}</pre>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  makeParagraphEditorState, setCaret, setRange, applyFormatToSelection,
+  buildSaveDryRunPayload as buildParaDryRun,
+} from "./para_edit_state.mjs";
+import { onKeyDown } from "./para_edit_runtime.mjs";
+import { matchToggle } from "./format_charpr_matcher.mjs";
+import {
+  makeEditorState, selectCell, enterCellEdit, cancelCellEdit,
+  commitCellText, undo as cellUndo, redo as cellRedo,
+  buildSaveDryRunPayload as buildCellDryRun,
+  MODE_CELL_EDIT,
+} from "./cell_edit_state.mjs";
+
+/* ── 샘플 데이터 (내장, 원본 파일 없음) ─────────────────────────── */
+const charPrDefs = {
+  "10": { charPrId:"10", fontName:"바탕", fontFace:"바탕", fontSizePt:11, height:1100, textColor:"#17202a", bold:false, italic:false, underline:false },
+  "11": { charPrId:"11", fontName:"바탕", fontFace:"바탕", fontSizePt:11, height:1100, textColor:"#17202a", bold:true,  italic:false, underline:false },
+  "12": { charPrId:"12", fontName:"바탕", fontFace:"바탕", fontSizePt:11, height:1100, textColor:"#17202a", bold:false, italic:true,  underline:false },
+  "13": { charPrId:"13", fontName:"바탕", fontFace:"바탕", fontSizePt:11, height:1100, textColor:"#17202a", bold:false, italic:false, underline:true },
+  "14": { charPrId:"14", fontName:"바탕", fontFace:"바탕", fontSizePt:11, height:1100, textColor:"#c0392b", bold:false, italic:false, underline:false },
+};
+const BLOCK = (i)=>({ kind:"block", sectionIndex:i??0 });
+const initialParas = [
+  { paragraphId:"1", parPrIDRef:"P0", containerScope:BLOCK(0), runs:[
+      { runId:"1_r0", text:"안녕하세요, ", charPrIDRef:"10" },
+      { runId:"1_r1", text:"HWPX",          charPrIDRef:"11" },
+      { runId:"1_r2", text:" 편집기 데모입니다.", charPrIDRef:"10" } ] },
+  { paragraphId:"2", parPrIDRef:"P0", containerScope:BLOCK(0), runs:[
+      { runId:"2_r0", text:"이 문단을 클릭하고 자유롭게 편집해 보세요.", charPrIDRef:"10" } ] },
+  { paragraphId:"9", parPrIDRef:"PH", containerScope:{ kind:"header", sectionIndex:0 }, runs:[
+      { runId:"9_r0", text:"머리말 — 편집 금지 구역 (여기 타이핑 시 거부됨)", charPrIDRef:"10" } ] },
+];
+const paraDoc = { sourceDocumentHash:"demo-sha-para" };
+
+/* ── 상태 ────────────────────────────────────────────────── */
+let paraState = makeParagraphEditorState(paraDoc, initialParas);
+let lastReason = "";
+
+const FMT = [ ["bold","B","가"], ["italic","I","가"], ["underline","U","가"], ["textColor","색","가"] ];
+
+const $ = (id)=>document.getElementById(id);
+const paraLen = (p)=> p.runs.reduce((a,r)=>a+r.text.length,0);
+const activePara = ()=> paraState.paragraphs.find(p=>p.paragraphId===paraState.activeParagraphId);
+function charPrAt(p, off){ let pos=0; for(const r of p.runs){ if(off < pos+r.text.length || (off===paraLen(p) && r===p.runs[p.runs.length-1])) return r.charPrIDRef; pos+=r.text.length; } return p.runs[0]?.charPrIDRef ?? null; }
+function styleOf(cid){ const d=charPrDefs[cid]; if(!d) return ""; let s=""; if(d.bold)s+="font-weight:700;"; if(d.italic)s+="font-style:italic;"; if(d.underline)s+="text-decoration:underline;"; if(d.textColor)s+="color:"+d.textColor+";"; if(d.fontSizePt)s+="font-size:"+d.fontSizePt+"pt;"; return s; }
+
+/* ── 렌더 ────────────────────────────────────────────────── */
+function renderParas(){
+  const ed = $("paraEditor"); ed.innerHTML="";
+  const st = paraState;
+  const a = st.rangeAnchor, b = st.rangeFocus;
+  const selA = a!==null&&b!==null ? Math.min(a,b):null, selB = a!==null&&b!==null?Math.max(a,b):null;
+  for(const p of st.paragraphs){
+    const kind = p.containerScope?.kind ?? "block";
+    const div = document.createElement("div");
+    div.className = "pe-para"+(st.activeParagraphId===p.paragraphId?" active":"");
+    div.dataset.pid = p.paragraphId; div.dataset.kind = kind;
+    const badge = document.createElement("span");
+    badge.className = "pe-scope-badge badge-"+kind; badge.textContent = kind;
+    div.appendChild(badge);
+    const isActive = st.activeParagraphId===p.paragraphId;
+    let off = 0;
+    const put = (ch, cid)=>{
+      if(isActive && selA===null && st.caretOffset===off) div.appendChild(mkCaret());
+      const s = document.createElement("span");
+      s.className = "pe-ch"+(selA!==null&&isActive&&off>=selA&&off<selB?" sel":"");
+      s.style.cssText = styleOf(cid); s.dataset.pid=p.paragraphId; s.dataset.off=off;
+      s.textContent = ch; div.appendChild(s); off++;
+    };
+    for(const r of p.runs) for(const ch of r.text) put(ch, r.charPrIDRef);
+    if(isActive && selA===null && st.caretOffset===off) div.appendChild(mkCaret());
+    if(p.runs.every(r=>r.text==="")) { /* empty para clickable */ }
+    ed.appendChild(div);
+  }
+}
+function mkCaret(){ const c=document.createElement("span"); c.className="pe-caret"; return c; }
+
+function renderFmtBar(){
+  const bar=$("fmtbar"); bar.innerHTML="";
+  const p = activePara();
+  const hasRange = paraState.selectionMode==="TEXT_RANGE" && p;
+  const curCid = p ? charPrAt(p, paraState.rangeAnchor ?? paraState.caretOffset) : null;
+  const curDef = curCid!=null ? charPrDefs[curCid] : null;
+  for(const [dim,label] of FMT){
+    const btn=document.createElement("button");
+    btn.textContent = label + (dim==="bold"?" 굵게":dim==="italic"?" 기울임":dim==="underline"?" 밑줄":" 빨강");
+    const matched = curDef ? matchToggle(curDef, charPrDefs, dim) : null;
+    const active = !!curDef?.[dim==="textColor"?"":dim];
+    if(active) btn.classList.add("on");
+    if(dim==="bold")btn.style.fontWeight="700"; if(dim==="italic")btn.style.fontStyle="italic";
+    if(dim==="underline")btn.style.textDecoration="underline"; if(dim==="textColor")btn.style.color="#c0392b";
+    btn.disabled = !hasRange || !matched;
+    btn.title = !hasRange ? "먼저 텍스트를 선택하세요 (Shift+화살표)"
+              : !matched ? "문서에 매칭되는 기존 charPr 없음" : "charPr #"+matched+" 적용";
+    btn.onclick = ()=>{ const r=applyFormatToSelection(paraState, matched, charPrDefs); paraState=r.state; setReason(r); renderAll(); };
+    bar.appendChild(btn);
+  }
+  const u=document.createElement("button"); u.textContent="↶ 취소"; u.disabled=paraState.undoStack.length===0;
+  u.onclick=()=>{ const r=onKeyDown(paraState,{key:"z",ctrlKey:true,preventDefault(){}}); paraState=r.state; setReason(r); renderAll(); };
+  const rd=document.createElement("button"); rd.textContent="↷ 재실행"; rd.disabled=paraState.redoStack.length===0;
+  rd.onclick=()=>{ const r=onKeyDown(paraState,{key:"y",ctrlKey:true,preventDefault(){}}); paraState=r.state; setReason(r); renderAll(); };
+  bar.appendChild(u); bar.appendChild(rd);
+}
+
+function setReason(r){ lastReason = (r&&r.reason)||""; }
+function renderStatus(){
+  const el=$("paraStatus"); const p=activePara();
+  const ok = ["OK","COMPOSITION_STARTED"].includes(lastReason) || lastReason==="";
+  el.className = "status"+(lastReason&&!ok?" rej":ok&&lastReason?" ok":"");
+  const where = p ? `문단 #${p.paragraphId} (${p.containerScope?.kind}) · caret ${paraState.caretOffset}` : "미선택";
+  el.textContent = (lastReason?`[${lastReason}] `:"") + where +
+    (paraState.selectionMode==="TEXT_RANGE"?` · 선택 ${paraState.rangeAnchor}~${paraState.rangeFocus}`:"");
+}
+function renderMetrics(){
+  $("paraMetrics").innerHTML =
+    `<span>dirty <b>${paraState.dirty}</b></span><span>undo <b>${paraState.undoStack.length}</b></span>`+
+    `<span>redo <b>${paraState.redoStack.length}</b></span><span>commands <b>${paraState.commandLog.length}</b></span>`;
+}
+function renderLog(){
+  $("mParaCmd").textContent = paraState.commandLog.length;
+  $("mCellCmd").textContent = cellState.commandLog.length;
+  const merged = [
+    ...paraState.commandLog.map(c=>({t:"para",c})),
+    ...cellState.commandLog.map(c=>({t:"cell",c})),
+  ];
+  $("cmdLog").innerHTML = merged.map(({t,c})=>{
+    const kind = c.commandType;
+    let d="";
+    if(c.payload?.insertText!==undefined) d=`"${c.payload.insertText}" @${c.payload.caretOffset}`;
+    else if(c.commandType==="APPLY_FORMAT") d=`charPr→#${c.payload?.targetCharPrIDRef}`;
+    else if(c.commandType==="PARA_INSERT") d=`split→#${c.payload?.newParagraphId}`;
+    else if(c.after!==undefined) d=`"${c.before}"→"${c.after}"`;
+    else if(c.payload) d=JSON.stringify(c.payload).slice(0,42);
+    return `<li><span class="ct">${t}:${kind}</span><span>${d}</span></li>`;
+  }).join("") || '<li style="color:#8a94a0">아직 편집 없음</li>';
+  const dp = buildParaDryRun(paraState), dc = buildCellDryRun(cellState);
+  $("dryrun").textContent = JSON.stringify({ paragraph:dp, cell:dc }, null, 2);
+}
+function renderAll(){ renderParas(); renderFmtBar(); renderStatus(); renderMetrics(); renderLog(); }
+
+/* ── 이벤트 ──────────────────────────────────────────────── */
+$("paraEditor").addEventListener("mousedown",(e)=>{
+  const t=e.target.closest("[data-off]"); const pd=e.target.closest(".pe-para");
+  if(t){ const pid=t.dataset.pid, off=parseInt(t.dataset.off,10);
+    if(e.shiftKey && paraState.activeParagraphId===pid){ paraState=setRange(paraState,pid,paraState.caretOffset,off); }
+    else paraState=setCaret(paraState,pid,off);
+  } else if(pd){ paraState=setCaret(paraState,pd.dataset.pid,0); }
+  lastReason=""; renderAll(); $("paraEditor").focus(); e.preventDefault();
+});
+$("paraEditor").addEventListener("keydown",(e)=>{
+  if(!paraState.activeParagraphId) return;
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+    e.preventDefault(); const p=activePara(); if(!p) return;
+    const len=paraLen(p); const nx=Math.max(0,Math.min(len, paraState.caretOffset+(e.key==="ArrowRight"?1:-1)));
+    if(e.shiftKey){ const anc=paraState.rangeAnchor!==null?paraState.rangeAnchor:paraState.caretOffset; paraState=setRange(paraState,p.paragraphId,anc,nx); }
+    else paraState=setCaret(paraState,p.paragraphId,nx);
+    lastReason=""; renderAll(); return;
+  }
+  const r = onKeyDown(paraState, e); paraState=r.state; setReason(r); renderAll();
+});
+
+/* ── 셀 편집기 ───────────────────────────────────────────── */
+const cellModel = {
+  sourceRef:{ sha256:"demo-sha-cell" },
+  tables:[{ tableId:"t0" }],
+  cells:[
+    { cellId:"cell_t0_r0_c0", tableId:"t0", row:0, col:0, text:"항목" },
+    { cellId:"cell_t0_r0_c1", tableId:"t0", row:0, col:1, text:"내용" },
+    { cellId:"cell_t0_r1_c0", tableId:"t0", row:1, col:0, text:"이름" },
+    { cellId:"cell_t0_r1_c1", tableId:"t0", row:1, col:1, text:"" },
+    { cellId:"cell_t0_r2_c0", tableId:"t0", row:2, col:0, text:"금액" },
+    { cellId:"cell_t0_r2_c1", tableId:"t0", row:2, col:1, text:"1,000,000" },
+  ],
+};
+let cellState = makeEditorState(cellModel);
+function renderCells(){
+  const tb=$("cellGrid").querySelector("tbody"); tb.innerHTML="";
+  const rows={}; for(const c of cellState.documentModel.cells){ (rows[c.row]=rows[c.row]||[]).push(c); }
+  Object.keys(rows).sort((a,b)=>a-b).forEach(rk=>{
+    const tr=document.createElement("tr");
+    rows[rk].sort((a,b)=>a.col-b.col).forEach(c=>{
+      const td=document.createElement("td");
+      const editing = cellState.editorMode===MODE_CELL_EDIT && cellState.activeCellId===c.cellId;
+      if(editing){
+        const inp=document.createElement("input"); inp.value=c.text; inp.autofocus=true;
+        inp.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); cellState=commitCellText(cellState,c.cellId,inp.value).state; renderCellAll(); }
+                             else if(e.key==="Escape"){ cellState=cancelCellEdit(cellState); renderCellAll(); } };
+        inp.onblur=()=>{ cellState=commitCellText(cellState,c.cellId,inp.value).state; renderCellAll(); };
+        td.appendChild(inp); setTimeout(()=>inp.focus(),0);
+      } else {
+        const b=document.createElement("button");
+        b.className="cell"+(cellState.activeCellId===c.cellId?" active":"");
+        b.textContent=c.text||"(빈 셀)";
+        b.onclick=()=>{ if(cellState.activeCellId===c.cellId){ cellState=enterCellEdit(selectCell(cellState,c.cellId)); }
+                        else cellState=selectCell(cellState,c.cellId); renderCellAll(); };
+        td.appendChild(b);
+      }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+}
+function renderCellMetrics(){
+  $("cellMetrics").innerHTML=`<span>mode <b>${cellState.editorMode}</b></span>`+
+    `<span>dirty <b>${cellState.dirty}</b></span><span>undo <b>${cellState.undoStack.length}</b></span>`+
+    `<span>commands <b>${cellState.commandLog.length}</b></span>`;
+}
+function renderCellAll(){ renderCells(); renderCellMetrics(); renderLog(); }
+
+/* ── 초기 렌더 ───────────────────────────────────────────── */
+renderAll(); renderCellAll();
+// 데모 편의를 위해 첫 문단 캐럿 배치
+paraState = setCaret(paraState, "2", 0); renderAll(); $("paraEditor").focus();
+window.__demoReady = true;
+</script>
+</body>
+</html>

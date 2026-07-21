@@ -40,6 +40,10 @@ class WebOfficeCell:
     borderFillIDRef: str | None = None
     borderFill: dict[str, Any] = field(default_factory=dict)
     cellMargin: dict[str, Any] = field(default_factory=dict)
+    # WEB-OFFICE-RO-VIEW-TABLE-FORMAT-PRECISION-01: 셀 실측 크기(cellSz
+    # width/height, HWPUNIT)와 수직정렬(subList vertAlign) — 표 서식 정밀화.
+    cellSize: dict[str, Any] = field(default_factory=dict)
+    vertAlign: str | None = None
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
 

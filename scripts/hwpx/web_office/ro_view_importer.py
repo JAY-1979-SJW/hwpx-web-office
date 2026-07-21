@@ -321,6 +321,33 @@ def _iter_top_level_paragraphs_in_section(
     return result
 
 
+def _count_direct_top_level_tables(p_elem: ET.Element) -> int:
+    """top-level 문단 p_elem 이 직접 앵커한 hp:tbl 수.
+
+    다른 tbl 내부(cell)에 중첩된 tbl 은 제외한다. WEB-OFFICE-RO-VIEW-
+    BLOCK-READING-ORDER-01 에서 표 블록을 host 문단 위치에 끼워넣기 위한
+    카운트.
+    """
+    parents: dict[int, ET.Element] = {}
+    for e in p_elem.iter():
+        for c in list(e):
+            parents[id(c)] = e
+    count = 0
+    for e in p_elem.iter():
+        if local_name(e.tag).lower() != "tbl":
+            continue
+        anc = parents.get(id(e))
+        nested = False
+        while anc is not None:
+            if local_name(anc.tag).lower() == "tbl":
+                nested = True
+                break
+            anc = parents.get(id(anc))
+        if not nested:
+            count += 1
+    return count
+
+
 def _extract_ctrl_objects_from_section(
     section_root: ET.Element | None,
     section_index: int,
@@ -1001,6 +1028,9 @@ def import_hwpx_as_ro_view(
             border_fill_id_ref: str | None = None
             border_fill: dict[str, Any] = {}
             cell_margin: dict[str, Any] = {}
+            # WEB-OFFICE-RO-VIEW-TABLE-FORMAT-PRECISION-01
+            cell_size: dict[str, Any] = {}
+            vert_align: str | None = None
 
             # ── XML 직접 파싱 시도 ──────────────────────────────
             par_elems: list[ET.Element] = []
@@ -1015,6 +1045,10 @@ def import_hwpx_as_ro_view(
                     if border_fill_id_ref is not None:
                         border_fill = border_fill_defs.get(str(border_fill_id_ref), {})
                     cell_margin = _direct_child_attrs(cell_elem, "cellMargin")
+                    # 셀 실측 크기(cellSz) + 수직정렬(subList vertAlign)
+                    cell_size = _direct_child_attrs(cell_elem, "cellSz")
+                    _sub = _direct_child_attrs(cell_elem, "subList")
+                    vert_align = _sub.get("vertAlign") if _sub else None
                     par_elems = _iter_paragraphs_in_cell_elem(cell_elem)
 
             if not par_elems and (c.paragraphs or []):
@@ -1104,6 +1138,8 @@ def import_hwpx_as_ro_view(
                 borderFillIDRef=border_fill_id_ref,
                 borderFill=border_fill,
                 cellMargin=cell_margin,
+                cellSize=cell_size,
+                vertAlign=vert_align,
                 paragraphs=cell_pars,
                 text=c.normalizedText or ""))
         tables.append(WebOfficeTable(
@@ -1141,14 +1177,38 @@ def import_hwpx_as_ro_view(
     section_para_block_counter: dict[int, int] = {}
 
     blocks: list[WebOfficeBlock] = []
-    for t in parsed.tables or []:
-        blocks.append(WebOfficeBlock(
+
+    # WEB-OFFICE-RO-VIEW-BLOCK-READING-ORDER-01
+    # 표 블록을 "전부 앞에" 몰지 않고 문서 실제 순서(문단↔표 교차)대로
+    # 배치한다. parser 는 top-level 문단 순서만 주고 표의 문단간 위치는
+    # 주지 않으므로, top-level 문단이 hp:tbl 을 직접 품는지로 host 를
+    # 판정하고 그 문단 직후에 해당 표 블록을 emit 한다. 표는 문서 등장순
+    # (parsed.tables 순서)으로 host 슬롯에 배정한다. stable ID 불변.
+    def _make_table_block(t) -> WebOfficeBlock:
+        return WebOfficeBlock(
             blockId=_stable_block_id("table", t.sectionIndex,
-                                                      t.blockIndex, ref=t.tableId),
+                                     t.blockIndex, ref=t.tableId),
             type="table",
             sectionIndex=t.sectionIndex,
             blockIndex=t.blockIndex,
-            ref=t.tableId))
+            ref=t.tableId)
+
+    # section -> 문서 등장순 table 목록
+    tables_by_section: dict[int, list] = {}
+    for t in parsed.tables or []:
+        tables_by_section.setdefault(t.sectionIndex, []).append(t)
+    # section -> {top_para_idx: 그 문단이 직접 host 하는 표 수}
+    host_counts_by_section: dict[int, dict[int, int]] = {}
+    for sec_i in tables_by_section:
+        counts: dict[int, int] = {}
+        for pidx, pelem in _top_paragraphs_for(sec_i):
+            c = _count_direct_top_level_tables(pelem)
+            if c:
+                counts[pidx] = c
+        host_counts_by_section[sec_i] = counts
+    # section 별 표 emit 커서 — 각 표를 정확히 1회만 emit (누락/중복 방지)
+    section_table_cursor: dict[int, int] = {s: 0 for s in tables_by_section}
+
     for b in parsed.blocks or []:
         ref = None
         if b.type == "table" and getattr(b, "tableId", None):
@@ -1210,6 +1270,25 @@ def import_hwpx_as_ro_view(
             sectionIndex=b.sectionIndex,
             blockIndex=b.blockIndex,
             ref=ref))
+        # WEB-OFFICE-RO-VIEW-BLOCK-READING-ORDER-01: 이 문단이 host 하는 표를
+        # 문단 직후에 커서로 emit (각 표 1회). 커서라 중복 불가.
+        if b.type == "paragraph":
+            _cnt = host_counts_by_section.get(sec_i, {}).get(local_para_idx, 0)
+            if _cnt:
+                _tlist = tables_by_section.get(sec_i, [])
+                _cur = section_table_cursor.get(sec_i, 0)
+                for _ in range(_cnt):
+                    if _cur < len(_tlist):
+                        blocks.append(_make_table_block(_tlist[_cur]))
+                        _cur += 1
+                section_table_cursor[sec_i] = _cur
+    # 미배치 표 flush — 문단 0개 섹션/정합 실패분을 말미에 정확히 1회 emit.
+    for sec_i, _tlist in tables_by_section.items():
+        _cur = section_table_cursor.get(sec_i, 0)
+        while _cur < len(_tlist):
+            blocks.append(_make_table_block(_tlist[_cur]))
+            _cur += 1
+        section_table_cursor[sec_i] = _cur
 
     objects: list[WebOfficeObject] = []
     for section in sections:

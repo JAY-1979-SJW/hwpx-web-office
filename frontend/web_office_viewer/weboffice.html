@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 웹오피스 — 모듈형 뷰어·편집기</title>
+<style>
+  :root{ color-scheme:light; font-family:"Malgun Gothic","Segoe UI",sans-serif; background:#e9edf1; color:#1a2530; }
+  *{ box-sizing:border-box; } body{ margin:0; }
+  .wo-app{ display:flex; flex-direction:column; min-height:100vh; }
+  .wo-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px 14px; background:#26313d; color:#fff; }
+  .wo-bar h1{ font-size:15px; margin:0 8px 0 0; }
+  .wo-bar .wo-sp{ flex:1; } .wo-bar .wo-div{ width:1px; height:22px; background:#4a5967; margin:0 4px; }
+  button{ font:inherit; min-height:31px; border:1px solid #9aa6b2; background:#fff; color:#1a2530; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button:hover:not(:disabled){ background:#eef3f8; } button:disabled{ color:#9aa6b2; cursor:not-allowed; opacity:.6; }
+  .wo-bar button{ border-color:#5f7081; }
+  .wo-chk{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:#cdd6df; }
+  .wo-status{ padding:7px 14px; font-size:13px; background:#fff; border-bottom:1px solid #d7dde3; min-height:32px; }
+  .wo-status[data-k="ok"]{ color:#0b6b46; } .wo-status[data-k="fail"]{ color:#9f2d20; } .wo-status[data-k="load"]{ color:#2b5d94; }
+  .wo-wrap{ display:flex; flex:1; min-height:0; }
+  .wo-page{ flex:1; overflow:auto; padding:26px; background:#f4f6f8; }
+  .wo-sheet{ background:#fff; margin:0 auto; padding:34px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:60vh; max-width:900px; }
+  .wo-side{ width:290px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:13px; overflow:auto; }
+  .wo-side h3{ font-size:13px; margin:0 0 7px; color:#42505e; }
+  .wo-drop{ border:2px dashed #b8c2cc; border-radius:10px; padding:14px; text-align:center; color:#66717d; background:#fafbfc; margin-bottom:14px; font-size:13px; }
+  .wo-drop.wo-over{ border-color:#2d6cdf; background:#f0f6ff; color:#1e4fa3; }
+  .wo-metrics{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .wo-metrics span{ font-size:12px; background:#eef2f5; border:1px solid #dfe5ea; border-radius:6px; padding:3px 7px; }
+  table.wo-table{ border-collapse:collapse; margin:12px auto; table-layout:fixed; }
+  table.wo-table td{ vertical-align:middle; overflow:hidden; }
+  td.wo-editing{ padding:0 !important; }
+  .wo-cell-inp{ width:100%; min-width:40px; border:2px solid #2d6cdf; padding:2px 4px; font:inherit; }
+  td[data-cell-id]{ cursor:text; } td[data-cell-id]:hover{ background:#f5f9ff; }
+  .wo-cp{ white-space:pre-wrap; word-break:break-word; }
+  .wo-body-para{ margin:6px 0; white-space:pre-wrap; word-break:break-word; }
+  .wo-empty{ color:#8a94a0; }
+  .wo-log{ list-style:none; margin:0; padding:0; font-size:12px; max-height:220px; overflow:auto; }
+  .wo-log li{ padding:4px 6px; border-bottom:1px solid #eef1f4; }
+  .wo-ct{ font-weight:700; color:#1e4fa3; } .wo-muted{ color:#8a94a0; font-size:12px; }
+  .wo-feat{ font-size:12px; line-height:1.7; color:#42505e; margin:0; padding-left:16px; }
+</style>
+</head>
+<body>
+<div class="wo-app">
+  <div class="wo-bar">
+    <h1>HWPX 웹오피스 <span style="font-size:11px;color:#8a94a0;">모듈형</span></h1>
+    <input data-role="file" type="file" accept=".hwpx" hidden />
+    <button data-role="pick" type="button">파일 열기</button>
+    <button data-role="sample" type="button">샘플</button>
+    <span class="wo-div"></span>
+    <button data-role="undo" type="button" disabled>↶ 실행취소</button>
+    <button data-role="redo" type="button" disabled>↷ 재실행</button>
+    <span class="wo-div"></span>
+    <label class="wo-chk"><input data-role="guides" type="checkbox" checked /> 박스선</label>
+    <span class="wo-sp"></span>
+    <button data-role="save" type="button" disabled>저장(sandbox)</button>
+    <button data-role="download" type="button" disabled>편집본 다운로드</button>
+  </div>
+  <div class="wo-status" data-role="status" data-k="">HWPX를 열거나 «샘플»을 누르세요. 원본은 수정되지 않습니다.</div>
+  <div class="wo-wrap">
+    <div class="wo-page">
+      <div class="wo-drop" data-role="drop">여기로 <b>.hwpx</b> 드래그 · 또는 «파일 열기»</div>
+      <div class="wo-sheet" data-role="sheet"><p class="wo-empty">문서 없음.</p></div>
+    </div>
+    <aside class="wo-side">
+      <h3>편집 상태</h3>
+      <div class="wo-metrics" data-role="metrics"><span>cells <b>0</b></span></div>
+      <h3>구성 (모듈)</h3>
+      <ul class="wo-feat">
+        <li>뷰어: style_resolver · paragraph_view · table_view · document_view</li>
+        <li>편집기: cell_edit · save · upload controller</li>
+        <li>원본 무수정 · sandbox 저장 · 편집본 다운로드</li>
+      </ul>
+      <h3>Command Log</h3>
+      <ul class="wo-log" data-role="log"><li class="wo-muted">편집 없음</li></ul>
+    </aside>
+  </div>
+</div>
+<script type="module">
+  import { mountWebOffice } from "./weboffice/app.mjs";
+  mountWebOffice(document.querySelector(".wo-app"));
+</script>
+</body>
+</html>
