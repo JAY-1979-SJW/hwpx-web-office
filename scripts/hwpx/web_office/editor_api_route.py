@@ -105,6 +105,19 @@ def call_cell_save_apply(
     }])
 
 
+def call_hwpx_layout(request: dict[str, Any],
+                     *, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
+    """lineseg 좌표 레이아웃(한컴 없이 원본 배치 재현용). read-only."""
+    from .coordinate_layout import build_layout
+    result = build_layout(request, project_root=project_root)
+    if result.get("verdict") == "PASS":
+        return _envelope("SUCCESS", result)
+    return _envelope("FAILED", result, [{
+        "code": result.get("reason", "LAYOUT_REJECTED"),
+        "message": result.get("reason", ""),
+    }])
+
+
 if _FASTAPI_AVAILABLE:
     class EditorLoadRequest(BaseModel):
         operation: str
@@ -117,6 +130,9 @@ if _FASTAPI_AVAILABLE:
         commandLog: list[dict[str, Any]] = []
         requestId: str | None = None
         dryRunOnly: bool = False
+
+    class HwpxLayoutRequest(BaseModel):
+        sourcePath: str
 
 
 def create_app() -> Any:
@@ -142,6 +158,10 @@ def create_app() -> Any:
     @app.post("/api/web-office/cell-save-apply")
     def cell_save_apply(req: CellSaveApplyRequest) -> dict[str, Any]:
         return call_cell_save_apply(req.model_dump())
+
+    @app.post("/api/web-office/hwpx-layout")
+    def hwpx_layout(req: HwpxLayoutRequest) -> dict[str, Any]:
+        return call_hwpx_layout(req.model_dump())
 
     if FRONTEND_DIR.is_dir():
         app.mount(

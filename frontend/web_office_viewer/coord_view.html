@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 좌표 렌더러 (lineseg 기반, 한컴 없이)</title>
+<style>
+  :root{ color-scheme:light; font-family:"함초롬바탕","바탕","Malgun Gothic",serif; background:#57606b; color:#17202a; }
+  *{ box-sizing:border-box; } body{ margin:0; }
+  .co-bar{ display:flex; align-items:center; gap:8px; padding:9px 14px; background:#26313d; color:#fff; position:sticky; top:0; z-index:5; }
+  .co-bar h1{ font-size:14px; margin:0 8px 0 0; }
+  button{ font:inherit; min-height:30px; border:1px solid #5f7081; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  .co-status{ font-size:12px; color:#cdd6df; }
+  .co-scroll{ padding:24px; overflow:auto; }
+  .co-page{ position:relative; background:#fff; margin:0 auto 22px; box-shadow:0 2px 10px rgba(0,0,0,.35); }
+  .co-line{ position:absolute; white-space:pre; overflow:hidden; }
+  .co-box{ position:absolute; }
+  .co-empty{ color:#e0e6eb; text-align:center; padding:40px; }
+</style>
+</head>
+<body>
+  <div class="co-bar">
+    <h1>HWPX 좌표 렌더러 <span style="font-size:11px;color:#8a94a0;">lineseg 기반 · 한컴 없이</span></h1>
+    <input id="file" type="file" accept=".hwpx" hidden />
+    <button id="pick" type="button">파일 열기</button>
+    <button id="sample" type="button">샘플</button>
+    <span id="status" class="co-status">HWPX를 열면 한컴이 저장한 줄 좌표 그대로 배치합니다.</span>
+  </div>
+  <div class="co-scroll" id="scroll"><p class="co-empty">문서 없음.</p></div>
+<script type="module">
+  import { renderCoordinateLayout } from "./weboffice/coordinate_renderer.mjs";
+  const $=(id)=>document.getElementById(id);
+  const setStatus=(m)=>{ $("status").textContent=m; };
+  async function loadLayout(sourcePath){
+    setStatus("레이아웃 추출 중 …");
+    try{
+      const res=await fetch("/api/web-office/hwpx-layout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sourcePath})});
+      const j=await res.json();
+      const d=j.data||j;
+      if((j.status&&j.status!=="SUCCESS")||d.verdict==="REJECTED"||d.error){ setStatus("실패: "+((j.errors&&j.errors[0]&&j.errors[0].code)||d.reason||d.error||"UNKNOWN")); return; }
+      $("scroll").innerHTML=renderCoordinateLayout(d);
+      setStatus(`${d.pages}페이지 · ${d.lines.length}줄 · 좌표 배치(한컴 없이)`);
+    }catch(e){ setStatus("실패: "+e.message); }
+  }
+  async function upload(file){
+    if(!file) return;
+    setStatus("업로드 중: "+file.name+" …");
+    const fd=new FormData(); fd.append("file",file);
+    const res=await fetch("/api/web-office/hwpx-upload",{method:"POST",body:fd});
+    const j=await res.json(); const d=j.data||j;
+    if(d.sourcePath) loadLayout(d.sourcePath); else setStatus("업로드 실패");
+  }
+  $("pick").onclick=()=>$("file").click();
+  $("file").onchange=(e)=>upload(e.target.files[0]);
+  $("sample").onclick=()=>loadLayout("tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx");
+  window.__coordReady=true;
+</script>
+</body>
+</html>
