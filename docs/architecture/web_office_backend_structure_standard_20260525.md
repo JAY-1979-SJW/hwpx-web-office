@@ -51,6 +51,7 @@ The backend API surface is limited to:
 - `GET /api/web-office/health`
 - `POST /api/web-office/hwpx-load`
 - `POST /api/web-office/cell-save-apply`
+- `POST /api/web-office/hwpx-layout` — lineseg 좌표 레이아웃(한컴 미사용, read-only)
 
 The health response must expose the active load and save endpoints and confirm
 that the pipeline is ready without exposing local filesystem locations.

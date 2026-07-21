@@ -54,6 +54,8 @@ REQUIRED_ENDPOINTS = [
     "GET /api/web-office/health",
     "POST /api/web-office/hwpx-load",
     "POST /api/web-office/cell-save-apply",
+    # WEB-OFFICE-COORD-LAYOUT-01: lineseg 좌표 레이아웃(한컴 없이) 엔드포인트.
+    "POST /api/web-office/hwpx-layout",
 ]
 
 REQUIRED_SERVER_TOKENS = [

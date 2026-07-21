@@ -148,6 +148,7 @@ The approved Web Office API surface is:
 - `GET /api/web-office/health`
 - `POST /api/web-office/hwpx-load`
 - `POST /api/web-office/cell-save-apply`
+- `POST /api/web-office/hwpx-layout` (lineseg 좌표 레이아웃, 한컴 없이 · read-only)
 
 Adding, removing, or renaming an endpoint requires a new task standard and
 explicit approval.
