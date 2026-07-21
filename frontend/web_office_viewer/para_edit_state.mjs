@@ -59,6 +59,29 @@ function _scopeBoundaryRejectReason(scope, cmdType) {
   return "BODY_SCOPE_ONLY_SUPPORTED";
 }
 
+// WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01
+// inline 텍스트 편집(TYPE_TEXT / DELETE_TEXT_RANGE / APPLY_FORMAT)을
+// body(kind=="block") 및 cell scope로만 한정. header/footer/footnote/
+// endnote/caption 문단의 inline 편집은 CLAUDE.md §4 "header/footer
+// paragraph 편집 금지"에 따라 명시적으로 reject.
+// scope 없음(null)은 여기서 null 반환 — 별도 _scopeMissing 가드가 처리.
+function _inlineScopeRejectReason(scope) {
+  const kind = scope?.kind;
+  if (!kind || kind === "block" || kind === "cell") return null;
+  if (kind === "header")   return "HEADER_SCOPE_NOT_SUPPORTED";
+  if (kind === "footer")   return "FOOTER_SCOPE_NOT_SUPPORTED";
+  if (kind === "footnote") return "FOOTNOTE_SCOPE_NOT_SUPPORTED";
+  if (kind === "endnote")  return "ENDNOTE_SCOPE_NOT_SUPPORTED";
+  if (kind === "caption")  return "CAPTION_SCOPE_NOT_SUPPORTED";
+  return "BODY_SCOPE_ONLY_SUPPORTED";
+}
+
+// 활성 문단의 containerScope에 대해 inline 편집 허용 여부를 판정.
+function _inlineScopeGuard(state) {
+  const p = _findPara(state, state.activeParagraphId);
+  return _inlineScopeRejectReason(p?.containerScope ?? null);
+}
+
 function _findRun(paragraph, runId) {
   return paragraph.runs.find((r) => r.runId === runId);
 }
@@ -246,6 +269,12 @@ export function typeTextAtCaret(state, text) {
     return { state, command: null,
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
   }
+  // WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01: header/footer 등
+  // non-body/non-cell scope의 inline 편집 차단 (§4).
+  const _inlineReject = _inlineScopeGuard(state);
+  if (_inlineReject) {
+    return { state, command: null, reason: _inlineReject };
+  }
   const p = _findPara(state, state.activeParagraphId);
   const _cprg = _charPrGuard(p);
   if (_cprg) return { state, command: null, reason: _cprg };
@@ -332,6 +361,12 @@ export function applyFormatToSelection(
     return { state, command: null,
                   reason: "TARGET_CHARPR_NOT_IN_HEADER" };
   }
+  // WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01: header/footer 등
+  // non-body/non-cell scope의 inline 편집 차단 (§4).
+  const _inlineReject = _inlineScopeGuard(state);
+  if (_inlineReject) {
+    return { state, command: null, reason: _inlineReject };
+  }
   const p = _findPara(state, state.activeParagraphId);
   const _cprg = _charPrGuard(p);
   if (_cprg) return { state, command: null, reason: _cprg };
@@ -362,6 +397,12 @@ export function deleteRange(state) {
   if (_scopeMissing(state)) {
     return { state, command: null,
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
+  }
+  // WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01: header/footer 등
+  // non-body/non-cell scope의 inline 편집 차단 (§4).
+  const _inlineReject = _inlineScopeGuard(state);
+  if (_inlineReject) {
+    return { state, command: null, reason: _inlineReject };
   }
   const p = _findPara(state, state.activeParagraphId);
   const _cprg = _charPrGuard(p);
@@ -405,6 +446,12 @@ export function deleteBackward(state) {
   if (_scopeMissing(state)) {
     return { state, command: null,
                   reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
+  }
+  // WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01: header/footer 등
+  // non-body/non-cell scope의 inline 편집 차단 (§4).
+  const _inlineReject = _inlineScopeGuard(state);
+  if (_inlineReject) {
+    return { state, command: null, reason: _inlineReject };
   }
   const p = _findPara(state, state.activeParagraphId);
   const _cprg = _charPrGuard(p);

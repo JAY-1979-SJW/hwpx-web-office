@@ -4,6 +4,7 @@ import {
   makeParagraphEditorState, selectParagraph,
   setCaret, setRange, clearSelection,
   typeTextAtCaret, deleteRange, deleteBackward,
+  applyFormatToSelection,
   startComposition, updateComposition, endComposition,
   cancelComposition,
   undo, redo, buildSaveDryRunPayload,
@@ -208,6 +209,62 @@ assert(payload.dryRun === true);
 assert(payload.sourceDocumentHash === "abc123");
 assert(payload.commandLog.length >= 1);
 checks.saveDryRunReady = true;
+
+// 15) WEB-OFFICE-PARA-EDIT-INLINE-SCOPE-BOUNDARY-REJECT-01:
+//     header/footer/footnote/endnote/caption scope 문단의 inline 편집은
+//     거부. block/cell scope 는 계속 허용 (기능 회귀 방지).
+function scopedParas(kind) {
+  return [{
+    paragraphId: "sp1", parPrIDRef: "P1",
+    runs: [{ runId: "sp1_run0", text: "hello", charPrIDRef: "A" }],
+    containerScope: { kind, sectionIndex: 0 },
+  }];
+}
+function inlineTypeReason(kind) {
+  let st = makeParagraphEditorState(doc, scopedParas(kind));
+  st = selectParagraph(st, "sp1");
+  st = setCaret(st, "sp1", 2);
+  return typeTextAtCaret(st, "Z");
+}
+for (const [kind, reason] of [
+  ["header", "HEADER_SCOPE_NOT_SUPPORTED"],
+  ["footer", "FOOTER_SCOPE_NOT_SUPPORTED"],
+  ["footnote", "FOOTNOTE_SCOPE_NOT_SUPPORTED"],
+  ["endnote", "ENDNOTE_SCOPE_NOT_SUPPORTED"],
+  ["caption", "CAPTION_SCOPE_NOT_SUPPORTED"],
+]) {
+  const rr = inlineTypeReason(kind);
+  assert(rr.command === null, `${kind} inline typeText: no command`);
+  assert(rr.reason === reason, `${kind} inline typeText rejected`);
+  assert(rr.state.commandLog.length === 0, `${kind} inline: log empty`);
+  assert(rr.state.dirty === false, `${kind} inline: not dirty`);
+}
+// deleteRange / applyFormat / deleteBackward 도 동일 scope 가드 적용
+{
+  let sr = makeParagraphEditorState(doc, scopedParas("footer"));
+  sr = selectParagraph(sr, "sp1");
+  sr = setRange(sr, "sp1", 1, 3);
+  assert(deleteRange(sr).reason === "FOOTER_SCOPE_NOT_SUPPORTED",
+    "footer inline deleteRange rejected");
+  assert(applyFormatToSelection(sr, "A").reason
+    === "FOOTER_SCOPE_NOT_SUPPORTED",
+    "footer inline applyFormat rejected");
+  let sb = makeParagraphEditorState(doc, scopedParas("header"));
+  sb = selectParagraph(sb, "sp1");
+  sb = setCaret(sb, "sp1", 2);
+  assert(deleteBackward(sb).reason === "HEADER_SCOPE_NOT_SUPPORTED",
+    "header inline deleteBackward rejected");
+}
+// block / cell scope 는 여전히 정상 발행
+for (const kind of ["block", "cell"]) {
+  let sa = makeParagraphEditorState(doc, scopedParas(kind));
+  sa = selectParagraph(sa, "sp1");
+  sa = setCaret(sa, "sp1", 2);
+  const ra = typeTextAtCaret(sa, "Z");
+  assert(ra.command !== null && ra.reason === "OK",
+    `${kind} inline typeText still allowed`);
+}
+checks.inlineScopeBoundaryReject = true;
 
 console.log(JSON.stringify({
   task: "WEB-OFFICE-PARA-EDIT-BROWSER-01",
