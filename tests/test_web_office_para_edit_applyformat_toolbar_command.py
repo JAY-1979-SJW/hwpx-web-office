@@ -23,7 +23,7 @@ STATE_MJS = (PR / "frontend/web_office_viewer/para_edit_state.mjs")
 CMD_MJS = (PR / "frontend/web_office_viewer/para_edit_command.mjs")
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "619f2e0"  # PARA_INSERT 준공 후 갱신 (abebab6 → 1f442ec)
+BASELINE_COMMIT = "4b0515f"  # PARA_INSERT 준공 후 갱신 (abebab6 → 1f442ec)
 
 
 def _node_ok() -> bool:

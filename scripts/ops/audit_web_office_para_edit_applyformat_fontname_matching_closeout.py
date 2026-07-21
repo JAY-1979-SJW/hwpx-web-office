@@ -16,7 +16,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_fontname_matching_closeout.md")
-BASELINE_COMMIT = "619f2e0"
+BASELINE_COMMIT = "4b0515f"
 
 DOC_REQUIRED_IN_SCOPE = [
     "matchAxisChange",
