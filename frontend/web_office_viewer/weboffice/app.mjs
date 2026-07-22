@@ -4,28 +4,46 @@
  * 저장/업로드 로직은 각 모듈에 있다.
  */
 import { renderDocument } from "./document_view.mjs";
+import { renderCoordinateLayout, autoFitLines }
+  from "./coordinate_renderer.mjs";
 import { createCellEditController } from "./cell_edit_controller.mjs";
 import { createSaveController } from "./save_controller.mjs";
 import { createUploadController } from "./upload_controller.mjs";
-import { createCoordBgController } from "./coord_bg_controller.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
+const LAYOUT_ENDPOINT = "/api/web-office/hwpx-layout";
 
 export function mountWebOffice(root) {
   const $ = (sel) => root.querySelector(sel);
   let loaded = null, cell = null, save = null;
+  let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
 
   const setStatus = (k, msg) => {
     const e = $("[data-role=status]");
     e.dataset.k = k; e.textContent = msg;
   };
-  const guides = () => $("[data-role=guides]").checked;
+  // "충실 보기"(좌표 렌더러, 한컴 원본 배치) vs "편집 모드"(흐름 렌더러).
+  // 기본은 충실 보기 — 흐름 렌더러의 텍스트 뭉침(blob)을 피한다.
+  const faithful = () => {
+    const c = $("[data-role=coordbg]");
+    return c ? c.checked : true;
+  };
 
-  const coordBg = createCoordBgController({
-    canvas: $("[data-role=canvas]"),
-    layer: $("[data-role=coord]"),
-    setStatus,
-  });
+  async function fetchLayout(sourcePath) {
+    if (!sourcePath) return null;
+    try {
+      const res = await fetch(LAYOUT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourcePath }),
+      });
+      const env = await res.json();
+      const d = (env && env.data) || env || {};
+      if ((env && env.status && env.status !== "SUCCESS")
+        || d.verdict === "REJECTED" || d.error) return null;
+      return d;
+    } catch (_e) { return null; }
+  }
 
   function render() {
     const sheet = $("[data-role=sheet]");
@@ -34,15 +52,24 @@ export function mountWebOffice(root) {
       renderSide();
       return;
     }
-    sheet.innerHTML = renderDocument(loaded.renderPayload, {
-      guides: guides(),
-      getCellText: (id) => (cell ? cell.getCellText(id) : null),
-      editableCell: () => true,
-    });
-    sheet.querySelectorAll("td[data-cell-id]").forEach((td) => {
-      td.addEventListener("click",
-        () => cell.startEdit(td.dataset.cellId, td, render));
-    });
+    if (faithful() && coordLayout) {
+      // 한컴 좌표 그대로 절대배치 — 원본 배치·서식 충실 재현(읽기 전용)
+      sheet.innerHTML = renderCoordinateLayout(coordLayout);
+      autoFitLines(sheet);
+      root.classList.add("wo-faithful");
+    } else {
+      // 편집 모드 — 흐름 렌더러 + 셀 클릭 편집
+      root.classList.remove("wo-faithful");
+      sheet.innerHTML = renderDocument(loaded.renderPayload, {
+        guides: true,
+        getCellText: (id) => (cell ? cell.getCellText(id) : null),
+        editableCell: () => true,
+      });
+      sheet.querySelectorAll("td[data-cell-id]").forEach((td) => {
+        td.addEventListener("click",
+          () => cell.startEdit(td.dataset.cellId, td, render));
+      });
+    }
     renderSide();
   }
 
@@ -65,19 +92,22 @@ export function mountWebOffice(root) {
     $("[data-role=download]").disabled = !(save && save.lastOutput());
   }
 
-  function onLoaded(d) {
+  async function onLoaded(d) {
     loaded = d;
+    coordLayout = null;
     cell = createCellEditController(d.documentModel);
     save = createSaveController({
       getState: () => cell.getState(),
       getSourcePath: () => loaded.sourcePath,
     });
     const sm = d.summary || {};
+    setStatus("load", "좌표 레이아웃(원본 배치) 불러오는 중 …");
+    render();  // 즉시 1차 렌더(레이아웃 오기 전엔 흐름/빈 화면)
+    coordLayout = await fetchLayout(d.sourcePath);
     setStatus("ok",
-      `불러옴 · 표 ${sm.tables ?? "?"} · 셀 ${sm.cells ?? "?"} · 원본 무수정`);
-    coordBg.setSource(d.sourcePath);
-    render();
-    coordBg.refresh();  // 배경 토글이 켜져 있으면 새 문서로 재적용
+      `불러옴 · 표 ${sm.tables ?? "?"} · 셀 ${sm.cells ?? "?"} · `
+      + (coordLayout ? "원본 배치 충실 재현" : "흐름 보기") + " · 원본 무수정");
+    render();  // 레이아웃 반영 재렌더
   }
 
   const upload = createUploadController({ onLoaded, setStatus });
@@ -92,9 +122,9 @@ export function mountWebOffice(root) {
     () => cell && cell.undo(render));
   $("[data-role=redo]").addEventListener("click",
     () => cell && cell.redo(render));
-  $("[data-role=guides]").addEventListener("change", render);
-  $("[data-role=coordbg]").addEventListener("change",
-    (e) => coordBg.toggle(e.target.checked));
+  const guidesEl = $("[data-role=guides]");
+  if (guidesEl) guidesEl.addEventListener("change", render);
+  $("[data-role=coordbg]").addEventListener("change", render);
   $("[data-role=save]").addEventListener("click", async () => {
     if (!cell) return;
     setStatus("load", "저장 중(sandbox 사본 + readback 검증) …");
@@ -124,6 +154,15 @@ export function mountWebOffice(root) {
     if (f) upload.upload(f);
   });
 
+  // 딥링크 자동 로드: #load=<프로젝트 상대경로> — 임의 프로젝트 문서 열기.
+  // (임의 디스크 업로드는 보안 홀드라 미지원; 상대경로 로드만.)
+  function loadFromHash() {
+    const m = /[#&]load=([^&]+)/.exec(location.hash || "");
+    if (m) upload.loadSample(decodeURIComponent(m[1]));
+  }
+  window.addEventListener("hashchange", loadFromHash);
+
   render();
+  loadFromHash();
   window.__weReady = true;
 }
