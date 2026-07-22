@@ -27,7 +27,8 @@
   .wo-canvas.wo-bg .wo-coord{ display:flex; }
   .wo-canvas.wo-bg .wo-sheet{ background:rgba(255,255,255,.60); box-shadow:0 1px 8px rgba(0,0,0,.06); }
   .wo-coord .co-page{ position:relative; background:#fff; margin:0 auto 20px; box-shadow:0 1px 6px rgba(0,0,0,.18); }
-  .wo-coord .co-line{ position:absolute; white-space:pre; overflow:hidden; }
+  /* overflow:clip + clip-margin — 글자 하단(받침·descender) 잘림 방지 */
+  .wo-coord .co-line{ position:absolute; white-space:pre; overflow:clip; overflow-clip-margin:3px; }
   .wo-coord .co-box{ position:absolute; }
   .wo-coord .co-empty{ display:none; }
   .wo-side{ width:290px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:13px; overflow:auto; }

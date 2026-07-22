@@ -13,7 +13,9 @@
   .co-status{ font-size:12px; color:#cdd6df; }
   .co-scroll{ padding:24px; overflow:auto; }
   .co-page{ position:relative; background:#fff; margin:0 auto 22px; box-shadow:0 2px 10px rgba(0,0,0,.35); }
-  .co-line{ position:absolute; white-space:pre; overflow:hidden; }
+  /* overflow:clip + clip-margin — 글자 하단(받침·descender) 잘림 방지.
+     줄상자 높이==폰트크기라 hidden 이면 아랫부분이 잘린다. 3px 여유. */
+  .co-line{ position:absolute; white-space:pre; overflow:clip; overflow-clip-margin:3px; }
   .co-box{ position:absolute; }
   .co-empty{ color:#e0e6eb; text-align:center; padding:40px; }
 </style>
