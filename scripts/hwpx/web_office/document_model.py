@@ -46,6 +46,9 @@ class WebOfficeCell:
     vertAlign: str | None = None
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
+    # 파싱 시 셀 서식 기반 입력칸 분류(빈칸+비헤더+비커버+무채색) —
+    # 프런트는 이 값을 단일 진실로 사용한다.
+    isInputCell: bool = False
 
 
 @dataclass

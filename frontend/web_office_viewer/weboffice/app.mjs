@@ -77,28 +77,78 @@ export function mountWebOffice(root) {
       // 편집된 셀은 새 텍스트 표시(getCellText), 셀 박스 클릭 시 인라인 편집.
       sheet.innerHTML = renderCoordinateLayout(coordLayout, {
         editable: true,
-        getCellText: (id) => (cell ? cell.getCellText(id) : null),
+        // 입력칸은 상시 필드가 값을 표시하므로 렌더러 오버레이 제외(이중
+        // 표시 방지). 라벨 편집만 렌더러 오버레이 경로 사용.
+        getCellText: (id) => (cell && !cell.isInputCell(id)
+          ? cell.getCellText(id) : null),
         truthBase,   // 가용 시 '원본 그대로'(한컴 실렌더 배경 + 편집 오버레이)
       });
       autoFitLines(sheet);
+      // 상시 입력필드 — XML 에서 입력칸(로드 시 빈 셀)을 이미 알므로,
+      // 클릭 시 생성이 아니라 로드 즉시 모든 입력칸에 실제 <input> 을
+      // 배치한다(커서 대기·Tab 이동·Enter 다음 칸). 문서 순서(페이지→
+      // 위→왼쪽)로 tabindex 를 매겨 폼처럼 채워내려갈 수 있다.
+      // 색칠 셀 배제 — 유채색 채움(간트 진행바·차트 칸)만 입력칸에서
+      // 제외한다. 무채색 연회색(#F2F2F2 등)은 일반 셀 배경이므로 유지.
+      // 판정: RGB 채도(chroma = max-min) > 12 이면 유채색.
+      const _chromatic = (hex) => {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+        if (!m) return false;
+        const v = parseInt(m[1], 16);
+        const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+        return (Math.max(r, g, b) - Math.min(r, g, b)) > 12;
+      };
+      const filledIds = new Set();
+      for (const pdp of (coordLayout.pagesDetail || [])) {
+        for (const b of pdp.boxes) {
+          if (b.cellId && _chromatic(b.fill)) filledIds.add(b.cellId);
+        }
+      }
+      const inputBoxes = [];
       sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
         const id = box.dataset.cellId;
-        const isInput = cell.isInputCell(id);   // 로드 시 빈칸 = 입력칸
+        const isInput = cell.isInputCell(id)
+          && !filledIds.has(id);   // 로드 시 빈칸 + 무채움 = 입력칸
         box.classList.add(isInput ? "wo-input" : "wo-label");
-        if (isInput) {
-          // 입력칸: 단일 클릭으로 값 입력. prefill=현재값(빈칸은 빈 입력에서
-          // 시작, 이미 채운 칸은 값 유지 — 재클릭 시 빈값 커밋으로 소실 방지).
-          box.addEventListener("click", () =>
-            cell.startEdit(id, box, render, { prefill: true }));
+        if (isInput && !box.dataset.frag) {
+          const r = box.getBoundingClientRect();
+          inputBoxes.push({ id, box, top: r.top, left: r.left });
         }
         // 라벨(원래 문구): 더블클릭으로만 수정. 편집된 적 있으면 현재값,
         // 아니면 충실 원문(정규화 아님)을 prefill — 자간·공백 원형 유지.
-        box.addEventListener("dblclick", (e) => {
-          e.preventDefault();
-          const edited = cell.getCellText(id);
-          const pf = edited != null ? edited : faithfulCellText(id);
-          cell.startEdit(id, box, render, { prefill: true, prefillText: pf });
+        if (!isInput) {
+          box.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            const edited = cell.getCellText(id);
+            const pf = edited != null ? edited : faithfulCellText(id);
+            cell.startEdit(id, box, render,
+              { prefill: true, prefillText: pf });
+          });
+        }
+      });
+      inputBoxes.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+      inputBoxes.forEach((it, idx) => {
+        const inp = document.createElement("input");
+        inp.className = "wo-fld";
+        inp.tabIndex = idx + 1;
+        inp.value = cell.currentText(it.id);
+        inp.addEventListener("change", () => {
+          if (cell.setCellText(it.id, inp.value)) renderSide();
         });
+        inp.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            inp.dispatchEvent(new Event("change"));
+            const nxt = sheet.querySelector(
+              `.wo-fld[tabindex="${idx + 2}"]`);
+            if (nxt) nxt.focus();
+            else inp.blur();
+          } else if (e.key === "Escape") {
+            inp.value = cell.currentText(it.id);
+            inp.blur();
+          }
+        });
+        it.box.appendChild(inp);
       });
       root.classList.add("wo-faithful");
     } else {

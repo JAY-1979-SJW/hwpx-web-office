@@ -11,11 +11,26 @@ import {
 export function createCellEditController(documentModel) {
   let state = makeEditorState(documentModel);
   const editedIds = new Set();
-  // 로드 시점 빈 셀 = 입력칸(값 채우는 칸). 값 채운 뒤에도 입력칸으로 유지
-  // 하려고 원본 기준으로 스냅샷(편집으로 텍스트가 바뀌어도 분류 불변).
+  // 입력칸 분류 — 파서(서버)가 문서 파싱 시 셀 서식으로 정확 분류한
+  // isInputCell 을 단일 진실로 사용한다(빈칸+비헤더+비병합커버+무채색 채움).
+  // 서버 필드가 없는 구버전 payload 만 프런트 휴리스틱으로 폴백.
+  // 값 채운 뒤에도 입력칸 유지(원본 기준 스냅샷 — 편집으로 분류 불변).
+  const _hasFill = (c) => {
+    const f = c.borderFill && c.borderFill.fill;
+    return !!(f && String(f).toUpperCase() !== "#FFFFFF");
+  };
+  // header 원시 속성은 "0"(문자열)도 오므로 truthy 검사 금지 —
+  // 정규화 불리언(headerCell) 또는 명시 "1"/"true" 만 헤더로 본다.
+  const _isHeader = (c) => c.headerCell === true
+    || c.header === "1" || c.header === "true";
+  const _legacyInput = (c) => !((c.text || "").trim())
+    && !_isHeader(c)
+    && !c.isCoveredByMerge
+    && !_hasFill(c);
   const inputCells = new Set(
     (documentModel.cells || [])
-      .filter((c) => !((c.text || "").trim()))
+      .filter((c) => (typeof c.isInputCell === "boolean")
+        ? c.isInputCell : _legacyInput(c))
       .map((c) => c.cellId));
 
   const cellOf = (id) =>
@@ -32,6 +47,23 @@ export function createCellEditController(documentModel) {
     },
     // 로드 시점 빈 셀 = 입력칸(라벨 아님). 값 채운 뒤에도 true 유지.
     isInputCell: (cellId) => inputCells.has(cellId),
+    // 상시 입력필드용 — 셀의 현재 텍스트(편집 반영값)
+    currentText(cellId) {
+      const c = cellOf(cellId);
+      return c ? (c.text || "") : "";
+    },
+    // 상시 입력필드용 직접 커밋 — 값이 바뀐 경우에만 command 생성.
+    // (DOM 재구축 없이 필드가 값을 유지하므로 rerender 는 호출자가 결정)
+    setCellText(cellId, value) {
+      const cell = cellOf(cellId);
+      if (!cell) return false;
+      if ((cell.text || "") === value) return false;
+      state = enterCellEdit(selectCell(state, cellId));
+      const r = commitCellText(state, cellId, value);
+      state = r.state;
+      if (r.command) editedIds.add(cellId);
+      return !!r.command;
+    },
     startEdit(cellId, tdEl, rerender, opts = {}) {
       const cell = cellOf(cellId);
       if (!cell) return;

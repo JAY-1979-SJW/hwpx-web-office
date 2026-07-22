@@ -127,8 +127,9 @@ export function renderCoordinateLayout(layout, opts = {}) {
         if (b.border.b !== "none") bd += `border-bottom:${b.border.b};`;
       }
       const fill = (b.fill && !pageTruth) ? `background:${b.fill};` : "";
-      const editAttr = (opts.editable && b.cellId)
-        ? ` data-cell-id="${esc(b.cellId)}"` : "";
+      const editAttr = ((opts.editable && b.cellId)
+        ? ` data-cell-id="${esc(b.cellId)}"` : "")
+        + (b.frag ? ' data-frag="1"' : "");
       parts.push(`<div class="co-box"${editAttr} style="left:${b.x}px;`
         + `top:${localY(b.y).toFixed(1)}px;width:${b.w}px;`
         + `height:${b.h}px;${bd}${fill}"></div>`);

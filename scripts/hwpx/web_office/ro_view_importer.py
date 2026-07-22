@@ -770,6 +770,39 @@ def _extract_revision_tracking(package: HwpxPackage | None) -> dict[str, Any]:
     return payload
 
 
+def _chromatic_fill(hex_color: str | None) -> bool:
+    """유채색 채움 여부 — 무채색 연회색(#F2F2F2 등 일반 셀 배경)은 False.
+    채도(chroma = max-min RGB) > 12 이면 유채색(간트 바·차트 칸)."""
+    if not hex_color:
+        return False
+    h = str(hex_color).lstrip("#")
+    if len(h) != 6:
+        return False
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    except ValueError:
+        return False
+    return (max(r, g, b) - min(r, g, b)) > 12
+
+
+def _classify_input_cell(text, header_attr, header_cell, covered,
+                         border_fill) -> bool:
+    """파싱 시 셀 서식 기반 입력칸 분류 (프런트 휴리스틱 이관 — 단일 진실).
+
+    입력칸 = 빈 텍스트 + 비헤더(headerCell/명시 header=1) + 병합커버 아님
+             + 유채색 채움 아님. header 원시값 "0" 문자열은 헤더 아님.
+    """
+    if (text or "").strip():
+        return False
+    if header_cell is True or str(header_attr) in ("1", "true"):
+        return False
+    if covered:
+        return False
+    if _chromatic_fill((border_fill or {}).get("fill")):
+        return False
+    return True
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -794,6 +827,12 @@ def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[
             elif child_name in {"diagonal", "slash", "backSlash"}:
                 payload[child_name] = dict(child.attrib)
         payload["sides"] = sides
+        # 채움색(fillBrush) — 입력칸 분류(색칠 셀 배제)에 필요. 흰색/none 은 None.
+        try:
+            from .coord_styles import _fill_color
+            payload["fill"] = _fill_color(border_fill)
+        except Exception:
+            payload["fill"] = None
         defs[str(border_fill_id)] = payload
     return defs
 
@@ -1141,7 +1180,10 @@ def import_hwpx_as_ro_view(
                 cellSize=cell_size,
                 vertAlign=vert_align,
                 paragraphs=cell_pars,
-                text=c.normalizedText or ""))
+                text=c.normalizedText or "",
+                isInputCell=_classify_input_cell(
+                    c.normalizedText, header_attr, header_cell,
+                    bool(c.isCoveredByMerge), border_fill)))
         tables.append(WebOfficeTable(
             tableId=tid,
             blockId=_stable_block_id("table", t.sectionIndex,

@@ -339,6 +339,32 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                     b["y"], b["h"] = round(y0, 1), round(y1 - y0, 1)
                     b["x"], b["w"] = round(x0, 1), round(x1 - x0, 1)
                     changed = True
+        # 격자칸 재봉합 — 스냅 후에도 박스 '내부'를 격자선이 관통하면
+        # (변이 서로 다른 칸의 선에 붙은 오정렬) 박스 중심을 감싸는 실제
+        # 격자칸으로 재봉합한다. 병합 셀은 내부에 선이 없어 건드리지 않음.
+        # 입력필드가 '도면 테이블 그대로'의 칸에 정확히 앉게 하는 규칙.
+        for b in pd["boxes"]:
+            if not b.get("cellId"):
+                continue
+            y0, y1 = b["y"], b["y"] + b["h"]
+            x0, x1 = b["x"], b["x"] + b["w"]
+            in_y = [t for t in ys if y0 + 4 < t < y1 - 4]
+            in_x = [t for t in xs if x0 + 4 < t < x1 - 4]
+            if not in_y and not in_x:
+                continue
+            cyc, cxc = (y0 + y1) / 2, (x0 + x1) / 2
+            if in_y:
+                lo = max((t for t in ys if t <= cyc), default=None)
+                hi = min((t for t in ys if t >= cyc), default=None)
+                if lo is not None and hi is not None and hi - lo > 8:
+                    b["y"], b["h"] = round(lo, 1), round(hi - lo, 1)
+                    changed = True
+            if in_x:
+                lo = max((t for t in xs if t <= cxc), default=None)
+                hi = min((t for t in xs if t >= cxc), default=None)
+                if lo is not None and hi is not None and hi - lo > 8:
+                    b["x"], b["w"] = round(lo, 1), round(hi - lo, 1)
+                    changed = True
         # 페이지별 정합 판정 — 총 쪽수가 같아도 중간 페이지 경계가 달라
         # 특정 페이지 내용이 통째로 어긋날 수 있다(예: 우리 p6 내용이
         # 한컴 p6 그림과 다름). 스냅 후 잔여 중위가 크면 그 페이지만 배경

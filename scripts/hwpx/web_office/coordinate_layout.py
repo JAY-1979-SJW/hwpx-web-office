@@ -656,6 +656,63 @@ def layout_quality(layout):
     }
 
 
+def _table_id_sequence(path):
+    """문서 전역 등장순 표 ID 시퀀스 [(tableId, tc수)] — 섹션 파일 순.
+
+    한컴 재저장 정규화본은 섹션을 재분할(예: 1개→2개)할 수 있어, 정규화본
+    기준 tableId(t_s1_*)가 원본 파싱 문서모델(t_s0_*)과 어긋난다. 표의
+    전역 등장 순서·구성(tc 수)은 재저장에도 보존되므로 위치 대응으로
+    원본 네임스페이스에 번역한다.
+    """
+    z = zipfile.ZipFile(path)
+    sec_files = sorted(
+        [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())],
+        key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)))
+    out = []
+    for sec in sec_files:
+        m = re.search(r"section(\d+)", sec.lower())
+        si = int(m.group(1)) if m else 0
+        root = ET.fromstring(z.read(sec))
+        for i, t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
+            tc = sum(1 for e in t.iter() if ln(e.tag) == "tc")
+            out.append(("t_s%d_%03d" % (si, i), tc))
+    return out
+
+
+def _remap_cell_ids_to_source(layout, source_path, extracted_path):
+    """레이아웃 cellId 를 원본 문서 표 네임스페이스로 재매핑.
+
+    표 수·위치별 tc 수가 완전 일치할 때만 수행(보수적) — 불일치면 무변경.
+    편집(문서모델)은 원본 cellId 를 쓰므로, 이 재매핑이 없으면 정규화로
+    섹션이 분할된 문서에서 뒤쪽 표들의 입력칸·편집 연결이 통째로 끊긴다.
+    """
+    orig = _table_id_sequence(source_path)
+    norm = _table_id_sequence(extracted_path)
+    if len(orig) != len(norm) or any(a[1] != b[1] for a, b in zip(orig, norm)):
+        return False
+    remap = {b[0]: a[0] for a, b in zip(orig, norm) if a[0] != b[0]}
+    if not remap:
+        return False
+    pat = re.compile(r"^cell_(t_s\d+_\d+)_")
+    seen = set()
+    colls = [layout.get("lines", []), layout.get("boxes", [])]
+    for pd in layout.get("pagesDetail", []):
+        colls.append(pd.get("lines", []))
+        colls.append(pd.get("boxes", []))
+    for coll in colls:
+        for it in coll:
+            if id(it) in seen:          # 동일 dict 공유 대비(이중 치환 방지)
+                continue
+            seen.add(id(it))
+            cid = it.get("cellId")
+            if not cid:
+                continue
+            m = pat.match(cid)
+            if m and m.group(1) in remap:
+                it["cellId"] = cid.replace(m.group(1), remap[m.group(1)], 1)
+    return True
+
+
 def build_layout(request, *, project_root=PROJECT_ROOT):
     """{sourcePath} → 좌표 레이아웃. 프로젝트-상대 .hwpx 만 허용(보안).
 
@@ -707,6 +764,14 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         else:
             layout = extract(str(extract_from))
             layout["rowScaleRejected"] = _rs
+    if normalized:
+        # 정규화본이 섹션을 재분할한 경우 cellId 를 원본 네임스페이스로 번역
+        # (편집·입력칸 연결은 원본 문서모델 cellId 기준).
+        try:
+            layout["cellIdRemapped"] = _remap_cell_ids_to_source(
+                layout, str(cand), str(extract_from))
+        except Exception:
+            layout["cellIdRemapped"] = False
     layout["verdict"] = "PASS"
     layout["sourcePath"] = cand.relative_to(root).as_posix()
     layout["hancomNormalized"] = normalized
