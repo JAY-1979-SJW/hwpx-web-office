@@ -267,6 +267,17 @@ def extract(path):
             if ln(cp.tag) == "p" and _nearest_cell(cp) is tc:
                 for cl in _cell_para_lines(cp):
                     content_h = max(content_h, cl["ry"] + cl["h"])
+        # 직속 중첩표 높이도 내용에 포함 — 안 하면 외곽 행이 중첩표보다
+        # 짧아, 뒤 내용(푸터 등)이 위로 올라오고 중첩표가 아래로 넘친다.
+        for nt in tc.iter():
+            if ln(nt.tag) == "tbl" and _nearest_cell(nt) is tc:
+                pp = _nearest_p(nt)
+                nsegs = _direct_linesegs(pp) if pp is not None else []
+                nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
+                         if nsegs else 0.0)
+                nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
+                content_h = max(content_h, nvpos + _sane_hu(nsz.get("height",
+                                                                    "0")))
         return {
             "row": int(addr.get("rowAddr", "0")),
             "col": int(addr.get("colAddr", "0")),

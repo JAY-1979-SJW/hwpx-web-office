@@ -87,15 +87,15 @@ export function renderCoordinateLayout(layout, opts = {}) {
     parts.push(`<div class="co-page" style="width:${W}px;height:${H}px">`);
     for (const b of layout.boxes || []) {
       if (Math.floor(b.y / H) !== pi) continue;
-      let bd;
+      // 한컴이 지정한 테두리만 그린다. none/미지정 변은 안 그림(한컴은
+      // borderless 셀을 보이지 않게 렌더 — 안내선을 그리면 없던 박스가
+      // 생겨 원본과 달라진다). 셀 편집 위치는 hover 하이라이트로 표시.
+      let bd = "";
       if (b.border) {
-        const g = "0.6px solid #e2e6ea";  // 없는 변은 옅은 안내선
-        bd = `border-left:${b.border.l === "none" ? g : b.border.l};`
-          + `border-right:${b.border.r === "none" ? g : b.border.r};`
-          + `border-top:${b.border.t === "none" ? g : b.border.t};`
-          + `border-bottom:${b.border.b === "none" ? g : b.border.b};`;
-      } else {
-        bd = "border:0.6px solid #e2e6ea;";
+        if (b.border.l !== "none") bd += `border-left:${b.border.l};`;
+        if (b.border.r !== "none") bd += `border-right:${b.border.r};`;
+        if (b.border.t !== "none") bd += `border-top:${b.border.t};`;
+        if (b.border.b !== "none") bd += `border-bottom:${b.border.b};`;
       }
       const fill = b.fill ? `background:${b.fill};` : "";
       const editAttr = (opts.editable && b.cellId)

@@ -48,10 +48,14 @@ assert(esc.includes("&lt;b&gt;&amp;x") && !esc.includes("<b>&x"),
   "html escaped");
 checks.escape = true;
 
-// 4) 박스 테두리: 지정 변은 solid, none 변은 옅은 안내선으로 치환
-assert(html.includes("border-left:1.00px solid #000"), "box left border");
-assert(html.includes("border-right:0.6px solid #e2e6ea"), "none→guide");
-assert(html.includes("border:0.6px solid #e2e6ea"), "no-border box guide");
+// 4) 박스 테두리: 지정 변만 그림, none 변·미지정 박스는 테두리 없음(한컴 일치)
+assert(html.includes("border-left:1.00px solid #000"), "지정 변 solid 렌더");
+assert(!/border-right:[^;"]*#e2e6ea/.test(html), "none 변에 안내선 안 그림");
+assert(!/border:0\.6px solid #e2e6ea/.test(html), "미지정 박스 안내선 없음");
+// none 변은 border-right 선언 자체가 없어야
+const boxHtml = (html.match(/<div class="co-box"[^>]*><\/div>/) || [""])[0];
+assert(!/border-right:/.test(boxHtml) || /border-right:1/.test(boxHtml),
+  "none 우측변 미선언");
 checks.borders = true;
 
 // 5) 빈 레이아웃
