@@ -359,7 +359,22 @@ def extract(path):
             for cp in c["tc"].iter():
                 if ln(cp.tag) == "p" and _nearest_cell(cp) is c["tc"]:
                     cell_lines.extend(_cell_para_lines(cp))
-            text_h = max((cl["ry"] + cl["h"] for cl in cell_lines), default=0)
+            # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
+            nested = []
+            for nt in c["tc"].iter():
+                if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
+                    pp = _nearest_p(nt)
+                    nsegs = _direct_linesegs(pp) if pp is not None else []
+                    nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
+                             if nsegs else 0.0)
+                    nsz = next((x.attrib for x in nt
+                                if ln(x.tag) == "sz"), {})
+                    nh = _sane_hu(nsz.get("height", "0"))
+                    nested.append((nt, nvpos, nh))
+            # 내용 총 높이 = 본문 줄 + 중첩표 하단 중 최대
+            text_h = max(
+                [cl["ry"] + cl["h"] for cl in cell_lines]
+                + [nv + nh for _, nv, nh in nested] + [0.0])
             avail = ch - c["mt"] * 2
             va = c["vAlign"]
             voff = (max(0.0, (avail - text_h) / 2) if va == "CENTER"
@@ -392,15 +407,10 @@ def extract(path):
                 if bf.get("fill"):
                     box["fill"] = bf["fill"]
             boxes.append(box)
-            # 이 셀 직속 중첩표 → 셀 안 실제 세로 위치(담긴 문단 vertpos)에서
-            # 재귀 배치. 셀 최상단에 놓으면 앞선 본문 문단과 겹친다.
-            for nt in c["tc"].iter():
-                if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
-                    pp = _nearest_p(nt)
-                    nsegs = _direct_linesegs(pp) if pp is not None else []
-                    nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
-                             if nsegs else 0.0)
-                    walk_table(nt, cx + c["ml"], cy + c["mt"] + nvpos)
+            # 직속 중첩표 재귀 배치 — voff(세로정렬 오프셋)를 본문 줄과 동일
+            # 하게 더한다. 안 그러면 vAlign=CENTER 셀에서 본문만 내려가 겹친다.
+            for nt, nvpos, _ in nested:
+                walk_table(nt, cx + c["ml"], cy + c["mt"] + voff + nvpos)
             table_bottom = max(table_bottom, cy + ch)
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
