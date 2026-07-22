@@ -52,6 +52,21 @@ The backend API surface is limited to:
 - `POST /api/web-office/hwpx-load`
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` — lineseg 좌표 레이아웃(한컴 미사용, read-only)
+- `POST /api/web-office/ai-fill` — AI 자동채움 값 제안(§9 Claude Code CLI Haiku only; AI inject 없이 자동 실행 금지)
+- `POST /api/web-office/source-extract` — 소스 이미지(사업자등록증 등) OCR; PII 원문 미출력, 마스킹 미리보기만
+- `GET /api/web-office/catalog-stats` — 카탈로그 통계(read-only SQLite `mode=ro`)
+- `GET /api/web-office/catalog-categories` — 도메인 분류 목록(read-only)
+- `POST /api/web-office/catalog-search` — 키워드 검색(read-only)
+- `POST /api/web-office/catalog-match` — 업로드 서식 ↔ 카탈로그 대조(read-only)
+- `POST /api/web-office/catalog-by-category` — 도메인별 서식 조회(read-only)
+- `POST /api/web-office/catalog-ai-search` — 자연어 질의 → 키워드 해석 후 검색(§9 Haiku only, read-only)
+- `POST /api/web-office/prepare-form` — 온디맨드 서식 준비(HWP→한컴 COM 변환 또는 HWPX 복사); 산출물은 sandbox `tmp/web_office_forms/` 한정, 내부 경로 미노출
+- `GET /api/web-office/download/{filename}` — 편집 산출물 다운로드; sandbox 파일만 제공, 경로 조작 방어
+
+The catalog endpoints open the SQLite catalog read-only (`mode=ro`) and never
+mutate it. The prepare-form endpoint writes converted HWPX only to the sandbox
+output location and returns a project-relative path. The AI endpoints must not
+run without an explicit AI inject step (no auto-submit).
 
 The health response must expose the active load and save endpoints and confirm
 that the pipeline is ready without exposing local filesystem locations.

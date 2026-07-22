@@ -90,7 +90,10 @@ export function renderTable(table, styles, opts = {}) {
       const style = borderFillToCss(c.borderFill, { guides })
         + cellMarginToCss(c.cellMargin)
         + `vertical-align:${va};`;
-      const content = renderCellParagraphs(c, styles, getCellText(c.cellId));
+      const nestedT = opts.nestedTables && opts.nestedTables.get(c.cellId);
+      const content = nestedT
+        ? renderTable(nestedT, styles, opts)                   // 중첩표를 셀 안에 렌더
+        : renderCellParagraphs(c, styles, getCellText(c.cellId));
       html += `<td${idAttr}${rs}${cs} style="${style}">${content}</td>`;
     }
     html += "</tr>";

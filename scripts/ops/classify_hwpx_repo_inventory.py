@@ -164,6 +164,9 @@ def classify_path(path: str) -> tuple[str, str, str]:
         if any(token in lower for token in ("hancom", "hwp_to_hwpx", "converter", "native_com")):
             return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
         return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_core"
+    if lower.startswith("scripts/hwp-worker/"):
+        # 한컴 COM 변환 워커(HWP→HWPX) — 부모 저장소서 복원한 컨버터 라인.
+        return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
     if lower.startswith("scripts/local/") or lower.startswith("tmp/"):
         return "LEGACY_EXPERIMENT", "unassigned", "review_legacy_experiment"
     if lower.startswith("scripts/"):

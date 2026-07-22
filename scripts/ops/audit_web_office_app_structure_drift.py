@@ -56,6 +56,19 @@ REQUIRED_ENDPOINTS = [
     "POST /api/web-office/cell-save-apply",
     # WEB-OFFICE-COORD-LAYOUT-01: lineseg 좌표 레이아웃(한컴 없이) 엔드포인트.
     "POST /api/web-office/hwpx-layout",
+    # WEB-OFFICE-AI-FILL-01: AI 자동채움(§9 Claude Code CLI Haiku) · 사업자등록증 OCR.
+    "POST /api/web-office/ai-fill",
+    "POST /api/web-office/source-extract",
+    # WEB-OFFICE-CATALOG-01: 서식 카탈로그 검색/매칭/분류(read-only SQLite).
+    "GET /api/web-office/catalog-stats",
+    "GET /api/web-office/catalog-categories",
+    "POST /api/web-office/catalog-search",
+    "POST /api/web-office/catalog-match",
+    "POST /api/web-office/catalog-by-category",
+    "POST /api/web-office/catalog-ai-search",
+    # WEB-OFFICE-CONVERT-01: 온디맨드 서식 준비(HWP→한컴 COM 변환) + 산출물 다운로드.
+    "POST /api/web-office/prepare-form",
+    "GET /api/web-office/download/{filename}",
 ]
 
 REQUIRED_SERVER_TOKENS = [

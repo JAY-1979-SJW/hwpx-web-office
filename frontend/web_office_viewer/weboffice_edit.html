@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 웹오피스 — 편집기(한컴식)</title>
+<style>
+  :root{ color-scheme:light; font-family:"Malgun Gothic","Segoe UI",sans-serif; background:#e9edf1; color:#1a2530; }
+  *{ box-sizing:border-box; } body{ margin:0; }
+  .wo{ display:flex; flex-direction:column; height:100vh; }
+  .rb{ position:sticky; top:0; z-index:20; }
+
+  /* ── 상단 리본 ─────────────────────────────── */
+  .rb{ background:#f3f5f8; border-bottom:1px solid #cfd6dd; }
+  .rb-title{ display:flex; align-items:center; gap:8px; padding:7px 14px; background:#26313d; color:#fff; }
+  .rb-title h1{ font-size:14px; margin:0; } .rb-title .sp{ flex:1; }
+  .rb-title .k{ font-size:12px; color:#cdd6df; }
+  .rb-row{ display:flex; align-items:stretch; padding:6px 10px; overflow-x:auto; }
+  .grp{ display:flex; flex-direction:column; align-items:center; padding:0 12px; border-right:1px solid #dde3e9; }
+  .grp:last-child{ border-right:0; }
+  .grp .btns{ display:flex; gap:5px; align-items:center; }
+  .grp .lbl{ font-size:10px; color:#8792a0; margin-top:5px; }
+  button{ font:inherit; min-height:32px; border:1px solid #b3bcc6; background:#fff; color:#1a2530; border-radius:5px; padding:3px 11px; cursor:pointer; }
+  button:hover:not(:disabled){ background:#eaf1fb; border-color:#7ea6e6; }
+  /* 비활성도 '버튼'으로 명확히 보이게 — 흐릿하게 지우지 않는다 */
+  button:disabled{ color:#5b6673; background:#eef1f4; border-color:#c4ccd4; cursor:not-allowed; }
+  button.on{ background:#dce9ff; border-color:#3a7be0; color:#1e4fa3; box-shadow:inset 0 0 0 1px #3a7be0; }
+  .b-ico{ width:36px; font-weight:800; } .b-i{ font-style:italic; } .b-u{ text-decoration:underline; }
+  select{ font:inherit; min-height:32px; border:1px solid #b3bcc6; border-radius:5px; padding:2px 6px; background:#fff; }
+
+  .wo-status{ padding:6px 14px; font-size:12.5px; background:#fff; border-bottom:1px solid #d7dde3; min-height:30px; }
+  .wo-status[data-k=ok]{ color:#0b6b46; } .wo-status[data-k=fail]{ color:#9f2d20; }
+  .wo-status[data-k=load]{ color:#2b5d94; } .wo-status[data-k=rej]{ color:#9f2d20; }
+
+  /* ── 하단 문서 ─────────────────────────────── */
+  .wo-main{ display:flex; flex:1; min-height:0; }
+  .wo-page{ flex:1; overflow:auto; padding:24px; background:#f4f6f8; }
+  .sheet{ max-width:860px; margin:0 auto; background:#fff; padding:32px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:70vh; outline:none; }
+  .body-para{ margin:6px 0; line-height:1.9; white-space:pre-wrap; word-break:break-word; }
+
+  table.doc{ border-collapse:collapse; width:100%; margin:12px 0; table-layout:fixed; }
+  table.doc td{ border:1px solid #333; padding:4px 6px; vertical-align:top; font-size:13px; cursor:text; }
+  table.doc td:hover{ background:#f5f9ff; }
+  td.active-cell{ background:#eef6ff; outline:2px solid #3a7be0; outline-offset:-2px; }
+
+  .pe-para{ line-height:1.7; white-space:pre-wrap; word-break:break-word; min-height:1.2em; }
+  .pe-para.active{ background:#f0f6ff; }
+  .pe-para[data-kind=header]{ background:#fdf1f0; outline:1px dashed #e0a9a2; }
+  .pe-para.ai-filled{ background:#fff5d6; box-shadow:inset 0 0 0 1px #e8c766; border-radius:3px; }
+  td.ai-cell{ background:#fffbe8; }
+  .pe-ch{ white-space:pre; } .pe-ch.sel{ background:#b9d4ff; }
+  .rev{ list-style:none; margin:0 0 12px; padding:0; font-size:11px; }
+  .rev li{ padding:4px 5px; border-bottom:1px solid #eef1f4; cursor:pointer; }
+  .rev li:hover{ background:#fff8e1; }
+  .rev .lab{ color:#8a6d1a; font-weight:700; } .rev .val{ color:#1a2530; }
+  .rev .cf{ float:right; font-size:10px; color:#0b6b46; }
+  .rev .cf.lo{ color:#b26a00; }
+  .b-ai{ background:#fff4d1; border-color:#e0b84a; font-weight:700; }
+  .b-ai:hover:not(:disabled){ background:#ffe9a8; }
+  .caret{ display:inline-block; width:0; border-left:1.6px solid #1e4fa3; height:1.05em; vertical-align:text-bottom; animation:bl 1s step-end infinite; }
+  @keyframes bl{ 50%{ opacity:0; } }
+  .empty-hint{ color:#c0c7cf; font-size:11px; }
+
+  .wo-side{ width:260px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:12px; overflow:auto; }
+  .wo-side h3{ font-size:12px; margin:0 0 6px; color:#42505e; }
+  .mx{ display:flex; gap:5px; flex-wrap:wrap; margin:6px 0 12px; }
+  .mx span{ font-size:11px; background:#eef2f5; border:1px solid #dfe5ea; border-radius:5px; padding:2px 6px; }
+  .log{ list-style:none; margin:0; padding:0; font-size:11px; max-height:44vh; overflow:auto; }
+  .log li{ padding:3px 5px; border-bottom:1px solid #eef1f4; }
+  .ct{ font-weight:700; color:#1e4fa3; } .muted{ color:#8a94a0; }
+
+  /* ── 인쇄: 앱 크롬 숨기고 문서(.sheet)만 깨끗이 출력 ── */
+  @media print{
+    @page{ size:A4; margin:15mm; }
+    :root{ background:#fff; }
+    .rb, .wo-status, .wo-side, .caret, .empty-hint{ display:none !important; }
+    .wo{ height:auto; display:block; }
+    .wo-main{ display:block; }
+    .wo-page{ overflow:visible; padding:0; background:#fff; }
+    .sheet{ max-width:none; margin:0; padding:0; box-shadow:none; min-height:0; }
+    /* 편집 하이라이트(노랑·파랑 배경/외곽선)는 인쇄물에서 제거 — 잉크·가독성 */
+    .pe-para.ai-filled, td.ai-cell, td.ai-cell.ai-filled,
+    .pe-para.active, td.active-cell{ background:transparent !important; box-shadow:none !important; outline:none !important; }
+    .pe-para[data-kind=header]{ background:transparent !important; outline:none !important; }
+    table.doc td:hover{ background:transparent !important; }
+    table.doc, table.doc td{ page-break-inside:avoid; }
+    body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div class="wo">
+  <div class="rb">
+    <div class="rb-title">
+      <h1>HWPX 웹오피스 편집기</h1>
+      <span class="k">· 한컴식 리본 · 원본 무수정</span>
+      <span class="sp"></span>
+      <span class="k" data-role="doc">문서 없음</span>
+    </div>
+    <div class="rb-row">
+      <div class="grp"><div class="btns">
+        <button data-role="sample" type="button">샘플 열기</button>
+      </div><div class="lbl">파일</div></div>
+
+      <div class="grp"><div class="btns">
+        <button data-role="undo" type="button" disabled>↶ 실행취소</button>
+        <button data-role="redo" type="button" disabled>↷ 재실행</button>
+      </div><div class="lbl">편집 이력</div></div>
+
+      <div class="grp"><div class="btns">
+        <button class="b-ico"    data-fmt="bold"      type="button" disabled>가</button>
+        <button class="b-ico b-i" data-fmt="italic"    type="button" disabled>가</button>
+        <button class="b-ico b-u" data-fmt="underline" type="button" disabled>가</button>
+        <button class="b-ico"    data-fmt="strikeout" type="button" disabled style="text-decoration:line-through">가</button>
+      </div><div class="lbl">글자 모양</div></div>
+
+      <div class="grp"><div class="btns">
+        <select data-role="size" disabled title="글자 크기"><option>크기</option></select>
+        <select data-role="color" disabled title="글자 색"><option>색</option></select>
+      </div><div class="lbl">크기 · 색</div></div>
+
+      <div class="grp"><div class="btns">
+        <button data-role="srcconnect" type="button" disabled>📄 소스 연결</button>
+        <button class="b-ai" data-role="aifill" type="button" disabled>✨ AI 자동채움</button>
+        <button data-role="aiclear" type="button" disabled>지우기</button>
+      </div><div class="lbl">AI 자동입력</div></div>
+
+      <div class="grp"><div class="btns">
+        <button data-role="save" type="button" disabled>저장(dry-run)</button>
+        <button data-role="print" type="button" disabled>🖨 인쇄</button>
+      </div><div class="lbl">저장 · 인쇄</div></div>
+    </div>
+  </div>
+
+  <div class="wo-status" data-role="status" data-k="">«샘플 열기»로 실제 HWPX 문서를 불러오세요. 셀·문단을 클릭해 편집합니다.</div>
+
+  <div class="wo-main">
+    <div class="wo-page"><div class="sheet" data-role="sheet" tabindex="0"><p class="muted">문서 없음.</p></div></div>
+    <aside class="wo-side">
+      <h3>AI 검토 <span class="muted" style="font-weight:400">(채운 값 확인)</span></h3>
+      <ul class="rev" data-role="review"><li class="muted">아직 AI 채움 없음</li></ul>
+      <h3>편집 상태</h3>
+      <div class="mx" data-role="metrics"><span>문단 0</span></div>
+      <h3>Command Log</h3>
+      <ul class="log" data-role="log"><li class="muted">편집 없음</li></ul>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+import {
+  makeParagraphEditorState, setCaret, setRange, applyFormatToSelection,
+  typeTextAtCaret, buildSaveDryRunPayload,
+} from "./para_edit_state.mjs";
+import { onKeyDown } from "./para_edit_runtime.mjs";
+import { matchToggle, matchAxisChange, extractAxisValues } from "./format_charpr_matcher.mjs";
+
+const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
+const $ = (s) => document.querySelector(`[data-role=${s}]`);
+
+let state = null, defs = {}, blocks = [], tables = {}, lastReason = "";
+let aiFilled = new Set();   // AI가 채운 paragraphId
+let aiProposals = [];       // 검토용 [{pid, label, value, confidence}]
+let sourceData = null;      // 연결된 소스(사업자등록증 등) 실제 값
+const DEFAULT_SRC = "C:/Users/skyjw/OneDrive/01. PROJECT_FILE/01. HAEHAN_ENGNEERING/해한AI엔지니어링 사업자 등록증.jpg";
+
+const setStatus = (k, m) => { const e = $("status"); e.dataset.k = k; e.textContent = m; };
+function normDefs(raw){ const o={}; for(const [id,d] of Object.entries(raw||{})) o[id]={...d,charPrId:id}; return o; }
+function styleOf(cid){ const d=defs[cid]; if(!d) return ""; let s="";
+  if(d.bold)s+="font-weight:700;"; if(d.italic)s+="font-style:italic;";
+  let td=""; if(d.underline)td+="underline "; if(d.strikeout)td+="line-through "; if(td)s+="text-decoration:"+td.trim()+";";
+  if(d.textColor)s+="color:"+d.textColor+";"; if(d.fontSizePt)s+="font-size:"+Math.max(9,Math.min(20,d.fontSizePt))+"pt;"; return s; }
+const paraLen=(p)=>p.runs.reduce((a,r)=>a+r.text.length,0);
+const activePara=()=>state&&state.paragraphs.find(p=>p.paragraphId===state.activeParagraphId);
+function charPrAt(p,off){ let pos=0; for(const r of p.runs){ if(off<pos+r.text.length||(off===paraLen(p)&&r===p.runs[p.runs.length-1])) return r.charPrIDRef; pos+=r.text.length; } return p.runs[0]?.charPrIDRef??null; }
+function cellKey(cs){ return cs&&cs.kind==="cell"?`${cs.tableIndex}:${cs.rowIndex}:${cs.colIndex}`:null; }
+// 표 셀 텍스트를 평탄화 중복 출력하는 컨테이너 문단 감지(표와 90%+ 문자 겹침)
+let _tableChars=null;
+function tableCharSet(){
+  if(_tableChars) return _tableChars;
+  _tableChars=new Set();
+  for(const t of Object.values(tables)) for(const c of t.cells||[]) for(const ch of (c.text||"").replace(/\s/g,"")) _tableChars.add(ch);
+  return _tableChars;
+}
+
+/* ── 중첩표 탐지 ──
+   부모 셀 텍스트가 다른 표의 전체 내용과 일치하면(파서가 중첩표를 셀에 납작하게
+   눌러붙이면서 별도 표로도 추출한 경우), 그 표를 부모 셀 안에서 렌더하고
+   최상위 블록에서는 제외한다. → run-on 중복 제거 + 충실한 레이아웃. */
+let _nested=null;
+const _stripFlow=s=>(s||"").replace(/[\s→⭢⇒]/g,"");
+function nestedMap(){
+  if(_nested) return _nested;
+  const sigs=Object.values(tables).map(t=>({id:t.blockId, sig:_stripFlow((t.cells||[]).map(c=>c.text||"").join(""))}));
+  const byCell={}, tableIds=new Set();
+  for(const t of Object.values(tables)){
+    for(const c of t.cells||[]){
+      if(c.isCoveredByMerge) continue;
+      const ct=_stripFlow(c.text||""); if(ct.length<12) continue;
+      const hit=sigs.find(s=>s.id!==t.blockId && s.sig.length>=12 && s.sig===ct && !tableIds.has(s.id));
+      if(hit){ byCell[`${t.__idx}:${c.row}:${c.col}`]=hit.id; tableIds.add(hit.id); }
+    }
+  }
+  _nested={byCell, tableIds};
+  return _nested;
+}
+function isTableDupPara(p){
+  const cs=p.containerScope; if(cs&&cs.kind==="cell") return false;   // 셀 문단은 표에서 렌더
+  const txt=p.runs.map(r=>r.text).join("").replace(/\s/g,"");
+  if(txt.length<40) return false;
+  const uniq=new Set(txt); if(!uniq.size) return false;
+  const tc=tableCharSet(); let n=0; for(const ch of uniq) if(tc.has(ch)) n++;
+  return n/uniq.size>=0.9;
+}
+
+/* ── 문단 1개를 편집 가능하게 그리기(본문·셀 공용) ── */
+function renderPara(p){
+  const div=document.createElement("div");
+  const kind=p.containerScope?.kind??"block";
+  div.className="pe-para"+(state.activeParagraphId===p.paragraphId?" active":"")+(aiFilled.has(p.paragraphId)?" ai-filled":"");
+  div.dataset.pid=p.paragraphId; div.dataset.kind=kind;
+  const a=state.rangeAnchor,b=state.rangeFocus;
+  const selA=a!==null&&b!==null?Math.min(a,b):null, selB=a!==null&&b!==null?Math.max(a,b):null;
+  const isA=state.activeParagraphId===p.paragraphId;
+  let off=0;
+  const put=(ch,cid)=>{
+    if(isA&&selA===null&&state.caretOffset===off) div.appendChild(mkCaret());
+    const s=document.createElement("span");
+    s.className="pe-ch"+(selA!==null&&isA&&off>=selA&&off<selB?" sel":"");
+    s.style.cssText=styleOf(cid); s.dataset.pid=p.paragraphId; s.dataset.off=off;
+    s.textContent=ch; div.appendChild(s); off++;
+  };
+  for(const r of p.runs) for(const ch of r.text) put(ch,r.charPrIDRef);
+  if(isA&&selA===null&&state.caretOffset===off) div.appendChild(mkCaret());
+  if(paraLen(p)===0){ const e=document.createElement("span"); e.className="empty-hint"; e.textContent="(빈칸)"; e.dataset.pid=p.paragraphId; e.dataset.off=0; div.appendChild(e); }
+  return div;
+}
+function mkCaret(){ const c=document.createElement("span"); c.className="caret"; return c; }
+
+/* ── 표 격자 그리기 ── */
+function renderTable(t){
+  const parasByCell={};
+  for(const p of state.paragraphs){ const k=cellKey(p.containerScope); if(k){ (parasByCell[k]=parasByCell[k]||[]).push(p); } }
+  const tIdx=t.__idx;
+  const grid=document.createElement("table"); grid.className="doc";
+  const colgroup=document.createElement("colgroup");
+  for(let c=0;c<t.colCount;c++){ colgroup.appendChild(document.createElement("col")); }
+  grid.appendChild(colgroup);
+  const tbody=document.createElement("tbody");
+  for(let r=0;r<t.rowCount;r++){
+    const tr=document.createElement("tr");
+    for(const cell of t.cells){
+      if(cell.row!==r||cell.isCoveredByMerge) continue;
+      const td=document.createElement("td");
+      if(cell.colSpan>1) td.colSpan=cell.colSpan;
+      if(cell.rowSpan>1) td.rowSpan=cell.rowSpan;
+      const ckey=`${tIdx}:${cell.row}:${cell.col}`;
+      td.dataset.tkey=ckey;
+      const nestedId=nestedMap().byCell[ckey];
+      if(nestedId && tables[nestedId]){
+        // 중첩표 — 부모 셀 안에 제대로 된 표로 렌더(run-on 텍스트 대체)
+        td.appendChild(renderTable(tables[nestedId]));
+      } else {
+        const paras=parasByCell[ckey]||[];
+        if(paras.length){ for(const p of paras) td.appendChild(renderPara(p)); if(paras.some(p=>aiFilled.has(p.paragraphId))) td.classList.add("ai-cell"); }
+        else { td.textContent=cell.text||""; }
+      }
+      const ap=activePara();
+      if(ap&&cellKey(ap.containerScope)===`${tIdx}:${cell.row}:${cell.col}`) td.classList.add("active-cell");
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  grid.appendChild(tbody);
+  return grid;
+}
+
+/* ── 문서 전체(블록 순서대로) ── */
+function renderDoc(){
+  const sheet=$("sheet");
+  if(!state){ sheet.innerHTML='<p class="muted">문서 없음.</p>'; return; }
+  sheet.innerHTML="";
+  for(const blk of blocks){
+    if(blk.type==="table"){
+      const t=tables[blk.blockId]||tables[blk.ref];
+      if(t){ if(nestedMap().tableIds.has(t.blockId)) continue;   // 중첩표는 부모 셀에서 렌더
+             sheet.appendChild(renderTable(t)); continue; }
+    }
+    // paragraph 블록(본문) — 표 내용을 중복 출력하는 컨테이너 문단은 제외
+    const pid=blk.ref||blk.paragraph?.paragraphId;
+    const p=state.paragraphs.find(x=>x.paragraphId===pid);
+    if(p && !isTableDupPara(p)){ const wrap=document.createElement("div"); wrap.className="body-para"; wrap.appendChild(renderPara(p)); sheet.appendChild(wrap); }
+  }
+}
+
+function renderRibbon(){
+  const p=activePara();
+  const hasRange=state&&state.selectionMode==="TEXT_RANGE"&&p;
+  const curCid=p?charPrAt(p,state.rangeAnchor??state.caretOffset):null;
+  const curDef=curCid!=null?defs[curCid]:null;
+  for(const dim of ["bold","italic","underline","strikeout"]){
+    const btn=document.querySelector(`[data-fmt=${dim}]`);
+    const matched=curDef?matchToggle(curDef,defs,dim):null;
+    btn.classList.toggle("on",!!curDef?.[dim]);
+    btn.disabled=!hasRange||!matched;
+    btn.title=!hasRange?"텍스트를 선택하세요 (Shift+화살표)":!matched?"매칭되는 기존 charPr 없음(신규 생성 금지)":"charPr #"+matched+" 적용";
+    btn.onclick=()=>{ const r=applyFormatToSelection(state,matched,defs); state=r.state; lastReason=r.reason||""; renderAll(); };
+  }
+  // 크기·색 셀렉트 — 현재 문서에 존재하는 값만 채운다
+  fillAxis($("size"),"fontSizePt",hasRange,curDef,(v)=>v+"pt");
+  fillAxis($("color"),"textColor",hasRange,curDef,(v)=>v);
+  $("undo").disabled=!state||state.undoStack.length===0;
+  $("redo").disabled=!state||state.redoStack.length===0;
+  $("save").disabled=!state||state.commandLog.length===0;
+}
+function fillAxis(sel,axis,hasRange,curDef,fmt){
+  const label=axis==="fontSizePt"?"크기":"색";
+  if(!hasRange||!curDef){ sel.disabled=true; sel.innerHTML=`<option>${label}</option>`; sel.onchange=null; return; }
+  const vals=extractAxisValues(defs,axis,curDef)||[];
+  sel.disabled=false; sel.innerHTML=`<option disabled>${label}</option>`;
+  for(const v of vals){
+    const o=document.createElement("option"); o.value=String(v.value);
+    o.textContent=fmt(v.value)+(v.current?" ✓":""); o.disabled=!v.enabled&&!v.current; if(v.current)o.selected=true;
+    sel.appendChild(o);
+  }
+  sel.onchange=()=>{ const nv=axis==="fontSizePt"?Number(sel.value):sel.value; const id=matchAxisChange(curDef,defs,axis,nv); if(id){ const r=applyFormatToSelection(state,id,defs); state=r.state; lastReason=r.reason||""; renderAll(); } };
+}
+function renderSide(){
+  if(!state) return;
+  $("metrics").innerHTML=`<span>문단 ${state.paragraphs.length}</span><span>dirty ${state.dirty}</span><span>편집 ${state.commandLog.length}</span><span>undo ${state.undoStack.length}</span>`;
+  const log=state.commandLog;
+  $("log").innerHTML=log.length?log.map(c=>{ let d="";
+    if(c.payload?.insertText!==undefined)d=`"${c.payload.insertText}" @${c.payload.caretOffset}`;
+    else if(c.commandType==="APPLY_FORMAT")d=`charPr→#${c.payload?.targetCharPrIDRef}`;
+    else if(c.after!==undefined)d=`"${(c.before||"").slice(0,8)}"→"${(c.after||"").slice(0,8)}"`;
+    return `<li><span class="ct">${c.commandType}</span> <span class="muted">${d}</span></li>`; }).join(""):'<li class="muted">편집 없음</li>';
+}
+function renderStatus(){
+  const p=activePara(); const ok=["OK","COMPOSITION_STARTED",""].includes(lastReason);
+  $("status").dataset.k=lastReason&&!ok?"rej":"ok";
+  const where=p?`문단 #${p.paragraphId} (${p.containerScope?.kind}) · caret ${state.caretOffset}`:"미선택";
+  $("status").textContent=(lastReason?`[${lastReason}] `:"")+where+(state?.selectionMode==="TEXT_RANGE"?` · 선택 ${state.rangeAnchor}~${state.rangeFocus}`:"");
+}
+/* ── AI 자동채움 (실제 Claude Code CLI Haiku 백엔드 호출) ──
+ * 빈 입력칸의 라벨을 인식 → /api/web-office/ai-fill (claude -p --model haiku)
+ * → 제안 값을 TYPE_TEXT EditCommand로 주입(Undo 가능). §4 가드는 엔진이 강제. */
+function labelForCell(t, byRC, cell){
+  for(let cc=cell.col-1; cc>=0; cc--){ const lc=byRC[`${cell.row}:${cc}`]; if(lc&&(lc.text||"").trim()) return lc.text.trim(); }
+  for(let rr=cell.row-1; rr>=0; rr--){ const uc=byRC[`${rr}:${cell.col}`]; if(uc&&(uc.text||"").trim()) return uc.text.trim(); }
+  return "";
+}
+function collectEmptyFields(){
+  const fields=[];
+  for(const t of Object.values(tables)){
+    const tIdx=t.__idx;
+    const byRC={}; for(const c of t.cells) byRC[`${c.row}:${c.col}`]=c;
+    for(const cell of t.cells){
+      if(cell.isCoveredByMerge) continue;
+      const key=`${tIdx}:${cell.row}:${cell.col}`;
+      const empties=state.paragraphs.filter(p=>cellKey(p.containerScope)===key && paraLen(p)===0);
+      if(!empties.length) continue;
+      const label=labelForCell(t,byRC,cell);
+      if(!label) continue;
+      fields.push({ key:empties[0].paragraphId, label });
+    }
+  }
+  return fields;
+}
+async function connectSource(){
+  const path=prompt("소스 문서(사업자등록증 등) 이미지 경로:", DEFAULT_SRC);
+  if(!path) return;
+  $("srcconnect").disabled=true;
+  setStatus("load","사업자등록증 비전 OCR 중 … (Claude, 수십 초)");
+  try{
+    const res=await fetch("/api/web-office/source-extract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({imagePath:path})});
+    const env=await res.json(); const d=env.data||{};
+    if(env.status!=="SUCCESS"){ setStatus("fail","소스 추출 실패: "+((env.errors||[])[0]?.code||"UNKNOWN")); $("srcconnect").disabled=false; return; }
+    sourceData=d.source||{};
+    const mp=d.maskedPreview||{};
+    const n=Object.keys(sourceData).length;
+    $("srcconnect").textContent=`📄 소스 연결됨 (${n})`;
+    setStatus("ok",`소스 연결 완료 — ${n}개 필드 추출 (${Object.entries(mp).map(([k,v])=>k+":"+v).join(", ")}). 이제 «AI 자동채움»은 이 실제 값으로 채웁니다.`);
+  }catch(e){ setStatus("fail","소스 추출 오류: "+e.message); }
+  $("srcconnect").disabled=false;
+}
+async function aiAutoFill(){
+  if(!state) return;
+  const fields=collectEmptyFields();
+  if(!fields.length){ setStatus("fail","채울 빈 입력칸(라벨 있는 칸)을 찾지 못했습니다."); return; }
+  $("aifill").disabled=true;
+  const usingSrc = sourceData && Object.keys(sourceData).length>0;
+  setStatus("load",`AI(Claude) ${usingSrc?"소스 값 매핑":"예시 제안"} 중 … 입력칸 ${fields.length}개 (수 초 소요)`);
+  try{
+    const body={fields}; if(usingSrc) body.sourceData=sourceData;
+    const res=await fetch("/api/web-office/ai-fill",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const env=await res.json(); const d=env.data||{};
+    if(env.status!=="SUCCESS"){ setStatus("fail","AI 실패: "+((env.errors||[])[0]?.code||"UNKNOWN")); $("aifill").disabled=false; return; }
+    const proposals=d.proposals||[];
+    aiClear(false);
+    const props=[];
+    for(const pr of proposals){
+      const p=state.paragraphs.find(x=>x.paragraphId===pr.key);
+      if(!p||paraLen(p)>0) continue;
+      state=setCaret(state,p.paragraphId,0);
+      const r=typeTextAtCaret(state,String(pr.value));
+      if(r.command){ state=r.state; aiFilled.add(p.paragraphId); props.push({pid:p.paragraphId,label:pr.label,value:pr.value,confidence:pr.confidence}); }
+    }
+    aiProposals=props; lastReason="";
+    const modeLabel = d.mode==="source_mapping" ? "실제 소스 값" : "AI 예시";
+    setStatus("ok",`AI 자동채움 완료 (${modeLabel}) — ${props.length}칸 채움. 노란 칸을 확인하고 틀리면 클릭해 수정하세요.`);
+    renderAll();
+  }catch(e){ setStatus("fail","AI 호출 오류: "+e.message); }
+  $("aifill").disabled=false;
+}
+function aiClear(revert){
+  if(revert){ /* 되돌리기: undo를 채운 만큼 반복 */ for(let i=0;i<aiProposals.length;i++){ const r=onKeyDown(state,{key:"z",ctrlKey:true,preventDefault(){}}); state=r.state; } }
+  aiFilled=new Set(); aiProposals=[];
+  if(revert){ setStatus("ok","AI 채움 되돌림."); renderAll(); }
+}
+function renderReview(){
+  const el=$("review"); if(!el) return;
+  if(!aiProposals.length){ el.innerHTML='<li class="muted">아직 AI 채움 없음</li>'; return; }
+  el.innerHTML=aiProposals.map(p=>{
+    const lo=p.confidence<0.85?" lo":"";
+    return `<li data-pid="${p.pid}"><span class="cf${lo}">${Math.round(p.confidence*100)}%</span>`+
+      `<span class="lab">${(p.label||"?").slice(0,10)}</span> → <span class="val">${p.value}</span></li>`;
+  }).join("");
+  el.querySelectorAll("li[data-pid]").forEach(li=>{
+    li.onclick=()=>{ state=setCaret(state,li.dataset.pid,0); lastReason=""; renderAll();
+      const node=$("sheet").querySelector(`.pe-para[data-pid="${li.dataset.pid}"]`); if(node) node.scrollIntoView({block:"center"}); };
+  });
+}
+function renderAll(){ renderDoc(); renderRibbon(); renderStatus(); renderSide(); renderReview(); }
+
+/* ── 이벤트 ── */
+$("sheet").addEventListener("mousedown",(e)=>{
+  const t=e.target.closest("[data-off]"); const pd=e.target.closest(".pe-para");
+  if(t){ const pid=t.dataset.pid, off=parseInt(t.dataset.off,10);
+    if(e.shiftKey&&state.activeParagraphId===pid) state=setRange(state,pid,state.caretOffset,off);
+    else state=setCaret(state,pid,off);
+  } else if(pd){ state=setCaret(state,pd.dataset.pid,0); }
+  else return;
+  lastReason=""; renderAll(); $("sheet").focus(); e.preventDefault();
+});
+$("sheet").addEventListener("keydown",(e)=>{
+  if(!state||!state.activeParagraphId) return;
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"){ e.preventDefault(); const p=activePara(); if(!p)return;
+    const len=paraLen(p); const nx=Math.max(0,Math.min(len,state.caretOffset+(e.key==="ArrowRight"?1:-1)));
+    if(e.shiftKey){ const anc=state.rangeAnchor!==null?state.rangeAnchor:state.caretOffset; state=setRange(state,p.paragraphId,anc,nx); }
+    else state=setCaret(state,p.paragraphId,nx); lastReason=""; renderAll(); return; }
+  const r=onKeyDown(state,e); state=r.state; lastReason=r.reason||""; renderAll();
+});
+$("undo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"z",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
+$("redo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"y",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
+$("save").addEventListener("click",()=>{ const pl=buildSaveDryRunPayload(state); setStatus("ok",`저장 dry-run — 편집 ${state.commandLog.length}건 · ${pl.status||"READY"} (전송 안 함)`); });
+$("print").addEventListener("click",()=>{ if(!state){ setStatus("fail","인쇄할 문서가 없습니다. 먼저 서식을 불러오세요."); return; } window.print(); });
+$("srcconnect").addEventListener("click",connectSource);
+$("aifill").addEventListener("click",aiAutoFill);
+$("aiclear").addEventListener("click",()=>aiClear(true));
+
+/* ── 로드 ── */
+let currentSource=SAMPLE;
+async function loadForm(sourcePath){
+  currentSource=sourcePath;
+  setStatus("load","실제 HWPX 로드 중 …");
+  try{
+    const res=await fetch("/api/web-office/hwpx-load",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({operation:"HWPX_EDITOR_LOAD",sourcePath})});
+    const env=await res.json(); const d=env.data||env;
+    if(env.status!=="SUCCESS"||d.verdict!=="PASS"){ setStatus("fail","로드 실패: "+(d.reason||"UNKNOWN")); return false; }
+    const dm=d.documentModel; defs=normDefs((dm.styles||{}).charPrDefs);
+    const paragraphs=(dm.paragraphs||[]).map(p=>({paragraphId:p.paragraphId,parPrIDRef:p.parPrIDRef,containerScope:p.containerScope,runs:(p.runs||[]).map(r=>({runId:r.runId,text:r.text,charPrIDRef:r.charPrIDRef}))}));
+    state=makeParagraphEditorState({sourceDocumentHash:dm.sourceDocumentHash},paragraphs);
+    blocks=(d.renderPayload||{}).blocks||[];
+    tables={}; _tableChars=null; _nested=null; ((d.renderPayload||{}).tables||[]).forEach((t,i)=>{ t.__idx=i; tables[t.blockId]=t; });
+    aiFilled=new Set(); aiProposals=[];
+    const sm=d.summary||{};
+    $("doc").textContent=`표 ${sm.tables??"?"} · 셀 ${sm.cells??"?"} · 문단 ${paragraphs.length}`;
+    $("aifill").disabled=false; $("aiclear").disabled=false; $("srcconnect").disabled=false; $("print").disabled=false;
+    setStatus("ok",`불러옴 · 원본 무수정. «✨ AI 자동채움»을 누르거나, 셀을 클릭해 직접 편집하세요.`);
+    renderAll();
+    return true;
+  }catch(e){ setStatus("fail","로드 실패: "+e.message); return false; }
+}
+$("sample").addEventListener("click",()=>loadForm(SAMPLE));
+
+/* ── 카탈로그에서 온디맨드 진입 (?src= 또는 ?prepare=) ── */
+(async()=>{
+  const q=new URLSearchParams(location.search);
+  const direct=q.get("src");
+  const prepare=q.get("prepare");   // 원본(HWP/HWPX) 경로 → 필요시 한컴 변환
+  const formId=q.get("formId");
+  if(direct){ await loadForm(direct); return; }
+  if(prepare||formId){
+    setStatus("load","서식 준비 중 … (HWP면 한컴 변환, 다소 시간이 걸립니다)");
+    try{
+      const body=formId?{formId:Number(formId)}:{sourcePath:prepare};
+      const res=await fetch("/api/web-office/prepare-form",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const env=await res.json(); const d=env.data||env;
+      if(env.status!=="SUCCESS"||!d.sourcePath){ setStatus("fail","준비 실패: "+(d.error||env.status)); return; }
+      const tag=d.converted?" (한컴 변환됨)":"";
+      const ok=await loadForm(d.sourcePath);
+      if(ok) setStatus("ok",`서식 준비 완료${tag} · 원본 무수정. «✨ AI 자동채움»을 누르거나 셀을 클릭해 편집하세요.`);
+    }catch(e){ setStatus("fail","준비 실패: "+e.message); }
+  }
+})();
+</script>
+</body>
+</html>

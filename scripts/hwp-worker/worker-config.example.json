@@ -1,0 +1,14 @@
+{
+  "workerId": "",
+  "providerVersion": "hancom-com-powershell-v2",
+  "installDir": "%LOCALAPPDATA%\\Haehan\\HwpWorker",
+  "selfTestStatus": "unknown",
+  "hancomComProgId": "HwpFrame.HwpObject.2",
+  "localApiPort": 17823,
+  "localApiOriginAllowlist": [],
+  "convertTimeoutSec": 90,
+  "logRetentionDays": 7,
+  "serverBaseUrl": "",
+  "lastSelfTestAt": null,
+  "lastErrorCode": null
+}

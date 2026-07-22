@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HWPX 웹오피스 — 서식 카탈로그</title>
+<style>
+  :root{ color-scheme:light; font-family:"Malgun Gothic","Segoe UI",sans-serif; background:#eef1f4; color:#1a2530; }
+  *{ box-sizing:border-box; } body{ margin:0; }
+  .wrap{ max-width:960px; margin:0 auto; padding:0 16px 40px; }
+  header{ background:#26313d; color:#fff; padding:14px 16px; }
+  header .in{ max-width:960px; margin:0 auto; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  header h1{ font-size:17px; margin:0; }
+  header .st{ font-size:12.5px; color:#c8d2dc; }
+  .searchbar{ display:flex; gap:8px; margin:20px 0 14px; }
+  .searchbar input{ flex:1; font:inherit; font-size:15px; padding:10px 14px; border:1px solid #b3bcc6; border-radius:8px; }
+  .searchbar input:focus{ outline:none; border-color:#3a7be0; box-shadow:0 0 0 3px #dbe8fb; }
+  .searchbar button{ font:inherit; padding:10px 18px; border:1px solid #2f6fd6; background:#3a7be0; color:#fff; border-radius:8px; cursor:pointer; }
+  .searchbar button:hover{ background:#2f6fd6; }
+  .hint{ color:#7c8792; font-size:13px; margin:0 0 14px; }
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .chip{ font-size:12px; background:#fff; border:1px solid #cdd6df; border-radius:14px; padding:4px 12px; cursor:pointer; color:#42505e; }
+  .chip:hover{ background:#eaf1fb; border-color:#7ea6e6; }
+  .catrow{ display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 12px; }
+  .cat{ font-size:12.5px; background:#eef4fb; border:1px solid #cdddf1; border-radius:8px; padding:5px 12px; cursor:pointer; color:#1e4fa3; font-weight:600; }
+  .cat:hover{ background:#dbe8fb; } .cat.on{ background:#3a7be0; color:#fff; border-color:#2f6fd6; }
+  .cat b{ font-weight:400; color:#6f86a8; margin-left:4px; }
+  .cat.on b{ color:#dbe8fb; }
+  .status{ font-size:13px; color:#42505e; margin:6px 0 12px; }
+  .card{ background:#fff; border:1px solid #e0e5ea; border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+  .card .top{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .card .nm{ font-size:14.5px; font-weight:700; color:#1a2530; }
+  .card .statute{ font-size:11px; background:#e5eefb; color:#1e4fa3; border-radius:5px; padding:2px 7px; }
+  .card .meta{ font-size:12px; color:#8a94a0; margin-left:auto; }
+  .card .fields{ margin-top:8px; display:flex; gap:5px; flex-wrap:wrap; }
+  .card .fld{ font-size:11.5px; background:#f4f6f8; border:1px solid #e3e8ec; border-radius:5px; padding:2px 8px; color:#42505e; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .card .more{ font-size:11.5px; color:#3a7be0; cursor:pointer; padding:2px 4px; }
+  .card .acts{ margin-top:10px; }
+  .card .openbtn{ font-size:12.5px; font-weight:700; background:#1e4fa3; color:#fff; border:0; border-radius:7px; padding:7px 14px; cursor:pointer; }
+  .card .openbtn:hover{ background:#163d80; }
+  .empty{ color:#8a94a0; padding:24px; text-align:center; }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <h1>📚 서식 카탈로그</h1>
+  <span class="st" data-role="stats">로딩 중…</span>
+</div></header>
+
+<div class="wrap">
+  <div class="searchbar">
+    <input data-role="q" type="search" placeholder="서식 이름으로 검색 (예: 착공신고서) — 또는 «AI 검색»으로 자연어 질의" />
+    <button data-role="go" type="button">검색</button>
+    <button data-role="ai" type="button" title="자연어로 서식 찾기 (Claude, 수 초 소요)" style="background:#fff4d1;border-color:#e0b84a;color:#7a5b12;">🤖 AI 검색</button>
+  </div>
+  <p class="hint">키워드 검색(즉시) · 카테고리 브라우즈 · AI 의미검색("공사 시작할 때 내는 서류" 같은 자연어). 서식을 고르면 입력칸이 보입니다.</p>
+  <div class="catrow" data-role="cats"></div>
+  <div class="chips" data-role="chips"></div>
+  <div class="status" data-role="status"></div>
+  <div data-role="results"></div>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(`[data-role=${s}]`);
+const QUICK = ["착공신고서","감리보고서","사용승인","가설건축물","변경신고","점검표","협의서","등록증"];
+
+async function loadStats(){
+  try{
+    const r = await fetch("/api/web-office/catalog-stats");
+    const d = (await r.json()).data || {};
+    if(!d.ready){ $("stats").textContent = "카탈로그 준비 중… (빌드 진행 중일 수 있음)"; return; }
+    $("stats").textContent = `수집 ${d.total?.toLocaleString()}종 · 파싱 ${d.parsed?.toLocaleString()}종 · 법정서식 ${d.statuteForms?.toLocaleString()}종 · 필드 ${d.totalFields?.toLocaleString()}개`;
+  }catch(e){ $("stats").textContent = "통계 로드 실패"; }
+}
+function renderChips(){
+  $("chips").innerHTML = QUICK.map(q=>`<span class="chip">${q}</span>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ $("q").value=c.textContent; search(); });
+}
+function esc(s){ return String(s||"").replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+
+function renderResults(rs, label){
+  $("status").textContent = label;
+  if(!rs.length){ $("results").innerHTML = '<div class="empty">일치하는 서식이 없습니다.</div>'; return; }
+  $("results").innerHTML = rs.map(f=>{
+    const flds = (f.sampleFields||[]).filter(x=>x && x.length<40);
+    const shown = flds.slice(0,10);
+    const rest = (f.fieldCount||0) - shown.length;
+    const mk = f.matchedKeywords?`<span class="statute" style="background:#fff4d1;color:#7a5b12">AI 매칭 ${f.matchedKeywords}</span>`:"";
+    return `<div class="card">
+      <div class="top">
+        <span class="nm">${esc(f.name.replace(/\.hwpx?$/i,""))}</span>
+        ${f.statuteNo?`<span class="statute">${esc(f.statuteNo)}</span>`:""}${mk}
+        <span class="meta">필드 ${f.fieldCount} · 표 ${f.tableCount} · 셀 ${f.cellCount}</span>
+      </div>
+      <div class="fields">
+        ${shown.map(l=>`<span class="fld" title="${esc(l)}">${esc(l)}</span>`).join("")}
+        ${rest>0?`<span class="more">+${rest}개</span>`:""}
+      </div>
+      <div class="acts">
+        <button class="openbtn" data-fid="${f.formId}">📝 편집기로 열기</button>
+      </div>
+    </div>`;
+  }).join("");
+  $("results").querySelectorAll(".openbtn").forEach(b=>{
+    b.addEventListener("click",()=>{
+      const fid=b.getAttribute("data-fid");
+      // 온디맨드 준비(HWP면 한컴 변환) 후 편집기 진입
+      location.href="weboffice_edit.html?formId="+encodeURIComponent(fid);
+    });
+  });
+}
+function clearCatSel(){ $("cats").querySelectorAll(".cat").forEach(c=>c.classList.remove("on")); }
+
+async function search(){
+  const q = $("q").value.trim();
+  if(!q){ $("results").innerHTML=""; $("status").textContent=""; return; }
+  clearCatSel(); $("status").textContent = "검색 중…";
+  try{
+    const r = await fetch("/api/web-office/catalog-search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,limit:30})});
+    const rs = ((await r.json()).data||{}).results || [];
+    renderResults(rs, `"${q}" 결과 ${rs.length}건`);
+  }catch(e){ $("status").textContent = "검색 오류: "+e.message; }
+}
+async function aiSearch(){
+  const q = $("q").value.trim();
+  if(!q){ $("status").textContent="자연어로 찾고 싶은 서식을 입력하세요 (예: 공사 시작할 때 내는 서류)"; return; }
+  clearCatSel(); $("ai").disabled=true; $("status").textContent = "🤖 AI가 질의를 해석하는 중… (Claude, 수 초)";
+  try{
+    const r = await fetch("/api/web-office/catalog-ai-search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,limit:20})});
+    const env = await r.json(); const d = env.data||{};
+    if(env.status!=="SUCCESS"){ $("status").textContent="AI 검색 실패: "+((env.errors||[])[0]?.code||"UNKNOWN"); $("ai").disabled=false; return; }
+    const rs = d.results||[];
+    renderResults(rs, `AI 해석 키워드 [${(d.keywords||[]).join(", ")}] → ${rs.length}건`);
+  }catch(e){ $("status").textContent = "AI 검색 오류: "+e.message; }
+  $("ai").disabled=false;
+}
+async function loadCategories(){
+  try{
+    const r = await fetch("/api/web-office/catalog-categories");
+    const cats = ((await r.json()).data||{}).categories || [];
+    $("cats").innerHTML = cats.map(c=>`<span class="cat" data-dom="${esc(c.domain)}">${esc(c.domain)}<b>${c.count}</b></span>`).join("");
+    $("cats").querySelectorAll(".cat").forEach(el=>el.onclick=()=>selectCategory(el));
+  }catch(e){}
+}
+async function selectCategory(el){
+  clearCatSel(); el.classList.add("on"); $("q").value="";
+  const dom=el.dataset.dom;
+  $("status").textContent = `"${dom}" 카테고리 로딩…`;
+  try{
+    const r = await fetch("/api/web-office/catalog-by-category",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({domain:dom,limit:40})});
+    const rs = ((await r.json()).data||{}).results || [];
+    renderResults(rs, `📂 ${dom} · ${rs.length}건`);
+  }catch(e){ $("status").textContent="카테고리 오류: "+e.message; }
+}
+
+$("go").addEventListener("click", search);
+$("ai").addEventListener("click", aiSearch);
+$("q").addEventListener("keydown", e=>{ if(e.key==="Enter") search(); });
+renderChips(); loadStats(); loadCategories();
+setInterval(loadStats, 15000);
+</script>
+</body>
+</html>

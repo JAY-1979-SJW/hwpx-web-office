@@ -150,6 +150,25 @@ The approved Web Office API surface is:
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` (lineseg 좌표 레이아웃, 한컴 없이 · read-only)
 
+AI 자동채움 / 소스 추출 (WEB-OFFICE-AI-FILL-01, §9 Claude Code CLI Haiku only):
+
+- `POST /api/web-office/ai-fill` (빈 입력칸 값 제안 · AI inject 필수, 자동 실행 금지)
+- `POST /api/web-office/source-extract` (사업자등록증 등 소스 이미지 OCR · PII 마스킹)
+
+서식 카탈로그 (WEB-OFFICE-CATALOG-01, read-only SQLite `mode=ro`):
+
+- `GET /api/web-office/catalog-stats`
+- `GET /api/web-office/catalog-categories`
+- `POST /api/web-office/catalog-search`
+- `POST /api/web-office/catalog-match`
+- `POST /api/web-office/catalog-by-category`
+- `POST /api/web-office/catalog-ai-search` (자연어 → 키워드 해석 후 검색)
+
+온디맨드 서식 준비 / 다운로드 (WEB-OFFICE-CONVERT-01):
+
+- `POST /api/web-office/prepare-form` (HWP→한컴 COM 변환 또는 HWPX 복사 → project sandbox `tmp/web_office_forms/`)
+- `GET /api/web-office/download/{filename}` (편집 산출물 다운로드 · sandbox 한정)
+
 Adding, removing, or renaming an endpoint requires a new task standard and
 explicit approval.
 
