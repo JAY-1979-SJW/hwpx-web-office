@@ -199,7 +199,8 @@ import {
   makeParagraphEditorState, setCaret, setRange, applyFormatToSelection,
   typeTextAtCaret, deleteRange, applyParaFormat, buildSaveDryRunPayload,
 } from "./para_edit_state.mjs";
-import { onKeyDown } from "./para_edit_runtime.mjs";
+import { onKeyDown, onCompositionStart, onCompositionUpdate,
+         onCompositionEnd } from "./para_edit_runtime.mjs";
 import { matchToggle, matchAxisChange, extractAxisValues } from "./format_charpr_matcher.mjs";
 import { findMatches, buildReplacePlan } from "./weboffice/editor_find.mjs";
 import { matchParaAxisChange } from "./weboffice/format_parpr_matcher.mjs";
@@ -584,6 +585,18 @@ $("sheet").addEventListener("keydown",(e)=>{
     else state=setCaret(state,p.paragraphId,nx); lastReason=""; renderAll(); return; }
   const r=onKeyDown(state,e); state=r.state; lastReason=r.reason||""; renderAll();
 });
+/* 한글 IME — 조합 입력은 keydown 이 아니라 composition 이벤트로 온다.
+ * 이걸 연결하지 않으면 keydown 은 isComposing 을 보고 무시하고(IN_COMPOSITION),
+ * compositionend 도 처리되지 않아 한글이 한 글자도 들어가지 않는다.
+ * 실측으로 확인된 결함이라 세 이벤트를 모두 배선한다. */
+for(const [type,handler] of [["compositionstart",onCompositionStart],
+                             ["compositionupdate",onCompositionUpdate],
+                             ["compositionend",onCompositionEnd]]){
+  $("sheet").addEventListener(type,(e)=>{
+    if(!state||!state.activeParagraphId) return;
+    const r=handler(state,e); state=r.state; lastReason=r.reason||""; renderAll();
+  });
+}
 $("undo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"z",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
 $("redo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"y",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
 $("save").addEventListener("click",()=>{ const pl=buildSaveDryRunPayload(state); setStatus("ok",`저장 dry-run — 편집 ${state.commandLog.length}건 · ${pl.status||"READY"} (전송 안 함)`); });
