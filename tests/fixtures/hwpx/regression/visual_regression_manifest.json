@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "generatedBy": "WEB-OFFICE-VISUAL-REGRESSION-01",
+  "note": "좌표 렌더러 시각 회귀 게이트용 고정 문서. 각 HWPX 내장 한컴 원본 렌더(PrvImage)와 격자선 위치를 대조해 렌더 회귀를 커밋 전에 잡는다. .hwpx 바이너리는 저장소 관례(*.hwpx gitignore)에 따라 추적하지 않으며 로컬/프로비저닝으로 제공. 개인정보 검사 통과(PII 패턴 없음).",
+  "gateTest": "tests/test_web_office_visual_regression.py",
+  "auditTool": "scripts/ops/audit_web_office_visual_fidelity.py",
+  "fixtures": [
+    {
+      "name": "simple_form",
+      "fileName": "fx_metadata_form.hwpx",
+      "location": "tests/fixtures/hwpx/corpus/",
+      "coversMode": "단순 표 폼 (기준 케이스)",
+      "baseline": {"minWithin2px": 0.72, "maxMedianPx": 2.0, "measured": {"within2px": 0.842, "medianPx": 0.54}}
+    },
+    {
+      "name": "nested_signature",
+      "fileName": "fx_stamp_approval_legal.hwpx",
+      "location": "tests/fixtures/hwpx/corpus/",
+      "coversMode": "셀 내 중첩표(서명블록) 하단 배치",
+      "baseline": {"minWithin2px": 0.68, "maxMedianPx": 2.0, "measured": {"within2px": 0.786, "medianPx": 0.54}}
+    },
+    {
+      "name": "nested_valign_center",
+      "fileName": "reg_nested_valign_center.hwpx",
+      "location": "tests/fixtures/hwpx/regression/",
+      "sha256_16": "56402d3ffb797d2b",
+      "sourceOrigin": "data/drafts/hwpx_e2e_demo_sandbox/[별지_제47호의2서식]_굴착공사_협의서 (e2e 데모 fill, 무PII)",
+      "coversMode": "vAlign=CENTER 셀 + 중첩표 voff 정합 (겹침 회귀 방지)",
+      "baseline": {"minWithin2px": 0.80, "maxMedianPx": 2.0, "measured": {"within2px": 0.923, "medianPx": 0.66}}
+    },
+    {
+      "name": "detail_form_watch",
+      "fileName": "reg_detail_form.hwpx",
+      "location": "tests/fixtures/hwpx/regression/",
+      "sha256_16": "3d0bb0a76fd119dd",
+      "sourceOrigin": "data/drafts/hwpx_e2e_demo_sandbox/[별지_제24호서식]_정밀안전검진_신청서 (e2e 데모 fill, 무PII)",
+      "coversMode": "세부 폼 세로 미세 과대(롱테일 추적용 하한 — 악화만 감지)",
+      "baseline": {"minWithin2px": 0.18, "maxMedianPx": 14.0, "measured": {"within2px": 0.25, "medianPx": 9.26}}
+    }
+  ]
+}
