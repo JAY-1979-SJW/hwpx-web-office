@@ -19,6 +19,7 @@ export function mountWebOffice(root) {
   let loaded = null, cell = null, save = null;
   let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
   let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
+  let pendingEditId = null; // 재렌더 후 이어서 열 즉석 편집 대상(이동 연속)
 
   const setStatus = (k, msg) => {
     const e = $("[data-role=status]");
@@ -77,42 +78,30 @@ export function mountWebOffice(root) {
       // 편집된 셀은 새 텍스트 표시(getCellText), 셀 박스 클릭 시 인라인 편집.
       sheet.innerHTML = renderCoordinateLayout(coordLayout, {
         editable: true,
-        // 입력칸은 상시 필드가 값을 표시하므로 렌더러 오버레이 제외(이중
-        // 표시 방지). 라벨 편집만 렌더러 오버레이 경로 사용.
-        getCellText: (id) => (cell && !cell.isInputCell(id)
-          ? cell.getCellText(id) : null),
+        // 편집된 셀은 원본 줄 대신 새 텍스트를 문서 텍스트로 렌더 —
+        // AI fill 주입과 동일하게 '문서에 직접 기입'된 모습만 남는다.
+        getCellText: (id) => (cell ? cell.getCellText(id) : null),
         truthBase,   // 가용 시 '원본 그대로'(한컴 실렌더 배경 + 편집 오버레이)
       });
       autoFitLines(sheet);
-      // 상시 입력필드 — XML 에서 입력칸(로드 시 빈 셀)을 이미 알므로,
-      // 클릭 시 생성이 아니라 로드 즉시 모든 입력칸에 실제 <input> 을
-      // 배치한다(커서 대기·Tab 이동·Enter 다음 칸). 문서 순서(페이지→
-      // 위→왼쪽)로 tabindex 를 매겨 폼처럼 채워내려갈 수 있다.
-      // 색칠 셀 배제 — 유채색 채움(간트 진행바·차트 칸)만 입력칸에서
-      // 제외한다. 무채색 연회색(#F2F2F2 등)은 일반 셀 배경이므로 유지.
-      // 판정: RGB 채도(chroma = max-min) > 12 이면 유채색.
-      const _chromatic = (hex) => {
-        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
-        if (!m) return false;
-        const v = parseInt(m[1], 16);
-        const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
-        return (Math.max(r, g, b) - Math.min(r, g, b)) > 12;
-      };
-      const filledIds = new Set();
-      for (const pdp of (coordLayout.pagesDetail || [])) {
-        for (const b of pdp.boxes) {
-          if (b.cellId && _chromatic(b.fill)) filledIds.add(b.cellId);
-        }
-      }
+      // 문서 직접 기입 방식 — 화면에 상시 입력창을 만들지 않는다. 문서는
+      // 원형 그대로 보이고, 입력칸을 클릭한 순간에만 그 칸에 즉석 편집기
+      // 하나가 나타나며, 커밋하면 AI fill 주입과 동일하게 값이 문서
+      // 텍스트로 렌더된다(입력 위젯 흔적 없음).
       const inputBoxes = [];
       sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
         const id = box.dataset.cellId;
-        const isInput = cell.isInputCell(id)
-          && !filledIds.has(id);   // 로드 시 빈칸 + 무채움 = 입력칸
+        const isInput = cell.isInputCell(id);   // 파서(XML) 분류 단일 진실
         box.classList.add(isInput ? "wo-input" : "wo-label");
         if (isInput && !box.dataset.frag) {
           const r = box.getBoundingClientRect();
-          inputBoxes.push({ id, box, top: r.top, left: r.left });
+          // 방향키 이동용 기하 — 같은 스크롤 상태에서 일괄 측정하므로 상대
+          // 좌표계가 일관(페이지 세로 적층 → ↓ 가 다음 페이지로 이어짐).
+          inputBoxes.push({
+            id, box,
+            x0: r.left, x1: r.right, y0: r.top, y1: r.bottom,
+            cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2,
+          });
         }
         // 라벨(원래 문구): 더블클릭으로만 수정. 편집된 적 있으면 현재값,
         // 아니면 충실 원문(정규화 아님)을 prefill — 자간·공백 원형 유지.
@@ -126,30 +115,122 @@ export function mountWebOffice(root) {
           });
         }
       });
-      inputBoxes.sort((a, b) => (a.top - b.top) || (a.left - b.left));
-      inputBoxes.forEach((it, idx) => {
+      // 엑셀식 이동 — 1차: 같은 열/행(구간 겹침)에서 방향으로 가장 가까운
+      // 칸, 2차(없으면): 겹침 없이 방향만 맞는 최근접 칸. 표·페이지 경계를
+      // 넘어 입력칸들이 하나의 격자처럼 이어진다.
+      const navFrom = (cur, dir) => {
+        const horiz = dir === "left" || dir === "right";
+        const sgn = (dir === "right" || dir === "down") ? 1 : -1;
+        let best = null, bestKey = Infinity;
+        const scan = (needOverlap) => {
+          for (const g of inputBoxes) {
+            if (g === cur) continue;
+            const d = horiz ? (g.cx - cur.cx) * sgn : (g.cy - cur.cy) * sgn;
+            if (d <= 2) continue;
+            const ov = horiz
+              ? Math.min(g.y1, cur.y1) - Math.max(g.y0, cur.y0)
+              : Math.min(g.x1, cur.x1) - Math.max(g.x0, cur.x0);
+            if (needOverlap && ov <= 0) continue;
+            const perp = horiz
+              ? Math.abs(g.cy - cur.cy) : Math.abs(g.cx - cur.cx);
+            const key = d + perp * 4;
+            if (key < bestKey) { bestKey = key; best = g; }
+          }
+        };
+        scan(true);
+        if (!best) scan(false);
+        return best;
+      };
+      // 즉석 편집기 — 클릭된 입력칸에만 임시 <input> 하나. 커밋(Enter/이동/
+      // blur)하면 편집기는 사라지고 값은 문서 텍스트로 렌더된다.
+      const openEditor = (it) => {
+        if (it.box.querySelector("input")) return;   // 이미 편집 중
         const inp = document.createElement("input");
         inp.className = "wo-fld";
-        inp.tabIndex = idx + 1;
-        inp.value = cell.currentText(it.id);
-        inp.addEventListener("change", () => {
-          if (cell.setCellText(it.id, inp.value)) renderSide();
-        });
+        const ph = cell.inputLabel(it.id);
+        const cur = cell.currentText(it.id);
+        if (ph) {
+          // 마커 칸: 항목명을 placeholder 로, 마커 원문은 값으로 노출 안 함
+          inp.placeholder = ph;
+          inp.title = ph;
+          inp.classList.add("wo-fld-ph");
+          inp.value = /\[입력필요:/.test(cur) ? "" : cur;
+        } else {
+          inp.value = cur;
+        }
+        const initial = inp.value;
+        let done = false;
+        const close = () => { done = true; inp.remove(); };
+        const commit = (nxt) => {
+          if (done) return;
+          const v = inp.value;
+          // 마커 보존 — 빈 값이면 마커 원문 유지(문서 훼손 방지)
+          const changed = (v !== initial) && !(ph && v === "")
+            && cell.setCellText(it.id, v);
+          close();
+          if (nxt) pendingEditId = nxt.id;
+          if (changed) render();          // 값이 문서 텍스트로 렌더됨
+          else if (nxt) openEditor(nxt);
+        };
         inp.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            inp.dispatchEvent(new Event("change"));
-            const nxt = sheet.querySelector(
-              `.wo-fld[tabindex="${idx + 2}"]`);
-            if (nxt) nxt.focus();
-            else inp.blur();
+            commit(navFrom(it, "down"));   // 엑셀처럼 아래 칸으로
+          } else if (e.key === "Tab") {
+            e.preventDefault();
+            commit(navFrom(it, e.shiftKey ? "left" : "right"));
+          } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            commit(navFrom(it, e.key === "ArrowUp" ? "up" : "down"));
+          } else if (e.key === "ArrowLeft") {
+            // 캐럿이 맨 앞일 때만 칸 이동(텍스트 내 이동 보호)
+            if (inp.selectionStart === 0 && inp.selectionEnd === 0) {
+              e.preventDefault();
+              commit(navFrom(it, "left"));
+            }
+          } else if (e.key === "ArrowRight") {
+            if (inp.selectionStart === inp.value.length
+                && inp.selectionEnd === inp.value.length) {
+              e.preventDefault();
+              commit(navFrom(it, "right"));
+            }
           } else if (e.key === "Escape") {
-            inp.value = cell.currentText(it.id);
-            inp.blur();
+            close();
           }
         });
+        inp.addEventListener("blur", () => commit(null));
+        // 편집기를 셀의 실제 텍스트 줄 y 에 정렬 — rowSpan 큰 셀에서
+        // 편집기가 위 줄에 떠 보이던 결함 수리. 줄 없으면 세로 중앙.
+        const pgIdx = [...sheet.querySelectorAll(".co-page")]
+          .indexOf(it.box.closest(".co-page"));
+        const pdc = (coordLayout.pagesDetail || [])[pgIdx];
+        const ln0 = pdc
+          ? pdc.lines.find((l) => l.cellId === it.id) : null;
+        const boxTop = parseFloat(it.box.style.top) || 0;
+        const boxH = parseFloat(it.box.style.height) || 0;
+        if (ln0) {
+          inp.style.top = Math.max(0, ln0.y - boxTop - 3) + "px";
+          inp.style.height = ((ln0.h || 14) + 8) + "px";
+          inp.style.bottom = "auto";
+        } else if (boxH > 40) {
+          inp.style.top = Math.max(0, (boxH - 24) / 2) + "px";
+          inp.style.height = "24px";
+          inp.style.bottom = "auto";
+        }
         it.box.appendChild(inp);
+        inp.focus();
+        inp.select();
+        inp.scrollIntoView({ block: "nearest", inline: "nearest" });
+      };
+      inputBoxes.forEach((it) => {
+        it.box.addEventListener("click", () => openEditor(it));
       });
+      // 재렌더 직후 이동 연속 — 직전 커밋이 지정한 다음 칸에서 이어서 편집
+      if (pendingEditId) {
+        const nxt = inputBoxes.find((b) => b.id === pendingEditId);
+        pendingEditId = null;
+        if (nxt) openEditor(nxt);
+      }
       root.classList.add("wo-faithful");
     } else {
       // 편집 모드 — 흐름 렌더러 + 셀 클릭 편집
@@ -184,6 +265,7 @@ export function mountWebOffice(root) {
     $("[data-role=undo]").disabled = !(cell && cell.canUndo());
     $("[data-role=redo]").disabled = !(cell && cell.canRedo());
     $("[data-role=download]").disabled = !(save && save.lastOutput());
+    $("[data-role=aifill]").disabled = !cell;
   }
 
   // '원본 그대로' 배경 준비 — 한컴 실렌더 페이지(서버 캐시). 첫 문서는
@@ -263,6 +345,57 @@ export function mountWebOffice(root) {
     () => cell && cell.undo(render));
   $("[data-role=redo]").addEventListener("click",
     () => cell && cell.redo(render));
+  // AI 자동입력 — AI 창에 HWPX 를 주는 것과 동일: 서버가 인식한 입력
+  // 지점(라벨 붙은 셀)에 Claude 제안값을 로직으로 정확히 기입한다.
+  // 제안일 뿐 자동 승인 아님 — 화면에서 검토·수정 후 저장은 사람이.
+  $("[data-role=aifill]").addEventListener("click", async () => {
+    if (!cell || !loaded) return;
+    const model = loaded.documentModel || {};
+    const byId = new Map();   // cellId → label (인식 필드 + 파서 라벨)
+    for (const f of (model.recognizedFields || [])) {
+      if (f.cellId && f.label) byId.set(f.cellId, f.label);
+    }
+    for (const c of (model.cells || [])) {
+      if (c.isInputCell && c.inputLabel && !byId.has(c.cellId)) {
+        byId.set(c.cellId, c.inputLabel);
+      }
+    }
+    // 아직 값이 없는 칸만(이미 채운 값·라벨 원문은 보존)
+    const fields = [...byId]
+      .filter(([id]) => {
+        const t = cell.currentText(id);
+        return !t.trim() || /\[입력필요:/.test(t);
+      })
+      .map(([id, label]) => ({ key: id, label }));
+    const paraN = (model.recognizedFields || [])
+      .filter((f) => f.paragraph).length;
+    if (!fields.length) {
+      setStatus("ok", "AI 입력 대상 없음(모든 인식 칸에 값 있음)");
+      return;
+    }
+    setStatus("load", `AI 값 제안 중 … (${fields.length}칸, Claude)`);
+    try {
+      const res = await fetch("/api/web-office/ai-fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+      const env = await res.json();
+      const d = (env && env.data) || env || {};
+      let n = 0;
+      for (const p of (d.proposals || [])) {
+        if (p.key && p.value && cell.setCellText(p.key, p.value)) n += 1;
+      }
+      render();
+      renderSide();
+      setStatus(n ? "ok" : "fail",
+        n ? `AI 자동입력 ${n}/${fields.length}칸 — 제안값이니 검토·수정 후 저장`
+          + (paraN ? ` (본문 문단 ${paraN}건은 문단편집 공정 예정)` : "")
+          : "AI 제안 0건 — " + (d.error || "다시 시도"));
+    } catch (e) {
+      setStatus("fail", "AI 자동입력 실패: " + (e.message || e));
+    }
+  });
   $("[data-role=save]").addEventListener("click", async () => {
     if (!cell) return;
     setStatus("load", "저장 중(sandbox 사본 + readback 검증) …");

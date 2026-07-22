@@ -193,7 +193,7 @@
       ],
       "returncode": 0,
       "ok": true,
-      "summary": "15 passed in 0.35s"
+      "summary": "15 passed in 0.05s"
     },
     "zoneGateRunner": {
       "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
@@ -228,7 +228,8 @@
       "reports_untracked"
     ],
     "unexpectedOutsideScope": [
-      "M scripts/ops/hwpx_form_auto_fill_persistent_gate_installation.json",
+      "M scripts/hwpx/web_office/coordinate_layout.py",
+      "M scripts/hwpx/web_office/hancom_layout_refresh.py",
       "?? tmp/"
     ]
   },

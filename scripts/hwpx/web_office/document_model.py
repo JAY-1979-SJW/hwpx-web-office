@@ -46,9 +46,13 @@ class WebOfficeCell:
     vertAlign: str | None = None
     paragraphs: list[WebOfficeParagraph] = field(default_factory=list)
     text: str = ""
-    # 파싱 시 셀 서식 기반 입력칸 분류(빈칸+비헤더+비커버+무채색) —
-    # 프런트는 이 값을 단일 진실로 사용한다.
+    # 파싱 시 입력칸 분류 — 프런트는 이 값을 단일 진실로 사용한다.
+    # 문서에 [입력필요: ...] 마커가 있으면 XML 그대로(마커 셀만 입력칸),
+    # 없으면 셀 서식 기반(빈칸+비헤더+비커버+무채색).
     isInputCell: bool = False
+    # 마커 문서의 필드 라벨([입력필요: 문서번호] → "문서번호") — 뷰어가
+    # placeholder 로 표시. 마커 없는 문서는 None.
+    inputLabel: str | None = None
 
 
 @dataclass

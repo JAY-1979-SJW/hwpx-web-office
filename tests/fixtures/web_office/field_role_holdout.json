@@ -1,0 +1,570 @@
+[
+ {
+  "institution": "법무부",
+  "name": "18254327_범법자_출입국_규제_요청_지휘_건의.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18254327_범법자_출입국_규제_요청_지휘_건의.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "성별",
+    "role": "office"
+   },
+   {
+    "label": "주민등록번호",
+    "role": "office"
+   },
+   {
+    "label": "비고",
+    "role": "office"
+   },
+   {
+    "label": "○○○(기관명)",
+    "role": "office"
+   },
+   {
+    "label": "특별사법경찰관",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "고용노동부",
+  "name": "18275311_고용보험_산재보험_개산보험료_감액조정신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18275311_고용보험_산재보험_개산보험료_감액조정신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "감액조정신청사유",
+    "role": "applicant"
+   },
+   {
+    "label": "조정신청액",
+    "role": "applicant"
+   },
+   {
+    "label": "1",
+    "role": "applicant"
+   },
+   {
+    "label": "2",
+    "role": "applicant"
+   },
+   {
+    "label": "3",
+    "role": "applicant"
+   },
+   {
+    "label": "4",
+    "role": "applicant"
+   },
+   {
+    "label": "5",
+    "role": "applicant"
+   },
+   {
+    "label": "6",
+    "role": "applicant"
+   },
+   {
+    "label": "7",
+    "role": "applicant"
+   },
+   {
+    "label": "8",
+    "role": "applicant"
+   },
+   {
+    "label": "9",
+    "role": "applicant"
+   },
+   {
+    "label": "10",
+    "role": "applicant"
+   },
+   {
+    "label": "11",
+    "role": "applicant"
+   },
+   {
+    "label": "12",
+    "role": "applicant"
+   },
+   {
+    "label": "계",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일",
+    "role": "applicant"
+   },
+   {
+    "label": "신청인(보험가입자)",
+    "role": "applicant"
+   },
+   {
+    "label": "[ ]보험사무대행기관",
+    "role": "applicant"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "기후에너지환경부",
+  "name": "17780701_정수기_제조업_수입판매업_신고증명서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17780701_정수기_제조업_수입판매업_신고증명서.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "제품명",
+    "role": "office"
+   },
+   {
+    "label": "모델명",
+    "role": "office"
+   },
+   {
+    "label": "여과방식",
+    "role": "office"
+   },
+   {
+    "label": "유효정수량(L)",
+    "role": "office"
+   },
+   {
+    "label": "수입국(수입판매업의경우)",
+    "role": "office"
+   },
+   {
+    "label": "소재",
+    "role": "office"
+   },
+   {
+    "label": "규격",
+    "role": "office"
+   },
+   {
+    "label": "구조",
+    "role": "office"
+   },
+   {
+    "label": "의무정수성능",
+    "role": "office"
+   },
+   {
+    "label": "선택정수성능",
+    "role": "office"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "유효정수량",
+    "role": "office"
+   },
+   {
+    "label": "검사항목",
+    "role": "office"
+   },
+   {
+    "label": "검사기관",
+    "role": "office"
+   },
+   {
+    "label": "확인",
+    "role": "office"
+   },
+   {
+    "label": "연월일",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "해양수산부",
+  "name": "18284669_공유수면_점용_사용_변경허가증.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18284669_공유수면_점용_사용_변경허가증.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "[별지제7호서식] <개정 2017. 9. 22.>",
+    "role": "noise"
+   },
+   {
+    "label": "주소",
+    "role": "office"
+   },
+   {
+    "label": "변경사항",
+    "role": "office"
+   },
+   {
+    "label": "목적",
+    "role": "office"
+   },
+   {
+    "label": "조건",
+    "role": "office"
+   },
+   {
+    "label": "년월일",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "한국무역보험공사",
+  "name": "106_해외채권회수불능확인신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/ksure_hwpx/106_해외채권회수불능확인신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "소재국",
+    "role": "applicant"
+   },
+   {
+    "label": "채무자명",
+    "role": "applicant"
+   },
+   {
+    "label": "대표자",
+    "role": "applicant"
+   },
+   {
+    "label": "전화번호",
+    "role": "applicant"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "Email",
+    "role": "applicant"
+   },
+   {
+    "label": "Fax번호",
+    "role": "applicant"
+   },
+   {
+    "label": "채권원금",
+    "role": "applicant"
+   },
+   {
+    "label": "회수금액",
+    "role": "applicant"
+   },
+   {
+    "label": "채권잔액",
+    "role": "applicant"
+   },
+   {
+    "label": "채권만기",
+    "role": "applicant"
+   },
+   {
+    "label": "채권소멸시효*",
+    "role": "applicant"
+   },
+   {
+    "label": "연락처",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "원자력안전위원회",
+  "name": "18254869_국제운송방호검사_변경신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18254869_국제운송방호검사_변경신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "원자력안전위원회귀중",
+    "role": "noise"
+   },
+   {
+    "label": "첨부서류",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성접수서류검토결과통보결과확인",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "재정경제부",
+  "name": "17913011_정부소유유가증권환부청구서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17913011_정부소유유가증권환부청구서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "[별지제2호서식] <개정 1970.7.25>",
+    "role": "noise"
+   },
+   {
+    "label": "증권명칭",
+    "role": "applicant"
+   },
+   {
+    "label": "권면액",
+    "role": "applicant"
+   },
+   {
+    "label": "기번호",
+    "role": "applicant"
+   },
+   {
+    "label": "장수",
+    "role": "applicant"
+   },
+   {
+    "label": "비고",
+    "role": "applicant"
+   },
+   {
+    "label": "계",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "재정경제부",
+  "name": "18256735_연결납세방식적용신청서_연결모법인의_주요주주_상황_연결자법인의_주주상황_등.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18256735_연결납세방식적용신청서_연결모법인의_주요주주_상황_연결자법인의_주주상황_등.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "1 법인명",
+    "role": "applicant"
+   },
+   {
+    "label": "3 대표자성명",
+    "role": "applicant"
+   },
+   {
+    "label": "5번호",
+    "role": "applicant"
+   },
+   {
+    "label": "10 직접출자",
+    "role": "applicant"
+   },
+   {
+    "label": "11 간접출자비",
+    "role": "applicant"
+   },
+   {
+    "label": "7사업자등록번호",
+    "role": "applicant"
+   },
+   {
+    "label": "여",
+    "role": "noise"
+   },
+   {
+    "label": "지방국세청장귀하",
+    "role": "noise"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "1법인명",
+    "role": "applicant"
+   },
+   {
+    "label": "3발행주식총수또는출자총액",
+    "role": "applicant"
+   },
+   {
+    "label": "4번호",
+    "role": "applicant"
+   },
+   {
+    "label": "5성명(법인명)",
+    "role": "applicant"
+   },
+   {
+    "label": "7보유주식수또는출자금액",
+    "role": "applicant"
+   },
+   {
+    "label": "4우리사주조합이보유한주식",
+    "role": "applicant"
+   },
+   {
+    "label": "7",
+    "role": "applicant"
+   },
+   {
+    "label": "10번호",
+    "role": "applicant"
+   },
+   {
+    "label": "11법인명",
+    "role": "applicant"
+   },
+   {
+    "label": "14출자비율(13/9)(%)",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "국토교통부",
+  "name": "18171247_화물자동차_운송주선사업_허가대장.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18171247_화물자동차_운송주선사업_허가대장.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "1 상호",
+    "role": "office"
+   },
+   {
+    "label": "2 대표자",
+    "role": "office"
+   },
+   {
+    "label": "5 겸영업종",
+    "role": "office"
+   },
+   {
+    "label": "6 종류",
+    "role": "office"
+   },
+   {
+    "label": "7 명칭",
+    "role": "office"
+   },
+   {
+    "label": "8 소재지",
+    "role": "office"
+   },
+   {
+    "label": "1 연월일",
+    "role": "office"
+   },
+   {
+    "label": "2 건명",
+    "role": "office"
+   },
+   {
+    "label": "4 처분관청",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "해양수산부",
+  "name": "16925421_해양이용영향평가대행업_권리_의무_승계신고서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/16925421_해양이용영향평가대행업_권리_의무_승계신고서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "소재지(사무실) (전화번호: )",
+    "role": "applicant"
+   },
+   {
+    "label": "승계구분",
+    "role": "applicant"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   },
+   {
+    "label": "신청인(서명또는인)",
+    "role": "applicant"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신고인",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "과학기술정보통신부 기후에너지환경부 산업통상부 해양수산부",
+  "name": "17664857_이산화탄소_수송사업_승인신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17664857_이산화탄소_수송사업_승인신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "사업장소재지",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일신청인 (서명또는인) 기후에너지환경부장관귀하",
+    "role": "applicant"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   },
+   {
+    "label": "신청인",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "해양수산부",
+  "name": "17012215_국_공유지_무상양여신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17012215_국_공유지_무상양여신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "양여신청면적",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일",
+    "role": "applicant"
+   },
+   {
+    "label": "승인번호",
+    "role": "office"
+   },
+   {
+    "label": "해양수산부장관, 시·도지사또는시장·군수·구청장",
+    "role": "noise"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   }
+  ]
+ }
+]

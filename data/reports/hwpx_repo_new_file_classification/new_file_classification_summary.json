@@ -2,17 +2,2663 @@
   "schemaVersion": "hwpx_repo_new_file_classification_gate_v1",
   "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
   "summary": {
-    "newFiles": 1,
+    "newFiles": 295,
     "ignoredFiles": 0,
-    "passedFiles": 1,
+    "passedFiles": 295,
     "failedFiles": 0
   },
   "newFileResults": [
     {
-      "safePath": "scripts/ops/deploy_web_office_to_server.ps1",
+      "safePath": "frontend/web_office_viewer/weboffice/editor_find.mjs",
+      "category": "FRONTEND_VIEWER",
+      "zone": "browser_ui",
+      "separationPlan": "keep_frontend_viewer",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "scripts/hwpx/convert_law_forms_batch.py",
+      "category": "ACTIVE_HWPX_CORE",
+      "zone": "hwpx_core",
+      "separationPlan": "keep_hwpx_core",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "scripts/hwpx/harvest_gov_forms.py",
+      "category": "ACTIVE_HWPX_CORE",
+      "zone": "hwpx_core",
+      "separationPlan": "keep_hwpx_core",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "scripts/hwpx/harvest_kepco_forms.py",
+      "category": "ACTIVE_HWPX_CORE",
+      "zone": "hwpx_core",
+      "separationPlan": "keep_hwpx_core",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "scripts/hwpx/web_office/hancom_layout_refresh.py",
+      "category": "ACTIVE_HWPX_CORE",
+      "zone": "hwpx_core",
+      "separationPlan": "keep_hwpx_core",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "scripts/hwpx/web_office/index_form_corpus.py",
+      "category": "ACTIVE_HWPX_CORE",
+      "zone": "hwpx_core",
+      "separationPlan": "keep_hwpx_core",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/hancom_hwp_to_hwpx_diag/hancom_hwp_to_hwpx_1642fa03.json",
       "category": "LEGACY_EXPERIMENT",
       "zone": "unassigned",
-      "separationPlan": "review_legacy_ops",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/hancom_hwp_to_hwpx_diag/hancom_hwp_to_hwpx_1642fa03.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/hancom_hwp_to_hwpx_diag/hancom_hwp_to_hwpx_1642fa03.stderr.log",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/hancom_hwp_to_hwpx_diag/hancom_hwp_to_hwpx_1642fa03.stdout.log",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_004d2075.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_00d8685c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_033e5be9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_03c71254.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0444942f.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_046444cd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_058c5f49.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_064904ac.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_079fa187.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0c6ff509.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0d353634.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0d4e61e3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0dd38e39.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0ea2c14b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0ef1502b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0f181283.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_0fc6cf97.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_100e76d9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1450e754.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_152f33de.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_162ac41c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_165218a4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_19e071c8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1a10575b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1aa55ffb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1b6990fb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1c8d6761.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1da36460.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_1f86f13b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_202d3474.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_215837d6.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_21d02d5a.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_21d95e45.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_23d194eb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_23f01a6e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_25c31c75.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_25cebb02.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_286fa9d3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_29a72149.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_29d05a4b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_29d903a0.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_2bfe80c1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_2cba2b0d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_2e2ae4c9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_2e5662e5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_2fa2f5ac.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_303f7319.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_307a5cfe.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_308f9b3b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_30aa92d8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_30af51c9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_30f92dc2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_312ffcc9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3241af9d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_332835ae.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_33e4f700.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3656ed54.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3666e4ba.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_39bc24e7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3c8c8a11.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3d2e5da5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3f27d40d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_3fd5cc8b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4109ddbe.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_439abe7b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_43e8bace.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_440afdb4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_46c6625f.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_47100e5c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4785b5a2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_47d4970b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_48167463.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_484b8697.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_48d4d3e4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4999917d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4b5e6fe2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4bce6b3c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_4fa74fff.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_505d234e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_51054cf2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_523ae59e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5287e784.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5337f2d5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_53d48e6c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_53dde5e3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_53fe3b6f.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5535f448.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_553ecfa3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_55a65815.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_57ba37e3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_57dc214b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5af1ab43.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5b21e556.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5baf19f2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5c4912a8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5c549b32.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_5d267318.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_60f3d0dd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_62062429.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_644cf913.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_64a664de.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6551d8e2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6554d4b9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6736035d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_68a1a2cb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_69119d3a.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_696d64a8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6a51c300.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6b819875.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6cbc772d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6d682f4a.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6f0b5462.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6f75e528.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_6fe8b3a9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7369dab4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_74d36dfd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_75752248.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7652f444.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_76837b9e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_79bf2fce.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7a5daad7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7b8ba5f0.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7c2abebc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7d8a9213.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7dd6dde8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7dde3085.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7e2646ee.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_7e99a224.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_801a757b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_80cc8f52.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_81018563.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_81c397cd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_81e551c6.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_824b8bf8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_840ee52a.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_845a6696.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_84dbd4bb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_84e50e88.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_85327bd6.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_85f96529.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_85ffa1af.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_888c3edd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_894fa048.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8956e7d4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_89ce782d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8a0eecb9.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8a9c6856.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8bb94508.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8bcde3cd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8c54c2e5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8cfde739.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8e49efcf.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8f1e9fbf.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_8f80c8ab.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_90bb01bc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_90f5e379.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_91e64dba.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_92086bee.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_926473e3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_926afa12.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_93d54aa8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_94b7ecdd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_94db9f0b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_94e5723c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9535ed17.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_95669416.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9599c0d5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_965adc60.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_96e7fe31.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_96f229bb.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_974390c7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_993984f4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_994ead81.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9a47b8f8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9a76ff53.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9b0f5ca7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9bae82c3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9c33dc5d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9c591389.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9d833acc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9e0c7be6.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9f094c27.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_9f234e73.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a068f457.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a23033b2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a26fa501.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a3f668c4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a478dbc8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a59c1438.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a7d484f7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_a9bb2a3e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_aa9d56b8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ac1ffcd1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ac547027.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ae44aff7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_af244438.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b19ba8aa.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b2798948.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b2c061cd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b2f0f52d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b3db33bc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b5205742.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b64eee40.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b6dad795.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b8267015.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b8beb011.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b965b9bc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_b98562a4.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_bc8f5ee0.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_bd771cbc.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_bdad284b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_bebec0e1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c1d86389.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c238fa7f.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c34a34db.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c3e9bba1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c4701b02.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c4d78551.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c61d5d36.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c78f819e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c835e570.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c8d818b7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c8e314b2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_c9d44f53.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ca6f032e.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ca7507bd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_cd8e66ed.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_cdc5dbe3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_cddb44bd.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d02c5706.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d127ca68.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d21322f2.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d2d98b76.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d2eb0432.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d841eaa1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_d92c6666.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_da700676.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dafec785.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_db3d2cf8.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_db5fc4fe.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dc440747.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dc50154b.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dcdd2a95.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dcf7f039.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_de3a0d4d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_dea8e268.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_df4a8075.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_df8a4a0c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e063ffec.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e17feeb5.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e3448622.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e41e5d1a.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e521db6f.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e6014673.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e801ca96.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_e9e1e0ad.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ea1b4de0.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ed06f76d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ee0804b7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ee3ea539.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_eed93d01.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_ef496a0d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f0bd0403.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f218e62c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f41eac1d.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f54d6185.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f6602617.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f689a697.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f6964025.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f70516e7.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f71fd048.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f7595f4c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f7b71fe1.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_f9042510.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_fcb12270.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_fd13858c.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_fe3c95f3.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_diag/persistent_batch_fe66f599.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_work/chunk_manifest.json",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/law_convert_work/chunk_result.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/p3d_g2b_hancom_conversion_report_20260508.json",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/web_office_convert_diag/hancom_hwp_to_hwpx_d6185503.json",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/web_office_convert_diag/hancom_hwp_to_hwpx_d6185503.jsonl",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/web_office_convert_diag/hancom_hwp_to_hwpx_d6185503.stderr.log",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
+      "moduleDeclared": false,
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "safePath": "tmp/web_office_convert_diag/hancom_hwp_to_hwpx_d6185503.stdout.log",
+      "category": "LEGACY_EXPERIMENT",
+      "zone": "unassigned",
+      "separationPlan": "review_legacy_experiment",
       "moduleDeclared": false,
       "status": "PASS",
       "failures": []

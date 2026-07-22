@@ -1,0 +1,530 @@
+[
+ {
+  "institution": "보건복지부",
+  "name": "17975401_노숙인자활지원사업_실시_신고서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17975401_노숙인자활지원사업_실시_신고서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "노숙인자활지원사업실시신고서",
+    "role": "noise"
+   },
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "소재지( 전화번호: )",
+    "role": "applicant"
+   },
+   {
+    "label": "기관명",
+    "role": "applicant"
+   },
+   {
+    "label": "소재지",
+    "role": "applicant"
+   },
+   {
+    "label": "직원 명",
+    "role": "applicant"
+   },
+   {
+    "label": "특별자치시장ᆞ특별자치도지사ᆞ시장ᆞ군수ᆞ구청장",
+    "role": "noise"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신고서작성접수검토결재신고증작성신고증발급",
+    "role": "noise"
+   },
+   {
+    "label": "신고인",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "법무부",
+  "name": "15761023_형미집행자기록.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/15761023_형미집행자기록.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "명부진행번호",
+    "role": "office"
+   },
+   {
+    "label": "집제번호",
+    "role": "office"
+   },
+   {
+    "label": "성명",
+    "role": "office"
+   },
+   {
+    "label": "요청일",
+    "role": "office"
+   },
+   {
+    "label": "의뢰일",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "과학기술정보통신부",
+  "name": "17759279_무선국_신고증명서_전파법_제11조_및_제12조에_따라_주파수할당을_받은_자가_전기통신역무_등을_제공하기_위하.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17759279_무선국_신고증명서_전파법_제11조_및_제12조에_따라_주파수할당을_받은_자가_전기통신역무_등을_제공하기_위하.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "무선기기명칭및기기일련번호",
+    "role": "office"
+   },
+   {
+    "label": "안테나공급전력(W, kW)",
+    "role": "office"
+   },
+   {
+    "label": "부관(附款) 사항",
+    "role": "office"
+   },
+   {
+    "label": "호출부호또는호출명칭",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "15143467_현금출납부_시설용.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/15143467_현금출납부_시설용.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "200 년월",
+    "role": "office"
+   },
+   {
+    "label": "연월일",
+    "role": "office"
+   },
+   {
+    "label": "계정과목",
+    "role": "office"
+   },
+   {
+    "label": "(전월누계)...",
+    "role": "office"
+   },
+   {
+    "label": "(월계)",
+    "role": "office"
+   },
+   {
+    "label": "(누계)",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "기후에너지환경부",
+  "name": "18200625_토양관련전문기관_토양오염조사_누출검사_토양환경평가_위해성평가_지정서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18200625_토양관련전문기관_토양오염조사_누출검사_토양환경평가_위해성평가_지정서.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "토양관련전문기관",
+    "role": "office"
+   },
+   {
+    "label": "일자",
+    "role": "office"
+   },
+   {
+    "label": "내용",
+    "role": "office"
+   },
+   {
+    "label": "확인",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "행정안전부",
+  "name": "17968491_체납자_명단공개_대상자_통지.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17968491_체납자_명단공개_대상자_통지.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "통지일자",
+    "role": "office"
+   },
+   {
+    "label": "성명(대표자)",
+    "role": "office"
+   },
+   {
+    "label": "사업자등록번호",
+    "role": "office"
+   },
+   {
+    "label": "지방행정제재ᆞ부과금종류(항목) 계",
+    "role": "office"
+   },
+   {
+    "label": "주민(법인, 외국인) 등록번호",
+    "role": "office"
+   },
+   {
+    "label": "소명기한",
+    "role": "office"
+   },
+   {
+    "label": "협조자",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "18257921_채혈금지대상자_관리대장.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18257921_채혈금지대상자_관리대장.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "일련번호",
+    "role": "office"
+   },
+   {
+    "label": "주민등록번호",
+    "role": "office"
+   },
+   {
+    "label": "성명",
+    "role": "office"
+   },
+   {
+    "label": "채혈금지사유",
+    "role": "office"
+   },
+   {
+    "label": "채혈금지기간",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "18190955_장애친화_산부인과_운영_의료기관_인력_시설_장비_현황.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18190955_장애친화_산부인과_운영_의료기관_인력_시설_장비_현황.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "외래진료실",
+    "role": "applicant"
+   },
+   {
+    "label": "진통실",
+    "role": "applicant"
+   },
+   {
+    "label": "입원실(1인실)",
+    "role": "applicant"
+   },
+   {
+    "label": "신생아실",
+    "role": "applicant"
+   },
+   {
+    "label": "10) 시각및청각장애인경보·피난설비",
+    "role": "applicant"
+   },
+   {
+    "label": "4) 장애인등의이용이가능한매표소·판매기또는음료대",
+    "role": "applicant"
+   },
+   {
+    "label": "일련번호",
+    "role": "applicant"
+   },
+   {
+    "label": "장비명",
+    "role": "applicant"
+   },
+   {
+    "label": "제조번호",
+    "role": "applicant"
+   },
+   {
+    "label": "제조국명",
+    "role": "applicant"
+   },
+   {
+    "label": "제조연도",
+    "role": "applicant"
+   },
+   {
+    "label": "구입연도",
+    "role": "applicant"
+   },
+   {
+    "label": "비고",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "과학기술정보통신부",
+  "name": "17171025_사립과학관_설립계획_설립계획_변경_승인신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17171025_사립과학관_설립계획_설립계획_변경_승인신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "2 주소",
+    "role": "applicant"
+   },
+   {
+    "label": "10 준공예정연월일",
+    "role": "applicant"
+   },
+   {
+    "label": "9 착공예정연월일",
+    "role": "applicant"
+   },
+   {
+    "label": "11 구분",
+    "role": "applicant"
+   },
+   {
+    "label": "변경사항",
+    "role": "applicant"
+   },
+   {
+    "label": "첨부서류: 뒤쪽",
+    "role": "noise"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "특별시ᆞ광역시ᆞ특별자치시ᆞ도ᆞ특별자치도",
+    "role": "noise"
+   },
+   {
+    "label": "▲",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성",
+    "role": "noise"
+   },
+   {
+    "label": "제",
+    "role": "noise"
+   },
+   {
+    "label": "▼",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "재정경제부",
+  "name": "18131239_이스라엘과의_협정에_따른_원산지증명서의_서식_을지.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18131239_이스라엘과의_협정에_따른_원산지증명서의_서식_을지.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "9. Description of goods",
+    "role": "applicant"
+   },
+   {
+    "label": "No.",
+    "role": "applicant"
+   },
+   {
+    "label": "Tariff item number",
+    "role": "applicant"
+   },
+   {
+    "label": "ORIGIN CERTIFICATION",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "17902481_장애인등록증_기재사항_변경신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17902481_장애인등록증_기재사항_변경신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "장애인등록증기재사항변경신청서",
+    "role": "noise"
+   },
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "주소(전화번호: )",
+    "role": "applicant"
+   },
+   {
+    "label": "발급기관",
+    "role": "applicant"
+   },
+   {
+    "label": "현행",
+    "role": "applicant"
+   },
+   {
+    "label": "변경내용",
+    "role": "applicant"
+   },
+   {
+    "label": "특별자치시장ᆞ특별자치도지사시장ᆞ군수ᆞ구청장",
+    "role": "noise"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "특별자치시ᆞ특별자치도, 시ᆞ군ᆞ구(읍ᆞ면ᆞ동)",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성",
+    "role": "noise"
+   },
+   {
+    "label": "▶",
+    "role": "noise"
+   },
+   {
+    "label": "등록사항확인",
+    "role": "noise"
+   },
+   {
+    "label": "▼",
+    "role": "noise"
+   },
+   {
+    "label": "◀",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "산업통상부",
+  "name": "18192063_특정고압가스사용시설_완성검사_정기검사_신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18192063_특정고압가스사용시설_완성검사_정기검사_신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "접수일자",
+    "role": "office"
+   },
+   {
+    "label": "사업자등록번호(※ 사업자가아닌경우에는주민등록번호: )",
+    "role": "applicant"
+   },
+   {
+    "label": "첨부서류",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신청인",
+    "role": "noise"
+   },
+   {
+    "label": "한국가스안전공사",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "해양수산부",
+  "name": "16932809_어장환경조사_공무원_등의_증표.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/16932809_어장환경조사_공무원_등의_증표.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "어장환경조사공무원등의증표",
+    "role": "noise"
+   },
+   {
+    "label": "어장환경조사(평가) 공무원증(수행원증)",
+    "role": "noise"
+   },
+   {
+    "label": "사진(3cm×4cm)",
+    "role": "office"
+   },
+   {
+    "label": "생년월일",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "법무부",
+  "name": "15123471_계속수용사실_통지.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/15123471_계속수용사실_통지.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "비행명",
+    "role": "office"
+   },
+   {
+    "label": "주소",
+    "role": "office"
+   },
+   {
+    "label": "보호자성명",
+    "role": "office"
+   },
+   {
+    "label": "그밖의사항(참고사항)",
+    "role": "office"
+   },
+   {
+    "label": "끝.발신명의직인",
+    "role": "noise"
+   },
+   {
+    "label": "협조자",
+    "role": "office"
+   }
+  ]
+ }
+]

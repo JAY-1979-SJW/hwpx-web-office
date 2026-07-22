@@ -11,6 +11,7 @@ hwpx_paragraph_ops 의 paragraph helper 만 사용하며 mutation API
 """
 from __future__ import annotations
 import hashlib
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -770,6 +771,11 @@ def _extract_revision_tracking(package: HwpxPackage | None) -> dict[str, Any]:
     return payload
 
 
+# 입력 위치 명시 마커 — AI fill 파이프라인/서식 초안이 XML 텍스트에 심는
+# 확립된 규약(hwpx_header_field_detector 와 동일 표기).
+_INPUT_MARKER_RE = re.compile(r"\[입력필요:\s*([^\]]+)\]")
+
+
 def _chromatic_fill(hex_color: str | None) -> bool:
     """유채색 채움 여부 — 무채색 연회색(#F2F2F2 등 일반 셀 배경)은 False.
     채도(chroma = max-min RGB) > 12 이면 유채색(간트 바·차트 칸)."""
@@ -1376,6 +1382,15 @@ def import_hwpx_as_ro_view(
             warnings.append(w)
         else:
             warnings.append({"message": str(w)})
+
+    # [입력필요: ...] 마커 셀 — XML 이 입력 위치를 명시한 곳은 가산으로
+    # 입력칸 승격 + 마커명을 필드 라벨로. 나머지 셀은 서식 분류 유지
+    # (마커가 다른 입력 가능 칸을 잠그지 않는다 — 입력처 봉쇄 금지).
+    for c in cells:
+        m = _INPUT_MARKER_RE.search(c.text or "")
+        if m is not None and not c.isCoveredByMerge:
+            c.isInputCell = True
+            c.inputLabel = m.group(1).strip()
 
     document_id = f"doc_{sha[:16]}"
     return WebOfficeDocumentModel(

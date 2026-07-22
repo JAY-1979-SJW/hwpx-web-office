@@ -156,10 +156,20 @@ export function renderCoordinateLayout(layout, opts = {}) {
           ? boxByCell.get(cid) : null);
       if (!b) continue;
       const t = getCellText(cid);
-      parts.push(`<div class="co-line co-edited" style="left:${b.x + 3}px;`
-        + `top:${(localY(b.y) + 2).toFixed(1)}px;`
-        + `width:${Math.max(10, b.w - 6)}px;`
-        + `height:${Math.max(12, b.h - 4)}px;line-height:1.3;`
+      // 편집값은 박스 좌상단이 아니라 그 셀의 실제 텍스트 줄 위치에 —
+      // rowSpan 큰 셀(결재란 왼쪽 열 등)에서 값이 위 줄에 떠 보이던 결함
+      // 수리. 줄이 없는 빈 셀은 세로 중앙(한컴 기본 정렬과 유사).
+      const ln0 = pd
+        ? pd.lines.find((l) => l.cellId === cid)
+        : null;
+      const ty = ln0 ? localY(ln0.y)
+        : (localY(b.y) + Math.max(2, (b.h - 16) / 2));
+      const tx = ln0 ? ln0.x : (b.x + 3);
+      parts.push(`<div class="co-line co-edited" style="left:${tx}px;`
+        + `top:${ty.toFixed(1)}px;`
+        + `width:${Math.max(10, b.x + b.w - tx - 3)}px;`
+        + `height:${Math.max(12, (ln0 && ln0.h) ? ln0.h + 4 : 16)}px;`
+        + `line-height:1.3;`
         + `white-space:pre-wrap;font-size:10pt">`
         + `<span class="co-in" style="display:inline-block">${esc(t)}`
         + `</span></div>`);

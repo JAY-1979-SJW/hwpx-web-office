@@ -47,6 +47,11 @@ export function createCellEditController(documentModel) {
     },
     // 로드 시점 빈 셀 = 입력칸(라벨 아님). 값 채운 뒤에도 true 유지.
     isInputCell: (cellId) => inputCells.has(cellId),
+    // 마커 문서([입력필요: ...])의 필드 라벨 — placeholder 표시용.
+    inputLabel(cellId) {
+      const c = cellOf(cellId);
+      return (c && c.inputLabel) ? c.inputLabel : null;
+    },
     // 상시 입력필드용 — 셀의 현재 텍스트(편집 반영값)
     currentText(cellId) {
       const c = cellOf(cellId);

@@ -1,0 +1,718 @@
+[
+ {
+  "institution": "국토교통부",
+  "name": "13638941_국가부담비용_정산서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/13638941_국가부담비용_정산서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "국가부담비용정산서",
+    "role": "noise"
+   },
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "보상구분",
+    "role": "applicant"
+   },
+   {
+    "label": "지급금액(원)",
+    "role": "applicant"
+   },
+   {
+    "label": "정산내용",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일",
+    "role": "applicant"
+   },
+   {
+    "label": "국토교통부장관",
+    "role": "noise"
+   },
+   {
+    "label": "첨부서류",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성접수검토결재수리",
+    "role": "noise"
+   },
+   {
+    "label": "제출인",
+    "role": "noise"
+   },
+   {
+    "label": "국토교통부",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "국토교통부",
+  "name": "13638955_도로와_다른_시설의_연결허가신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/13638955_도로와_다른_시설의_연결허가신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "도로와다른시설의연결허가신청서",
+    "role": "noise"
+   },
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "연락처",
+    "role": "applicant"
+   },
+   {
+    "label": "도로와연결하는다른시설의종류및명칭",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일",
+    "role": "applicant"
+   },
+   {
+    "label": "도로관리청귀하",
+    "role": "noise"
+   },
+   {
+    "label": "작성방법",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성접수현지조사검토결재허가서발급",
+    "role": "noise"
+   },
+   {
+    "label": "신청인",
+    "role": "noise"
+   },
+   {
+    "label": "처리기관",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "12227795_법인_설립허가_신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/12227795_법인_설립허가_신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "법인설립허가신청서",
+    "role": "noise"
+   },
+   {
+    "label": "처리일",
+    "role": "office"
+   },
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "신청인",
+    "role": "applicant"
+   },
+   {
+    "label": "담당공무원확인사항",
+    "role": "office"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성접수확인결재허가증작성허가증발급",
+    "role": "noise"
+   },
+   {
+    "label": "보건복지부ᆞ질병관리청(비영리법인의설립및감독업무담당부서)",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "보건복지부",
+  "name": "12227797_법인_설립허가증.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/12227797_법인_설립허가증.hwpx",
+  "formKind": "발급증서",
+  "fields": [
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "준수사항",
+    "role": "noise"
+   },
+   {
+    "label": "변경일",
+    "role": "office"
+   },
+   {
+    "label": "내용",
+    "role": "office"
+   },
+   {
+    "label": "확인",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "국민연금공단",
+  "name": "100_서식_6_사망(경위)신고서.hwpx",
+  "sourcePath": "data/drafts/form_library/nps_hwpx/100_서식_6_사망(경위)신고서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "접수일자",
+    "role": "office"
+   },
+   {
+    "label": "사망일시",
+    "role": "applicant"
+   },
+   {
+    "label": "사망장소",
+    "role": "applicant"
+   },
+   {
+    "label": "사망의원인된질병, 부상",
+    "role": "applicant"
+   },
+   {
+    "label": "사망경위",
+    "role": "applicant"
+   },
+   {
+    "label": "성명",
+    "role": "applicant"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "합의사항",
+    "role": "applicant"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "신고인",
+    "role": "noise"
+   },
+   {
+    "label": "신고서제출",
+    "role": "noise"
+   },
+   {
+    "label": "신고서접수및확인",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "국민연금공단",
+  "name": "104_서식_3_연계노령유족연금_지급_청구서.hwpx",
+  "sourcePath": "data/drafts/form_library/nps_hwpx/104_서식_3_연계노령유족연금_지급_청구서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "지급받고자하는금융기관",
+    "role": "applicant"
+   },
+   {
+    "label": "-",
+    "role": "noise"
+   },
+   {
+    "label": "청구인확인(인)",
+    "role": "applicant"
+   },
+   {
+    "label": "년월일",
+    "role": "applicant"
+   },
+   {
+    "label": "청구인과의관계",
+    "role": "applicant"
+   },
+   {
+    "label": "국민연금공단이사장귀하",
+    "role": "noise"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "첨부서류",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "청구인",
+    "role": "noise"
+   },
+   {
+    "label": "청구서작성",
+    "role": "noise"
+   },
+   {
+    "label": "연금관리기관",
+    "role": "noise"
+   },
+   {
+    "label": "금융기관",
+    "role": "noise"
+   },
+   {
+    "label": "지급계좌에입금",
+    "role": "noise"
+   },
+   {
+    "label": "지급의뢰",
+    "role": "noise"
+   },
+   {
+    "label": "청구서접수및수급권확인",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "고용노동부",
+  "name": "13308231_노동쟁의_조정_중재_신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/13308231_노동쟁의_조정_중재_신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "접수일",
+    "role": "office"
+   },
+   {
+    "label": "명칭",
+    "role": "applicant"
+   },
+   {
+    "label": "대표자",
+    "role": "applicant"
+   },
+   {
+    "label": "소재지",
+    "role": "applicant"
+   },
+   {
+    "label": "중앙노동위원회",
+    "role": "noise"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "처리기관",
+    "role": "noise"
+   },
+   {
+    "label": "노동쟁의조정ᆞ중재신청서작성",
+    "role": "noise"
+   },
+   {
+    "label": "▶",
+    "role": "noise"
+   },
+   {
+    "label": "접수",
+    "role": "noise"
+   },
+   {
+    "label": "조정개시",
+    "role": "noise"
+   },
+   {
+    "label": "제시",
+    "role": "noise"
+   },
+   {
+    "label": "당사자가조정안수락시",
+    "role": "noise"
+   },
+   {
+    "label": "◀",
+    "role": "noise"
+   },
+   {
+    "label": "조정안",
+    "role": "noise"
+   },
+   {
+    "label": "▼",
+    "role": "noise"
+   },
+   {
+    "label": "조정안작성",
+    "role": "noise"
+   },
+   {
+    "label": "조정불성립시",
+    "role": "noise"
+   },
+   {
+    "label": "재정서송달",
+    "role": "noise"
+   },
+   {
+    "label": "중재재정",
+    "role": "noise"
+   },
+   {
+    "label": "중재재정이위법또는월권에의한것으로인정하는경우 15일이내에행정소송제기가능",
+    "role": "noise"
+   },
+   {
+    "label": "중재",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "고용노동부",
+  "name": "14589739_가사서비스_제공기관_인증신청서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/14589739_가사서비스_제공기관_인증신청서.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "접수번호",
+    "role": "office"
+   },
+   {
+    "label": "처리기간",
+    "role": "office"
+   },
+   {
+    "label": "5대표자성명",
+    "role": "applicant"
+   },
+   {
+    "label": "8손해배상수단",
+    "role": "applicant"
+   },
+   {
+    "label": "9대표자",
+    "role": "applicant"
+   },
+   {
+    "label": "10임원",
+    "role": "applicant"
+   },
+   {
+    "label": "○○지방고용노동청(지청)장",
+    "role": "noise"
+   },
+   {
+    "label": "신청인(대표자)",
+    "role": "applicant"
+   },
+   {
+    "label": "(뒤쪽)",
+    "role": "noise"
+   },
+   {
+    "label": "처리절차",
+    "role": "noise"
+   },
+   {
+    "label": "지방고용노동관서",
+    "role": "noise"
+   },
+   {
+    "label": "신청서작성",
+    "role": "noise"
+   },
+   {
+    "label": "▶",
+    "role": "noise"
+   },
+   {
+    "label": "▼",
+    "role": "noise"
+   },
+   {
+    "label": "◀",
+    "role": "noise"
+   }
+  ]
+ },
+ {
+  "institution": "한국전력공사",
+  "name": "149_대가족가구_호별_사용전력량_검침표.hwpx",
+  "sourcePath": "data/drafts/form_library/kepco_hwpx/149_대가족가구_호별_사용전력량_검침표.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "고객번호",
+    "role": "applicant"
+   },
+   {
+    "label": "아파트명",
+    "role": "applicant"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "전화번호",
+    "role": "applicant"
+   },
+   {
+    "label": "전월",
+    "role": "applicant"
+   },
+   {
+    "label": "당월",
+    "role": "applicant"
+   },
+   {
+    "label": "개별사용량(A)",
+    "role": "applicant"
+   },
+   {
+    "label": "공동사용량(B)",
+    "role": "applicant"
+   },
+   {
+    "label": "요금적용사용량(C) = (A) + (B)",
+    "role": "applicant"
+   },
+   {
+    "label": "비고",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "한국전력공사",
+  "name": "150_생명유지장치요금제신청서_행정관서_신청대행용.hwpx",
+  "sourcePath": "data/drafts/form_library/kepco_hwpx/150_생명유지장치요금제신청서_행정관서_신청대행용.hwpx",
+  "formKind": "민원신청",
+  "fields": [
+   {
+    "label": "생명유지장치사용자명",
+    "role": "applicant"
+   },
+   {
+    "label": "주민등록번호",
+    "role": "applicant"
+   },
+   {
+    "label": "전화번호",
+    "role": "applicant"
+   },
+   {
+    "label": "고객번호",
+    "role": "applicant"
+   },
+   {
+    "label": "주소",
+    "role": "applicant"
+   },
+   {
+    "label": "아파트명",
+    "role": "applicant"
+   },
+   {
+    "label": "임대업체명",
+    "role": "applicant"
+   },
+   {
+    "label": "개인정보수집및이용에동의하십니까? □ 동의함 □ 동의하지않음",
+    "role": "applicant"
+   }
+  ]
+ },
+ {
+  "institution": "기후에너지환경부",
+  "name": "17646311_송달서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17646311_송달서.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "안건",
+    "role": "office"
+   },
+   {
+    "label": "신청인",
+    "role": "office"
+   },
+   {
+    "label": "피신청인",
+    "role": "office"
+   },
+   {
+    "label": "송달서류",
+    "role": "office"
+   },
+   {
+    "label": "참고사항",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "기후에너지환경부",
+  "name": "17646317_건강피해조사에_관한_심의_의결서.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/17646317_건강피해조사에_관한_심의_의결서.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "안건",
+    "role": "office"
+   },
+   {
+    "label": "주문",
+    "role": "office"
+   },
+   {
+    "label": "이유",
+    "role": "office"
+   },
+   {
+    "label": "주요내용",
+    "role": "office"
+   },
+   {
+    "label": "건강피해조사분과위원회",
+    "role": "office"
+   },
+   {
+    "label": "위원장",
+    "role": "office"
+   },
+   {
+    "label": "위원",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "소방청",
+  "name": "18195161_소방공무원기장_수여대장.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18195161_소방공무원기장_수여대장.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "수여번호",
+    "role": "office"
+   },
+   {
+    "label": "수여연월일",
+    "role": "office"
+   },
+   {
+    "label": "소속",
+    "role": "office"
+   },
+   {
+    "label": "계급",
+    "role": "office"
+   },
+   {
+    "label": "직위",
+    "role": "office"
+   },
+   {
+    "label": "성명",
+    "role": "office"
+   },
+   {
+    "label": "생년월일",
+    "role": "office"
+   },
+   {
+    "label": "비고",
+    "role": "office"
+   }
+  ]
+ },
+ {
+  "institution": "소방청",
+  "name": "18255507_긴급구조대응계획_수정일지.hwpx",
+  "sourcePath": "data/drafts/form_library/law_hwpx/18255507_긴급구조대응계획_수정일지.hwpx",
+  "formKind": "행정내부",
+  "fields": [
+   {
+    "label": "수정요구서제출일자",
+    "role": "office"
+   },
+   {
+    "label": "장",
+    "role": "office"
+   },
+   {
+    "label": "절",
+    "role": "office"
+   },
+   {
+    "label": "페이지",
+    "role": "office"
+   },
+   {
+    "label": "수정일자",
+    "role": "office"
+   },
+   {
+    "label": "비고",
+    "role": "office"
+   }
+  ]
+ }
+]

@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,29 @@ def stats() -> dict[str, Any]:
         return {"ready": False, "total": 0, "error": str(e)[:120]}
 
 
+def _requirements_of(row) -> dict[str, Any]:
+    """행정 요건(해부 결과)을 결과에 실어 보낸다. 미해부 행은 빈 값."""
+    def _arr(v):
+        if not v:
+            return []
+        try:
+            out = json.loads(v)
+            return out if isinstance(out, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    keys = row.keys() if hasattr(row, "keys") else []
+    if "attachments" not in keys:
+        return {}
+    return {
+        "attachments": _arr(row["attachments"]),
+        "attachmentCount": row["attachment_count"] or 0,
+        "processingTime": row["processing_time"] or "",
+        "fee": row["fee"] or "",
+        "legalBasis": _arr(row["legal_basis"]),
+        "submitTo": row["submit_to"] or "",
+    }
+
+
 def institutions(*, limit: int = 300) -> dict[str, Any]:
     """기관/부처별 서식 수 (많은 순). 카탈로그 UI 필터용."""
     if not catalog_ready():
@@ -159,7 +183,8 @@ def search(query: str, *, limit: int = 20,
         params.append(limit)
         rows = con.execute(
             "SELECT form_id,form_type,statute_no,name,field_count,table_count,"
-            "cell_count,institution FROM forms WHERE " + " AND ".join(where) +
+            "cell_count,institution,attachments,attachment_count,processing_time,"
+            "fee,legal_basis,submit_to FROM forms WHERE " + " AND ".join(where) +
             " ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
             tuple(params),
         ).fetchall()
@@ -173,6 +198,7 @@ def search(query: str, *, limit: int = 20,
                 "fieldCount": r["field_count"], "tableCount": r["table_count"],
                 "cellCount": r["cell_count"], "sampleFields": labels,
                 "institution": r["institution"],
+                **_requirements_of(r),
             })
         con.close()
         return {"ready": True, "query": q, "institution": inst or None,
