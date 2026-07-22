@@ -124,6 +124,32 @@ def test_table_total_size_matches_declared_sz():
         f"표 높이 {h:.1f} vs 선언 {decl_h:.1f} ({(h/decl_h-1)*100:+.1f}%)"
 
 
+def test_cell_lines_do_not_overrun_their_cell():
+    """WEB-OFFICE-COORD-FIDELITY-05 — 셀 텍스트 줄이 담긴 셀 박스를 가로로
+    넘지 않는지. horzsize 가 셀보다 넓어도(공백 패딩 등) 셀 경계로 제한되어
+    (전자우편 주소:)·(서명 또는 인) 등이 셀 밖으로 삐져나가지 않도록 가드."""
+    out = extract(str(PR / FORM))
+    boxes = out["boxes"]
+
+    def cell_of(l):
+        cx = l["x"] + 1
+        cy = l["y"] + l["h"] / 2
+        cs = [b for b in boxes
+              if b["x"] - 1 <= cx <= b["x"] + b["w"] + 1
+              and b["y"] - 1 <= cy <= b["y"] + b["h"] + 1]
+        return min(cs, key=lambda b: b["w"] * b["h"]) if cs else None
+
+    over = []
+    for l in out["lines"]:
+        if not l["cell"] or not l["text"].strip():
+            continue
+        b = cell_of(l)
+        if b and (l["x"] + l["w"]) > (b["x"] + b["w"]) + 4:
+            over.append((l["text"][:16], round(l["x"] + l["w"]),
+                         round(b["x"] + b["w"])))
+    assert not over, f"셀을 넘는 줄: {over}"
+
+
 def test_header_cells_have_gray_fill():
     """WEB-OFFICE-COORD-FIDELITY-03 — 헤더 셀 배경(fillBrush)이 반출되는지."""
     out = extract(str(PR / FORM))

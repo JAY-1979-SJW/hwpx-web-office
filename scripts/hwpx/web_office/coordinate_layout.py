@@ -315,12 +315,19 @@ def extract(path):
                     else max(0.0, avail - text_h) if va == "BOTTOM"
                     else 0.0)
             for cl in cell_lines:
+                line_x = cx + c["ml"] + cl["rx"]
+                # 줄 폭을 셀 오른쪽 경계까지로 제한 — horzsize 가 셀보다 넓어도
+                # (공백 패딩 등) 셀 밖으로 삐져나가지 않게 한다. 넘치는 부분은
+                # overflow:clip 으로 셀 안에서 잘리고, 우측정렬 ')' 는 셀
+                # 가장자리에 놓인다.
+                cap = (cx + cw) - line_x
+                wpx = min(cl["w"], cap) if cap > 2 else cl["w"]
                 cline = {
                     "text": cl["text"],
                     "segments": cl.get("segments", []),
-                    "x": round(cx + c["ml"] + cl["rx"], 1),
+                    "x": round(line_x, 1),
                     "y": round(cy + c["mt"] + voff + cl["ry"], 1),
-                    "w": round(cl["w"], 1), "h": round(cl["h"], 1),
+                    "w": round(wpx, 1), "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
                     "cell": True}
                 if cl.get("align"):
