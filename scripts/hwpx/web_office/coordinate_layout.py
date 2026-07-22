@@ -5,6 +5,7 @@
 재현하기 위한 데이터. read-only, 원본 무수정.
 """
 import json
+import os
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
@@ -235,7 +236,16 @@ def extract(path):
         sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
         mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
         sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
-        mt = _sane_hu(mg.get("top", "0"))
+        w = _sane_hu(sz.get("width", "0"))
+        h = _sane_hu(sz.get("height", "0"))
+        # 손상 여백 방어 — 일부 문서가 cellMargin 에 셀보다 큰 값
+        # (예: 20520HU=274px)을 담아 행높이를 폭증시킨다. 여백 합이 셀
+        # 크기를 잠식(90%↑)하면 한컴처럼 무시하고 기본값(≈141HU)으로.
+        _DEF_MG = 1.9
+        ml_raw = _sane_hu(mg.get("left", "0"))
+        mt_raw = _sane_hu(mg.get("top", "0"))
+        ml = ml_raw if (w <= 0 or ml_raw * 2 <= w * 0.9) else _DEF_MG
+        mt = mt_raw if (h <= 0 or mt_raw * 2 <= h * 0.9) else _DEF_MG
         # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
         # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
         content_h = 0.0
@@ -248,9 +258,9 @@ def extract(path):
             "col": int(addr.get("colAddr", "0")),
             "rowSpan": int(span.get("rowSpan", "1") or "1"),
             "colSpan": int(span.get("colSpan", "1") or "1"),
-            "w": _sane_hu(sz.get("width", "0")),
-            "h": _sane_hu(sz.get("height", "0")),
-            "ml": _sane_hu(mg.get("left", "0")),
+            "w": w,
+            "h": h,
+            "ml": ml,
             "mt": mt,
             "hContent": content_h,
             "bfRef": tc.attrib.get("borderFillIDRef"),
@@ -327,6 +337,11 @@ def extract(path):
                 if tslack > 1e-6:
                     k = min(1.0, (sh - th) / tslack)
                     row_h = [row_h[i] - slack[i] * k for i in range(nrow)]
+        if os.environ.get("COORD_DEBUG"):
+            print(f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
+                  f"nrow={nrow} ncol={ncol} th={th:.0f} "
+                  f"sum={sum(row_h):.0f} row_h="
+                  f"{[round(h, 1) for h in row_h]}", file=sys.stderr)
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
             col_x[i + 1] = col_x[i] + col_w[i]
