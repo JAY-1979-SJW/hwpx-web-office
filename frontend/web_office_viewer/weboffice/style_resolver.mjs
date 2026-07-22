@@ -28,9 +28,12 @@ function _truthy(v) {
 export function fontFamily(name) {
   if (!name) return "";
   const serif = /바탕|명조|Batang|Myeongjo|serif/i.test(name);
+  // 지정 폰트(설치 시) → 계열 대체 → "맑은 고딕"(Windows 기본 한글, 항상
+  // 존재) 순. @font-face 로 이름을 덮어쓰지 않으므로 설치된 함초롬/한양
+  // 실폰트가 그대로 쓰이고, 미설치 환경도 맑은 고딕으로 정상 렌더된다.
   const tail = serif
-    ? "'함초롬바탕','바탕','Batang',serif"
-    : "'맑은 고딕','함초롬돋움','돋움','Dotum',sans-serif";
+    ? "'함초롬바탕','바탕','Batang','Malgun Gothic','맑은 고딕',serif"
+    : "'함초롬돋움','돋움','Dotum','Malgun Gothic','맑은 고딕',sans-serif";
   return `font-family:'${name}',${tail};`;
 }
 
@@ -48,6 +51,13 @@ export function charPrToCss(def) {
   if (def.underline) deco.push("underline");
   if (_truthy(def.strikeout)) deco.push("line-through");
   if (deco.length) s += `text-decoration:${deco.join(" ")};`;
+  // 장평(글자 가로비율) — 100 이 기준. font-stretch % 로 안전 적용(레이아웃
+  // 파괴 없는 정석 속성; 미지원 폰트는 no-op).
+  const ratio = def.ratio
+    && parseFloat(def.ratio.hangul || def.ratio.latin || "100");
+  if (ratio && ratio !== 100 && ratio >= 50 && ratio <= 200) {
+    s += `font-stretch:${ratio}%;`;
+  }
   const sp = def.spacing && parseFloat(def.spacing.hangul || "0");
   if (sp) s += `letter-spacing:${(sp / 100).toFixed(3)}em;`;
   const off = def.offset && parseFloat(def.offset.hangul || "0");

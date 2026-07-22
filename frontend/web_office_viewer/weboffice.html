@@ -19,7 +19,17 @@
   .wo-status[data-k="ok"]{ color:#0b6b46; } .wo-status[data-k="fail"]{ color:#9f2d20; } .wo-status[data-k="load"]{ color:#2b5d94; }
   .wo-wrap{ display:flex; flex:1; min-height:0; }
   .wo-page{ flex:1; overflow:auto; padding:26px; background:#f4f6f8; }
-  .wo-sheet{ background:#fff; margin:0 auto; padding:34px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:60vh; max-width:900px; }
+  .wo-canvas{ position:relative; max-width:900px; margin:0 auto; }
+  .wo-sheet{ position:relative; z-index:1; background:#fff; padding:34px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:60vh; }
+  /* 원본 배치 배경(ghost) — 편집 클릭을 막지 않도록 pointer-events:none.
+     display 는 wo-bg 클래스로만 켠다(hidden 속성 특정도 이슈 회피). */
+  .wo-coord{ position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:0; display:none; flex-direction:column; align-items:center; pointer-events:none; opacity:.42; filter:saturate(.85); }
+  .wo-canvas.wo-bg .wo-coord{ display:flex; }
+  .wo-canvas.wo-bg .wo-sheet{ background:rgba(255,255,255,.60); box-shadow:0 1px 8px rgba(0,0,0,.06); }
+  .wo-coord .co-page{ position:relative; background:#fff; margin:0 auto 20px; box-shadow:0 1px 6px rgba(0,0,0,.18); }
+  .wo-coord .co-line{ position:absolute; white-space:pre; overflow:hidden; }
+  .wo-coord .co-box{ position:absolute; }
+  .wo-coord .co-empty{ display:none; }
   .wo-side{ width:290px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:13px; overflow:auto; }
   .wo-side h3{ font-size:13px; margin:0 0 7px; color:#42505e; }
   .wo-drop{ border:2px dashed #b8c2cc; border-radius:10px; padding:14px; text-align:center; color:#66717d; background:#fafbfc; margin-bottom:14px; font-size:13px; }
@@ -52,6 +62,7 @@
     <button data-role="redo" type="button" disabled>↷ 재실행</button>
     <span class="wo-div"></span>
     <label class="wo-chk"><input data-role="guides" type="checkbox" checked /> 박스선</label>
+    <label class="wo-chk"><input data-role="coordbg" type="checkbox" /> 원본 배치 배경</label>
     <span class="wo-sp"></span>
     <button data-role="save" type="button" disabled>저장(sandbox)</button>
     <button data-role="download" type="button" disabled>편집본 다운로드</button>
@@ -60,7 +71,10 @@
   <div class="wo-wrap">
     <div class="wo-page">
       <div class="wo-drop" data-role="drop">여기로 <b>.hwpx</b> 드래그 · 또는 «파일 열기»</div>
-      <div class="wo-sheet" data-role="sheet"><p class="wo-empty">문서 없음.</p></div>
+      <div class="wo-canvas" data-role="canvas">
+        <div class="wo-coord" data-role="coord" hidden></div>
+        <div class="wo-sheet" data-role="sheet"><p class="wo-empty">문서 없음.</p></div>
+      </div>
     </div>
     <aside class="wo-side">
       <h3>편집 상태</h3>

@@ -7,6 +7,7 @@ import { renderDocument } from "./document_view.mjs";
 import { createCellEditController } from "./cell_edit_controller.mjs";
 import { createSaveController } from "./save_controller.mjs";
 import { createUploadController } from "./upload_controller.mjs";
+import { createCoordBgController } from "./coord_bg_controller.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
 
@@ -19,6 +20,12 @@ export function mountWebOffice(root) {
     e.dataset.k = k; e.textContent = msg;
   };
   const guides = () => $("[data-role=guides]").checked;
+
+  const coordBg = createCoordBgController({
+    canvas: $("[data-role=canvas]"),
+    layer: $("[data-role=coord]"),
+    setStatus,
+  });
 
   function render() {
     const sheet = $("[data-role=sheet]");
@@ -68,7 +75,9 @@ export function mountWebOffice(root) {
     const sm = d.summary || {};
     setStatus("ok",
       `불러옴 · 표 ${sm.tables ?? "?"} · 셀 ${sm.cells ?? "?"} · 원본 무수정`);
+    coordBg.setSource(d.sourcePath);
     render();
+    coordBg.refresh();  // 배경 토글이 켜져 있으면 새 문서로 재적용
   }
 
   const upload = createUploadController({ onLoaded, setStatus });
@@ -84,6 +93,8 @@ export function mountWebOffice(root) {
   $("[data-role=redo]").addEventListener("click",
     () => cell && cell.redo(render));
   $("[data-role=guides]").addEventListener("change", render);
+  $("[data-role=coordbg]").addEventListener("change",
+    (e) => coordBg.toggle(e.target.checked));
   $("[data-role=save]").addEventListener("click", async () => {
     if (!cell) return;
     setStatus("load", "저장 중(sandbox 사본 + readback 검증) …");

@@ -1,21 +1,49 @@
 /* coordinate_renderer — HWPX lineseg 좌표 레이아웃 → 절대배치 HTML.
  *
  * 한컴이 저장한 줄별 좌표(vertpos/horzpos/size)를 그대로 절대배치해 원본
- * 배치(줄바꿈·행높이)를 재현한다. 브라우저 재-flow 없음. read-only.
+ * 배치(줄바꿈·행높이)를 재현하고, 각 줄을 run 별 charPr 조각으로 나눠
+ * 원본 서식(폰트·크기·색·굵게·기울임·밑줄·자간)까지 입힌다. 문단 정렬
+ * (가운데/오른쪽)도 반영. 브라우저 재-flow 없음. read-only.
  *
- * layout = { pageWidthPx, pageHeightPx, pages, lines[], boxes[] }
- *   line = { text, x, y(global), w, h, cell }
- *   box  = { x, y(global), w, h }   (표 셀 테두리)
+ * layout = { pageWidthPx, pageHeightPx, pages, lines[], boxes[], charPrDefs{} }
+ *   line = { text, segments[{text,charPr}], x, y(global), w, h, align?, cell }
+ *   box  = { x, y(global), w, h, border?, fill? }
  */
+import { charPrToCss } from "./style_resolver.mjs";
+
+// Wingdings 계열 PUA 화살표(한컴이 심볼폰트로 넣은 글자) → 유니코드 화살표.
+// 대체 폰트에 해당 글리프가 없어 □(두부)로 깨지는 것을 방지, 원본 의도대로
+// 화살표를 표시한다. (확인된 U+F0E8=오른쪽 화살표만 매핑; 필요 시 확장)
+const SYM = { "": "→" };
+function normSym(s) {
+  return String(s ?? "").replace(/[-]/g, (c) => SYM[c] || c);
+}
+
 function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;")
+  return normSym(s).replace(/&/g, "&amp;")
     .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* 한 줄의 서식 조각 → span 문자열. charPr 정의가 있으면 실서식(폰트/색/
+ * 굵게…)을, 없으면 줄높이 기반 추정 크기를 적용한다. */
+function segmentsHtml(line, defs, fallbackFs) {
+  const segs = (line.segments && line.segments.length)
+    ? line.segments
+    : [{ text: line.text, charPr: null }];
+  return segs.map((sg) => {
+    const def = sg.charPr != null ? defs[sg.charPr] : null;
+    let css = def ? charPrToCss(def) : "";
+    // charPr 에 크기가 없으면 줄높이 추정치로 보강 (텍스트 안 보이는 것 방지)
+    if (!def || !def.fontSizePt) css += `font-size:${fallbackFs.toFixed(1)}px;`;
+    return `<span style="${css}">${esc(sg.text)}</span>`;
+  }).join("");
 }
 
 export function renderCoordinateLayout(layout) {
   if (!layout) return '<p class="co-empty">레이아웃 없음.</p>';
   const W = layout.pageWidthPx, H = layout.pageHeightPx;
   const pages = layout.pages || 1;
+  const defs = layout.charPrDefs || {};
   const parts = [];
   for (let pi = 0; pi < pages; pi++) {
     const yTop = pi * H;
@@ -32,17 +60,22 @@ export function renderCoordinateLayout(layout) {
       } else {
         bd = "border:0.6px solid #e2e6ea;";
       }
+      const fill = b.fill ? `background:${b.fill};` : "";
       parts.push(`<div class="co-box" style="left:${b.x}px;`
         + `top:${(b.y - yTop).toFixed(1)}px;width:${b.w}px;`
-        + `height:${b.h}px;${bd}"></div>`);
+        + `height:${b.h}px;${bd}${fill}"></div>`);
     }
     for (const l of layout.lines || []) {
       if (Math.floor(l.y / H) !== pi) continue;
       const fs = Math.max(7, l.h * 0.72);
+      // line-height 는 반드시 박스 높이와 같게 둔다. 더 크게 주면
+      // overflow:hidden 이 글자 위/아래(받침 포함)를 세로로 잘라 문자가
+      // 깨진다. 한컴 baseline 정밀 정렬은 클리핑 없는 방식으로 후속 처리.
+      const al = l.align ? `text-align:${l.align};` : "";
       parts.push(`<div class="co-line" style="left:${l.x}px;`
         + `top:${(l.y - yTop).toFixed(1)}px;width:${l.w}px;`
-        + `height:${l.h}px;line-height:${l.h}px;`
-        + `font-size:${fs.toFixed(1)}px">${esc(l.text)}</div>`);
+        + `height:${l.h}px;line-height:${l.h}px;${al}">`
+        + `${segmentsHtml(l, defs, fs)}</div>`);
     }
     parts.push("</div>");
   }

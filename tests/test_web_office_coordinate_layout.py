@@ -39,6 +39,59 @@ def test_lines_have_finite_coords_and_text_slices():
     assert any(l["text"].strip() for l in out["lines"])
 
 
+def test_lines_carry_charpr_segments_and_defs():
+    """WEB-OFFICE-COORD-FORMAT-01 — 각 줄이 run 별 charPr 조각을 보존하고
+    charPrDefs(서식 정의)가 함께 반출되는지. 위치+서식 동시 재현의 기반."""
+    out = extract(str(PR / FORM))
+    defs = out.get("charPrDefs")
+    assert isinstance(defs, dict) and len(defs) > 0, "charPrDefs 반출 없음"
+    # 모든 줄은 segments 를 가지며, 조각 텍스트 합 == 줄 텍스트(정렬 불변식)
+    for line in out["lines"]:
+        segs = line.get("segments")
+        assert isinstance(segs, list)
+        if segs:
+            assert "".join(s["text"] for s in segs) == line["text"]
+    # 실제 서식(charPr 참조)이 붙은 줄이 존재하고, 그 참조가 defs 에 있음
+    styled = [s for l in out["lines"] for s in (l.get("segments") or [])
+              if s.get("charPr") is not None]
+    assert styled, "charPr 참조가 붙은 조각 없음"
+    assert any(s["charPr"] in defs for s in styled), "조각 charPr 가 defs 미해결"
+
+
+def test_lines_carry_hancom_baseline():
+    """WEB-OFFICE-COORD-FIDELITY-01 — 한컴 저장 baseline(글자 기준선) 반출.
+
+    baseline 은 줄 상단 기준 offset(px)이며 줄 높이 h 안에 있어야 한다.
+    한컴 실행 화면과 수직 위치를 맞추기 위한 데이터."""
+    out = extract(str(PR / FORM))
+    withbl = [l for l in out["lines"] if l.get("baseline", 0) > 0]
+    assert withbl, "baseline 반출 없음"
+    for line in withbl:
+        assert 0 < line["baseline"] <= line["h"] + 1, \
+            f"baseline({line['baseline']}) 이 줄 높이({line['h']}) 밖"
+
+
+def test_nested_table_placed_at_container_not_top():
+    """WEB-OFFICE-COORD-FIDELITY-02 — 중첩표(처리절차)가 부모 셀 위치(하단)에
+    배치되고 상단으로 새지 않는지. _nearest_tbl/_nearest_cell 회귀 가드."""
+    out = extract(str(PR / FORM))
+    ph = out["pageHeightPx"]
+    flow = [l for l in out["lines"]
+            if any(k in l["text"] for k in ("지정서", "갱신 허가"))]
+    assert flow, "처리절차 흐름 텍스트를 찾지 못함"
+    # 흐름 스텝은 문서 하단(페이지 60% 이하)에 있어야 한다(상단 유출 아님).
+    assert all(l["y"] > ph * 0.6 for l in flow), \
+        f"중첩표가 상단으로 유출됨: {[(l['text'], round(l['y'])) for l in flow]}"
+
+
+def test_header_cells_have_gray_fill():
+    """WEB-OFFICE-COORD-FIDELITY-03 — 헤더 셀 배경(fillBrush)이 반출되는지."""
+    out = extract(str(PR / FORM))
+    filled = [b for b in out["boxes"] if b.get("fill")]
+    assert filled, "채움색 있는 셀 없음"
+    assert all(b["fill"].startswith("#") for b in filled)
+
+
 def test_table_boxes_cover_cells_with_borders():
     out = extract(str(PR / FORM))
     boxes = out["boxes"]
