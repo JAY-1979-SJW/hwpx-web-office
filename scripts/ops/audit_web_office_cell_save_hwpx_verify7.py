@@ -16,6 +16,8 @@ PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
 
+from scripts.hwpx.web_office.hwpx_sample_source import (  # noqa: E402
+    resolve_sample as _catalog_sample)
 from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
     import_hwpx_as_ro_view)
 from scripts.hwpx.web_office.edit_command_model import (  # noqa: E402
@@ -34,7 +36,9 @@ def _sha(p: Path) -> str:
 def _resolve_fixture() -> Path | None:
     db = PR / "data/recognition_corpus/corpus.sqlite3"
     if not db.is_file():
-        return None
+        # 레거시 corpus DB 부재 — 카탈로그 표본으로 대체한다.
+        # 이게 없으면 감리가 조용히 SKIP 되어 안 돈 채 통과처럼 보인다.
+        return _catalog_sample()
     conn = sqlite3.connect(db)
     row = conn.execute("""
         SELECT d.source_path FROM hwpx_documents d

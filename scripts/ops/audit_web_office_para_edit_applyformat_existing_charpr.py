@@ -134,18 +134,26 @@ def _check_audit_no_writer_calls() -> list[dict]:
 
 def _pick_multi(scope_kind: str):
     db = PR / "data/recognition_corpus/corpus.sqlite3"
-    if not db.is_file():
-        return None, None
-    try:
-        conn = sqlite3.connect(db)
-        rows = conn.execute("""
-            SELECT d.source_path FROM hwpx_documents d
-            WHERE d.inventory_status='FOUND'
-            ORDER BY d.first_seen_at LIMIT 200
-        """).fetchall()
-        conn.close()
-    except sqlite3.Error:
-        return None, None
+    if db.is_file():
+        try:
+            conn = sqlite3.connect(db)
+            rows = conn.execute("""
+                SELECT d.source_path FROM hwpx_documents d
+                WHERE d.inventory_status='FOUND'
+                ORDER BY d.first_seen_at LIMIT 200
+            """).fetchall()
+            conn.close()
+        except sqlite3.Error:
+            return None, None
+    else:
+        # 레거시 corpus DB 부재 — 카탈로그 후보를 같은 형태로 공급한다.
+        # 표본 하나만 주면 조건에 맞는 문단이 없을 때 None 이 흘러가 터진다.
+        from scripts.hwpx.web_office.hwpx_sample_source import (
+            catalog_candidates)
+        rows = [(str(p.relative_to(PR)).replace("\\", "/"),)
+                for p in catalog_candidates(limit=200)]
+        if not rows:
+            return None, None
     from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
         import_hwpx_as_ro_view)
     for (sp,) in rows:

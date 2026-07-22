@@ -15,6 +15,7 @@ import_hwpx_as_ro_view (read-only) 만 사용한다.
 from __future__ import annotations
 import hashlib
 import zipfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -34,8 +35,18 @@ def _output_under_sandbox(out: Path, project_root: Path) -> bool:
     try:
         rel = out.resolve().relative_to(project_root.resolve())
     except ValueError:
-        # 프로젝트 외부 (예: tmp_path) — 절대 경로 검사
-        s = str(out.resolve()).lower()
+        # 프로젝트 외부 (예: tmp_path) — 절대 경로 검사.
+        # 문자열 패턴만으로 판정하면 임시폴더가 표준 위치가 아닌 PC 에서
+        # 멀쩡한 출력이 거부된다. 실측: 이 개발기는 ESTsoft 가 임시폴더를
+        # C:\Users\Public\Documents\ESTsoft\CreatorTemp 로 돌려놔서
+        # V6 가 FAIL 이 났다. 그래서 OS 가 알려주는 임시폴더를 먼저 본다.
+        resolved = out.resolve()
+        try:
+            resolved.relative_to(Path(tempfile.gettempdir()).resolve())
+            return True
+        except ValueError:
+            pass
+        s = str(resolved).lower()
         return ("\\temp\\" in s or "/tmp/" in s
                       or "pytest-of-" in s or "appdata\\local\\temp" in s)
     s = str(rel).replace("\\", "/").lower()

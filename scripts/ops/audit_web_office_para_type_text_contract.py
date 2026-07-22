@@ -48,7 +48,11 @@ REQUIRED_JS_PATTERNS = [
 def _fixture() -> Path | None:
     db = PR / "data/recognition_corpus/corpus.sqlite3"
     if not db.is_file():
-        return None
+        # 레거시 corpus DB 부재 — 카탈로그 표본으로 대체한다.
+        # 이게 없으면 감리가 조용히 SKIP 되어 안 돈 채 통과처럼 보인다.
+        from scripts.hwpx.web_office.hwpx_sample_source import (
+            resolve_sample as _catalog_sample)
+        return _catalog_sample()
     try:
         conn = sqlite3.connect(db)
         row = conn.execute("""

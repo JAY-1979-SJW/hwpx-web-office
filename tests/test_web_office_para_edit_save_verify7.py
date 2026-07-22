@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.hwpx.web_office.hwpx_sample_source import (  # noqa: E402
+    resolve_sample as resolve_hwpx_fixture)
+
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
@@ -61,27 +65,12 @@ def _target(pid: str) -> ParagraphTarget:
 
 
 def _hwpx_fixture() -> Path | None:
-    db = PR / "data/recognition_corpus/corpus.sqlite3"
-    if not db.is_file():
-        return None
-    try:
-        conn = sqlite3.connect(db)
-        row = conn.execute("""
-            SELECT d.source_path FROM hwpx_documents d
-            JOIN document_classifications c
-                ON c.document_id=d.document_id
-            WHERE d.inventory_status='FOUND'
-              AND c.document_type='fillable_form'
-              AND d.file_size BETWEEN 30000 AND 80000
-            ORDER BY d.first_seen_at LIMIT 1
-        """).fetchone()
-        conn.close()
-    except sqlite3.Error:
-        return None
-    if not row:
-        return None
-    p = PR / row[0]
-    return p if p.is_file() else None
+    """표본 HWPX — 레거시 corpus DB 가 없으면 카탈로그에서 고른다.
+
+    이 파일의 테스트는 문단을 합성해서 쓰므로(_make_para) 표본의 내부
+    구조에는 의존하지 않는다. 저장 대상 원본 파일로만 필요하다.
+    """
+    return resolve_hwpx_fixture()
 
 
 FIXTURE = _hwpx_fixture()

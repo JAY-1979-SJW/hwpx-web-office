@@ -10,6 +10,10 @@ import sys
 from pathlib import Path
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.hwpx.web_office.hwpx_sample_source import (  # noqa: E402
+    resolve_sample_with_cells as resolve_hwpx_fixture_with_cells)
+
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
@@ -32,20 +36,12 @@ def _sha(p: Path) -> str:
 
 
 def _fixture() -> Path | None:
-    db = PR / "data/recognition_corpus/corpus.sqlite3"
-    if not db.is_file():
-        return None
-    conn = sqlite3.connect(db)
-    row = conn.execute("""
-        SELECT d.source_path FROM hwpx_documents d
-        JOIN document_classifications c ON c.document_id=d.document_id
-        WHERE d.inventory_status='FOUND'
-          AND c.document_type='fillable_form'
-          AND d.file_size BETWEEN 30000 AND 80000
-        ORDER BY d.first_seen_at LIMIT 1
-    """).fetchone()
-    conn.close()
-    return (PR / row[0]) if row and (PR / row[0]).is_file() else None
+    """표본 HWPX — t_s0_000 의 (3,0)·(4,0) 셀을 실제로 가진 파일.
+
+    이 파일의 테스트는 좌표를 직접 집으므로(_find_cell) 구조 확인이 필요하다.
+    레거시 corpus DB 가 없으면 카탈로그에서 조건 충족분을 고른다.
+    """
+    return resolve_hwpx_fixture_with_cells(((3, 0), (4, 0)), "t_s0_000")
 
 
 FIXTURE = _fixture()
