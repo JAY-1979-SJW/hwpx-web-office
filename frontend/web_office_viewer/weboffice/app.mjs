@@ -22,12 +22,9 @@ export function mountWebOffice(root) {
     const e = $("[data-role=status]");
     e.dataset.k = k; e.textContent = msg;
   };
-  // "충실 보기"(좌표 렌더러, 한컴 원본 배치) vs "편집 모드"(흐름 렌더러).
-  // 기본은 충실 보기 — 흐름 렌더러의 텍스트 뭉침(blob)을 피한다.
-  const faithful = () => {
-    const c = $("[data-role=coordbg]");
-    return c ? c.checked : true;
-  };
+  // 충실 보기(좌표 렌더러)가 유일 표시 모드 — 원본 배치 충실 재현 + 셀 직접
+  // 편집. 좌표 레이아웃이 없는 문서(lineseg 미저장)만 흐름 렌더러로 폴백.
+  const faithful = () => coordLayout != null;
 
   async function fetchLayout(sourcePath) {
     if (!sourcePath) return null;
@@ -52,7 +49,7 @@ export function mountWebOffice(root) {
       renderSide();
       return;
     }
-    if (faithful() && coordLayout) {
+    if (coordLayout) {
       // 한컴 좌표 그대로 절대배치 — 원본 배치·서식 충실 재현 + 셀 직접 편집.
       // 편집된 셀은 새 텍스트 표시(getCellText), 셀 박스 클릭 시 인라인 편집.
       sheet.innerHTML = renderCoordinateLayout(coordLayout, {
@@ -130,9 +127,6 @@ export function mountWebOffice(root) {
     () => cell && cell.undo(render));
   $("[data-role=redo]").addEventListener("click",
     () => cell && cell.redo(render));
-  const guidesEl = $("[data-role=guides]");
-  if (guidesEl) guidesEl.addEventListener("change", render);
-  $("[data-role=coordbg]").addEventListener("change", render);
   $("[data-role=save]").addEventListener("click", async () => {
     if (!cell) return;
     setStatus("load", "저장 중(sandbox 사본 + readback 검증) …");

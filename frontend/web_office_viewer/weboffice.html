@@ -15,6 +15,7 @@
   button:hover:not(:disabled){ background:#eef3f8; } button:disabled{ color:#9aa6b2; cursor:not-allowed; opacity:.6; }
   .wo-bar button{ border-color:#5f7081; }
   .wo-chk{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:#cdd6df; }
+  .wo-hint{ font-size:12px; color:#8fa6bd; }
   .wo-status{ padding:7px 14px; font-size:13px; background:#fff; border-bottom:1px solid #d7dde3; min-height:32px; }
   .wo-status[data-k="ok"]{ color:#0b6b46; } .wo-status[data-k="fail"]{ color:#9f2d20; } .wo-status[data-k="load"]{ color:#2b5d94; }
   .wo-wrap{ display:flex; flex:1; min-height:0; }
@@ -66,7 +67,7 @@
     <button data-role="undo" type="button" disabled>↶ 실행취소</button>
     <button data-role="redo" type="button" disabled>↷ 재실행</button>
     <span class="wo-div"></span>
-    <label class="wo-chk"><input data-role="coordbg" type="checkbox" checked /> 충실 보기(원본 배치)</label>
+    <span class="wo-hint">원본 배치 충실 재현 · 셀 클릭 편집</span>
     <span class="wo-sp"></span>
     <button data-role="save" type="button" disabled>저장(sandbox)</button>
     <button data-role="download" type="button" disabled>편집본 다운로드</button>
