@@ -308,8 +308,25 @@ def extract(path):
         if tw > 0 and sw > 0:
             col_w = [w * tw / sw for w in col_w]
         sh = sum(row_h)
-        if th > 0 and sh > 0 and sh < th:
-            row_h = [h * th / sh for h in row_h]
+        if th > 0 and sh > 0:
+            if sh < th:
+                row_h = [h * th / sh for h in row_h]
+            elif sh > th * 1.02:
+                # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
+                # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
+                # 근사가 행을 부풀려 페이지가 배로 늘던 결함의 근본 보정.
+                min_need = [0.0] * nrow
+                for c in cells:
+                    if c["rowSpan"] == 1:
+                        need = min(c["hContent"] + c["mt"] * 2, c["hEff"])
+                        if need > min_need[c["row"]]:
+                            min_need[c["row"]] = need
+                slack = [max(0.0, row_h[i] - min_need[i])
+                         for i in range(nrow)]
+                tslack = sum(slack)
+                if tslack > 1e-6:
+                    k = min(1.0, (sh - th) / tslack)
+                    row_h = [row_h[i] - slack[i] * k for i in range(nrow)]
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
             col_x[i + 1] = col_x[i] + col_w[i]
