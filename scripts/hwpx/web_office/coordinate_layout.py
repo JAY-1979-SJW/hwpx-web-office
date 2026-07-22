@@ -6,6 +6,7 @@
 """
 import json
 import os
+import re
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
@@ -176,6 +177,19 @@ def extract(path):
                if "section0" in n.lower() and n.endswith(".xml")][0]
     root = ET.fromstring(z.read(secname))
     parent_map = {c: p for p in root.iter() for c in p}
+    # 표 문서순 인덱스 — 문서모델(ro_view_importer)의 tableId
+    # 't_s{sec}_{order:03d}' 와 동일 순서로 매겨 cellId 를 일치시킨다(편집 연결).
+    _sec_idx = 0
+    m_sec = re.search(r"section(\d+)", secname)
+    if m_sec:
+        _sec_idx = int(m_sec.group(1))
+    tbl_order = {}
+    for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
+        tbl_order[_t] = _i
+
+    def _cell_id(tbl, row, col):
+        return "cell_t_s%d_%03d_r%d_c%d" % (
+            _sec_idx, tbl_order.get(tbl, 0), row, col)
     border_fills = _parse_border_fills(z)
     char_prs = _parse_char_prs(z)
     para_aligns = _parse_para_aligns(z)
@@ -350,8 +364,19 @@ def extract(path):
         row_y = [0.0] * (nrow + 1)
         for i in range(nrow):
             row_y[i + 1] = row_y[i] + row_h[i]
+        # 행별 colAddr → 순차 col 인덱스 — 문서모델(ro_view)은 col 을 행 내
+        # 순차 번호(0,1,2…)로 매기므로 raw colAddr 갭(병합)을 압축해 맞춘다.
+        col_rank = {}
+        row_cols = {}
+        for c in cells:
+            row_cols.setdefault(c["row"], set()).add(c["col"])
+        for r, cs in row_cols.items():
+            for rank, ca in enumerate(sorted(cs)):
+                col_rank[(r, ca)] = rank
         table_bottom = base_y
         for c in cells:
+            cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]),
+                                                        c["col"]))
             cx = base_x + col_x[c["col"]]
             cy = base_y + row_y[c["row"]]
             cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
@@ -397,12 +422,13 @@ def extract(path):
                     "y": round(cy + c["mt"] + voff + cl["ry"], 1),
                     "w": round(wpx, 1), "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
-                    "cell": True}
+                    "cell": True, "cellId": cid}
                 if cl.get("align"):
                     cline["align"] = cl["align"]
                 lines.append(cline)
             box = {"x": round(cx, 1), "y": round(cy, 1),
-                   "w": round(cw, 1), "h": round(ch, 1)}
+                   "w": round(cw, 1), "h": round(ch, 1),
+                   "cellId": cid}
             bf = border_fills.get(c["bfRef"])
             if bf:
                 box["border"] = _border_sides_css(bf["sides"])

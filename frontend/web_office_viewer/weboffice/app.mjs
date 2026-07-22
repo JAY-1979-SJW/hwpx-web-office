@@ -53,9 +53,17 @@ export function mountWebOffice(root) {
       return;
     }
     if (faithful() && coordLayout) {
-      // 한컴 좌표 그대로 절대배치 — 원본 배치·서식 충실 재현(읽기 전용)
-      sheet.innerHTML = renderCoordinateLayout(coordLayout);
+      // 한컴 좌표 그대로 절대배치 — 원본 배치·서식 충실 재현 + 셀 직접 편집.
+      // 편집된 셀은 새 텍스트 표시(getCellText), 셀 박스 클릭 시 인라인 편집.
+      sheet.innerHTML = renderCoordinateLayout(coordLayout, {
+        editable: true,
+        getCellText: (id) => (cell ? cell.getCellText(id) : null),
+      });
       autoFitLines(sheet);
+      sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
+        box.addEventListener("click", () =>
+          cell.startEdit(box.dataset.cellId, box, render));
+      });
       root.classList.add("wo-faithful");
     } else {
       // 편집 모드 — 흐름 렌더러 + 셀 클릭 편집

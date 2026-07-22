@@ -28,6 +28,13 @@
   .co-line{ position:absolute; white-space:pre; overflow:clip; overflow-clip-margin:3px; }
   .co-box{ position:absolute; }
   .co-empty{ color:#8a94a0; text-align:center; padding:40px; }
+  /* 충실 보기 편집: 줄은 클릭 통과, 셀 박스가 편집 대상 */
+  .wo-app.wo-faithful .co-line{ pointer-events:none; }
+  .wo-app.wo-faithful .co-box[data-cell-id]{ cursor:text; }
+  .wo-app.wo-faithful .co-box[data-cell-id]:hover{ background:rgba(45,108,223,.07); }
+  .co-box.wo-editing{ z-index:5; background:#fff; }
+  .co-box .wo-cell-inp{ position:absolute; inset:0; width:100%; height:100%; border:2px solid #2d6cdf; padding:2px 4px; font:13px/1.4 "Malgun Gothic",sans-serif; box-sizing:border-box; }
+  .co-edited{ color:#12313a; }
   .wo-side{ width:290px; border-left:1px solid #d7dde3; background:#fbfcfd; padding:13px; overflow:auto; }
   .wo-side h3{ font-size:13px; margin:0 0 7px; color:#42505e; }
   .wo-drop{ border:2px dashed #b8c2cc; border-radius:10px; padding:14px; text-align:center; color:#66717d; background:#fafbfc; margin-bottom:14px; font-size:13px; }

@@ -62,11 +62,25 @@ export function autoFitLines(root) {
   });
 }
 
-export function renderCoordinateLayout(layout) {
+/* opts (모두 선택):
+ *   editable         : true 면 셀 박스에 data-cell-id 부여(클릭 편집 대상)
+ *   getCellText(id)  : 편집된 셀 텍스트(없으면 null). 편집된 셀은 원본 줄을
+ *                      숨기고 이 텍스트를 박스 안에 렌더한다.
+ */
+export function renderCoordinateLayout(layout, opts = {}) {
   if (!layout) return '<p class="co-empty">레이아웃 없음.</p>';
   const W = layout.pageWidthPx, H = layout.pageHeightPx || 1;  // 0 나눗셈 가드
   const pages = layout.pages || 1;
   const defs = layout.charPrDefs || {};
+  const getCellText = opts.getCellText || (() => null);
+  const boxByCell = new Map();       // cellId → box (편집 텍스트 렌더 위치)
+  const editedIds = new Set();       // 편집된 셀(원본 줄 숨김)
+  for (const b of layout.boxes || []) {
+    if (b.cellId && !boxByCell.has(b.cellId)) boxByCell.set(b.cellId, b);
+  }
+  for (const cid of boxByCell.keys()) {
+    if (getCellText(cid) != null) editedIds.add(cid);
+  }
   const parts = [];
   for (let pi = 0; pi < pages; pi++) {
     const yTop = pi * H;
@@ -84,12 +98,15 @@ export function renderCoordinateLayout(layout) {
         bd = "border:0.6px solid #e2e6ea;";
       }
       const fill = b.fill ? `background:${b.fill};` : "";
-      parts.push(`<div class="co-box" style="left:${b.x}px;`
+      const editAttr = (opts.editable && b.cellId)
+        ? ` data-cell-id="${esc(b.cellId)}"` : "";
+      parts.push(`<div class="co-box"${editAttr} style="left:${b.x}px;`
         + `top:${(b.y - yTop).toFixed(1)}px;width:${b.w}px;`
         + `height:${b.h}px;${bd}${fill}"></div>`);
     }
     for (const l of layout.lines || []) {
       if (Math.floor(l.y / H) !== pi) continue;
+      if (l.cellId && editedIds.has(l.cellId)) continue;  // 편집셀 원본 숨김
       const fs = Math.max(7, l.h * 0.72);
       // line-height 는 반드시 박스 높이와 같게 둔다. 더 크게 주면
       // overflow:hidden 이 글자 위/아래(받침 포함)를 세로로 잘라 문자가
@@ -99,6 +116,18 @@ export function renderCoordinateLayout(layout) {
         + `top:${(l.y - yTop).toFixed(1)}px;width:${l.w}px;`
         + `height:${l.h}px;line-height:${l.h}px;${al}">`
         + `${segmentsHtml(l, defs, fs)}</div>`);
+    }
+    // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더
+    for (const cid of editedIds) {
+      const b = boxByCell.get(cid);
+      if (!b || Math.floor(b.y / H) !== pi) continue;
+      const t = getCellText(cid);
+      parts.push(`<div class="co-line co-edited" style="left:${b.x + 3}px;`
+        + `top:${(b.y - yTop + 2).toFixed(1)}px;width:${Math.max(10, b.w - 6)}px;`
+        + `height:${Math.max(12, b.h - 4)}px;line-height:1.3;`
+        + `white-space:pre-wrap;font-size:10pt">`
+        + `<span class="co-in" style="display:inline-block">${esc(t)}`
+        + `</span></div>`);
     }
     parts.push("</div>");
   }

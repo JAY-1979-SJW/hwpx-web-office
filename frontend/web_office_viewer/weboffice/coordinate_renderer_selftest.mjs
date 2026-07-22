@@ -116,6 +116,28 @@ assert(al.includes("→") && !al.includes(""),
   "Wingdings PUA arrow normalized to unicode →");
 checks.alignAndSymbol = true;
 
+// 9) 편집 연결 — editable 시 셀 박스에 data-cell-id, getCellText 로 편집셀
+//    원본 줄 숨기고 새 텍스트 렌더.
+const ed = renderCoordinateLayout({
+  pageWidthPx: 400, pageHeightPx: 400, pages: 1,
+  boxes: [{ x: 0, y: 0, w: 100, h: 20, cellId: "cell_t_s0_000_r0_c0" }],
+  lines: [{ text: "원본", x: 0, y: 0, w: 100, h: 20,
+            cellId: "cell_t_s0_000_r0_c0",
+            segments: [{ text: "원본", charPr: null }] }],
+}, { editable: true,
+     getCellText: (id) => (id === "cell_t_s0_000_r0_c0" ? "수정됨" : null) });
+assert(ed.includes('data-cell-id="cell_t_s0_000_r0_c0"'),
+  "editable 시 박스에 data-cell-id");
+assert(ed.includes("수정됨") && !ed.includes("원본"),
+  "편집셀 원본 숨기고 새 텍스트 렌더");
+// editable 아니면 data-cell-id 없음(읽기 전용)
+const ro = renderCoordinateLayout({
+  pageWidthPx: 400, pageHeightPx: 400, pages: 1,
+  boxes: [{ x: 0, y: 0, w: 100, h: 20, cellId: "cell_x" }], lines: [],
+});
+assert(!ro.includes("data-cell-id"), "non-editable 은 data-cell-id 없음");
+checks.editableCells = true;
+
 console.log(JSON.stringify({
   task: "HWPX-COORD-RENDERER-SELFTEST", checks, verdict: "PASS",
 }));
