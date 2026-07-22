@@ -84,6 +84,46 @@ def test_nested_table_placed_at_container_not_top():
         f"중첩표가 상단으로 유출됨: {[(l['text'], round(l['y'])) for l in flow]}"
 
 
+def test_table_total_size_matches_declared_sz():
+    """WEB-OFFICE-COORD-FIDELITY-04 — 렌더된 표 총 폭/높이가 한컴 선언
+    치수(tbl>sz)와 일치하는지(±1.5%). 셀 폭 합 근사 오차가 표 전체로
+    누적되지 않도록 sz 정규화 회귀 가드."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+    HU = 96 / 7200
+
+    def lname(t):
+        return t.rsplit("}", 1)[-1]
+
+    z = zipfile.ZipFile(str(PR / FORM))
+    sec = [n for n in z.namelist()
+           if "section0" in n.lower() and n.endswith(".xml")][0]
+    root = ET.fromstring(z.read(sec))
+    pm = {c: p for p in root.iter() for c in p}
+
+    def top_level(el):
+        x = pm.get(el)
+        while x is not None:
+            if lname(x.tag) == "tbl":
+                return False
+            x = pm.get(x)
+        return True
+    tbl = next(e for e in root.iter()
+               if lname(e.tag) == "tbl" and top_level(e))
+    sz = next((c.attrib for c in tbl if lname(c.tag) == "sz"), {})
+    decl_w = float(sz.get("width", "0")) * HU
+    decl_h = float(sz.get("height", "0")) * HU
+
+    out = extract(str(PR / FORM))
+    bx = out["boxes"]
+    w = max(b["x"] + b["w"] for b in bx) - min(b["x"] for b in bx)
+    h = max(b["y"] + b["h"] for b in bx) - min(b["y"] for b in bx)
+    assert abs(w - decl_w) / decl_w < 0.015, \
+        f"표 폭 {w:.1f} vs 선언 {decl_w:.1f} ({(w/decl_w-1)*100:+.1f}%)"
+    assert abs(h - decl_h) / decl_h < 0.015, \
+        f"표 높이 {h:.1f} vs 선언 {decl_h:.1f} ({(h/decl_h-1)*100:+.1f}%)"
+
+
 def test_header_cells_have_gray_fill():
     """WEB-OFFICE-COORD-FIDELITY-03 — 헤더 셀 배경(fillBrush)이 반출되는지."""
     out = extract(str(PR / FORM))

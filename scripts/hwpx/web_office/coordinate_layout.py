@@ -280,6 +280,17 @@ def extract(path):
         nrow = max((c["row"] + c["rowSpan"] for c in cells), default=1)
         col_w = _solve_axis(cells, ncol, "col", "colSpan", "w")
         row_h = _solve_axis(cells, nrow, "row", "rowSpan", "h")
+        # 한컴이 선언한 표 총 크기(sz)에 정규화 — 셀 폭/높이 합의 근사 오차가
+        # 표 전체 폭·높이로 누적되지 않도록 비례 보정(저장 치수 신뢰).
+        sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
+        tw = float(sz.get("width", "0")) * HU
+        th = float(sz.get("height", "0")) * HU
+        sw = sum(col_w)
+        if tw > 0 and sw > 0:
+            col_w = [w * tw / sw for w in col_w]
+        sh = sum(row_h)
+        if th > 0 and sh > 0:
+            row_h = [h * th / sh for h in row_h]
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
             col_x[i + 1] = col_x[i] + col_w[i]
