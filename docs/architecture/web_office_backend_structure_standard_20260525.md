@@ -53,10 +53,12 @@ The backend API surface is limited to:
 - `POST /api/web-office/hwpx-upload` — 브라우저 파일선택/드래그 업로드(WEB-OFFICE-UPLOAD-01). 사용자가 고른 파일 바이트만 수신 → sandbox(`tmp/web_office_uploads/`)에 내용해시 파일명으로 기록 → hwpx-load 동일 파이프. 서버는 사용자 PC 경로 미접근, 확장자·zip컨테이너·크기(기본 30MB) 검증, 원본 무수정
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` — lineseg 좌표 레이아웃(한컴 미사용, read-only)
+- `GET /api/web-office/truth-page` — 한컴 실렌더 페이지 PNG('원본 그대로' 표시 배경). 내용해시 캐시, 프로젝트-상대 경로만, 한컴 미설치 환경 404 → 좌표 렌더 폴백
 - `POST /api/web-office/ai-fill` — AI 자동채움 값 제안(§9 Claude Code CLI Haiku only; AI inject 없이 자동 실행 금지)
 - `POST /api/web-office/source-extract` — 소스 이미지(사업자등록증 등) OCR; PII 원문 미출력, 마스킹 미리보기만
 - `GET /api/web-office/catalog-stats` — 카탈로그 통계(read-only SQLite `mode=ro`)
 - `GET /api/web-office/catalog-categories` — 도메인 분류 목록(read-only)
+- `GET /api/web-office/catalog-institutions` — 기관·부처별 서식 수(read-only, UI 필터)
 - `POST /api/web-office/catalog-search` — 키워드 검색(read-only)
 - `POST /api/web-office/catalog-match` — 업로드 서식 ↔ 카탈로그 대조(read-only)
 - `POST /api/web-office/catalog-by-category` — 도메인별 서식 조회(read-only)

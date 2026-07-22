@@ -91,14 +91,32 @@ def _extract_section(path, secname):
             b = (int(segs[i + 1].get("textpos", "0") or "0")
                  if i + 1 < len(segs) else len(txt))
             line_txt = txt[a:b]
-            if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
-                st["page_idx"] += 1  # vpos 리셋 → 새 페이지
-            st["prev_vpos"] = vpos
+            # 페이지 상태머신은 가시 줄만 구동 — 빈 문단(공백 줄)은 페이지를
+            # 만들지 않는다. 문서 끝의 빈 문단 수백 개가 vpos 리셋을 반복해
+            # 유령 페이지 6쪽+를 만들던 결함(한컴은 빈 문단으로 쪽을 늘리지
+            # 않음 — 별지2: 한컴 12쪽 vs 우리 18쪽의 근본 원인).
+            _vis = bool(line_txt.strip())
+            if _vis:
+                if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
+                    st["page_idx"] += 1  # vpos 리셋 → 새 페이지
+                st["prev_vpos"] = vpos
             y = (st["page_idx"] * page_h) + m_top + vpos * HU
             x = m_left + float(s.get("horzpos", "0")) * HU
             w = float(s.get("horzsize", "0")) * HU
             h = float(s.get("vertsize", "1000")) * HU
             bl = float(s.get("baseline", "0")) * HU
+            # 흐름 불변식 — 문단은 선행 내용(표 하단 flow_y) 위에 올라앉을 수
+            # 없다. 표가 여러 페이지를 쓰면 뒤 본문을 같은 vpos 로 다음
+            # 페이지에 놓는다(한컴 배치: 각주 vpos 는 표가 끝난 페이지 기준).
+            # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
+            # 증가), 1.5줄 이상 실침범 시에만 발동.
+            if i == 0 and page_h > 0 and line_txt.strip():
+                _guard = 0
+                while (y < st["flow_y"] - max(h * 1.5, 20.0)
+                        and _guard < 6):
+                    st["page_idx"] += 1
+                    y = (st["page_idx"] * page_h) + m_top + vpos * HU
+                    _guard += 1
             line = {"text": line_txt,
                     "segments": slice_segments(txt, spans, a, b),
                     "x": round(x, 1),
@@ -108,7 +126,8 @@ def _extract_section(path, secname):
             if align:
                 line["align"] = align
             lines.append(line)
-            st["max_y"] = max(st["max_y"], y + h)
+            if _vis:
+                st["max_y"] = max(st["max_y"], y + h)
         st["flow_y"] = st["max_y"]
 
     def _cell_info(tc):
@@ -186,8 +205,28 @@ def _extract_section(path, secname):
         tw = sane_hu(sz.get("width", "0"))
         th = sane_hu(sz.get("height", "0"))
         col_w, row_h = normalize_declared(cells, col_w, row_h, tw, th, nrow)
-        row_h, alpha = compress_to_anchor(
-            cells, row_h, nrow, base_y, anchor_vpos, geo)
+        # 높이0 반복 헤더행 접기 — 한컴 '표 머리행 반복'의 저장 잔재(전 셀
+        # cellSz=0)를 흐름 중간에 평행으로 그리면 페이지 꼬리 문구와 겹친다.
+        # 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음). 페이지 수 왜곡도
+        # 제거된다.
+        _zero_rows = set()
+        _zr = {}
+        for c in cells:
+            if c["rowSpan"] == 1:
+                _zr.setdefault(c["row"], True)
+                if c["h"] > 0:
+                    _zr[c["row"]] = False
+        for _r, _az in _zr.items():
+            if _az and _r > 0:
+                _zero_rows.add(_r)
+                row_h[_r] = 0.0
+        # 표 압축 폐지 — 원본 해부 결과 한컴은 다중페이지 표를 압축하지 않고
+        # 페이지를 늘린다(검증: cellSz 합 2091 = p1 964+p2 1009+p3 118,
+        # 각주 저장 vpos 239 = p3 표 하단 바로 아래 — 픽셀 정합). 행은
+        # cellSz(한컴 저장 실높이) 그대로 두고, 표 뒤 본문은 emit_para 의
+        # 흐름 불변식이 올바른 페이지로 보낸다. (α압축은 2쪽 오가정 위에서
+        # 행을 글리프 밀착까지 눌러 서식이 뭉개지는 결함이었다)
+        alpha = 0.0
         if os.environ.get("COORD_DEBUG"):
             print(f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
                   f"nrow={nrow} ncol={ncol} th={th:.0f} a={alpha:.3f} "
@@ -200,13 +239,40 @@ def _extract_section(path, secname):
         col_rank = col_rank_map(cells)
         table_bottom = base_y
         for c in cells:
+            if c["rowSpan"] == 1 and c["row"] in _zero_rows:
+                continue   # 접힌 반복 헤더행 — 비표시
             cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]),
                                                         c["col"]))
             cx = base_x + col_x[c["col"]]
             cy = row_abs[c["row"]]
             cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
             _last = min(c["row"] + c["rowSpan"], nrow) - 1
-            ch = row_bot[_last] - row_abs[c["row"]]
+            # 병합 셀이 페이지 점프에 걸치면 연속 구간(조각)으로 분해 —
+            # 한컴의 병합 셀 페이지 분할 재현. 조각마다 박스를 따로 그리고,
+            # 셀 내용 줄은 조각을 잇는 연속 오프셋 공간에 매핑한다.
+            frags = []           # [(y_top, height)] 페이지별 연속 구간
+            _fs = c["row"]
+            for r2 in range(c["row"], _last + 1):
+                if (r2 < _last
+                        and abs(row_abs[r2 + 1] - row_bot[r2]) > 0.5):
+                    frags.append((row_abs[_fs], row_bot[r2] - row_abs[_fs]))
+                    _fs = r2 + 1
+            frags.append((row_abs[_fs], row_bot[_last] - row_abs[_fs]))
+            ch = sum(f[1] for f in frags)      # 가시 높이(페이지 갭 제외)
+
+            def _y_at(off, lh=0.0, _frags=frags):
+                """셀 내용 오프셋 → 절대 y (조각 경계를 건너 연속 매핑).
+
+                lh(줄 높이)를 주면 줄이 조각 절단면에 걸칠 때 한컴처럼 줄
+                전체를 다음 조각(다음 페이지) 시작으로 넘긴다 — 글리프가
+                페이지 절단면에서 반쯤 잘리는 것을 방지."""
+                cum = 0.0
+                for _k, (fy, fh) in enumerate(_frags):
+                    if _k == len(_frags) - 1 or off + lh <= cum + fh + 1.0:
+                        # 이월된 줄은 조각 상단에 클램프(음수 오프셋 방지)
+                        return fy + max(0.0, off - cum)
+                    cum += fh
+                return _frags[-1][0] + max(0.0, off - cum)
             # 이 셀 직속 문단만 (중첩표 안 문단 제외)
             cell_lines = []
             for cp in c["tc"].iter():
@@ -259,30 +325,34 @@ def _extract_section(path, secname):
                     "text": cl["text"],
                     "segments": cl.get("segments", []),
                     "x": round(line_x, 1),
-                    "y": round(cy + mt_eff + voff + cl["ryEff"], 1),
+                    "y": round(_y_at(mt_eff + voff + cl["ryEff"],
+                                     cl["h"]), 1),
                     "w": round(wpx, 1), "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
                     "cell": True, "cellId": cid}
                 if cl.get("align"):
                     cline["align"] = cl["align"]
                 lines.append(cline)
-            box = {"x": round(cx, 1), "y": round(cy, 1),
-                   "w": round(cw, 1), "h": round(ch, 1),
-                   "cellId": cid}
             bf = border_fills.get(c["bfRef"])
-            if bf:
-                box["border"] = border_sides_css(bf["sides"])
-                if bf.get("fill"):
-                    box["fill"] = bf["fill"]
-            boxes.append(box)
+            for _fi, (fy, fh) in enumerate(frags):
+                box = {"x": round(cx, 1), "y": round(fy, 1),
+                       "w": round(cw, 1), "h": round(fh, 1),
+                       "cellId": cid}
+                if _fi > 0:
+                    box["frag"] = _fi   # 병합 셀의 다음 페이지 연속 조각
+                if bf:
+                    box["border"] = border_sides_css(bf["sides"])
+                    if bf.get("fill"):
+                        box["fill"] = bf["fill"]
+                boxes.append(box)
             # 직속 중첩표 재귀 배치 — voff(세로정렬 오프셋)를 본문 줄과 동일
             # 하게 더한다. 안 그러면 vAlign=CENTER 셀에서 본문만 내려가 겹친다.
             # α 압축 시 여백 절반화 근사(다중페이지 표 안 중첩표는 코퍼스에
             # 드묾; 위치만 완만히 당긴다)
             for nt, nvpos, _ in nested:
                 walk_table(nt, cx + c["ml"],
-                           cy + mt_eff + voff + nvpos * (1.0 - 0.5 * alpha))
-            table_bottom = max(table_bottom, cy + ch)
+                           _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * alpha)))
+            table_bottom = max(table_bottom, row_bot[_last])
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
         # 통합 페이지 추적 — 본문(page_idx×page_h+vertpos)과 표(flow_y)가
@@ -411,6 +481,35 @@ def _extract_section(path, secname):
     walk(root)
     total_pages = max(st["page_idx"] + 1,
                       int(math.ceil(st["max_y"] / page_h)) if page_h else 1)
+    # 페이지별 복구·출력 — 전역 y 를 페이지-로컬 좌표로 재조립한다.
+    # 렌더러는 각 페이지를 독립 단위로 그리므로 전역 y 슬라이싱(경계 번짐·
+    # 갭 흡수류 결함의 뿌리)이 사라진다. 잔여 걸침 박스(페이지보다 큰
+    # 블록)는 여기서 페이지별 조각으로 최종 분할한다. 전역 lines/boxes 는
+    # 감사·회귀 호환을 위해 병행 유지.
+    pages_detail = [{"no": i + 1, "lines": [], "boxes": []}
+                    for i in range(total_pages)]
+    if page_h > 0:
+        for l in lines:
+            p = int(l["y"] // page_h)
+            if 0 <= p < total_pages:
+                q = dict(l)
+                q["y"] = round(l["y"] - p * page_h, 1)
+                pages_detail[p]["lines"].append(q)
+        for b in boxes:
+            top, bot = b["y"], b["y"] + b["h"]
+            p0 = max(int(top // page_h), 0)
+            p1 = min(int((bot - 0.1) // page_h), total_pages - 1)
+            for p in range(p0, p1 + 1):
+                py0 = max(top, p * page_h)
+                py1 = min(bot, (p + 1) * page_h)
+                if py1 - py0 < 0.5:
+                    continue
+                q = dict(b)
+                q["y"] = round(py0 - p * page_h, 1)
+                q["h"] = round(py1 - py0, 1)
+                if p > p0 or b.get("frag"):
+                    q["frag"] = 1
+                pages_detail[p]["boxes"].append(q)
     return {
         "pageWidthPx": round(page_w, 1),
         "pageHeightPx": round(page_h, 1),
@@ -419,6 +518,7 @@ def _extract_section(path, secname):
         "pages": total_pages,
         "lines": lines,
         "boxes": boxes,
+        "pagesDetail": pages_detail,
         "charPrDefs": char_prs,
     }
 
@@ -438,7 +538,7 @@ def extract(path):
     if len(sec_files) <= 1:
         return _extract_section(path, sec_files[0])
 
-    merged_lines, merged_boxes = [], []
+    merged_lines, merged_boxes, merged_pd = [], [], []
     page_base = 0
     first = None
     for sec in sec_files:
@@ -452,9 +552,14 @@ def extract(path):
         for box in r["boxes"]:
             box["y"] = round(box["y"] + off, 1)
             merged_boxes.append(box)
+        for pd in r.get("pagesDetail", []):
+            pd = dict(pd)
+            pd["no"] = page_base + pd["no"]
+            merged_pd.append(pd)
         page_base += r["pages"]
     out = dict(first)
-    out.update(pages=page_base, lines=merged_lines, boxes=merged_boxes)
+    out.update(pages=page_base, lines=merged_lines, boxes=merged_boxes,
+               pagesDetail=merged_pd)
     return out
 
 
@@ -466,6 +571,43 @@ PROJECT_ROOT = _pathlib.Path(__file__).resolve().parents[3]
 def extract_layout(path):
     """공개 API 별칭 (extract 와 동일)."""
     return extract(path)
+
+
+def layout_quality(layout):
+    """레이아웃 자가진단 — 셀 물림·본문 겹침을 페이지-로컬 기준으로 계량.
+
+    로드마다 서버가 계산해 응답에 실어, 품질 저하가 조용히 지나가지 않고
+    뷰어 상태줄에 즉시 드러나게 한다(사용자가 매번 수동 검증할 필요 제거).
+    """
+    viol = 0
+    max_over = 0.0
+    ovl = 0
+    for pd in layout.get("pagesDetail", []):
+        pb = {}
+        for b in pd["boxes"]:
+            cid = b.get("cellId")
+            if cid:
+                pb.setdefault(cid, []).append(b)
+        for l in pd["lines"]:
+            cid = l.get("cellId")
+            if cid and cid in pb:
+                if not any(b["y"] - 1.5 <= l["y"]
+                           and l["y"] + l["h"] <= b["y"] + b["h"] + 1.5
+                           for b in pb[cid]):
+                    viol += 1
+                    max_over = max(max_over, min(
+                        abs(l["y"] + l["h"] - (b["y"] + b["h"]))
+                        for b in pb[cid]))
+            elif not l.get("cell") and (l.get("text") or "").strip():
+                if any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13
+                       for b in pd["boxes"]):
+                    ovl += 1
+    return {
+        "cellOverflow": viol,
+        "cellOverflowMaxPx": round(max_over, 1),
+        "bodyOverlap": ovl,
+        "ok": ovl == 0 and (viol == 0 or max_over <= 3.0),
+    }
 
 
 def build_layout(request, *, project_root=PROJECT_ROOT):
@@ -490,9 +632,40 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         return {"verdict": "REJECTED", "reason": "NOT_HWPX"}
     if not cand.is_file():
         return {"verdict": "REJECTED", "reason": "NOT_FOUND"}
-    layout = extract(str(cand))
+    # 한컴 좌표 정규화(가용 시) — 문서마다 제각각인 저장 좌표 신선도를
+    # 한컴 재조판으로 통일해 로드 즉시 정확 렌더. 실패/미설치면 원본 추출.
+    # 표시 전용: sourcePath(편집·저장 대상)는 원본 유지.
+    extract_from = cand
+    normalized = False
+    try:
+        from .hancom_layout_refresh import normalize_for_layout
+        norm = normalize_for_layout(cand, project_root=root)
+        if norm != cand and norm.is_file():
+            extract_from = norm
+            normalized = True
+    except Exception:
+        pass
+    layout = extract(str(extract_from))
     layout["verdict"] = "PASS"
     layout["sourcePath"] = cand.relative_to(root).as_posix()
+    layout["hancomNormalized"] = normalized
+    layout["quality"] = layout_quality(layout)   # 로드 자가진단(상태줄 표시)
+    # 실렌더 배경 정합 스냅 — truth 캐시가 있으면 편집 오버레이(셀 박스)를
+    # 배경의 실제 격자선에 흡착(클릭 타깃 픽셀 정렬). 품질 계산 뒤에 수행
+    # (품질은 스냅 전 자체 렌더 기준 유지).
+    try:
+        from .hancom_layout_refresh import snap_layout_to_truth, _truth_dir
+        import hashlib as _hl
+        layout["truthAligned"] = snap_layout_to_truth(
+            layout, cand, project_root=root)
+        # 한컴 실제 쪽수(캐시 존재 시) — 뷰어가 배경 모드 안전 여부 판단
+        _dig = _hl.sha256(cand.read_bytes()).hexdigest()[:16]
+        _done = _truth_dir(root) / _dig / "DONE"
+        layout["hancomPages"] = (int(_done.read_text(encoding="ascii"))
+                                 if _done.is_file() else None)
+    except Exception:
+        layout["truthAligned"] = False
+        layout["hancomPages"] = None
     return layout
 
 

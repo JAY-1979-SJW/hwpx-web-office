@@ -44,11 +44,12 @@ def expand_rowspan_content(cells, row_h, nrow):
                 if 0 <= i < nrow]
         if not idxs:
             continue
+        # 내용 수용 하드 불변식 — 셀은 자기 내용(본문 줄)을 반드시 담는다.
+        # 이전의 cellSz 상한은 병합 셀 내용이 선언높이보다 클 때 줄이 셀
+        # 밖으로 밀리는 물림(문자·테두리 겹침)을 남겼다. 겹침은 페이지 수
+        # 오차보다 치명적이므로 상한 없이 내용만큼 확장한다. 단 중첩표
+        # 추정치(과대 가능)는 실측 줄 기반 하한(hCompact)과 병행 판단.
         need = c["hContent"] + c["mt"] * 2
-        # 선언 병합높이(cellSz)가 있으면 상한 — 내용 과대(중첩표 포함
-        # 근사치)로 표가 부풀어 페이지가 늘어나는 것을 방지.
-        if c["h"] > 0:
-            need = min(need, max(c["h"], 0.0))
         alloc = sum(row_h[i] for i in idxs)
         if need > alloc + 0.5:
             add = (need - alloc) / len(idxs)
@@ -66,7 +67,11 @@ def normalize_declared(cells, col_w, row_h, tw, th, nrow):
     if tw > 0 and sw > 0:
         col_w = [w * tw / sw for w in col_w]
     sh = sum(row_h)
-    if th > 0 and sh > 0:
+    # 선언 표높이(th)가 행합의 2/3에도 못 미치면 stale(구버전 잔존값) —
+    # 무시한다. cellSz(행별 저장 실높이)가 한컴 실배치와 일치함이 다중
+    # 문서 픽셀 감사로 검증됨. stale th 로 축소하면 행이 내용 밀착까지
+    # 눌려 서식이 뭉개진다. th-정규화는 근소 인플레이션(≤1.5x)만 보정.
+    if th > 0 and sh > 0 and sh <= th * 1.5:
         if sh > th * 1.02:
             # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
             # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
@@ -184,31 +189,15 @@ def compress_to_anchor(cells, row_h, nrow, base_y, anchor_vpos, geo):
     return row_h, alpha
 
 
-def _row_blocks(cells, nrow):
-    """rowSpan 병합 구간 → 블록 매핑 {row: (start, end)} (겹치면 합침)."""
-    _iv = sorted((c["row"], min(c["row"] + c["rowSpan"], nrow))
-                 for c in cells if c["rowSpan"] > 1)
-    _blocks = []
-    for s, e in _iv:
-        if _blocks and s < _blocks[-1][1]:
-            _blocks[-1][1] = max(_blocks[-1][1], e)
-        else:
-            _blocks.append([s, e])
-    blk_of = {}
-    for s, e in _blocks:
-        for i in range(s, e):
-            blk_of[i] = (s, e)
-    return blk_of
-
-
 def paginate_rows(cells, row_h, nrow, base_y, geo):
     """규격 기반 행 페이지네이션 → (row_abs, row_bot).
 
     - 행이 콘텐츠 영역(m_top ~ m_top+content_h)을 넘고 한 페이지에 들어가면
       통째로 다음 페이지 콘텐츠 상단으로 이동(한컴: 행은 페이지에 걸쳐
-      쪼개지지 않는다).
-    - rowSpan 병합 구간은 블록 통째로 이동(병합 셀 박스가 페이지 경계에
-      걸쳐 다음 페이지 위로 번져 겹쳐 보이는 결함 방지).
+      쪼개지지 않는다). 행 단위로만 점프한다 — 병합(rowSpan) 셀이 점프에
+      걸치면 방출부가 박스를 페이지별 조각으로 분할해 그린다(한컴의 병합 셀
+      페이지 분할 재현; 블록 통째 이월은 페이지 낭비 슬랙으로 표 하단이
+      앵커를 넘는 결함이 있어 폐기).
     - keep-with-table: 표 머리 몇 행(누적 12% 미만)만 남기고 본체가 점프하면
       표 전체를 다음 페이지 상단으로(서식 마커·제목 행이 표와 분리 방지).
     - row_bot 은 페이지 갭 미포함 행 하단 — 셀 박스 높이가 점프 갭을
@@ -217,30 +206,23 @@ def paginate_rows(cells, row_h, nrow, base_y, geo):
     page_h = geo["page_h"]
     m_top = geo["m_top"]
     content_h = geo["content_h"]
-    blk_of = _row_blocks(cells, nrow)
-
     def _paginate(start_y):
         ra = [start_y] * (nrow + 1)
         cur = start_y
         first_jump_at = None
         placed = 0.0
-        i2 = 0
-        while i2 < nrow:
-            s, e = blk_of.get(i2, (i2, i2 + 1))
-            bh = sum(row_h[s:e])
+        for i in range(nrow):
             if page_h > 0:
                 _pg = int(cur // page_h)
                 _cbot = _pg * page_h + m_top + content_h
-                if (cur + bh > _cbot + 1.0
-                        and bh <= content_h + 1.0):
+                if (cur + row_h[i] > _cbot + 1.0
+                        and row_h[i] <= content_h + 1.0):
                     if first_jump_at is None:
                         first_jump_at = placed
                     cur = (_pg + 1) * page_h + m_top
-            for j in range(s, e):
-                ra[j] = cur
-                cur += row_h[j]
-                placed += row_h[j]
-            i2 = e
+            ra[i] = cur
+            cur += row_h[i]
+            placed += row_h[i]
         ra[nrow] = cur
         return ra, first_jump_at
 

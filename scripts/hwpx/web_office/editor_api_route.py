@@ -211,8 +211,16 @@ def call_catalog_stats() -> dict[str, Any]:
 
 def call_catalog_search(request: dict[str, Any]) -> dict[str, Any]:
     from .catalog_search import search
-    return _envelope("SUCCESS", search(str(request.get("query") or ""),
-                                       limit=int(request.get("limit") or 20)))
+    return _envelope("SUCCESS", search(
+        str(request.get("query") or ""),
+        limit=int(request.get("limit") or 20),
+        institution=request.get("institution") or None))
+
+
+def call_catalog_institutions() -> dict[str, Any]:
+    """기관/부처 목록(서식 수 포함) — 카탈로그 UI 필터용."""
+    from .catalog_search import institutions
+    return _envelope("SUCCESS", institutions())
 
 
 def call_catalog_match(request: dict[str, Any]) -> dict[str, Any]:
@@ -316,6 +324,7 @@ if _FASTAPI_AVAILABLE:
     class CatalogSearchRequest(BaseModel):
         query: str = ""
         limit: int = 20
+        institution: str | None = None
 
     class CatalogMatchRequest(BaseModel):
         fingerprint: str | None = None
@@ -346,6 +355,16 @@ def create_app() -> Any:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
+
+    # 정적 자원(no-cache) — 브라우저가 .mjs/.html 을 휴리스틱 캐시해 코드
+    # 갱신이 화면에 반영되지 않는 문제를 차단한다. no-cache 는 매 요청
+    # 재검증(304 활용)이라 성능 손실은 미미하고 항상 최신 코드가 실린다.
+    @app.middleware("http")
+    async def _static_no_cache(request, call_next):
+        resp = await call_next(request)
+        if request.url.path.startswith("/web-office"):
+            resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return resp
 
     @app.get("/api/web-office/health")
     def health() -> dict[str, Any]:
@@ -378,6 +397,33 @@ def create_app() -> Any:
     def source_extract(req: SourceExtractRequest) -> dict[str, Any]:
         return call_source_extract(req.model_dump())
 
+    @app.get("/api/web-office/truth-page")
+    def truth_page(src: str, page: int = 1):
+        """한컴 실렌더 페이지 PNG — '원본 그대로' 표시 모드 배경.
+
+        src 는 프로젝트-상대 .hwpx 만 허용(경로 탈출 차단). 한컴 미설치/
+        실패 시 404 → 뷰어는 좌표(로직) 렌더로 폴백한다."""
+        from .hancom_layout_refresh import render_truth_pages
+        root = PROJECT_ROOT.resolve()
+        req = Path(str(src))
+        if req.is_absolute():
+            return JSONResponse(status_code=404,
+                                content={"error": "ABS_PATH"})
+        cand = (root / req).resolve()
+        if root not in cand.parents or cand.suffix.lower() != ".hwpx" \
+                or not cand.is_file():
+            return JSONResponse(status_code=404,
+                                content={"error": "NOT_FOUND"})
+        out_dir = render_truth_pages(cand, project_root=root)
+        if out_dir is None:
+            return JSONResponse(status_code=404,
+                                content={"error": "TRUTH_UNAVAILABLE"})
+        png = out_dir / f"p{int(page)}.png"
+        if not png.is_file():
+            return JSONResponse(status_code=404,
+                                content={"error": "PAGE_OUT_OF_RANGE"})
+        return FileResponse(str(png), media_type="image/png")
+
     @app.get("/api/web-office/download/{filename}")
     def download(filename: str):
         """편집본(sandbox) HWPX 다운로드. 경로 안전: output_dir 밖 접근 차단."""
@@ -403,6 +449,10 @@ def create_app() -> Any:
     @app.get("/api/web-office/catalog-categories")
     def catalog_categories() -> dict[str, Any]:
         return call_catalog_categories()
+
+    @app.get("/api/web-office/catalog-institutions")
+    def catalog_institutions() -> dict[str, Any]:
+        return call_catalog_institutions()
 
     @app.post("/api/web-office/catalog-by-category")
     def catalog_by_category(req: CatalogByCategoryRequest) -> dict[str, Any]:

@@ -69,6 +69,11 @@ export function autoFitLines(root) {
  *   editable         : true 면 셀 박스에 data-cell-id 부여(클릭 편집 대상)
  *   getCellText(id)  : 편집된 셀 텍스트(없으면 null). 편집된 셀은 원본 줄을
  *                      숨기고 이 텍스트를 박스 안에 렌더한다.
+ *   truthBase        : '원본 그대로' 모드 — 페이지 배경을 한컴 실렌더
+ *                      PNG(truthBase + 페이지번호)로 깔고, 우리 텍스트/
+ *                      테두리는 그리지 않는다(이중 표시 방지). 셀 박스는
+ *                      투명 클릭 타깃으로만 유지 → 화면은 정의상 원본과
+ *                      동일하고 편집은 오버레이가 담당한다.
  */
 export function renderCoordinateLayout(layout, opts = {}) {
   if (!layout) return '<p class="co-empty">레이아웃 없음.</p>';
@@ -84,31 +89,52 @@ export function renderCoordinateLayout(layout, opts = {}) {
   for (const cid of boxByCell.keys()) {
     if (getCellText(cid) != null) editedIds.add(cid);
   }
+  // 페이지별 구조(pagesDetail) 우선 — 추출기가 페이지-로컬 좌표로 복구한
+  // 페이지 배열을 그대로 그린다(전역 y 슬라이싱 제거: 경계 번짐·갭 흡수류
+  // 결함의 뿌리 소멸). 구버전 레이아웃(pagesDetail 없음)은 기존 슬라이싱.
+  const pagesDetail = (layout.pagesDetail && layout.pagesDetail.length)
+    ? layout.pagesDetail : null;
   const parts = [];
   for (let pi = 0; pi < pages; pi++) {
     const yTop = pi * H;
-    parts.push(`<div class="co-page" style="width:${W}px;height:${H}px">`);
-    for (const b of layout.boxes || []) {
-      if (Math.floor(b.y / H) !== pi) continue;
+    const pd = pagesDetail ? pagesDetail[pi] : null;
+    const pBoxes = pd ? pd.boxes
+      : (layout.boxes || []).filter((b) => Math.floor(b.y / H) === pi);
+    const pLines = pd ? pd.lines
+      : (layout.lines || []).filter((l) => Math.floor(l.y / H) === pi);
+    const localY = (y) => (pd ? y : y - yTop);
+    // 페이지별 정합 판정(truthOk=false 페이지는 배경 대신 좌표 렌더 —
+    // 페이지 경계가 한컴과 어긋난 페이지에서 엉뚱한 그림 위에 오버레이가
+    // 얹히는 것 방지)
+    const pageTruth = !!(opts.truthBase && (!pd || pd.truthOk !== false));
+    const truth = pageTruth
+      ? `background-image:url('${opts.truthBase}${pi + 1}');`
+        + "background-size:100% 100%;"
+      : "";
+    parts.push(`<div class="co-page" style="width:${W}px;height:${H}px;`
+      + `${truth}">`);
+    for (const b of pBoxes) {
       // 한컴이 지정한 테두리만 그린다. none/미지정 변은 안 그림(한컴은
       // borderless 셀을 보이지 않게 렌더 — 안내선을 그리면 없던 박스가
       // 생겨 원본과 달라진다). 셀 편집 위치는 hover 하이라이트로 표시.
       let bd = "";
-      if (b.border) {
+      if (b.border && !pageTruth) {
         if (b.border.l !== "none") bd += `border-left:${b.border.l};`;
         if (b.border.r !== "none") bd += `border-right:${b.border.r};`;
-        if (b.border.t !== "none") bd += `border-top:${b.border.t};`;
+        // 병합 셀의 페이지 연속 조각(frag)은 위/아래 경계선을 페이지
+        // 절단면에 맞게 처리 — 한컴처럼 이어지는 셀로 보이게 한다.
+        if (b.border.t !== "none" && !b.frag) bd += `border-top:${b.border.t};`;
         if (b.border.b !== "none") bd += `border-bottom:${b.border.b};`;
       }
-      const fill = b.fill ? `background:${b.fill};` : "";
+      const fill = (b.fill && !pageTruth) ? `background:${b.fill};` : "";
       const editAttr = (opts.editable && b.cellId)
         ? ` data-cell-id="${esc(b.cellId)}"` : "";
       parts.push(`<div class="co-box"${editAttr} style="left:${b.x}px;`
-        + `top:${(b.y - yTop).toFixed(1)}px;width:${b.w}px;`
+        + `top:${localY(b.y).toFixed(1)}px;width:${b.w}px;`
         + `height:${b.h}px;${bd}${fill}"></div>`);
     }
-    for (const l of layout.lines || []) {
-      if (Math.floor(l.y / H) !== pi) continue;
+    for (const l of pLines) {
+      if (pageTruth) break;           // 원본 배경 페이지 — 텍스트는 배경에 있음
       if (l.cellId && editedIds.has(l.cellId)) continue;  // 편집셀 원본 숨김
       const fs = Math.max(7, l.h * 0.72);
       // line-height 는 반드시 박스 높이와 같게 둔다. 더 크게 주면
@@ -116,17 +142,22 @@ export function renderCoordinateLayout(layout, opts = {}) {
       // 깨진다. 한컴 baseline 정밀 정렬은 클리핑 없는 방식으로 후속 처리.
       const al = l.align ? `text-align:${l.align};` : "";
       parts.push(`<div class="co-line" style="left:${l.x}px;`
-        + `top:${(l.y - yTop).toFixed(1)}px;width:${l.w}px;`
+        + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
         + `height:${l.h}px;line-height:${l.h}px;${al}">`
         + `${segmentsHtml(l, defs, fs)}</div>`);
     }
-    // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더
+    // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만)
     for (const cid of editedIds) {
-      const b = boxByCell.get(cid);
-      if (!b || Math.floor(b.y / H) !== pi) continue;
+      const b = pd
+        ? pd.boxes.find((x) => x.cellId === cid && !x.frag)
+        : ((boxByCell.get(cid)
+            && Math.floor(boxByCell.get(cid).y / H) === pi)
+          ? boxByCell.get(cid) : null);
+      if (!b) continue;
       const t = getCellText(cid);
       parts.push(`<div class="co-line co-edited" style="left:${b.x + 3}px;`
-        + `top:${(b.y - yTop + 2).toFixed(1)}px;width:${Math.max(10, b.w - 6)}px;`
+        + `top:${(localY(b.y) + 2).toFixed(1)}px;`
+        + `width:${Math.max(10, b.w - 6)}px;`
         + `height:${Math.max(12, b.h - 4)}px;line-height:1.3;`
         + `white-space:pre-wrap;font-size:10pt">`
         + `<span class="co-in" style="display:inline-block">${esc(t)}`

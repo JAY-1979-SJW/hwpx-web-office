@@ -1,0 +1,362 @@
+"""hancom_layout_refresh — 로드 시 한컴 재저장으로 좌표 데이터 정규화.
+
+문서마다 저장된 레이아웃 데이터(lineseg·cellSz·표 선언높이)의 신선도가
+제각각이라(구버전 저장·수기 편집 잔존) 좌표 재현 품질이 문서별로 흔들린다.
+한컴 오피스(COM)가 설치돼 있으면 로드 시 문서를 한컴으로 열어 sandbox 에
+재저장한다 — 한컴이 전체를 재조판해 모든 좌표를 현재 레이아웃으로 갱신
+하므로, 추출기는 신선한 좌표를 그대로 그리면 된다(구조적 정확성).
+
+- 표시(layout) 전용: 편집·저장 파이프라인은 계속 '원본'을 대상으로 한다.
+  cellId 는 구조(섹션/표 문서순/행/열) 기반이라 재저장 후에도 동일.
+- 원본 무수정: 산출물은 tmp/web_office_normalized/<sha16>.hwpx 에만.
+- 내용해시 캐시: 같은 문서는 재실행하지 않는다.
+- COM 은 서브프로세스에서 실행(타임아웃 격리 — API 서버 행 방지).
+- 한컴 미설치/실패 시 원본 경로 반환(현행 동작 폴백).
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CACHE_DIR_ENV = "HWPX_WEB_OFFICE_NORMALIZED_DIR"
+DISABLE_ENV = "HWPX_WEB_OFFICE_HANCOM_REFRESH"   # "0" 이면 비활성
+TIMEOUT_SEC = 90
+
+
+def _cache_dir(project_root: Path) -> Path:
+    configured = os.environ.get(CACHE_DIR_ENV)
+    d = (Path(configured) if configured
+         else project_root / "tmp" / "web_office_normalized")
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def hancom_available() -> bool:
+    if os.environ.get(DISABLE_ENV, "1") == "0":
+        return False
+    try:
+        import winreg
+        winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "HWPFrame.HwpObject")
+        return True
+    except Exception:
+        return False
+
+
+def _resave_subprocess(src: Path, dst: Path) -> bool:
+    """서브프로세스에서 한컴 COM 재저장 실행(행/크래시 격리)."""
+    code = (
+        "import sys, win32com.client\n"
+        "src, dst = sys.argv[1], sys.argv[2]\n"
+        "hwp = win32com.client.Dispatch('HwpFrame.HwpObject.2')\n"
+        "try:\n"
+        "    hwp.XHwpWindows.Item(0).Visible = False\n"
+        "except Exception:\n"
+        "    pass\n"
+        "for name in ('FilePathCheckerModule', 'SecurityModule',\n"
+        "             'FilePathCheckerModuleExample', 'AutomationModule'):\n"
+        "    try:\n"
+        "        if hwp.RegisterModule('FilePathCheckDLL', name):\n"
+        "            break\n"
+        "    except Exception:\n"
+        "        continue\n"
+        "try:\n"
+        "    hwp.SetMessageBoxMode(0x00010000)\n"
+        "except Exception:\n"
+        "    pass\n"
+        "ok = hwp.Open(src, '',\n"
+        "              'forceopen:true;versionwarning:false;lock:false;')\n"
+        "ok2 = hwp.SaveAs(dst, 'HWPX', '') if ok else False\n"
+        "try:\n"
+        "    hwp.XHwpDocuments.Close(False)\n"
+        "except Exception:\n"
+        "    pass\n"
+        "try:\n"
+        "    hwp.Quit()\n"
+        "except Exception:\n"
+        "    pass\n"
+        "sys.exit(0 if (ok and ok2) else 1)\n"
+    )
+    try:
+        r = subprocess.run(
+            [sys.executable, "-c", code, str(src), str(dst)],
+            capture_output=True, timeout=TIMEOUT_SEC)
+        return r.returncode == 0 and dst.is_file()
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception:
+        return False
+
+
+def normalize_for_layout(source_path: Path,
+                         project_root: Path = PROJECT_ROOT) -> Path:
+    """표시용 정규화 사본 경로 반환. 실패/비가용 시 원본 경로 그대로."""
+    src = Path(source_path)
+    if not src.is_file() or src.suffix.lower() != ".hwpx":
+        return src
+    try:
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return src
+    out = _cache_dir(Path(project_root)) / f"norm_{digest}.hwpx"
+    # 캐시 우선 — 빌드타임(한컴 있는 공장)에서 미리 정규화한 산출물은
+    # 런타임에 한컴 없이도 그대로 쓴다(운영 아키텍처: 한컴은 공장에만).
+    if out.is_file():
+        return out
+    if not hancom_available():
+        return src
+    if _resave_subprocess(src.resolve(), out.resolve()):
+        return out
+    # 실패 흔적 정리 후 원본 폴백
+    try:
+        if out.exists():
+            out.unlink()
+    except OSError:
+        pass
+    return src
+
+
+TRUTH_DIR_ENV = "HWPX_WEB_OFFICE_TRUTH_DIR"
+
+
+def _truth_dir(project_root: Path) -> Path:
+    configured = os.environ.get(TRUTH_DIR_ENV)
+    d = (Path(configured) if configured
+         else project_root / "tmp" / "web_office_truth")
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _pdf_subprocess(src: Path, dst_pdf: Path) -> bool:
+    """서브프로세스에서 한컴 COM 으로 PDF 출력(행/크래시 격리)."""
+    code = (
+        "import sys, win32com.client\n"
+        "src, dst = sys.argv[1], sys.argv[2]\n"
+        "hwp = win32com.client.Dispatch('HwpFrame.HwpObject.2')\n"
+        "try:\n"
+        "    hwp.XHwpWindows.Item(0).Visible = False\n"
+        "except Exception:\n"
+        "    pass\n"
+        "for name in ('FilePathCheckerModule', 'SecurityModule',\n"
+        "             'FilePathCheckerModuleExample', 'AutomationModule'):\n"
+        "    try:\n"
+        "        if hwp.RegisterModule('FilePathCheckDLL', name):\n"
+        "            break\n"
+        "    except Exception:\n"
+        "        continue\n"
+        "try:\n"
+        "    hwp.SetMessageBoxMode(0x00010000)\n"
+        "except Exception:\n"
+        "    pass\n"
+        "ok = hwp.Open(src, '',\n"
+        "              'forceopen:true;versionwarning:false;lock:false;')\n"
+        "ok2 = hwp.SaveAs(dst, 'PDF', '') if ok else False\n"
+        "try:\n"
+        "    hwp.XHwpDocuments.Close(False)\n"
+        "except Exception:\n"
+        "    pass\n"
+        "try:\n"
+        "    hwp.Quit()\n"
+        "except Exception:\n"
+        "    pass\n"
+        "sys.exit(0 if (ok and ok2) else 1)\n"
+    )
+    try:
+        r = subprocess.run(
+            [sys.executable, "-c", code, str(src), str(dst_pdf)],
+            capture_output=True, timeout=TIMEOUT_SEC)
+        return r.returncode == 0 and dst_pdf.is_file()
+    except Exception:
+        return False
+
+
+def render_truth_pages(source_path: Path,
+                       project_root: Path = PROJECT_ROOT,
+                       width_px: int = 794) -> Path | None:
+    """한컴 실렌더 페이지 이미지 생성(내용해시 캐시) → 디렉터리 경로.
+
+    '원본 그대로' 표시 모드의 배경: 한컴이 그린 페이지를 그대로 쓰므로
+    화면은 정의상 원본과 동일하다. 편집은 좌표 오버레이가 담당.
+    실패/미설치 시 None(로직 렌더 폴백). read-only, 원본 무수정.
+    """
+    src = Path(source_path)
+    if not src.is_file():
+        return None
+    try:
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return None
+    out_dir = _truth_dir(Path(project_root)) / digest
+    done = out_dir / "DONE"
+    # 캐시 우선 — 빌드타임에 생성한 실렌더 이미지는 한컴 없는 런타임에서도
+    # 서빙한다(운영: 한컴은 공장에만, 산출물은 배포 캐시).
+    if done.is_file():
+        return out_dir
+    if not hancom_available():
+        return None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pdf = out_dir / "truth.pdf"
+    if not pdf.is_file() and not _pdf_subprocess(src.resolve(), pdf.resolve()):
+        return None
+    try:
+        import fitz
+        doc = fitz.open(str(pdf))
+        for i, page in enumerate(doc):
+            z = float(width_px) / page.rect.width
+            pix = page.get_pixmap(matrix=fitz.Matrix(z, z))
+            pix.save(str(out_dir / f"p{i + 1}.png"))
+        (out_dir / "DONE").write_text(str(doc.page_count), encoding="ascii")
+        return out_dir
+    except Exception:
+        return None
+
+
+def _detect_grid(png_path: Path):
+    """실렌더 PNG 에서 표 격자선(가로/세로) 픽셀 좌표 검출."""
+    import numpy as np
+    from PIL import Image
+    im = np.asarray(Image.open(png_path).convert("L"))
+    dark = im < 176
+
+    def cluster(idx):
+        out = []
+        for v in idx:
+            if out and v - out[-1][-1] <= 2:
+                out[-1].append(v)
+            else:
+                out.append([v])
+        return [sum(g) / len(g) for g in out]
+
+    ys = cluster([y for y, v in enumerate(dark.mean(axis=1)) if v > 0.06])
+    xs = cluster([x for x, v in enumerate(dark.mean(axis=0)) if v > 0.06])
+    return ys, xs
+
+
+def snap_layout_to_truth(layout: dict, source_path: Path,
+                         project_root: Path = PROJECT_ROOT,
+                         tol_y: float = 12.0, tol_x: float = 6.0) -> bool:
+    """편집 오버레이(셀 박스)를 실렌더 배경의 실제 격자선에 스냅.
+
+    배경은 한컴 픽셀, 오버레이는 우리 좌표라 수 px~수십 px 어긋날 수 있다
+    (클릭 타깃 오정렬). 정답 이미지에서 격자선을 검출해 각 박스 변을 가장
+    가까운 실제 선에 흡착시키면 정합 오차가 구조적으로 소멸한다.
+    truth 캐시가 있을 때만 동작(없으면 False — 무변화)."""
+    src = Path(source_path)
+    try:
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return False
+    tdir = _truth_dir(Path(project_root)) / digest
+    if not (tdir / "DONE").is_file():
+        return False
+    # 페이지 구조 일치 가드 — 한컴 쪽수와 우리 쪽수가 다르면 배경-오버레이
+    # 페이지 대응 자체가 어긋나므로 스냅하지 않는다(뷰어는 이 신호로 배경
+    # 모드를 차단하고 좌표 렌더를 유지한다).
+    try:
+        hancom_pages = int((tdir / "DONE").read_text(encoding="ascii").strip())
+    except (OSError, ValueError):
+        return False
+    if hancom_pages != len(layout.get("pagesDetail", [])):
+        return False
+
+    def snap(v, lines, tol):
+        if not lines:
+            return v
+        srt = sorted(lines, key=lambda t: abs(v - t))
+        best = srt[0]
+        d = abs(v - best)
+        if d <= tol:
+            return best
+        # 장거리 스냅 — 누적 드리프트(수십 px)로 톨러런스를 벗어났지만
+        # 두 번째 후보보다 확연히 가까우면(모호성 없음) 흡착한다.
+        second = abs(v - srt[1]) if len(srt) > 1 else 1e9
+        if d <= 25.0 and second - d >= 12.0:
+            return best
+        return v
+
+    def _has_border(b):
+        bd = b.get("border") or {}
+        return any(bd.get(k, "none") != "none" for k in ("l", "r", "t", "b"))
+
+    changed = False
+    for pi, pd in enumerate(layout.get("pagesDetail", [])):
+        pd["truthOk"] = True   # 기본: 배경 사용(측정 실패 페이지 포함)
+        png = tdir / f"p{pi + 1}.png"
+        if not png.is_file():
+            continue
+        try:
+            ys, xs = _detect_grid(png)
+        except Exception:
+            continue
+        # 검출 신뢰 가드 — 격자선이 희박한 페이지(그래프·목록 등)는 스냅
+        # 생략(무관한 선에 끌려 오정렬되는 것 방지).
+        if len(ys) < 4 or len(xs) < 3:
+            continue
+        # 1단: 표 단위 정합등록 — 페이지 안에서도 표마다 흐름 누적 오차가
+        # 달라(위 표 0px·아래 표 20px 등) 페이지 단일 보정으론 부족하다.
+        # cellId 의 표 접두(cell_t_sX_TTT)로 묶어 표별 계통 이동(dy/dx)을
+        # 투표·제거한 뒤 개별 스냅한다.
+        groups = {}
+        for b in pd["boxes"]:
+            cid = b.get("cellId") or ""
+            key = cid.rsplit("_r", 1)[0] if "_r" in cid else "_"
+            groups.setdefault(key, []).append(b)
+        for gboxes in groups.values():
+            dys, dxs = [], []
+            for b in gboxes:
+                if not _has_border(b):
+                    continue
+                for e in (b["y"], b["y"] + b["h"]):
+                    dd = min((t - e for t in ys), key=abs)
+                    if abs(dd) <= 40:
+                        dys.append(dd)
+                for e in (b["x"], b["x"] + b["w"]):
+                    dd = min((t - e for t in xs), key=abs)
+                    if abs(dd) <= 40:
+                        dxs.append(dd)
+            shift_y = sorted(dys)[len(dys) // 2] if len(dys) >= 4 else 0.0
+            shift_x = sorted(dxs)[len(dxs) // 2] if len(dxs) >= 4 else 0.0
+            if abs(shift_y) > 1.0 or abs(shift_x) > 1.0:
+                for b in gboxes:
+                    b["y"] = round(b["y"] + shift_y, 1)
+                    b["x"] = round(b["x"] + shift_x, 1)
+                changed = True
+        for b in pd["boxes"]:
+            # 테두리 있는 셀만 — 보이지 않는 셀은 배경에 선이 없어 흡착
+            # 대상이 아니며(근사 클릭 타깃으로 충분), 잘못 끌리면 해롭다.
+            if not _has_border(b):
+                continue
+            y0 = snap(b["y"], ys, tol_y)
+            y1 = snap(b["y"] + b["h"], ys, tol_y)
+            x0 = snap(b["x"], xs, tol_x)
+            x1 = snap(b["x"] + b["w"], xs, tol_x)
+            if y1 - y0 > 4 and x1 - x0 > 4:
+                if (y0, y1 - y0, x0, x1 - x0) != (b["y"], b["h"],
+                                                  b["x"], b["w"]):
+                    b["y"], b["h"] = round(y0, 1), round(y1 - y0, 1)
+                    b["x"], b["w"] = round(x0, 1), round(x1 - x0, 1)
+                    changed = True
+        # 페이지별 정합 판정 — 총 쪽수가 같아도 중간 페이지 경계가 달라
+        # 특정 페이지 내용이 통째로 어긋날 수 있다(예: 우리 p6 내용이
+        # 한컴 p6 그림과 다름). 스냅 후 잔여 중위가 크면 그 페이지만 배경
+        # 사용을 차단(truthOk=False) → 뷰어가 해당 페이지를 좌표 렌더로
+        # 그린다(정합 페이지=원본 픽셀, 아닌 페이지=정직한 자체 렌더).
+        res = []
+        for b in pd["boxes"]:
+            if not _has_border(b):
+                continue
+            for e in (b["y"], b["y"] + b["h"]):
+                res.append(min(abs(e - t) for t in ys))
+        if len(res) >= 8:
+            res.sort()
+            if res[len(res) // 2] > 3.0:
+                pd["truthOk"] = False
+    return changed
+
+
+if __name__ == "__main__":
+    p = normalize_for_layout(Path(sys.argv[1]))
+    print(str(p))

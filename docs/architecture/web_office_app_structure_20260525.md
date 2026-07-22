@@ -150,6 +150,7 @@ The approved Web Office API surface is:
 - `POST /api/web-office/hwpx-upload` (WEB-OFFICE-UPLOAD-01 · 브라우저 파일선택/드래그 업로드 · sandbox 수신 · 내용해시 저장 · 서버는 사용자 PC 경로 미접근 · 확장자/zip/크기 검증)
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` (lineseg 좌표 레이아웃, 한컴 없이 · read-only)
+- `GET /api/web-office/truth-page` (WEB-OFFICE-TRUTH-01 · 한컴 실렌더 페이지 배경 — '원본 그대로' 하이브리드 표시 · 미설치 시 404→좌표 렌더 폴백)
 
 AI 자동채움 / 소스 추출 (WEB-OFFICE-AI-FILL-01, §9 Claude Code CLI Haiku only):
 
@@ -160,6 +161,7 @@ AI 자동채움 / 소스 추출 (WEB-OFFICE-AI-FILL-01, §9 Claude Code CLI Haik
 
 - `GET /api/web-office/catalog-stats`
 - `GET /api/web-office/catalog-categories`
+- `GET /api/web-office/catalog-institutions` (기관·부처별 서식 수 — UI 필터용, read-only)
 - `POST /api/web-office/catalog-search`
 - `POST /api/web-office/catalog-match`
 - `POST /api/web-office/catalog-by-category`

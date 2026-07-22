@@ -12,11 +12,13 @@ import { createUploadController } from "./upload_controller.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
 const LAYOUT_ENDPOINT = "/api/web-office/hwpx-layout";
+const TRUTH_ENDPOINT = "/api/web-office/truth-page";
 
 export function mountWebOffice(root) {
   const $ = (sel) => root.querySelector(sel);
   let loaded = null, cell = null, save = null;
   let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
+  let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
 
   const setStatus = (k, msg) => {
     const e = $("[data-role=status]");
@@ -28,18 +30,27 @@ export function mountWebOffice(root) {
 
   async function fetchLayout(sourcePath) {
     if (!sourcePath) return null;
-    try {
-      const res = await fetch(LAYOUT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath }),
-      });
-      const env = await res.json();
-      const d = (env && env.data) || env || {};
-      if ((env && env.status && env.status !== "SUCCESS")
-        || d.verdict === "REJECTED" || d.error) return null;
-      return d;
-    } catch (_e) { return null; }
+    // 서버 재기동 순간 등 일시 실패 시 짧게 재시도 — 실패로 흐름(blob)
+    // 폴백에 떨어지면 "서식이 뭉개진" 화면이 되므로 충실 보기를 우선 확보.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(LAYOUT_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourcePath }),
+        });
+        const env = await res.json();
+        const d = (env && env.data) || env || {};
+        if ((env && env.status && env.status !== "SUCCESS")
+          || d.verdict === "REJECTED" || d.error) return null;  // 명시 거부는 재시도 안 함
+        return d;
+      } catch (_e) {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+        }
+      }
+    }
+    return null;
   }
 
   // 좌표 레이아웃에서 셀의 충실 원문(정규화 이전, 줄 순서대로) 복원. 라벨
@@ -67,6 +78,7 @@ export function mountWebOffice(root) {
       sheet.innerHTML = renderCoordinateLayout(coordLayout, {
         editable: true,
         getCellText: (id) => (cell ? cell.getCellText(id) : null),
+        truthBase,   // 가용 시 '원본 그대로'(한컴 실렌더 배경 + 편집 오버레이)
       });
       autoFitLines(sheet);
       sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
@@ -124,9 +136,43 @@ export function mountWebOffice(root) {
     $("[data-role=download]").disabled = !(save && save.lastOutput());
   }
 
+  // '원본 그대로' 배경 준비 — 한컴 실렌더 페이지(서버 캐시). 첫 문서는
+  // 서버에서 한컴 조판(수 초)이 돌 수 있어 비동기 프로브 후 재렌더한다.
+  // 404(한컴 미설치 서비스 환경)면 좌표 렌더 그대로 — 무중단 폴백.
+  async function probeTruth(sourcePath) {
+    truthBase = null;
+    if (!sourcePath) return;
+    const base = `${TRUTH_ENDPOINT}?src=${encodeURIComponent(sourcePath)}&page=`;
+    try {
+      const res = await fetch(base + "1", { method: "GET" });
+      if (res.ok) {
+        // 배경 준비됨 → 레이아웃 재요청: 서버가 truth 격자선에 정합등록+
+        // 스냅한 오버레이 좌표(truthAligned)를 내려준다.
+        const aligned = await fetchLayout(loaded && loaded.sourcePath);
+        if (aligned) coordLayout = aligned;
+        // 안전 가드 — 한컴 쪽수와 우리 쪽수가 다르면 배경-오버레이 페이지
+        // 대응이 어긋나므로 배경 모드를 켜지 않는다(좌표 렌더 유지).
+        const hp = aligned && aligned.hancomPages;
+        if (hp && aligned.pages !== hp) {
+          truthBase = null;
+          setStatus("ok", ($("[data-role=status]").textContent || "")
+            + ` · 원본배경 보류(쪽수 ${aligned.pages}≠한컴 ${hp})`);
+          render();
+          return;
+        }
+        truthBase = base;
+        setStatus("ok", ($("[data-role=status]").textContent || "")
+          + " · 원본 실렌더 배경"
+          + (aligned && aligned.truthAligned ? "(정렬)" : ""));
+        render();
+      }
+    } catch (_e) { /* 폴백 유지 */ }
+  }
+
   async function onLoaded(d) {
     loaded = d;
     coordLayout = null;
+    truthBase = null;
     cell = createCellEditController(d.documentModel);
     save = createSaveController({
       getState: () => cell.getState(),
@@ -136,10 +182,23 @@ export function mountWebOffice(root) {
     setStatus("load", "좌표 레이아웃(원본 배치) 불러오는 중 …");
     render();  // 즉시 1차 렌더(레이아웃 오기 전엔 흐름/빈 화면)
     coordLayout = await fetchLayout(d.sourcePath);
-    setStatus("ok",
+    // 자가진단 배지 — 서버가 로드마다 품질(물림/겹침)을 계산해 보낸다.
+    // 이상 시 상태줄에 즉시 표기해 조용한 품질 저하를 없앤다.
+    let q = "";
+    const qual = coordLayout && coordLayout.quality;
+    if (qual && !qual.ok) {
+      q = ` · ⚠ 품질주의(물림 ${qual.cellOverflow}`
+        + `·max ${qual.cellOverflowMaxPx}px`
+        + (qual.bodyOverlap ? `·겹침 ${qual.bodyOverlap}` : "") + ")";
+    } else if (qual) {
+      q = " · 품질 ✓";
+    }
+    setStatus(qual && !qual.ok ? "fail" : "ok",
       `불러옴 · 표 ${sm.tables ?? "?"} · 셀 ${sm.cells ?? "?"} · `
-      + (coordLayout ? "원본 배치 충실 재현" : "흐름 보기") + " · 원본 무수정");
+      + (coordLayout ? "원본 배치 충실 재현" : "흐름 보기")
+      + " · 원본 무수정" + q);
     render();  // 레이아웃 반영 재렌더
+    probeTruth(d.sourcePath);   // 원본 실렌더 배경(가용 시 재렌더)
   }
 
   const upload = createUploadController({ onLoaded, setStatus });

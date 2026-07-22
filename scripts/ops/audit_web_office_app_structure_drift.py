@@ -59,12 +59,16 @@ REQUIRED_ENDPOINTS = [
     "POST /api/web-office/cell-save-apply",
     # WEB-OFFICE-COORD-LAYOUT-01: lineseg 좌표 레이아웃(한컴 없이) 엔드포인트.
     "POST /api/web-office/hwpx-layout",
+    # WEB-OFFICE-TRUTH-01: 한컴 실렌더 페이지 배경('원본 그대로' 하이브리드
+    # 표시). 한컴 미설치 환경은 404 → 좌표 렌더 폴백.
+    "GET /api/web-office/truth-page",
     # WEB-OFFICE-AI-FILL-01: AI 자동채움(§9 Claude Code CLI Haiku) · 사업자등록증 OCR.
     "POST /api/web-office/ai-fill",
     "POST /api/web-office/source-extract",
     # WEB-OFFICE-CATALOG-01: 서식 카탈로그 검색/매칭/분류(read-only SQLite).
     "GET /api/web-office/catalog-stats",
     "GET /api/web-office/catalog-categories",
+    "GET /api/web-office/catalog-institutions",
     "POST /api/web-office/catalog-search",
     "POST /api/web-office/catalog-match",
     "POST /api/web-office/catalog-by-category",
