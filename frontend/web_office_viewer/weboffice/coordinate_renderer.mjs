@@ -30,13 +30,36 @@ function segmentsHtml(line, defs, fallbackFs) {
   const segs = (line.segments && line.segments.length)
     ? line.segments
     : [{ text: line.text, charPr: null }];
-  return segs.map((sg) => {
+  const inner = segs.map((sg) => {
     const def = sg.charPr != null ? defs[sg.charPr] : null;
     let css = def ? charPrToCss(def) : "";
     // charPr 에 크기가 없으면 줄높이 추정치로 보강 (텍스트 안 보이는 것 방지)
     if (!def || !def.fontSizePt) css += `font-size:${fallbackFs.toFixed(1)}px;`;
     return `<span style="${css}">${esc(sg.text)}</span>`;
   }).join("");
+  // inline-block 래퍼 — autoFitLines 가 offsetWidth 로 실제 내용폭을 정확히
+  // 측정(overflow:clip 과 무관)해 필요 시 가로 압축한다.
+  return `<span class="co-in" style="display:inline-block">${inner}</span>`;
+}
+
+/* auto-fit — 렌더 후 호출. 각 줄의 실제 내용폭(scrollWidth)이 줄상자
+ * 폭(clientWidth)을 넘으면(폰트 차/justify 미작동으로 자연폭이 넓을 때)
+ * transform:scaleX 로 가로 압축해 줄상자 안에 맞춘다. 한컴의 justify
+ * 압축을 브라우저 실측 기반으로 재현 — 글자가 잘리거나 셀을 넘지 않게 한다.
+ * (브라우저 DOM 필요; 순수 렌더 결과에 후처리로 적용) */
+export function autoFitLines(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll(".co-line").forEach((el) => {
+    const inner = el.firstElementChild;   // .co-in (inline-block)
+    if (!inner) return;
+    inner.style.transform = "";           // 재측정 위해 초기화
+    const cw = el.clientWidth;             // 줄상자 폭
+    const sw = inner.offsetWidth;          // 실제 내용폭(clip 무관, 정확)
+    if (cw > 0 && sw > cw + 1) {
+      inner.style.transformOrigin = "left";
+      inner.style.transform = `scaleX(${(cw / sw).toFixed(4)})`;
+    }
+  });
 }
 
 export function renderCoordinateLayout(layout) {

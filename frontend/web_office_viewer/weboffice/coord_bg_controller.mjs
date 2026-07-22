@@ -7,7 +7,7 @@
  * 위치·서식은 coordinate_layout(백엔드) + coordinate_renderer(프론트) 를
  * 그대로 재사용한다 — 편집 로직/DOM 무접촉.
  */
-import { renderCoordinateLayout } from "./coordinate_renderer.mjs";
+import { renderCoordinateLayout, autoFitLines } from "./coordinate_renderer.mjs";
 
 const LAYOUT_ENDPOINT = "/api/web-office/hwpx-layout";
 
@@ -68,6 +68,8 @@ export function createCoordBgController(deps = {}) {
     }
     if (layer) { layer.innerHTML = cacheHtml; layer.hidden = false; }
     if (canvas) canvas.classList.add("wo-bg");
+    // 레이어가 표시된(display:flex) 뒤에 실측·압축해야 offsetWidth 가 유효
+    if (layer) autoFitLines(layer);
   }
 
   return {

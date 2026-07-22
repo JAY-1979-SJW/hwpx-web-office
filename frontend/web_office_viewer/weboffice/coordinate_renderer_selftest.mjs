@@ -74,7 +74,9 @@ const styled = renderCoordinateLayout({
   }],
   boxes: [],
 });
-assert((styled.match(/<span/g) || []).length === 2, "line split into 2 spans");
+// co-in 래퍼 1개 + 조각 2개 = span 3개
+assert((styled.match(/<span/g) || []).length === 3, "co-in wrapper + 2 segment spans");
+assert(styled.includes('class="co-in"'), "inline-block wrapper present (autoFit용)");
 assert(/font-weight:700/.test(styled), "bold charPr applied");
 assert(/font-size:14pt/.test(styled), "real fontSize applied (not h*0.72)");
 assert(/color:#ff0000/.test(styled), "text color applied");

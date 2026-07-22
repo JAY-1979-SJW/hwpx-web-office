@@ -30,7 +30,7 @@
   </div>
   <div class="co-scroll" id="scroll"><p class="co-empty">문서 없음.</p></div>
 <script type="module">
-  import { renderCoordinateLayout } from "./weboffice/coordinate_renderer.mjs";
+  import { renderCoordinateLayout, autoFitLines } from "./weboffice/coordinate_renderer.mjs";
   const $=(id)=>document.getElementById(id);
   const setStatus=(m)=>{ $("status").textContent=m; };
   async function loadLayout(sourcePath){
@@ -41,6 +41,7 @@
       const d=j.data||j;
       if((j.status&&j.status!=="SUCCESS")||d.verdict==="REJECTED"||d.error){ setStatus("실패: "+((j.errors&&j.errors[0]&&j.errors[0].code)||d.reason||d.error||"UNKNOWN")); return; }
       $("scroll").innerHTML=renderCoordinateLayout(d);
+      autoFitLines($("scroll"));  // 줄 넘침 시 가로 압축(글자 잘림 방지)
       setStatus(`${d.pages}페이지 · ${d.lines.length}줄 · 좌표 배치(한컴 없이)`);
     }catch(e){ setStatus("실패: "+e.message); }
   }
