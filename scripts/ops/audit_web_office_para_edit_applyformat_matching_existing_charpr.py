@@ -21,7 +21,7 @@ TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatToolbar.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "b411164"
+BASELINE_COMMIT = "685e8c9"
 
 REQUIRED_MATCHER_PATTERNS = [
     r"export\s+function\s+matchToggle\(",

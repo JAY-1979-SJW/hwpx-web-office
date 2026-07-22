@@ -22,7 +22,7 @@ if str(PR) not in sys.path:
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 RENDER_PAYLOAD = (PR / "scripts/hwpx/web_office/render_payload.py")
-BASELINE_COMMIT = "b411164"  # Web Office operational baseline before text-style read expansion.
+BASELINE_COMMIT = "685e8c9"  # Web Office operational baseline before text-style read expansion.
 
 # dc9e6ad ApplyFormat closeout 의 시공 자재 — 본 공정에서 무수정
 # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01: para_edit_state /

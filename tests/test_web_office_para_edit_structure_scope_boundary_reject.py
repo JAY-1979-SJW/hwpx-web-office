@@ -11,7 +11,7 @@ from pathlib import Path
 
 PR = Path(__file__).parents[1]
 
-BASELINE_COMMIT = "b411164"  # M2 문단서식 준공 후 갱신 (b411164 → b411164)
+BASELINE_COMMIT = "685e8c9"  # M2 문단서식 준공 후 갱신 (685e8c9 → 685e8c9)
 
 SCOPE_REASON_CONSTANTS = [
     "REASON_HEADER_SCOPE_NOT_SUPPORTED",
