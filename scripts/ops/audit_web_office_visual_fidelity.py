@@ -22,6 +22,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/hwpx"))
 
 from scripts.hwpx.web_office.coordinate_layout import extract  # noqa: E402
+from scripts.ops.audit_web_office_coord_corpus import (  # noqa: E402
+    _read_prv_text, _char_coverage)
 
 CHROME_CANDIDATES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -160,6 +162,17 @@ def compare_one(path: Path, chrome: str, workdir: Path,
             rec["verdict"] = "WARN"
             rec["warnings"].append("NO_LINESEG_DATA")
             return rec
+        # 정답지 신선도 — 문서 텍스트가 PrvText 에 없으면 XML 이 프리뷰
+        # 저장 이후 수정된 것(예: 자동 fill). 실효 정답지와의 픽셀 비교는
+        # 뷰어 결함이 아니므로 STALE_TRUTH 로 분리 집계한다.
+        truth_txt = _read_prv_text(path)
+        if truth_txt.strip():
+            ours_txt = "\n".join(
+                ln.get("text", "") for ln in lay.get("lines", []))
+            if _char_coverage(truth_txt, ours_txt) < 0.9:
+                rec["verdict"] = "STALE"
+                rec["warnings"].append("PREVIEW_OLDER_THAN_XML")
+                return rec
         W = int(round(lay["pageWidthPx"])) or 794
         H = int(round(lay["pageHeightPx"])) or 1123
         html = (
@@ -280,6 +293,7 @@ def main() -> int:
         "compared": len(results),
         "ok": by.get("OK", 0), "warn": by.get("WARN", 0),
         "error": by.get("ERROR", 0), "skip": by.get("SKIP", 0),
+        "staleTruth": by.get("STALE", 0),
         "grid": {
             "docs": len(graded),
             "meanAbsPx": round(sum(r["gridMeanAbsPx"] for r in graded)
