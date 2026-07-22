@@ -27,6 +27,9 @@ function _truthy(v) {
 // 설치 PC)에서는 지정한 fontName 그대로 렌더된다.
 export function fontFamily(name) {
   if (!name) return "";
+  // 문서 유래 값 — style 속성 탈출(XSS)·CSS 주입 방지 위해 위험문자 제거.
+  name = String(name).replace(/['"<>&\\;{}()]/g, "");
+  if (!name) return "";
   const serif = /바탕|명조|Batang|Myeongjo|serif/i.test(name);
   // 지정 폰트(설치 시) → 계열 대체 → "맑은 고딕"(Windows 기본 한글, 항상
   // 존재) 순. @font-face 로 이름을 덮어쓰지 않으므로 설치된 함초롬/한양
@@ -42,7 +45,9 @@ export function charPrToCss(def) {
   if (!def) return "font-size:10pt;";
   let s = fontFamily(def.fontName);
   if (def.fontSizePt) s += `font-size:${def.fontSizePt}pt;`;
-  if (def.textColor && def.textColor.toLowerCase() !== "#000000") {
+  // 색상은 hex 형식만 통과 (문서 유래 값 CSS 주입 방지)
+  if (def.textColor && /^#[0-9a-fA-F]{3,8}$/.test(def.textColor)
+    && def.textColor.toLowerCase() !== "#000000") {
     s += `color:${def.textColor};`;
   }
   if (def.bold) s += "font-weight:700;";

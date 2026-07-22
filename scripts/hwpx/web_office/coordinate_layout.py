@@ -125,10 +125,6 @@ def _direct_linesegs(p):
     return out
 
 
-def _para_bold(p, header_bytes=None):
-    return False  # 서식은 후속 — v1 은 위치/줄바꿈 재현에 집중
-
-
 def _fill_color(bf_el):
     """borderFill 의 fillBrush 채움색(faceColor 등) → '#RRGGBB' 또는 None.
     'none'/흰색은 None(칠하지 않음 — 흰 배경 위 덧칠 방지)."""
@@ -145,8 +141,9 @@ def _fill_color(bf_el):
                 h = h[:6]
             if len(h) == 6 and all(c in "0123456789abcdefABCDEF" for c in h):
                 col = "#" + h.upper()
-                return None if col in ("#FFFFFF",) else col
-            return v if v.startswith("#") else None
+                if col != "#FFFFFF":
+                    return col
+            # 흰색/비정형 값은 건너뛰고 다음 후보 계속 탐색 (엄격 hex 만 채택)
     return None
 
 
@@ -199,8 +196,8 @@ def extract(path):
         align = _css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
         for i, s in enumerate(segs):
             vpos = float(s.get("vertpos", "0"))
-            a = int(s.get("textpos", "0"))
-            b = (int(segs[i + 1].get("textpos"))
+            a = int(s.get("textpos", "0") or "0")
+            b = (int(segs[i + 1].get("textpos", "0") or "0")
                  if i + 1 < len(segs) else len(txt))
             line_txt = txt[a:b]
             if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
@@ -223,13 +220,22 @@ def extract(path):
             st["max_y"] = max(st["max_y"], y + h)
         st["flow_y"] = st["max_y"]
 
+    def _sane_hu(v):
+        """HWPUNIT → px. 음수/센티널(UINT32_MAX 등 비정상 거대값)은 0(미정)
+        으로 — 일부 문서가 cellSz 에 4294967295 를 저장해 좌표가 폭발한다."""
+        try:
+            n = float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        return n * HU if 0 <= n < 1e6 else 0.0
+
     def _cell_info(tc):
         addr = next((c.attrib for c in tc if ln(c.tag) == "cellAddr"), {})
         span = next((c.attrib for c in tc if ln(c.tag) == "cellSpan"), {})
         sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
         mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
         sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
-        mt = float(mg.get("top", "0")) * HU
+        mt = _sane_hu(mg.get("top", "0"))
         # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
         # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
         content_h = 0.0
@@ -242,9 +248,9 @@ def extract(path):
             "col": int(addr.get("colAddr", "0")),
             "rowSpan": int(span.get("rowSpan", "1") or "1"),
             "colSpan": int(span.get("colSpan", "1") or "1"),
-            "w": float(sz.get("width", "0")) * HU,
-            "h": float(sz.get("height", "0")) * HU,
-            "ml": float(mg.get("left", "0")) * HU,
+            "w": _sane_hu(sz.get("width", "0")),
+            "h": _sane_hu(sz.get("height", "0")),
+            "ml": _sane_hu(mg.get("left", "0")),
             "mt": mt,
             "hContent": content_h,
             "bfRef": tc.attrib.get("borderFillIDRef"),
@@ -296,8 +302,8 @@ def extract(path):
         # 한컴 선언 표 폭(sz)에 열 정규화(가로 드리프트 방지). 행높이는 내용
         # 기반이므로 선언 높이보다 작을 때만 위로 채우고, 클 때는 유지(넘침 방지).
         sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
-        tw = float(sz.get("width", "0")) * HU
-        th = float(sz.get("height", "0")) * HU
+        tw = _sane_hu(sz.get("width", "0"))
+        th = _sane_hu(sz.get("height", "0"))
         sw = sum(col_w)
         if tw > 0 and sw > 0:
             col_w = [w * tw / sw for w in col_w]
@@ -402,8 +408,8 @@ def extract(path):
         align = _css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
         out = []
         for i, s in enumerate(segs):
-            a = int(s.get("textpos", "0"))
-            b = (int(segs[i + 1].get("textpos"))
+            a = int(s.get("textpos", "0") or "0")
+            b = (int(segs[i + 1].get("textpos", "0") or "0")
                  if i + 1 < len(segs) else len(txt))
             out.append({
                 "rx": float(s.get("horzpos", "0")) * HU,
@@ -456,9 +462,12 @@ def extract(path):
             if top_tbls:
                 # 표를 flow 위치(직전 내용 아래)에 순차 배치. 다중 표가 각기
                 # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
-                # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다. _para_top_y 는
-                # 페이지 상태(prev_vpos) 갱신용으로만 호출.
-                _para_top_y(child)
+                # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다.
+                # 같은 문단에 자체 텍스트가 있으면 유실 없이 먼저 방출.
+                if _own_text(child).strip():
+                    emit_para(child)
+                else:
+                    _para_top_y(child)  # 페이지 상태 갱신용
                 base_y = st["flow_y"]
                 for t in top_tbls:
                     walk_table(t, m_left, base_y)

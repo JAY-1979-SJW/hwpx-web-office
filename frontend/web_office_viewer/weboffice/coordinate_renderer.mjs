@@ -64,7 +64,7 @@ export function autoFitLines(root) {
 
 export function renderCoordinateLayout(layout) {
   if (!layout) return '<p class="co-empty">레이아웃 없음.</p>';
-  const W = layout.pageWidthPx, H = layout.pageHeightPx;
+  const W = layout.pageWidthPx, H = layout.pageHeightPx || 1;  // 0 나눗셈 가드
   const pages = layout.pages || 1;
   const defs = layout.charPrDefs || {};
   const parts = [];
