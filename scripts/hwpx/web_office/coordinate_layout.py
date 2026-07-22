@@ -229,6 +229,14 @@ def extract(path):
         sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
         mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
         sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
+        mt = float(mg.get("top", "0")) * HU
+        # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
+        # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
+        content_h = 0.0
+        for cp in tc.iter():
+            if ln(cp.tag) == "p" and _nearest_cell(cp) is tc:
+                for cl in _cell_para_lines(cp):
+                    content_h = max(content_h, cl["ry"] + cl["h"])
         return {
             "row": int(addr.get("rowAddr", "0")),
             "col": int(addr.get("colAddr", "0")),
@@ -237,7 +245,8 @@ def extract(path):
             "w": float(sz.get("width", "0")) * HU,
             "h": float(sz.get("height", "0")) * HU,
             "ml": float(mg.get("left", "0")) * HU,
-            "mt": float(mg.get("top", "0")) * HU,
+            "mt": mt,
+            "hContent": content_h,
             "bfRef": tc.attrib.get("borderFillIDRef"),
             "vAlign": sub.get("vertAlign", "TOP"),
             "tc": tc,
@@ -278,10 +287,14 @@ def extract(path):
             return base_y
         ncol = max((c["col"] + c["colSpan"] for c in cells), default=1)
         nrow = max((c["row"] + c["rowSpan"] for c in cells), default=1)
+        # 행높이는 cellSz 와 실제 내용높이(hContent+상하여백) 중 큰 값으로 —
+        # cellSz 가 최소값이라 내용이 넘쳐 셀이 세로로 충돌하는 것을 막는다.
+        for c in cells:
+            c["hEff"] = max(c["h"], c["hContent"] + c["mt"] * 2)
         col_w = _solve_axis(cells, ncol, "col", "colSpan", "w")
-        row_h = _solve_axis(cells, nrow, "row", "rowSpan", "h")
-        # 한컴이 선언한 표 총 크기(sz)에 정규화 — 셀 폭/높이 합의 근사 오차가
-        # 표 전체 폭·높이로 누적되지 않도록 비례 보정(저장 치수 신뢰).
+        row_h = _solve_axis(cells, nrow, "row", "rowSpan", "hEff")
+        # 한컴 선언 표 폭(sz)에 열 정규화(가로 드리프트 방지). 행높이는 내용
+        # 기반이므로 선언 높이보다 작을 때만 위로 채우고, 클 때는 유지(넘침 방지).
         sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
         tw = float(sz.get("width", "0")) * HU
         th = float(sz.get("height", "0")) * HU
@@ -289,7 +302,7 @@ def extract(path):
         if tw > 0 and sw > 0:
             col_w = [w * tw / sw for w in col_w]
         sh = sum(row_h)
-        if th > 0 and sh > 0:
+        if th > 0 and sh > 0 and sh < th:
             row_h = [h * th / sh for h in row_h]
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
@@ -341,10 +354,15 @@ def extract(path):
                 if bf.get("fill"):
                     box["fill"] = bf["fill"]
             boxes.append(box)
-            # 이 셀 직속 중첩표 → 셀 내용 좌상단에서 재귀 배치
+            # 이 셀 직속 중첩표 → 셀 안 실제 세로 위치(담긴 문단 vertpos)에서
+            # 재귀 배치. 셀 최상단에 놓으면 앞선 본문 문단과 겹친다.
             for nt in c["tc"].iter():
                 if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
-                    walk_table(nt, cx + c["ml"], cy + c["mt"])
+                    pp = _nearest_p(nt)
+                    nsegs = _direct_linesegs(pp) if pp is not None else []
+                    nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
+                             if nsegs else 0.0)
+                    walk_table(nt, cx + c["ml"], cy + c["mt"] + nvpos)
             table_bottom = max(table_bottom, cy + ch)
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
@@ -364,6 +382,15 @@ def extract(path):
         x = parent_map.get(el)
         while x is not None:
             if ln(x.tag) == "tc":
+                return x
+            x = parent_map.get(x)
+        return None
+
+    def _nearest_p(el):
+        """el 의 가장 가까운 조상 p (없으면 None)."""
+        x = parent_map.get(el)
+        while x is not None:
+            if ln(x.tag) == "p":
                 return x
             x = parent_map.get(x)
         return None

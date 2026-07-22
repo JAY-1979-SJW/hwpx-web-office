@@ -150,6 +150,19 @@ def test_cell_lines_do_not_overrun_their_cell():
     assert not over, f"셀을 넘는 줄: {over}"
 
 
+def test_nested_table_below_preceding_cell_text():
+    """WEB-OFFICE-COORD-FIDELITY-06 — 셀 안 중첩표(서명블록)가 앞선 본문
+    문단 위로 겹치지 않고 아래에 배치되는지. 중첩표를 셀 최상단이 아닌
+    담긴 문단 vertpos 에 두는 회귀 가드."""
+    stamp = "tests/fixtures/hwpx/corpus/fx_stamp_approval_legal.hwpx"
+    out = extract(str(PR / stamp))
+    body = next((l for l in out["lines"] if "증명합니다" in l["text"]), None)
+    sign = next((l for l in out["lines"] if "특별자치시장" in l["text"]), None)
+    assert body is not None and sign is not None, "본문/서명 줄을 찾지 못함"
+    assert sign["y"] > body["y"] + 20, \
+        f"서명(y={sign['y']:.0f})이 본문(y={body['y']:.0f}) 아래에 있어야 함"
+
+
 def test_header_cells_have_gray_fill():
     """WEB-OFFICE-COORD-FIDELITY-03 — 헤더 셀 배경(fillBrush)이 반출되는지."""
     out = extract(str(PR / FORM))
