@@ -454,12 +454,15 @@ def extract(path):
             top_tbls = [t for t in child.iter()
                         if ln(t.tag) == "tbl" and _nearest_tbl(t) is None]
             if top_tbls:
-                # 표 보유 문단: 빈 텍스트 lineseg(=표 높이)로 flow 를 밀지 않고
-                # 표를 문단 top 에 직접 배치. 이후 flow 는 표 하단으로 전진.
-                top = _para_top_y(child)
-                base_y = top if top is not None else st["flow_y"] + 4
+                # 표를 flow 위치(직전 내용 아래)에 순차 배치. 다중 표가 각기
+                # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
+                # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다. _para_top_y 는
+                # 페이지 상태(prev_vpos) 갱신용으로만 호출.
+                _para_top_y(child)
+                base_y = st["flow_y"]
                 for t in top_tbls:
-                    base_y = walk_table(t, m_left, base_y) + 4
+                    walk_table(t, m_left, base_y)
+                    base_y = st["flow_y"]
             else:
                 emit_para(child)
 

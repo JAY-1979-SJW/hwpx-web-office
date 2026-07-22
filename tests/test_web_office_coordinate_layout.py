@@ -150,6 +150,18 @@ def test_cell_lines_do_not_overrun_their_cell():
     assert not over, f"셀을 넘는 줄: {over}"
 
 
+def test_multi_top_level_tables_flow_across_pages():
+    """WEB-OFFICE-COORD-FIDELITY-07 — 다중 top-level 표(각 vertpos=0 흐름)가
+    한 지점에 겹치지 않고 순차 flow 로 여러 페이지에 펼쳐지는지."""
+    mt = "tests/fixtures/hwpx/corpus/fx_many_tables_page_marker.hwpx"
+    out = extract(str(PR / mt))
+    bx = out["boxes"]
+    ymax = max(b["y"] + b["h"] for b in bx)
+    assert ymax > out["pageHeightPx"] * 1.5, \
+        f"표들이 flow 안 되고 한 페이지에 뭉침(ymax={ymax:.0f})"
+    assert out["pages"] >= 2
+
+
 def test_nested_table_below_preceding_cell_text():
     """WEB-OFFICE-COORD-FIDELITY-06 — 셀 안 중첩표(서명블록)가 앞선 본문
     문단 위로 겹치지 않고 아래에 배치되는지. 중첩표를 셀 최상단이 아닌
