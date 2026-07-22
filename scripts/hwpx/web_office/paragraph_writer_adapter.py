@@ -68,11 +68,16 @@ REASON_TYPE_TEXT_MULTI_RUN_NOT_SUPPORTED = (
     "TYPE_TEXT_MULTI_RUN_NOT_SUPPORTED")
 # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-EXISTING-CHARPR-01 신규 reject 사유.
 REASON_TARGET_CHARPR_NOT_IN_HEADER = "TARGET_CHARPR_NOT_IN_HEADER"
+REASON_TARGET_PARAPR_NOT_IN_HEADER = "TARGET_PARAPR_NOT_IN_HEADER"
+REASON_PARA_TEXT_MUTATED = "PARA_TEXT_MUTATED"
 REASON_EMPTY_RANGE = "EMPTY_RANGE"
 
 _SUPPORTED_COMMAND_TYPES = {
     "TYPE_TEXT", "REPLACE_TEXT_RANGE", "DELETE_TEXT_RANGE",
     "APPLY_FORMAT",
+    # WEB-OFFICE-PARA-FORMAT-01(M2): 문단서식(paraPr) 교체.
+    # header.xml 무수정 — 기존 paraPr id 로만 교체.
+    "APPLY_PARA_FORMAT",
     # WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-INSERT-01:
     "PARA_INSERT",
     # WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-01:
@@ -114,6 +119,35 @@ def _local_tag(elem) -> str:
 
 _HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
 _HEADER_CHARPR_IDS_CACHE: dict[int, set[str]] = {}
+
+
+def _read_header_para_pr_ids(package: HwpxPackage) -> set[str]:
+    """Contents/header.xml 의 <hh:paraPr id="N"> id 집합 (M2 문단서식 검증용)."""
+    header_bytes: bytes | None = None
+    for entry in ("Contents/header.xml", "Contents\\header.xml"):
+        if entry in package.entries:
+            header_bytes = package.entries[entry]
+            break
+    if header_bytes is None:
+        for name, data in package.entries.items():
+            if name.replace("\\", "/").endswith("Contents/header.xml"):
+                header_bytes = data
+                break
+    if header_bytes is None:
+        return set()
+    import xml.etree.ElementTree as ET  # noqa: WPS433
+    try:
+        root = ET.fromstring(header_bytes)
+    except ET.ParseError:
+        return set()
+    ids: set[str] = set()
+    for el in root.iter():
+        if el.tag.rsplit("}", 1)[-1] != "paraPr":
+            continue
+        pid = el.attrib.get("id")
+        if pid is not None:
+            ids.add(str(pid))
+    return ids
 
 
 def _read_header_char_pr_ids(package: HwpxPackage) -> set[str]:
@@ -865,6 +899,66 @@ def apply_paragraph_edits_plan(
                 "containerScope": scope,
                 "entry": entry,
                 "applyFormatExistingCharPr": True,
+                "dryRun": False,
+            })
+            continue
+
+        # WEB-OFFICE-PARA-FORMAT-01(M2): APPLY_PARA_FORMAT —
+        # 문단 요소의 paraPrIDRef 만 기존 header id 로 교체.
+        # 텍스트/run 일절 무변경, header.xml 무수정(§4 유지).
+        if ct == "APPLY_PARA_FORMAT":
+            target_ppr_raw = item.get("targetParaPrIDRef")
+            if target_ppr_raw is None or str(target_ppr_raw) == "":
+                rejected.append(_reject(
+                    item, REASON_TARGET_PARAPR_NOT_IN_HEADER,
+                    targetParaPrIDRef=target_ppr_raw))
+                continue
+            target_ppr = str(target_ppr_raw)
+            if target_ppr not in _read_header_para_pr_ids(package):
+                rejected.append(_reject(
+                    item, REASON_TARGET_PARAPR_NOT_IN_HEADER,
+                    targetParaPrIDRef=target_ppr))
+                continue
+            # 텍스트 불변 검증: expectedBefore 는 문단 전체 텍스트
+            expected_before = item.get("expectedBefore")
+            if (expected_before is not None
+                    and para_full != expected_before):
+                rejected.append(_reject(
+                    item, REASON_EXPECTED_BEFORE_MISMATCH,
+                    sliceBefore=para_full,
+                    expectedBefore=expected_before))
+                continue
+            before_ppr = paragraph_elem.attrib.get("paraPrIDRef")
+            if dry_run:
+                applied.append({
+                    "commandId": item.get("commandId"),
+                    "paragraphId": item.get("paragraphId"),
+                    "afterText": para_full,
+                    "commandType": ct,
+                    "beforeParaPrIDRef": before_ppr,
+                    "targetParaPrIDRef": target_ppr,
+                    "paraPrIDRef": target_ppr,
+                    "containerScope": scope,
+                    "entry": entry,
+                    "applyParaFormatExistingParaPr": True,
+                    "dryRun": True,
+                })
+                continue
+            paragraph_elem.set("paraPrIDRef", target_ppr)
+            package.write_xml(entry, root)
+            touched_entries.add(entry)
+            applied.append({
+                "commandId": item.get("commandId"),
+                "paragraphId": item.get("paragraphId"),
+                "afterText": para_full,
+                "commandType": ct,
+                "beforeParaPrIDRef": before_ppr,
+                "targetParaPrIDRef": target_ppr,
+                "afterParaPrIDRef": target_ppr,
+                "paraPrIDRef": target_ppr,
+                "containerScope": scope,
+                "entry": entry,
+                "applyParaFormatExistingParaPr": True,
                 "dryRun": False,
             })
             continue

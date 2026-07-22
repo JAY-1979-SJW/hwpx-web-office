@@ -136,6 +136,13 @@
       </div><div class="lbl">글자 모양</div></div>
 
       <div class="grp" data-tab="home"><div class="btns">
+        <button class="b-ico" data-align="LEFT"    type="button" disabled title="왼쪽 정렬">⯇</button>
+        <button class="b-ico" data-align="CENTER"  type="button" disabled title="가운데 정렬">≡</button>
+        <button class="b-ico" data-align="RIGHT"   type="button" disabled title="오른쪽 정렬">⯈</button>
+        <button class="b-ico" data-align="JUSTIFY" type="button" disabled title="양쪽 정렬">☰</button>
+      </div><div class="lbl">문단 정렬</div></div>
+
+      <div class="grp" data-tab="home"><div class="btns">
         <select data-role="font" disabled title="글꼴"><option>글꼴</option></select>
         <select data-role="size" disabled title="글자 크기"><option>크기</option></select>
         <select data-role="color" disabled title="글자 색"><option>색</option></select>
@@ -190,11 +197,12 @@
 <script type="module">
 import {
   makeParagraphEditorState, setCaret, setRange, applyFormatToSelection,
-  typeTextAtCaret, deleteRange, buildSaveDryRunPayload,
+  typeTextAtCaret, deleteRange, applyParaFormat, buildSaveDryRunPayload,
 } from "./para_edit_state.mjs";
 import { onKeyDown } from "./para_edit_runtime.mjs";
 import { matchToggle, matchAxisChange, extractAxisValues } from "./format_charpr_matcher.mjs";
 import { findMatches, buildReplacePlan } from "./weboffice/editor_find.mjs";
+import { matchParaAxisChange } from "./weboffice/format_parpr_matcher.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
 const $ = (s) => document.querySelector(`[data-role=${s}]`);
@@ -286,6 +294,7 @@ function replaceAll(){
 function charPrAt(p,off){ let pos=0; for(const r of p.runs){ if(off<pos+r.text.length||(off===paraLen(p)&&r===p.runs[p.runs.length-1])) return r.charPrIDRef; pos+=r.text.length; } return p.runs[0]?.charPrIDRef??null; }
 function cellKey(cs){ return cs&&cs.kind==="cell"?`${cs.tableIndex}:${cs.rowIndex}:${cs.colIndex}`:null; }
 // 표 셀 텍스트를 평탄화 중복 출력하는 컨테이너 문단 감지(표와 90%+ 문자 겹침)
+let paraDefs={};
 let _tableChars=null;
 function tableCharSet(){
   if(_tableChars) return _tableChars;
@@ -418,6 +427,19 @@ function renderRibbon(){
     btn.onclick=()=>{ const r=applyFormatToSelection(state,matched,defs); state=r.state; lastReason=r.reason||""; renderAll(); };
   }
   // 크기·색 셀렉트 — 현재 문서에 존재하는 값만 채운다
+  /* M2: 문단 정렬 — 기존 paraPr 매칭만(신규 생성 금지) */
+  const ap=activePara();
+  const curPara=ap&&ap.parPrIDRef!=null?paraDefs[String(ap.parPrIDRef)]:null;
+  for(const al of ["LEFT","CENTER","RIGHT","JUSTIFY"]){
+    const b=document.querySelector(`[data-align=${al}]`); if(!b) continue;
+    const isCur=curPara?.align?.horizontal===al;
+    const hit=curPara?matchParaAxisChange(curPara,paraDefs,"align",al):null;
+    b.classList.toggle("on",!!isCur);
+    b.disabled=!ap||isCur||!hit;
+    b.title=!ap?"문단을 클릭하세요":isCur?"현재 정렬":!hit?"매칭되는 기존 paraPr 없음(신규 생성 금지)":"paraPr #"+hit+" 적용";
+    b.onclick=()=>{ const r=applyParaFormat(state,hit,paraDefs); state=r.state; lastReason=r.reason||"";
+      setStatus(r.command?"ok":"rej", r.command?("문단 정렬 "+al+" · paraPr #"+hit):("정렬 거부: "+lastReason)); renderAll(); };
+  }
   fillAxis($("font"),"fontName",hasRange,curDef,(v)=>v);
   fillAxis($("size"),"fontSizePt",hasRange,curDef,(v)=>v+"pt");
   fillAxis($("color"),"textColor",hasRange,curDef,(v)=>v);
@@ -616,6 +638,7 @@ async function loadForm(sourcePath){
     const env=await res.json(); const d=env.data||env;
     if(env.status!=="SUCCESS"||d.verdict!=="PASS"){ setStatus("fail","로드 실패: "+(d.reason||"UNKNOWN")); return false; }
     const dm=d.documentModel; defs=normDefs((dm.styles||{}).charPrDefs);
+    paraDefs=(dm.styles||{}).paraPrDefs||{};
     const paragraphs=(dm.paragraphs||[]).map(p=>({paragraphId:p.paragraphId,parPrIDRef:p.parPrIDRef,containerScope:p.containerScope,runs:(p.runs||[]).map(r=>({runId:r.runId,text:r.text,charPrIDRef:r.charPrIDRef}))}));
     state=makeParagraphEditorState({sourceDocumentHash:dm.sourceDocumentHash},paragraphs);
     blocks=(d.renderPayload||{}).blocks||[];

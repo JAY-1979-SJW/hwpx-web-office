@@ -11,6 +11,9 @@ export const CT_SPLIT_TEXT_RUN = "SPLIT_TEXT_RUN";
 export const CT_MERGE_TEXT_RUNS = "MERGE_TEXT_RUNS";
 // WEB-OFFICE-PARA-EDIT-APPLYFORMAT-EXISTING-CHARPR-01.
 export const CT_APPLY_FORMAT = "APPLY_FORMAT";
+/* WEB-OFFICE-PARA-FORMAT-01(M2): 문단서식(paraPr) 적용.
+ * charPr 과 동일하게 "기존 paraPr 매칭"만 허용 — 신규 paraPr 생성 없음. */
+export const CT_APPLY_PARA_FORMAT = "APPLY_PARA_FORMAT";
 // WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-INSERT-01.
 export const CT_PARA_INSERT = "PARA_INSERT";
 // WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-01: 사용자 command (Backspace at start).
@@ -350,6 +353,36 @@ export function makeApplyFormatCommand({
   };
 }
 
+/* 문단서식(paraPr) 적용 명령. 텍스트 무변경 — parPrIDRef 만 교체. */
+export function makeApplyParaFormatCommand({
+  target, paragraph, targetParaPrIDRef, sourceDocumentHash, commandGroupId,
+}) {
+  const before = paragraph.parPrIDRef ?? null;
+  const tgt = String(targetParaPrIDRef);
+  if (before !== null && String(before) === tgt) return null;   // NOOP
+  const scope = target?.containerScope ?? null;
+  const beforeStr = before === null ? null : String(before);
+  return {
+    commandId: _uuid(), commandType: CT_APPLY_PARA_FORMAT,
+    target,
+    payload: { targetParaPrIDRef: tgt, beforeParaPrIDRef: beforeStr },
+    forward: { kind: "APPLY_PARA_FORMAT",
+               paragraphId: paragraph.paragraphId,
+               targetParaPrIDRef: tgt,
+               beforeParaPrIDRef: beforeStr,
+               containerScope: scope },
+    inverse: { kind: "APPLY_PARA_FORMAT_INVERSE",
+               paragraphId: paragraph.paragraphId,
+               restoreParaPrIDRef: beforeStr,
+               containerScope: scope },
+    expectedBefore: _paragraphText(paragraph),   // 텍스트 불변 검증용
+    createdAt: new Date().toISOString(),
+    sourceDocumentHash,
+    commandGroupId: commandGroupId ?? _uuid(),
+    status: STATUS_PENDING,
+  };
+}
+
 /* apply / validate */
 
 export function applyCommandToParagraph(p, cmd) {
@@ -369,6 +402,13 @@ export function applyCommandToParagraph(p, cmd) {
   if (k === "APPLY_FORMAT") return _applyFormat(p, cmd.forward);
   if (k === "APPLY_FORMAT_INVERSE") {
     return _applyFormatInverse(p, cmd.forward);
+  }
+  /* 문단서식: 텍스트/run 불변, parPrIDRef 만 교체 */
+  if (k === "APPLY_PARA_FORMAT") {
+    return { ...p, parPrIDRef: cmd.forward.targetParaPrIDRef };
+  }
+  if (k === "APPLY_PARA_FORMAT_INVERSE") {
+    return { ...p, parPrIDRef: cmd.forward.restoreParaPrIDRef };
   }
   throw new Error(`unknown forward kind: ${k}`);
 }

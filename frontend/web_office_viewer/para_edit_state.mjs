@@ -6,7 +6,7 @@
  */
 import {
   makeTypeTextCommand, makeReplaceTextRangeCommand,
-  makeDeleteTextRangeCommand, makeApplyFormatCommand,
+  makeDeleteTextRangeCommand, makeApplyFormatCommand, makeApplyParaFormatCommand,
   applyCommandToParagraph,
   CT_TYPE_TEXT, CT_REPLACE_TEXT_RANGE, CT_DELETE_TEXT_RANGE,
   CT_APPLY_FORMAT, CT_PARA_INSERT, CT_PARA_DELETE,
@@ -381,6 +381,49 @@ export function applyFormatToSelection(
   if (!cmd) {
     return { state, command: null, reason: "EMPTY_RANGE" };
   }
+  const nextPara = applyCommandToParagraph(p, cmd);
+  return {
+    state: _appendCommand(state, cmd, nextPara),
+    command: cmd, reason: "OK",
+  };
+}
+
+
+/* WEB-OFFICE-PARA-FORMAT-01(M2): 활성 문단에 문단서식(paraPr) 적용.
+ * 텍스트 선택 불필요(문단 단위). charPr 과 동일하게 기존 paraPr 매칭만 허용. */
+export function applyParaFormat(state, targetParaPrIDRef, paraPrDefs) {
+  if (!state.activeParagraphId) {
+    return { state, command: null, reason: "NO_ACTIVE_PARAGRAPH" };
+  }
+  if (state.composition?.active) {
+    return { state, command: null, reason: "COMPOSITION_LOCKED" };
+  }
+  if (_scopeMissing(state)) {
+    return { state, command: null,
+             reason: "REQUIRES_REVIEW_NO_CONTAINER_SCOPE" };
+  }
+  // §4: header/footer 등 non-body/non-cell scope 편집 차단
+  const _inlineReject = _inlineScopeGuard(state);
+  if (_inlineReject) {
+    return { state, command: null, reason: _inlineReject };
+  }
+  if (targetParaPrIDRef === null || targetParaPrIDRef === undefined
+      || String(targetParaPrIDRef) === "") {
+    return { state, command: null, reason: "TARGET_PARAPR_REQUIRED" };
+  }
+  const tgt = String(targetParaPrIDRef);
+  if (paraPrDefs && !Object.prototype.hasOwnProperty.call(paraPrDefs, tgt)) {
+    return { state, command: null, reason: "TARGET_PARAPR_NOT_IN_HEADER" };
+  }
+  const p = _findPara(state, state.activeParagraphId);
+  if (!p) return { state, command: null, reason: "NO_ACTIVE_PARAGRAPH" };
+  const cmd = makeApplyParaFormatCommand({
+    target: _buildTarget(state, p.paragraphId),
+    paragraph: p,
+    targetParaPrIDRef: tgt,
+    sourceDocumentHash: state.sourceDocumentHash,
+  });
+  if (!cmd) return { state, command: null, reason: "NOOP_SAME_PARAPR" };
   const nextPara = applyCommandToParagraph(p, cmd);
   return {
     state: _appendCommand(state, cmd, nextPara),

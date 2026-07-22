@@ -12,7 +12,8 @@ V4/V5/V6 는 정상 검증된다.
                                                           paragraphId 로 누출되지 않음
 - V3_UNTOUCHED_RUNS_PRESERVED  : 적용 안 한 paragraph 의 text 동일
 - V4_CHARPR_PRESERVED          : applyCharPrIDRef ⊆ 원본 char_pr_set
-- V5_PARPR_PRESERVED           : applied 명령의 paragraph 의 parPr 무변경
+- V5_PARPR_PRESERVED           : parPr 무결성 — APPLY_PARA_FORMAT 대상만
+                                 의도된 기존 paraPr 로 변경, 신규 paraPr 도입 금지
 - V6_OUTPUT_ISOLATED           : output != source && sandbox 하위
 - V7_READBACK_MATCH            : V1 PASS && output 존재
 """
@@ -32,6 +33,24 @@ def _read_blob(zip_path: Path) -> str:
             if name.endswith(".xml") or name.endswith(".hpf"):
                 parts.append(z.read(name).decode("utf-8", "ignore"))
     return "".join(parts)
+
+
+def _header_para_pr_ids(zip_path: Path) -> set[str]:
+    """HWPX 의 Contents/header.xml 에서 <hh:paraPr id> 집합 (신규 도입 탐지용)."""
+    import xml.etree.ElementTree as ET
+    if not zip_path.is_file():
+        return set()
+    try:
+        with zipfile.ZipFile(str(zip_path)) as z:
+            name = next((n for n in z.namelist()
+                         if n.replace("\\", "/").endswith("Contents/header.xml")), None)
+            if name is None:
+                return set()
+            root = ET.fromstring(z.read(name))
+    except Exception:
+        return set()
+    return {str(el.attrib["id"]) for el in root.iter()
+            if el.tag.rsplit("}", 1)[-1] == "paraPr" and "id" in el.attrib}
 
 
 def verify7_paragraphs(
@@ -110,6 +129,26 @@ def verify7_paragraphs(
             v5 = "FAIL"
             findings.append({"code": "V5_PARAGRAPH_MISSING",
                                       "paragraphId": pid})
+    # WEB-OFFICE-PARA-FORMAT-01(M2): parPr 변경은 APPLY_PARA_FORMAT 명령의
+    # 대상 문단에서만 허용하고, 그 값은 반드시 "원본 header 에 이미 있던"
+    # paraPr id 여야 한다(신규 paraPr 도입 = header mutation 금지).
+    src_para_pr_ids = _header_para_pr_ids(source_path)
+    for e in applied_plan_edits:
+        if e.get("commandType") != "APPLY_PARA_FORMAT":
+            continue
+        tgt = e.get("targetParaPrIDRef")
+        after = e.get("afterParaPrIDRef", e.get("paraPrIDRef"))
+        if tgt is None or str(after) != str(tgt):
+            v5 = "FAIL"
+            findings.append({"code": "V5_PARAPR_TARGET_MISMATCH",
+                             "paragraphId": e.get("paragraphId"),
+                             "targetParaPrIDRef": tgt,
+                             "afterParaPrIDRef": after})
+        elif src_para_pr_ids and str(tgt) not in src_para_pr_ids:
+            v5 = "FAIL"
+            findings.append({"code": "V5_NEW_PARAPR_INTRODUCED",
+                             "paragraphId": e.get("paragraphId"),
+                             "targetParaPrIDRef": tgt})
     if not applied_plan_edits:
         v5 = "FAIL"
         findings.append({"code": "V5_NO_APPLIED",
@@ -144,6 +183,10 @@ def verify7_paragraphs(
             # afterText (=원본 slice) 가 단일 hp:t 로 더 이상 존재하지
             # 않을 수 있다. 본 게이트는 텍스트 삽입/치환 명령 한정.
             if entry.get("commandType") == "APPLY_FORMAT":
+                continue
+            # WEB-OFFICE-PARA-FORMAT-01(M2): APPLY_PARA_FORMAT 은 charPr 을
+            # 건드리지 않는 문단서식 명령 → V4(charPr 보존) 검사 대상 아님.
+            if entry.get("commandType") == "APPLY_PARA_FORMAT":
                 continue
             after = entry.get("afterText", "")
             if after and after not in blob:
