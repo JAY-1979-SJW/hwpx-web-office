@@ -51,9 +51,19 @@ def _filename_from_cd(cd: str) -> str:
         return ""
     raw = m.group(1)
     try:
-        return urllib.parse.unquote(raw)
+        name = urllib.parse.unquote(raw)
     except Exception:
-        return raw
+        name = raw
+    # http.client 는 헤더를 latin-1 로 디코드한다. 서버가 UTF-8 파일명을
+    # 퍼센트인코딩 없이 그대로 보내면 모지바케가 되므로 되돌린다.
+    if not re.search(r"[가-힣]", name):
+        try:
+            fixed = name.encode("latin-1").decode("utf-8")
+            if re.search(r"[가-힣]", fixed):
+                name = fixed
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+    return name
 
 
 def load_done() -> set[int]:

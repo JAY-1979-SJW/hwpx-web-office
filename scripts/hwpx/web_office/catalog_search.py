@@ -115,21 +115,53 @@ def stats() -> dict[str, Any]:
         return {"ready": False, "total": 0, "error": str(e)[:120]}
 
 
-def search(query: str, *, limit: int = 20) -> dict[str, Any]:
-    """이름/종류/법정번호 텍스트 검색."""
+def institutions(*, limit: int = 300) -> dict[str, Any]:
+    """기관/부처별 서식 수 (많은 순). 카탈로그 UI 필터용."""
+    if not catalog_ready():
+        return {"ready": False, "institutions": []}
+    try:
+        con = _con()
+        rows = con.execute(
+            "SELECT institution, COUNT(*) AS n FROM forms "
+            "WHERE status='OK' AND institution IS NOT NULL AND institution != '' "
+            "GROUP BY institution ORDER BY n DESC, institution ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        con.close()
+        return {"ready": True,
+                "institutions": [{"institution": r["institution"], "count": r["n"]}
+                                 for r in rows]}
+    except sqlite3.Error as e:
+        return {"ready": False, "institutions": [], "error": str(e)[:120]}
+
+
+def search(query: str, *, limit: int = 20,
+           institution: str | None = None) -> dict[str, Any]:
+    """이름/종류/법정번호 텍스트 검색. institution 지정 시 해당 기관으로 한정하며,
+    질의어가 비어 있어도 기관만으로 목록 조회가 가능하다."""
     if not catalog_ready():
         return {"ready": False, "results": []}
     q = (query or "").strip()
-    if not q:
+    inst = (institution or "").strip()
+    if not q and not inst:
         return {"ready": True, "results": []}
     try:
         con = _con()
         like = f"%{q}%"
+        where = ["status='OK'"]
+        params: list[Any] = []
+        if q:
+            where.append("(name LIKE ? OR form_type LIKE ? OR statute_no LIKE ?)")
+            params += [like, like, like]
+        if inst:
+            where.append("institution = ?")
+            params.append(inst)
+        params.append(limit)
         rows = con.execute(
-            "SELECT form_id,form_type,statute_no,name,field_count,table_count,cell_count "
-            "FROM forms WHERE status='OK' AND (name LIKE ? OR form_type LIKE ? OR statute_no LIKE ?) "
-            "ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
-            (like, like, like, limit),
+            "SELECT form_id,form_type,statute_no,name,field_count,table_count,"
+            "cell_count,institution FROM forms WHERE " + " AND ".join(where) +
+            " ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
+            tuple(params),
         ).fetchall()
         results = []
         for r in rows:
@@ -140,9 +172,11 @@ def search(query: str, *, limit: int = 20) -> dict[str, Any]:
                 "statuteNo": r["statute_no"], "name": r["name"],
                 "fieldCount": r["field_count"], "tableCount": r["table_count"],
                 "cellCount": r["cell_count"], "sampleFields": labels,
+                "institution": r["institution"],
             })
         con.close()
-        return {"ready": True, "query": q, "results": results}
+        return {"ready": True, "query": q, "institution": inst or None,
+                "results": results}
     except sqlite3.Error as e:
         return {"ready": False, "results": [], "error": str(e)[:120]}
 

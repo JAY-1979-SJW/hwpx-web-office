@@ -35,6 +35,13 @@
   .card .fields{ margin-top:8px; display:flex; gap:5px; flex-wrap:wrap; }
   .card .fld{ font-size:11.5px; background:#f4f6f8; border:1px solid #e3e8ec; border-radius:5px; padding:2px 8px; color:#42505e; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .card .more{ font-size:11.5px; color:#3a7be0; cursor:pointer; padding:2px 4px; }
+  .instrow{ display:flex; align-items:center; gap:8px; margin:10px 0 4px; flex-wrap:wrap; font-size:13px; }
+  .instrow label{ color:#42505e; font-weight:700; }
+  .instrow select{ font:inherit; padding:5px 8px; border:1px solid #c3ccd6; border-radius:6px; max-width:340px; }
+  .instrow button{ font:inherit; padding:5px 10px; border:1px solid #b3bcc6; background:#fff; border-radius:6px; cursor:pointer; }
+  .instrow button:hover{ background:#eaf1fb; border-color:#7ea6e6; }
+  .instnote{ color:#8a94a0; font-size:12px; }
+  .card .inst{ font-size:11px; background:#eef7ee; color:#2c6b3f; border:1px solid #cfe6d3; border-radius:5px; padding:2px 7px; }
   .card .acts{ margin-top:10px; }
   .card .openbtn{ font-size:12.5px; font-weight:700; background:#1e4fa3; color:#fff; border:0; border-radius:7px; padding:7px 14px; cursor:pointer; }
   .card .openbtn:hover{ background:#163d80; }
@@ -54,6 +61,13 @@
     <button data-role="ai" type="button" title="자연어로 서식 찾기 (Claude, 수 초 소요)" style="background:#fff4d1;border-color:#e0b84a;color:#7a5b12;">🤖 AI 검색</button>
   </div>
   <p class="hint">키워드 검색(즉시) · 카테고리 브라우즈 · AI 의미검색("공사 시작할 때 내는 서류" 같은 자연어). 서식을 고르면 입력칸이 보입니다.</p>
+  <div class="instrow">
+    <label>🏛 기관·부처</label>
+    <select data-role="inst"><option value="">전체 기관</option></select>
+    <button data-role="instgo" type="button" title="선택한 기관의 서식 보기">이 기관 서식</button>
+    <button data-role="instclear" type="button" title="기관 필터 해제">✕ 해제</button>
+    <span class="instnote" data-role="instnote"></span>
+  </div>
   <div class="catrow" data-role="cats"></div>
   <div class="chips" data-role="chips"></div>
   <div class="status" data-role="status"></div>
@@ -90,6 +104,7 @@ function renderResults(rs, label){
       <div class="top">
         <span class="nm">${esc(f.name.replace(/\.hwpx?$/i,""))}</span>
         ${f.statuteNo?`<span class="statute">${esc(f.statuteNo)}</span>`:""}${mk}
+        ${f.institution?`<span class="inst">🏛 ${esc(f.institution)}</span>`:""}
         <span class="meta">필드 ${f.fieldCount} · 표 ${f.tableCount} · 셀 ${f.cellCount}</span>
       </div>
       <div class="fields">
@@ -116,9 +131,9 @@ async function search(){
   if(!q){ $("results").innerHTML=""; $("status").textContent=""; return; }
   clearCatSel(); $("status").textContent = "검색 중…";
   try{
-    const r = await fetch("/api/web-office/catalog-search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,limit:30})});
+    const r = await fetch("/api/web-office/catalog-search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,limit:30,institution:curInst()||null})});
     const rs = ((await r.json()).data||{}).results || [];
-    renderResults(rs, `"${q}" 결과 ${rs.length}건`);
+    renderResults(rs, `"${q}"${curInst()?` · 🏛 ${curInst()}`:""} 결과 ${rs.length}건`);
   }catch(e){ $("status").textContent = "검색 오류: "+e.message; }
 }
 async function aiSearch(){
@@ -153,10 +168,40 @@ async function selectCategory(el){
   }catch(e){ $("status").textContent="카테고리 오류: "+e.message; }
 }
 
+async function loadInstitutions(){
+  try{
+    const r = await fetch("/api/web-office/catalog-institutions");
+    const list = ((await r.json()).data||{}).institutions || [];
+    const sel = $("inst");
+    for(const it of list){
+      const o=document.createElement("option");
+      o.value=it.institution; o.textContent=`${it.institution} (${it.count.toLocaleString()})`;
+      sel.appendChild(o);
+    }
+    $("instnote").textContent = `${list.length}개 기관·부처`;
+  }catch(e){ $("instnote").textContent = "기관 목록 오류"; }
+}
+function curInst(){ return $("inst").value || ""; }
+async function browseInstitution(){
+  const inst = curInst();
+  if(!inst){ $("status").textContent="기관을 선택하세요."; return; }
+  clearCatSel(); $("status").textContent = `${inst} 서식 불러오는 중…`;
+  try{
+    const r = await fetch("/api/web-office/catalog-search",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({query:$("q").value.trim(),institution:inst,limit:40})});
+    const rs = ((await r.json()).data||{}).results || [];
+    const q=$("q").value.trim();
+    renderResults(rs, `🏛 ${inst}${q?` · "${q}"`:""} · ${rs.length}건`);
+  }catch(e){ $("status").textContent="기관 조회 오류: "+e.message; }
+}
+
+$("instgo").addEventListener("click", browseInstitution);
+$("instclear").addEventListener("click", ()=>{ $("inst").value=""; $("status").textContent="기관 필터 해제됨"; });
+$("inst").addEventListener("change", ()=>{ if(curInst()) browseInstitution(); });
 $("go").addEventListener("click", search);
 $("ai").addEventListener("click", aiSearch);
 $("q").addEventListener("keydown", e=>{ if(e.key==="Enter") search(); });
-renderChips(); loadStats(); loadCategories();
+renderChips(); loadStats(); loadCategories(); loadInstitutions();
 setInterval(loadStats, 15000);
 </script>
 </body>
