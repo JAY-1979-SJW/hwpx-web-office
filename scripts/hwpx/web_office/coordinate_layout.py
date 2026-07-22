@@ -319,9 +319,11 @@ def extract(path):
             col_w = [w * tw / sw for w in col_w]
         sh = sum(row_h)
         if th > 0 and sh > 0:
-            if sh < th:
-                row_h = [h * th / sh for h in row_h]
-            elif sh > th * 1.02:
+            # 행은 위로 늘리지 않는다 — 한컴은 각 행을 cellSz/내용 높이 그대로
+            # 렌더하고, 합이 선언 tbl height 보다 작으면 표가 그만큼 짧아질 뿐
+            # 이다(선언값은 상한/예약치). 위로 스케일하면 전 행이 균일 팽창해
+            # 세로가 늘어난다. 열 폭(위)만 선언 폭에 정규화한다.
+            if sh > th * 1.02:
                 # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
                 # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
                 # 근사가 행을 부풀려 페이지가 배로 늘던 결함의 근본 보정.

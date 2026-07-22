@@ -17,7 +17,7 @@
       "fileName": "fx_stamp_approval_legal.hwpx",
       "location": "tests/fixtures/hwpx/corpus/",
       "coversMode": "셀 내 중첩표(서명블록) 하단 배치",
-      "baseline": {"minWithin2px": 0.68, "maxMedianPx": 2.0, "measured": {"within2px": 0.786, "medianPx": 0.54}}
+      "baseline": {"minWithin2px": 0.85, "maxMedianPx": 2.0, "measured": {"within2px": 1.0, "medianPx": 0.66}}
     },
     {
       "name": "nested_valign_center",
@@ -29,13 +29,13 @@
       "baseline": {"minWithin2px": 0.80, "maxMedianPx": 2.0, "measured": {"within2px": 0.923, "medianPx": 0.66}}
     },
     {
-      "name": "detail_form_watch",
+      "name": "detail_form_multirow",
       "fileName": "reg_detail_form.hwpx",
       "location": "tests/fixtures/hwpx/regression/",
       "sha256_16": "3d0bb0a76fd119dd",
       "sourceOrigin": "data/drafts/hwpx_e2e_demo_sandbox/[별지_제24호서식]_정밀안전검진_신청서 (e2e 데모 fill, 무PII)",
-      "coversMode": "세부 폼 세로 미세 과대(롱테일 추적용 하한 — 악화만 감지)",
-      "baseline": {"minWithin2px": 0.18, "maxMedianPx": 14.0, "measured": {"within2px": 0.25, "medianPx": 9.26}}
+      "coversMode": "다행 세부 폼 (행 균일팽창 회귀 방지 — 행 스케일업 제거 후 정합)",
+      "baseline": {"minWithin2px": 0.60, "maxMedianPx": 2.0, "measured": {"within2px": 0.75, "medianPx": 0.28}}
     }
   ]
 }

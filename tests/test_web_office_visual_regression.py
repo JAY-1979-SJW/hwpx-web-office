@@ -29,17 +29,16 @@ from scripts.ops.audit_web_office_visual_fidelity import (  # noqa: E402
 PINNED = {
     "simple_form": (
         "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx",
-        0.72, 2.0, "단순 표 폼 (기준 케이스)"),
+        0.75, 2.0, "단순 표 폼 (기준 케이스)"),
     "nested_signature": (
         "tests/fixtures/hwpx/corpus/fx_stamp_approval_legal.hwpx",
-        0.68, 2.0, "셀 내 중첩표(서명블록) 하단 배치"),
+        0.85, 2.0, "셀 내 중첩표(서명블록) 하단 배치"),
     "nested_valign_center": (
         "tests/fixtures/hwpx/regression/reg_nested_valign_center.hwpx",
         0.80, 2.0, "vAlign=CENTER 셀 + 중첩표 voff 정합"),
-    # 현재 롱테일(세로 미세 과대) — 악화만 잡는 느슨한 하한.
-    "detail_form_watch": (
+    "detail_form_multirow": (
         "tests/fixtures/hwpx/regression/reg_detail_form.hwpx",
-        0.18, 14.0, "세부 폼 세로 과대(추적용 하한)"),
+        0.60, 2.0, "다행 세부 폼 (행 균일팽창 회귀 방지)"),
 }
 
 
