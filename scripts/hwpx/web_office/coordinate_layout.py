@@ -205,6 +205,10 @@ def _extract_section(path, secname, row_scale=1.0):
         tw = sane_hu(sz.get("width", "0"))
         th = sane_hu(sz.get("height", "0"))
         col_w, row_h = normalize_declared(cells, col_w, row_h, tw, th, nrow)
+        # 병합 내용 불변식 재확약 — normalize 의 슬랙 축소는 단일-span
+        # 하한(min_need)만 보호해 병합(rowSpan) 셀 보장을 되물릴 수 있다
+        # (별표2: 병합 5~8줄 셀이 최대 57px 물림). 멱등 재호출로 재보장.
+        row_h = expand_rowspan_content(cells, row_h, nrow)
         # 높이0 반복 헤더행 접기 — 한컴 '표 머리행 반복'의 저장 잔재(전 셀
         # cellSz=0)를 흐름 중간에 평행으로 그리면 페이지 꼬리 문구와 겹친다.
         # 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음). 페이지 수 왜곡도
