@@ -27,7 +27,7 @@ from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
 
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "3323eda"  # Web Office operational baseline before text-style read expansion.
+BASELINE_COMMIT = "b411164"  # M2 문단서식 준공 후 갱신 (b411164 → b411164)
 
 
 def _sha(p: Path) -> str:

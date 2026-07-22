@@ -14,7 +14,7 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_content_closeout.md")
-BASELINE_COMMIT = "15364fe"
+BASELINE_COMMIT = "b411164"
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────────

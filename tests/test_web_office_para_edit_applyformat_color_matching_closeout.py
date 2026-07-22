@@ -14,7 +14,7 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_color_matching_closeout.md")
-BASELINE_COMMIT = "15364fe"
+BASELINE_COMMIT = "b411164"  # M2 문단서식 준공 후 갱신 (b411164 → b411164)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────

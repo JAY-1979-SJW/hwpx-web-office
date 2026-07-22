@@ -16,7 +16,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_existing_charpr_closeout.md")
-BASELINE_COMMIT = "15364fe"
+BASELINE_COMMIT = "b411164"
 
 REQUIRED_DOC_PHRASES_IN_SCOPE = [
     "CT_APPLY_FORMAT", "make_apply_format_command",
