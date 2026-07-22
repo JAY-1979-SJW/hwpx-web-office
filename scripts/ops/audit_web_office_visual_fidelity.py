@@ -227,10 +227,14 @@ def compare_one(path: Path, chrome: str, workdir: Path,
             rec["gridMedianAbsPx"] = round(aoffs[len(aoffs) // 2], 2)
             rec["gridWithin2px"] = round(
                 sum(1 for o in aoffs if o <= 2) / len(aoffs), 3)
-            # 판정은 이상치에 강한 지표(2px이내 비율·중앙값)로 — 소수 특수
-            # 행(이중선 등)이 평균을 끌어올려 오탐하는 것 방지.
-            if (rec["gridWithin2px"] < 0.75
-                    or rec["gridMedianAbsPx"] > 3.5):
+            # 판정은 median(중앙값 오차) 주도 — 시각 정확도의 핵심 지표.
+            # within2px 는 하위픽셀 정밀도라 median<1.5px 인 near-perfect
+            # 문서도 임계 근처 격자선 소수 때문에 0.75 아래로 떨어져 오탐한다.
+            # → median>3px(육안 인지 가능) 이거나, within2px 가 매우 낮고
+            #   (<0.4) median 도 1.5px 초과일 때만 WARN.
+            if (rec["gridMedianAbsPx"] > 3.0
+                    or (rec["gridWithin2px"] < 0.40
+                        and rec["gridMedianAbsPx"] > 1.5)):
                 rec["verdict"] = "WARN"
                 rec["warnings"].append(
                     f"GRID_MISALIGN:med{rec['gridMedianAbsPx']}px")
