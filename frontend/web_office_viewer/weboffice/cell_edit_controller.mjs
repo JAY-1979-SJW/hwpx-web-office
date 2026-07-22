@@ -11,6 +11,12 @@ import {
 export function createCellEditController(documentModel) {
   let state = makeEditorState(documentModel);
   const editedIds = new Set();
+  // 로드 시점 빈 셀 = 입력칸(값 채우는 칸). 값 채운 뒤에도 입력칸으로 유지
+  // 하려고 원본 기준으로 스냅샷(편집으로 텍스트가 바뀌어도 분류 불변).
+  const inputCells = new Set(
+    (documentModel.cells || [])
+      .filter((c) => !((c.text || "").trim()))
+      .map((c) => c.cellId));
 
   const cellOf = (id) =>
     state.documentModel.cells.find((c) => c.cellId === id);
@@ -24,13 +30,17 @@ export function createCellEditController(documentModel) {
       const c = cellOf(cellId);
       return c ? c.text : "";
     },
-    startEdit(cellId, tdEl, rerender) {
+    // 로드 시점 빈 셀 = 입력칸(라벨 아님). 값 채운 뒤에도 true 유지.
+    isInputCell: (cellId) => inputCells.has(cellId),
+    startEdit(cellId, tdEl, rerender, opts = {}) {
       const cell = cellOf(cellId);
       if (!cell) return;
       state = enterCellEdit(selectCell(state, cellId));
       const inp = document.createElement("input");
       inp.className = "wo-cell-inp";
-      inp.value = cell.text || "";
+      // 라벨(원래 문구) 보호: 기본은 빈 입력에서 시작(값만 입력). 원래 문구를
+      // 수정하려면 prefill:true(더블클릭)로 기존 텍스트를 불러온다.
+      inp.value = opts.prefill ? (cell.text || "") : "";
       tdEl.classList.add("wo-editing");
       tdEl.innerHTML = "";
       tdEl.appendChild(inp);

@@ -58,8 +58,19 @@ export function mountWebOffice(root) {
       });
       autoFitLines(sheet);
       sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
-        box.addEventListener("click", () =>
-          cell.startEdit(box.dataset.cellId, box, render));
+        const id = box.dataset.cellId;
+        const isInput = cell.isInputCell(id);   // 로드 시 빈칸 = 입력칸
+        box.classList.add(isInput ? "wo-input" : "wo-label");
+        if (isInput) {
+          // 입력칸: 단일 클릭으로 값 입력(원래 문구 없음, 빈 입력에서 시작)
+          box.addEventListener("click", () =>
+            cell.startEdit(id, box, render));
+        }
+        // 라벨(원래 문구): 더블클릭으로만 수정(기존 텍스트 불러옴)
+        box.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          cell.startEdit(id, box, render, { prefill: true });
+        });
       });
       root.classList.add("wo-faithful");
     } else {
