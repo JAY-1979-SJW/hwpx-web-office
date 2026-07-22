@@ -80,6 +80,19 @@ def _char_coverage(ours: str, truth: str) -> float:
     return hit / sum(t.values())
 
 
+def _cellid_summary(results: list[dict]) -> dict:
+    vals = [r["cellIdMatch"] for r in results
+            if r.get("cellIdMatch") is not None]
+    if not vals:
+        return {"docs": 0}
+    return {
+        "docs": len(vals),
+        "mean": round(sum(vals) / len(vals), 3),
+        "min": round(min(vals), 3),
+        "under98": sum(1 for v in vals if v < 0.98),
+    }
+
+
 def audit_one(path: Path, project_root: Path) -> dict:
     rel = str(path.relative_to(project_root)) if path.is_relative_to(
         project_root) else str(path)
@@ -122,6 +135,25 @@ def audit_one(path: Path, project_root: Path) -> dict:
                   if not (b.get("w", 0) > 0 and b.get("h", 0) > 0))
     if neg_box:
         rec["warnings"].append(f"BOX_NONPOSITIVE:{neg_box}")
+
+    # 편집 연결성 — 좌표 박스 cellId 가 문서모델 셀 ID 와 일치하는지(편집
+    # 파이프라인 연결). 불일치 셀은 클릭 편집이 안 된다.
+    box_ids = {b["cellId"] for b in lay.get("boxes", []) if b.get("cellId")}
+    if box_ids:
+        try:
+            from scripts.hwpx.web_office.ro_view_importer import (
+                import_hwpx_as_ro_view)
+            doc = import_hwpx_as_ro_view(path)
+            model_ids = {c.cellId for c in doc.cells}
+            matched = box_ids & model_ids
+            rec["cellIdMatch"] = round(len(matched) / len(box_ids), 3)
+            rec["inputCells"] = sum(
+                1 for c in doc.cells if not (c.text or "").strip())
+            if rec["cellIdMatch"] < 0.98:
+                rec["warnings"].append(
+                    f"CELLID_MISMATCH:{rec['cellIdMatch']:.2f}")
+        except Exception as e:
+            rec["warnings"].append(f"CELLID_CHECK_FAIL:{type(e).__name__}")
 
     # 페이지 인플레이션 휴리스틱: 내용 대비 페이지 과다(빈 페이지 남발)
     if rec["pages"] > 3 and rec["lines"] / max(1, rec["pages"]) < 6:
@@ -198,6 +230,7 @@ def main() -> int:
             "min": round(min(covs), 3) if covs else None,
             "under85": sum(1 for c in covs if c < 0.85),
         },
+        "cellIdMatch": _cellid_summary(results),
         "warningModes": dict(warn_modes.most_common()),
         "worst": [
             {"path": r["path"], "verdict": r["verdict"],

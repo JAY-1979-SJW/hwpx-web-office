@@ -10,9 +10,12 @@ level writer bridge keeps outputPath for local tests; this route removes it.
 """
 from __future__ import annotations
 
+import hashlib
+import io
 import os
 import tempfile
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +28,7 @@ SCHEMA_VERSION = "web_office_editor_api_v1"
 MODE = "SANDBOX_ONLY"
 
 try:
-    from fastapi import FastAPI
+    from fastapi import FastAPI, File, UploadFile
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse, JSONResponse
@@ -91,6 +94,63 @@ def _api_output_dir() -> Path:
            else PROJECT_ROOT / "tmp" / "web_office_edits")
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+# 업로드 상한(위장/DoS 방지). 필요 시 환경변수로 조정.
+UPLOAD_MAX_BYTES = int(
+    os.environ.get("HWPX_WEB_OFFICE_UPLOAD_MAX_BYTES", str(30 * 1024 * 1024)))
+
+
+def _api_upload_dir() -> Path:
+    # 업로드 sandbox — 프로젝트 내부라 hwpx-load 경계검증을 통과한다.
+    configured = os.environ.get("HWPX_WEB_OFFICE_API_UPLOAD_DIR")
+    out = (Path(configured) if configured
+           else PROJECT_ROOT / "tmp" / "web_office_uploads")
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def call_hwpx_upload(filename: str, content: bytes,
+                     *, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
+    """브라우저가 업로드한 HWPX 바이트를 sandbox 에 받아 로드.
+
+    보안 설계 — 서버는 사용자 PC 경로에 일절 접근하지 않는다. 브라우저가
+    사용자 동의(파일 선택/드래그)로 보낸 바이트만 받아 sandbox 에만 기록하고,
+    저장 파일명은 내용 해시로 생성한다(사용자 파일명 신뢰 안 함 → 경로주입
+    차단). 로드는 hwpx-load 와 동일 파이프라인이라 원본 무수정 원칙 유지.
+    """
+    name = str(filename or "").strip()
+    if not name.lower().endswith(".hwpx"):
+        return _envelope(
+            "FAILED", {"verdict": "REJECTED", "reason": "NOT_HWPX"},
+            [{"code": "NOT_HWPX",
+              "message": "HWPX(.hwpx) 파일만 업로드할 수 있습니다."}])
+    if not content:
+        return _envelope(
+            "FAILED", {"verdict": "REJECTED", "reason": "EMPTY_FILE"},
+            [{"code": "EMPTY_FILE", "message": "빈 파일입니다."}])
+    if len(content) > UPLOAD_MAX_BYTES:
+        cap_mb = UPLOAD_MAX_BYTES // (1024 * 1024)
+        return _envelope(
+            "FAILED", {"verdict": "REJECTED", "reason": "FILE_TOO_LARGE"},
+            [{"code": "FILE_TOO_LARGE",
+              "message": f"파일이 너무 큽니다(최대 {cap_mb}MB)."}])
+    # HWPX 는 zip 컨테이너 — 유효 zip 아니면 거부(확장자만 바꾼 위장 차단)
+    if not zipfile.is_zipfile(io.BytesIO(content)):
+        return _envelope(
+            "FAILED", {"verdict": "REJECTED", "reason": "NOT_A_ZIP"},
+            [{"code": "NOT_A_ZIP",
+              "message": "유효한 HWPX 파일이 아닙니다(zip 컨테이너 아님)."}])
+    # 안전한 저장 파일명 — 내용 sha256(사용자 파일명 미신뢰 → 경로 traversal 차단)
+    digest = hashlib.sha256(content).hexdigest()[:16]
+    safe_path = _api_upload_dir() / f"upload_{digest}.hwpx"
+    if not safe_path.exists():
+        safe_path.write_bytes(content)
+    rel = safe_path.resolve().relative_to(project_root.resolve()).as_posix()
+    # 동일 로드 파이프라인 재사용 — 프로젝트 상대경로라 경계검증을 통과한다.
+    return call_hwpx_load(
+        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
+        project_root=project_root)
 
 
 def call_cell_save_apply(
@@ -294,6 +354,13 @@ def create_app() -> Any:
     @app.post("/api/web-office/hwpx-load")
     def hwpx_load(req: EditorLoadRequest) -> dict[str, Any]:
         return call_hwpx_load(req.model_dump())
+
+    @app.post("/api/web-office/hwpx-upload")
+    async def hwpx_upload(file: UploadFile = File(...)) -> dict[str, Any]:
+        """브라우저 파일선택/드래그로 올린 HWPX 를 sandbox 에 받아 로드.
+        누구나 자기 파일을 업로드해 볼 수 있다(서버는 사용자 경로 미접근)."""
+        content = await file.read()
+        return call_hwpx_upload(file.filename or "", content)
 
     @app.post("/api/web-office/cell-save-apply")
     def cell_save_apply(req: CellSaveApplyRequest) -> dict[str, Any]:

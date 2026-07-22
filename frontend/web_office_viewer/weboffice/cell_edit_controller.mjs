@@ -40,7 +40,13 @@ export function createCellEditController(documentModel) {
       inp.className = "wo-cell-inp";
       // 라벨(원래 문구) 보호: 기본은 빈 입력에서 시작(값만 입력). 원래 문구를
       // 수정하려면 prefill:true(더블클릭)로 기존 텍스트를 불러온다.
-      inp.value = opts.prefill ? (cell.text || "") : "";
+      // prefillText 가 명시되면 그 값을 우선 사용 — 라벨은 정규화된 cell.text
+      // 대신 충실 원문(자간·공백 원형)을 넣어, 편집 시 미편집 부분이 정규화
+      // 텍스트로 덮여 자간·공백이 소실되는 것을 방지한다.
+      inp.value = (opts.prefillText != null)
+        ? opts.prefillText
+        : (opts.prefill ? (cell.text || "") : "");
+      const initial = inp.value;   // 열림 시점 값 — 무변경 blur 는 편집 아님
       tdEl.classList.add("wo-editing");
       tdEl.innerHTML = "";
       tdEl.appendChild(inp);
@@ -50,6 +56,12 @@ export function createCellEditController(documentModel) {
       const commit = () => {
         if (done) return;
         done = true;
+        // 열렸으나 그대로면(prefill 이 정규화≠충실이어도) 편집 아님 — command
+        // 미생성·원본 무변경. (commitCellText 의 before 는 정규화 cell.text 라
+        // 여기서 initial 대비로 무변경을 판정해야 충실 prefill 과 어긋나지 않음)
+        if (inp.value === initial) {
+          state = cancelCellEdit(state); rerender(); return;
+        }
         const r = commitCellText(state, cellId, inp.value);
         state = r.state;
         if (r.command) editedIds.add(cellId);

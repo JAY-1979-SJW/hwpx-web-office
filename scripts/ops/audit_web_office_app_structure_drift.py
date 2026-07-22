@@ -53,6 +53,9 @@ REQUIRED_PATHS = [
 REQUIRED_ENDPOINTS = [
     "GET /api/web-office/health",
     "POST /api/web-office/hwpx-load",
+    # WEB-OFFICE-UPLOAD-01: 브라우저 파일선택/드래그 업로드(sandbox 수신, 내용해시
+    # 저장, 사용자 경로 미접근). 통제된 업로드 — 확장자/zip/크기 검증 후 로드.
+    "POST /api/web-office/hwpx-upload",
     "POST /api/web-office/cell-save-apply",
     # WEB-OFFICE-COORD-LAYOUT-01: lineseg 좌표 레이아웃(한컴 없이) 엔드포인트.
     "POST /api/web-office/hwpx-layout",

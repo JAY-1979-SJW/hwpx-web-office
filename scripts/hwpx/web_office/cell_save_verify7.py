@@ -112,11 +112,18 @@ def verify7(
         findings.append({"code": "OUTPUT_MISSING",
                                   "detail": str(output_path)})
 
-    # V1 — 좌표별 after 값 존재
+    # V1 — 좌표별 after 값 존재. readback 채널(ro_view cell.text)은 라벨
+    # 매칭용 정규화 텍스트(공백 병합·한글 사이 공백 제거)라, 원문 그대로
+    # 비교하면 공백 있는 정상 기록도 오탐 FAIL 한다. 좌표 검증 목적에 맞게
+    # 양변을 동일 정규화로 비교한다(실제 hp:t 는 공백 원형 그대로 기록됨 —
+    # 기록 충실성은 writer/파이프라인 계층에서 별도 보장).
+    from scripts.hwpx.parser.object_cell_mapper import (  # noqa: E402
+        _parser_normalize)
     v1 = "PASS"
     for cmd in accepted_commands:
         got = out_cells.get(cmd.targetId)
-        if got != cmd.after:
+        if got is None or _parser_normalize(got) != _parser_normalize(
+                cmd.after):
             v1 = "FAIL"
             findings.append({"code": "V1_POSITION_MISS",
                                       "cellId": cmd.targetId,

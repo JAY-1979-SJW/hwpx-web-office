@@ -125,8 +125,13 @@ def parse_char_pr_defs(header_xml: bytes,
         shadow_el = el.find(f"{{{NS_HH}}}shadow")
         u_type = u_el.get("type", "") if u_el is not None else ""
         underline_on = u_el is not None and u_type.upper() not in ("", "NONE")
-        s_shape = s_el.get("shape", "") if s_el is not None else ""
-        strikeout_on = s_el is not None and s_shape.upper() not in ("", "NONE")
+        s_shape = (s_el.get("shape", "") if s_el is not None else "").upper()
+        # "3D"/"3DGRAY" 는 취소선의 표준 선형(SOLID/DASH/DOT…)이 아니라 테두리용
+        # 3D 장식 선형이다. 한컴은 이 값을 텍스트 취소선으로 렌더하지 않는다 —
+        # 정부 서식 charPr 에 기본값처럼 대량 잔류(코퍼스 411개, 실 취소선 0개).
+        # 취소선으로 그리면 라벨마다 줄이 그어져 페이지가 깨져 보인다.
+        _NON_STRIKE_SHAPES = ("", "NONE", "3D", "3DGRAY")
+        strikeout_on = s_el is not None and s_shape not in _NON_STRIKE_SHAPES
         text_color_raw = el.get("textColor", "")
         result[cid] = {
             "height": height,

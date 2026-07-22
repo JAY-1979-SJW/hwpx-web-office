@@ -42,6 +42,18 @@ export function mountWebOffice(root) {
     } catch (_e) { return null; }
   }
 
+  // 좌표 레이아웃에서 셀의 충실 원문(정규화 이전, 줄 순서대로) 복원. 라벨
+  // 편집 prefill 에 사용 — 모델 cell.text 는 라벨 매칭용으로 정규화(공백
+  // 병합·한글 사이 공백 제거)돼 있어, 그대로 편집하면 자간·공백이 소실된다.
+  // 미저장/흐름 폴백 문서(cellId 라인 없음)면 null → 기존 동작 유지.
+  function faithfulCellText(id) {
+    if (!coordLayout || !id) return null;
+    const ls = (coordLayout.lines || []).filter((l) => l.cellId === id);
+    if (!ls.length) return null;
+    ls.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    return ls.map((l) => l.text || "").join("\n");
+  }
+
   function render() {
     const sheet = $("[data-role=sheet]");
     if (!loaded) {
@@ -62,14 +74,18 @@ export function mountWebOffice(root) {
         const isInput = cell.isInputCell(id);   // 로드 시 빈칸 = 입력칸
         box.classList.add(isInput ? "wo-input" : "wo-label");
         if (isInput) {
-          // 입력칸: 단일 클릭으로 값 입력(원래 문구 없음, 빈 입력에서 시작)
+          // 입력칸: 단일 클릭으로 값 입력. prefill=현재값(빈칸은 빈 입력에서
+          // 시작, 이미 채운 칸은 값 유지 — 재클릭 시 빈값 커밋으로 소실 방지).
           box.addEventListener("click", () =>
-            cell.startEdit(id, box, render));
+            cell.startEdit(id, box, render, { prefill: true }));
         }
-        // 라벨(원래 문구): 더블클릭으로만 수정(기존 텍스트 불러옴)
+        // 라벨(원래 문구): 더블클릭으로만 수정. 편집된 적 있으면 현재값,
+        // 아니면 충실 원문(정규화 아님)을 prefill — 자간·공백 원형 유지.
         box.addEventListener("dblclick", (e) => {
           e.preventDefault();
-          cell.startEdit(id, box, render, { prefill: true });
+          const edited = cell.getCellText(id);
+          const pf = edited != null ? edited : faithfulCellText(id);
+          cell.startEdit(id, box, render, { prefill: true, prefillText: pf });
         });
       });
       root.classList.add("wo-faithful");

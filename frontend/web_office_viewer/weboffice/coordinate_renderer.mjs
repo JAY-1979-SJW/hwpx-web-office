@@ -20,8 +20,11 @@ function normSym(s) {
 }
 
 function esc(s) {
+  // &<> 뿐 아니라 "'까지 이스케이프 — data-cell-id="…" 같은 속성 컨텍스트
+  // 에서도 안전(따옴표 미이스케이프 시 속성 탈출 위험). 요소 내용에도 무해.
   return normSym(s).replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 /* 한 줄의 서식 조각 → span 문자열. charPr 정의가 있으면 실서식(폰트/색/

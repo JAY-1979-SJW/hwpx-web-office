@@ -147,6 +147,7 @@ The approved Web Office API surface is:
 
 - `GET /api/web-office/health`
 - `POST /api/web-office/hwpx-load`
+- `POST /api/web-office/hwpx-upload` (WEB-OFFICE-UPLOAD-01 · 브라우저 파일선택/드래그 업로드 · sandbox 수신 · 내용해시 저장 · 서버는 사용자 PC 경로 미접근 · 확장자/zip/크기 검증)
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` (lineseg 좌표 레이아웃, 한컴 없이 · read-only)
 

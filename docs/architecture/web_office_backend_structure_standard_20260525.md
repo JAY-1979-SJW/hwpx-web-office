@@ -50,6 +50,7 @@ The backend API surface is limited to:
 
 - `GET /api/web-office/health`
 - `POST /api/web-office/hwpx-load`
+- `POST /api/web-office/hwpx-upload` — 브라우저 파일선택/드래그 업로드(WEB-OFFICE-UPLOAD-01). 사용자가 고른 파일 바이트만 수신 → sandbox(`tmp/web_office_uploads/`)에 내용해시 파일명으로 기록 → hwpx-load 동일 파이프. 서버는 사용자 PC 경로 미접근, 확장자·zip컨테이너·크기(기본 30MB) 검증, 원본 무수정
 - `POST /api/web-office/cell-save-apply`
 - `POST /api/web-office/hwpx-layout` — lineseg 좌표 레이아웃(한컴 미사용, read-only)
 - `POST /api/web-office/ai-fill` — AI 자동채움 값 제안(§9 Claude Code CLI Haiku only; AI inject 없이 자동 실행 금지)

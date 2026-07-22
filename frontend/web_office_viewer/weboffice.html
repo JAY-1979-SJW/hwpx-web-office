@@ -24,7 +24,9 @@
   .wo-sheet{ position:relative; z-index:1; background:#fff; padding:34px 40px; box-shadow:0 1px 8px rgba(0,0,0,.13); min-height:60vh; }
   /* 충실 보기 — 좌표 렌더러 출력(.co-page 절대배치). 시트 패딩 제거. */
   .wo-app.wo-faithful .wo-sheet{ padding:0; background:transparent; box-shadow:none; }
-  .co-page{ position:relative; background:#fff; margin:0 auto 20px; box-shadow:0 1px 8px rgba(0,0,0,.13); font-family:"함초롬바탕","바탕","Malgun Gothic",serif; }
+  /* overflow:clip — 페이지 경계에 걸친 박스(대형 병합 셀 등)가 페이지 밖
+     다음 페이지 위로 번져 겹쳐 보이는 것 차단(한컴도 페이지 단위로 자름) */
+  .co-page{ position:relative; background:#fff; margin:0 auto 20px; box-shadow:0 1px 8px rgba(0,0,0,.13); font-family:"함초롬바탕","바탕","Malgun Gothic",serif; overflow:clip; }
   /* overflow:clip + clip-margin — 글자 하단(받침·descender) 잘림 방지 */
   .co-line{ position:absolute; white-space:pre; overflow:clip; overflow-clip-margin:3px; }
   .co-box{ position:absolute; }

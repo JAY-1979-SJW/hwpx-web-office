@@ -1,180 +1,55 @@
-"""HWPX lineseg 기반 좌표 레이아웃 추출기 (프로토타입).
+"""HWPX lineseg 기반 좌표 레이아웃 추출기 (오케스트레이션 파사드).
 
 한컴이 저장 시 계산한 lineseg(줄별 vertpos/horzpos/size)를 그대로 써서
 페이지 좌표 레이아웃(JSON)을 만든다. 브라우저 재-flow 없이 원본 배치를
 재현하기 위한 데이터. read-only, 원본 무수정.
+
+모듈 구성(모듈화 분리):
+  coord_xml    — 순수 XML/단위 헬퍼 (own_runs·slice_segments·sane_hu…)
+  coord_styles — header.xml 스타일·페이지 규격 파싱
+  coord_table  — 표 축 해석·정규화·앵커 압축·블록 페이지네이션(순수 계산)
+  본 파일       — 문서 순회(walk)·표 방출(walk_table)·섹션 병합(extract)
 """
 import json
+import math
 import os
 import re
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
 
-HU = 96 / 7200  # HWPUNIT -> px (96dpi)
+try:
+    from .coord_xml import (
+        HU, ln, own_text, own_runs, slice_segments, direct_linesegs, sane_hu)
+    from .coord_styles import (
+        parse_para_aligns, css_align, parse_char_prs, parse_border_fills,
+        border_sides_css, parse_page_geometry)
+    from .coord_table import (
+        solve_axis, expand_rowspan_content, normalize_declared,
+        compress_to_anchor, paginate_rows, col_rank_map)
+except ImportError:                      # 스크립트 직접 실행 폴백
+    from coord_xml import (
+        HU, ln, own_text, own_runs, slice_segments, direct_linesegs, sane_hu)
+    from coord_styles import (
+        parse_para_aligns, css_align, parse_char_prs, parse_border_fills,
+        border_sides_css, parse_page_geometry)
+    from coord_table import (
+        solve_axis, expand_rowspan_content, normalize_declared,
+        compress_to_anchor, paginate_rows, col_rank_map)
+
+# 하위호환 별칭(기존 내부명 참조 보호) — 신규 코드는 coord_* 모듈을 쓸 것.
+_own_text = own_text
+_own_runs = own_runs
+_slice_segments = slice_segments
+_direct_linesegs = direct_linesegs
+_parse_para_aligns = parse_para_aligns
+_css_align = css_align
+_parse_char_prs = parse_char_prs
+_parse_border_fills = parse_border_fills
 
 
-def ln(tag):
-    return tag.rsplit("}", 1)[-1]
-
-
-def _own_text(p):
-    """문단 직속 run 의 텍스트(셀/중첩 제외)."""
-    return _own_runs(p)[0]
-
-
-def _own_runs(p):
-    """문단 직속 텍스트 + run 별 charPr 구간.
-
-    반환: (txt, spans) — spans = [{"s": start, "e": end, "cp": charPrIDRef}].
-    txt 는 _own_text 와 동일하게 조립되어 lineseg 의 textpos 인덱스와 정렬된다.
-    각 구간은 원본 run 의 charPrIDRef(서식 참조)를 그대로 보존한다.
-    """
-    parts = []
-    spans = []
-    pos = 0
-    for run in p:
-        if ln(run.tag) != "run":
-            continue
-        cref = run.attrib.get("charPrIDRef")
-        for c in run:
-            if ln(c.tag) == "t":
-                t = "".join(c.itertext())
-                if t:
-                    parts.append(t)
-                    spans.append({"s": pos, "e": pos + len(t), "cp": cref})
-                    pos += len(t)
-            elif ln(c.tag) == "lineBreak":
-                parts.append("\n")
-                spans.append({"s": pos, "e": pos + 1, "cp": cref})
-                pos += 1
-    return "".join(parts), spans
-
-
-def _slice_segments(txt, spans, a, b):
-    """텍스트 구간 [a,b) 를 run 별 서식 조각으로 분해.
-
-    한 줄(lineseg)이 여러 서식(run)에 걸치면 조각이 여러 개가 된다. 어떤
-    span 과도 겹치지 않으면(서식 정보 없음) charPr=None 단일 조각으로 대체.
-    """
-    out = []
-    for sp in spans:
-        s = max(a, sp["s"])
-        e = min(b, sp["e"])
-        if s < e:
-            out.append({"text": txt[s:e], "charPr": sp["cp"]})
-    if not out and a < b:
-        out.append({"text": txt[a:b], "charPr": None})
-    return out
-
-
-def _parse_para_aligns(z):
-    """header.xml 의 paraPr → {id: 'LEFT'|'CENTER'|'RIGHT'|'JUSTIFY'|...}.
-    가운데/오른쪽 정렬 문단의 수평 배치를 재현하기 위함."""
-    hdr = [n for n in z.namelist() if n.lower().endswith("header.xml")]
-    if not hdr:
-        return {}
-    root = ET.fromstring(z.read(hdr[0]))
-    out = {}
-    for pp in root.iter():
-        if ln(pp.tag) != "paraPr":
-            continue
-        pid = pp.attrib.get("id")
-        al = pp.attrib.get("align", "")
-        if not al:
-            ach = next((c.attrib for c in pp if ln(c.tag) == "align"), {})
-            al = ach.get("horizontal", "") or ach.get("align", "")
-        if pid is not None:
-            out[pid] = (al or "LEFT").upper()
-    return out
-
-
-def _css_align(a):
-    """HWPX 수평정렬 → CSS text-align (LEFT/기본은 None)."""
-    if a in ("CENTER",):
-        return "center"
-    if a in ("RIGHT",):
-        return "right"
-    if a in ("JUSTIFY", "DISTRIBUTE"):
-        return "justify"
-    return None
-
-
-def _parse_char_prs(z):
-    """header.xml 의 charPr 정의 → {id: {...서식...}} (style_parser 재사용).
-
-    실패해도 {} 반환 — 좌표(위치) 재현은 서식 없이도 계속된다.
-    """
-    hdr = [n for n in z.namelist() if n.lower().endswith("header.xml")]
-    if not hdr:
-        return {}
-    try:
-        hb = z.read(hdr[0])
-        from scripts.hwpx.parser.style_parser import (
-            parse_char_pr_defs, parse_font_face_table)
-        return parse_char_pr_defs(hb, parse_font_face_table(hb))
-    except Exception:
-        return {}
-
-
-def _direct_linesegs(p):
-    out = []
-    for arr in p:
-        if ln(arr.tag) == "linesegarray":
-            for s in arr:
-                if ln(s.tag) == "lineseg":
-                    out.append(s.attrib)
-    return out
-
-
-def _fill_color(bf_el):
-    """borderFill 의 fillBrush 채움색(faceColor 등) → '#RRGGBB' 또는 None.
-    'none'/흰색은 None(칠하지 않음 — 흰 배경 위 덧칠 방지)."""
-    fb = next((c for c in bf_el if ln(c.tag) == "fillBrush"), None)
-    if fb is None:
-        return None
-    for el in fb.iter():
-        for attr in ("faceColor", "color", "startColor"):
-            v = (el.attrib.get(attr) or "").strip()
-            if not v or v.lower() == "none":
-                continue
-            h = v[1:] if v.startswith("#") else v
-            if len(h) == 8:      # AARRGGBB/RRGGBBAA → 앞 6자리
-                h = h[:6]
-            if len(h) == 6 and all(c in "0123456789abcdefABCDEF" for c in h):
-                col = "#" + h.upper()
-                if col != "#FFFFFF":
-                    return col
-            # 흰색/비정형 값은 건너뛰고 다음 후보 계속 탐색 (엄격 hex 만 채택)
-    return None
-
-
-def _parse_border_fills(z):
-    """header.xml 의 borderFill → {id: {"sides": {...}, "fill": '#RRGGBB'|None}}."""
-    hdr = [n for n in z.namelist() if n.lower().endswith("header.xml")]
-    if not hdr:
-        return {}
-    root = ET.fromstring(z.read(hdr[0]))
-    out = {}
-    for bf in root.iter():
-        if ln(bf.tag) != "borderFill":
-            continue
-        bid = bf.attrib.get("id")
-        sides = {}
-        for ch in bf:
-            name = ln(ch.tag)
-            if name in ("leftBorder", "rightBorder", "topBorder",
-                        "bottomBorder"):
-                sides[name] = dict(ch.attrib)
-        if bid is not None:
-            out[bid] = {"sides": sides, "fill": _fill_color(bf)}
-    return out
-
-
-def extract(path):
+def _extract_section(path, secname):
     z = zipfile.ZipFile(path)
-    secname = [n for n in z.namelist()
-               if "section0" in n.lower() and n.endswith(".xml")][0]
     root = ET.fromstring(z.read(secname))
     parent_map = {c: p for p in root.iter() for c in p}
     # 표 문서순 인덱스 — 문서모델(ro_view_importer)의 tableId
@@ -190,25 +65,26 @@ def extract(path):
     def _cell_id(tbl, row, col):
         return "cell_t_s%d_%03d_r%d_c%d" % (
             _sec_idx, tbl_order.get(tbl, 0), row, col)
-    border_fills = _parse_border_fills(z)
-    char_prs = _parse_char_prs(z)
-    para_aligns = _parse_para_aligns(z)
 
-    pp = next((e.attrib for e in root.iter() if ln(e.tag) == "pagePr"), {})
-    mg = next((e.attrib for e in root.iter() if ln(e.tag) == "margin"), {})
-    page_w = float(pp.get("width", "59528")) * HU
-    page_h = float(pp.get("height", "84186")) * HU
-    m_left = float(mg.get("left", "4251")) * HU
-    m_top = float(mg.get("top", "4251")) * HU
+    border_fills = parse_border_fills(z)
+    char_prs = parse_char_prs(z)
+    para_aligns = parse_para_aligns(z)
+
+    geo = parse_page_geometry(root)
+    page_w = geo["page_w"]
+    page_h = geo["page_h"]
+    m_left = geo["m_left"]
+    m_top = geo["m_top"]
+    content_h = geo["content_h"]
 
     lines = []
     boxes = []
     st = {"page_idx": 0, "prev_vpos": -1, "flow_y": m_top, "max_y": m_top}
 
     def emit_para(p):
-        txt, spans = _own_runs(p)
-        segs = _direct_linesegs(p)
-        align = _css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
+        txt, spans = own_runs(p)
+        segs = direct_linesegs(p)
+        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
         for i, s in enumerate(segs):
             vpos = float(s.get("vertpos", "0"))
             a = int(s.get("textpos", "0") or "0")
@@ -224,7 +100,7 @@ def extract(path):
             h = float(s.get("vertsize", "1000")) * HU
             bl = float(s.get("baseline", "0")) * HU
             line = {"text": line_txt,
-                    "segments": _slice_segments(txt, spans, a, b),
+                    "segments": slice_segments(txt, spans, a, b),
                     "x": round(x, 1),
                     "y": round(y, 1), "w": round(w, 1),
                     "h": round(h, 1),
@@ -235,49 +111,43 @@ def extract(path):
             st["max_y"] = max(st["max_y"], y + h)
         st["flow_y"] = st["max_y"]
 
-    def _sane_hu(v):
-        """HWPUNIT → px. 음수/센티널(UINT32_MAX 등 비정상 거대값)은 0(미정)
-        으로 — 일부 문서가 cellSz 에 4294967295 를 저장해 좌표가 폭발한다."""
-        try:
-            n = float(v or 0)
-        except (TypeError, ValueError):
-            return 0.0
-        return n * HU if 0 <= n < 1e6 else 0.0
-
     def _cell_info(tc):
         addr = next((c.attrib for c in tc if ln(c.tag) == "cellAddr"), {})
         span = next((c.attrib for c in tc if ln(c.tag) == "cellSpan"), {})
         sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
         mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
         sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
-        w = _sane_hu(sz.get("width", "0"))
-        h = _sane_hu(sz.get("height", "0"))
+        w = sane_hu(sz.get("width", "0"))
+        h = sane_hu(sz.get("height", "0"))
         # 손상 여백 방어 — 일부 문서가 cellMargin 에 셀보다 큰 값
         # (예: 20520HU=274px)을 담아 행높이를 폭증시킨다. 여백 합이 셀
         # 크기를 잠식(90%↑)하면 한컴처럼 무시하고 기본값(≈141HU)으로.
         _DEF_MG = 1.9
-        ml_raw = _sane_hu(mg.get("left", "0"))
-        mt_raw = _sane_hu(mg.get("top", "0"))
+        ml_raw = sane_hu(mg.get("left", "0"))
+        mt_raw = sane_hu(mg.get("top", "0"))
         ml = ml_raw if (w <= 0 or ml_raw * 2 <= w * 0.9) else _DEF_MG
         mt = mt_raw if (h <= 0 or mt_raw * 2 <= h * 0.9) else _DEF_MG
         # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
         # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
-        content_h = 0.0
+        content = 0.0
+        compact = 0.0   # 줄간격 제거 시 최소 높이(글리프 합) — 앵커 압축용
         for cp in tc.iter():
             if ln(cp.tag) == "p" and _nearest_cell(cp) is tc:
                 for cl in _cell_para_lines(cp):
-                    content_h = max(content_h, cl["ry"] + cl["h"])
+                    content = max(content, cl["ry"] + cl["h"])
+                    compact += cl["h"]
         # 직속 중첩표 높이도 내용에 포함 — 안 하면 외곽 행이 중첩표보다
         # 짧아, 뒤 내용(푸터 등)이 위로 올라오고 중첩표가 아래로 넘친다.
         for nt in tc.iter():
             if ln(nt.tag) == "tbl" and _nearest_cell(nt) is tc:
                 pp = _nearest_p(nt)
-                nsegs = _direct_linesegs(pp) if pp is not None else []
+                nsegs = direct_linesegs(pp) if pp is not None else []
                 nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
                          if nsegs else 0.0)
                 nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
-                content_h = max(content_h, nvpos + _sane_hu(nsz.get("height",
-                                                                    "0")))
+                nh = sane_hu(nsz.get("height", "0"))
+                content = max(content, nvpos + nh)
+                compact += nh
         return {
             "row": int(addr.get("rowAddr", "0")),
             "col": int(addr.get("colAddr", "0")),
@@ -287,41 +157,18 @@ def extract(path):
             "h": h,
             "ml": ml,
             "mt": mt,
-            "hContent": content_h,
+            "hContent": content,
+            "hCompact": min(compact, content) if compact > 0 else content,
             "bfRef": tc.attrib.get("borderFillIDRef"),
             "vAlign": sub.get("vertAlign", "TOP"),
             "tc": tc,
         }
 
-    def _solve_axis(cells, n, key_start, key_span, key_size):
-        """단일-span 셀로 축(열폭/행높이) 확정 + 다중-span 나머지 분배."""
-        w = [0.0] * n
-        # 1) 단일 span 확정
-        for c in cells:
-            if c[key_span] == 1:
-                w[c[key_start]] = max(w[c[key_start]], c[key_size])
-        # 2) 다중 span: 미지 칸에 나머지 균등 분배 (2회 반복)
-        for _ in range(3):
-            for c in cells:
-                if c[key_span] <= 1:
-                    continue
-                idxs = list(range(c[key_start], c[key_start] + c[key_span]))
-                idxs = [i for i in idxs if 0 <= i < n]
-                known = sum(w[i] for i in idxs if w[i] > 0)
-                unknown = [i for i in idxs if w[i] <= 0]
-                if unknown and c[key_size] > known:
-                    share = (c[key_size] - known) / len(unknown)
-                    for i in unknown:
-                        w[i] = share
-        # 남은 0 은 평균으로
-        known = [x for x in w if x > 0]
-        avg = sum(known) / len(known) if known else 1.0
-        return [x if x > 0 else avg for x in w]
-
-    def walk_table(tbl, base_x, base_y):
+    def walk_table(tbl, base_x, base_y, anchor_vpos=None):
         """tbl 을 (base_x, base_y) 를 좌상단으로 배치. 이 tbl 의 직속 셀만
         그리고, 셀 안 중첩표는 그 셀 내용 좌상단에서 재귀 배치한다.
-        반환: 표 하단 y(px)."""
+        anchor_vpos: 표 다음 본문 문단의 저장 vpos(페이지 상대) — 다중페이지
+        표의 실제 높이를 원본 좌표에서 역산하는 권위 앵커. 반환: 표 하단 y."""
         cells = [_cell_info(tc) for tc in tbl.iter()
                  if ln(tc.tag) == "tc" and _nearest_tbl(tc) is tbl]
         if not cells:
@@ -332,66 +179,34 @@ def extract(path):
         # cellSz 가 최소값이라 내용이 넘쳐 셀이 세로로 충돌하는 것을 막는다.
         for c in cells:
             c["hEff"] = max(c["h"], c["hContent"] + c["mt"] * 2)
-        col_w = _solve_axis(cells, ncol, "col", "colSpan", "w")
-        row_h = _solve_axis(cells, nrow, "row", "rowSpan", "hEff")
-        # 한컴 선언 표 폭(sz)에 열 정규화(가로 드리프트 방지). 행높이는 내용
-        # 기반이므로 선언 높이보다 작을 때만 위로 채우고, 클 때는 유지(넘침 방지).
+        col_w = solve_axis(cells, ncol, "col", "colSpan", "w")
+        row_h = solve_axis(cells, nrow, "row", "rowSpan", "hEff")
+        row_h = expand_rowspan_content(cells, row_h, nrow)
         sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
-        tw = _sane_hu(sz.get("width", "0"))
-        th = _sane_hu(sz.get("height", "0"))
-        sw = sum(col_w)
-        if tw > 0 and sw > 0:
-            col_w = [w * tw / sw for w in col_w]
-        sh = sum(row_h)
-        if th > 0 and sh > 0:
-            # 행은 위로 늘리지 않는다 — 한컴은 각 행을 cellSz/내용 높이 그대로
-            # 렌더하고, 합이 선언 tbl height 보다 작으면 표가 그만큼 짧아질 뿐
-            # 이다(선언값은 상한/예약치). 위로 스케일하면 전 행이 균일 팽창해
-            # 세로가 늘어난다. 열 폭(위)만 선언 폭에 정규화한다.
-            if sh > th * 1.02:
-                # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
-                # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
-                # 근사가 행을 부풀려 페이지가 배로 늘던 결함의 근본 보정.
-                min_need = [0.0] * nrow
-                for c in cells:
-                    if c["rowSpan"] == 1:
-                        need = min(c["hContent"] + c["mt"] * 2, c["hEff"])
-                        if need > min_need[c["row"]]:
-                            min_need[c["row"]] = need
-                slack = [max(0.0, row_h[i] - min_need[i])
-                         for i in range(nrow)]
-                tslack = sum(slack)
-                if tslack > 1e-6:
-                    k = min(1.0, (sh - th) / tslack)
-                    row_h = [row_h[i] - slack[i] * k for i in range(nrow)]
+        tw = sane_hu(sz.get("width", "0"))
+        th = sane_hu(sz.get("height", "0"))
+        col_w, row_h = normalize_declared(cells, col_w, row_h, tw, th, nrow)
+        row_h, alpha = compress_to_anchor(
+            cells, row_h, nrow, base_y, anchor_vpos, geo)
         if os.environ.get("COORD_DEBUG"):
             print(f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
-                  f"nrow={nrow} ncol={ncol} th={th:.0f} "
+                  f"nrow={nrow} ncol={ncol} th={th:.0f} a={alpha:.3f} "
                   f"sum={sum(row_h):.0f} row_h="
                   f"{[round(h, 1) for h in row_h]}", file=sys.stderr)
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
             col_x[i + 1] = col_x[i] + col_w[i]
-        row_y = [0.0] * (nrow + 1)
-        for i in range(nrow):
-            row_y[i + 1] = row_y[i] + row_h[i]
-        # 행별 colAddr → 순차 col 인덱스 — 문서모델(ro_view)은 col 을 행 내
-        # 순차 번호(0,1,2…)로 매기므로 raw colAddr 갭(병합)을 압축해 맞춘다.
-        col_rank = {}
-        row_cols = {}
-        for c in cells:
-            row_cols.setdefault(c["row"], set()).add(c["col"])
-        for r, cs in row_cols.items():
-            for rank, ca in enumerate(sorted(cs)):
-                col_rank[(r, ca)] = rank
+        row_abs, row_bot = paginate_rows(cells, row_h, nrow, base_y, geo)
+        col_rank = col_rank_map(cells)
         table_bottom = base_y
         for c in cells:
             cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]),
                                                         c["col"]))
             cx = base_x + col_x[c["col"]]
-            cy = base_y + row_y[c["row"]]
+            cy = row_abs[c["row"]]
             cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
-            ch = row_y[min(c["row"] + c["rowSpan"], nrow)] - row_y[c["row"]]
+            _last = min(c["row"] + c["rowSpan"], nrow) - 1
+            ch = row_bot[_last] - row_abs[c["row"]]
             # 이 셀 직속 문단만 (중첩표 안 문단 제외)
             cell_lines = []
             for cp in c["tc"].iter():
@@ -402,18 +217,32 @@ def extract(path):
             for nt in c["tc"].iter():
                 if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
                     pp = _nearest_p(nt)
-                    nsegs = _direct_linesegs(pp) if pp is not None else []
+                    nsegs = direct_linesegs(pp) if pp is not None else []
                     nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
                              if nsegs else 0.0)
                     nsz = next((x.attrib for x in nt
                                 if ln(x.tag) == "sz"), {})
-                    nh = _sane_hu(nsz.get("height", "0"))
+                    nh = sane_hu(nsz.get("height", "0"))
                     nested.append((nt, nvpos, nh))
+            # α 압축 시 줄 위치 보간 — 각 줄을 [원 ry ↔ 글리프-밀착 스택]
+            # 사이에서 α 만큼 이동(줄간격만 줄고 글리프는 유지 → 물림 없음).
+            mt_eff = c["mt"] * (1.0 - 0.5 * alpha)
+            if alpha > 0 and cell_lines:
+                order = sorted(range(len(cell_lines)),
+                               key=lambda i: cell_lines[i]["ry"])
+                cum = 0.0
+                for i in order:
+                    cl = cell_lines[i]
+                    cl["ryEff"] = cl["ry"] - alpha * (cl["ry"] - cum)
+                    cum += cl["h"]
+            else:
+                for cl in cell_lines:
+                    cl["ryEff"] = cl["ry"]
             # 내용 총 높이 = 본문 줄 + 중첩표 하단 중 최대
             text_h = max(
-                [cl["ry"] + cl["h"] for cl in cell_lines]
+                [cl["ryEff"] + cl["h"] for cl in cell_lines]
                 + [nv + nh for _, nv, nh in nested] + [0.0])
-            avail = ch - c["mt"] * 2
+            avail = ch - mt_eff * 2
             va = c["vAlign"]
             voff = (max(0.0, (avail - text_h) / 2) if va == "CENTER"
                     else max(0.0, avail - text_h) if va == "BOTTOM"
@@ -430,7 +259,7 @@ def extract(path):
                     "text": cl["text"],
                     "segments": cl.get("segments", []),
                     "x": round(line_x, 1),
-                    "y": round(cy + c["mt"] + voff + cl["ry"], 1),
+                    "y": round(cy + mt_eff + voff + cl["ryEff"], 1),
                     "w": round(wpx, 1), "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
                     "cell": True, "cellId": cid}
@@ -442,17 +271,32 @@ def extract(path):
                    "cellId": cid}
             bf = border_fills.get(c["bfRef"])
             if bf:
-                box["border"] = _border_sides_css(bf["sides"])
+                box["border"] = border_sides_css(bf["sides"])
                 if bf.get("fill"):
                     box["fill"] = bf["fill"]
             boxes.append(box)
             # 직속 중첩표 재귀 배치 — voff(세로정렬 오프셋)를 본문 줄과 동일
             # 하게 더한다. 안 그러면 vAlign=CENTER 셀에서 본문만 내려가 겹친다.
+            # α 압축 시 여백 절반화 근사(다중페이지 표 안 중첩표는 코퍼스에
+            # 드묾; 위치만 완만히 당긴다)
             for nt, nvpos, _ in nested:
-                walk_table(nt, cx + c["ml"], cy + c["mt"] + voff + nvpos)
+                walk_table(nt, cx + c["ml"],
+                           cy + mt_eff + voff + nvpos * (1.0 - 0.5 * alpha))
             table_bottom = max(table_bottom, cy + ch)
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
+        # 통합 페이지 추적 — 본문(page_idx×page_h+vertpos)과 표(flow_y)가
+        # 별도 좌표계라, 페이지를 넘긴 표 뒤의 본문이 stale page_idx 로 계산돼
+        # 표 위에 겹치던 결함을 잡는다. 표 하단이 속한 페이지로 page_idx 를
+        # 전진시켜, 표 뒤 본문(page-relative vertpos)이 올바른 페이지에 놓이게
+        # 한다. 표가 한 페이지 안이면 end_pg==page_idx 라 무변화(단일페이지
+        # 배치·기존 시각회귀 baseline 보존).
+        if page_h:
+            end_pg = int(table_bottom // page_h)
+            if end_pg > st["page_idx"]:
+                st["page_idx"] = end_pg
+                # 새 페이지 기준 — 표 앞 본문 vertpos 와 비교해 거짓 리셋 방지
+                st["prev_vpos"] = -1
         return table_bottom
 
     def _nearest_tbl(el):
@@ -484,9 +328,9 @@ def extract(path):
 
     def _cell_para_lines(p):
         """셀 문단 → 셀 상대 라인 [{rx, ry, w, h, text, segments, align}]."""
-        txt, spans = _own_runs(p)
-        segs = _direct_linesegs(p)
-        align = _css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
+        txt, spans = own_runs(p)
+        segs = direct_linesegs(p)
+        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
         out = []
         for i, s in enumerate(segs):
             a = int(s.get("textpos", "0") or "0")
@@ -500,31 +344,13 @@ def extract(path):
                 "baseline": float(s.get("baseline", "0")) * HU,
                 "text": txt[a:b],
                 "align": align,
-                "segments": _slice_segments(txt, spans, a, b)})
+                "segments": slice_segments(txt, spans, a, b)})
         return out
-
-    def _mm_px(v):
-        import re as _re
-        m = _re.search(r"([\d.]+)\s*mm", v or "")
-        return float(m.group(1)) * 3.7795 if m else 0.0
-
-    def _border_sides_css(sides):
-        def one(sd):
-            if not sd or sd.get("type", "NONE") == "NONE":
-                return "none"
-            w = max(0.7, _mm_px(sd.get("width")))
-            return f"{w:.2f}px solid {sd.get('color', '#000')}"
-        return {
-            "l": one(sides.get("leftBorder")),
-            "r": one(sides.get("rightBorder")),
-            "t": one(sides.get("topBorder")),
-            "b": one(sides.get("bottomBorder")),
-        }
 
     def _para_top_y(p):
         """문단 첫 lineseg 의 전역 top(px). 페이지 상태(prev_vpos/page_idx)도
         emit_para 와 동일 규칙으로 갱신한다. lineseg 없으면 None."""
-        segs = _direct_linesegs(p)
+        segs = direct_linesegs(p)
         if not segs:
             return None
         vpos = float(segs[0].get("vertpos", "0"))
@@ -537,6 +363,14 @@ def extract(path):
         for child in el:
             if ln(child.tag) != "p":
                 continue
+            # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
+            # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
+            # (page_idx 전진 + vertpos 리셋). "0"/미지정이면 자동 흐름(무변화).
+            if child.attrib.get("pageBreak", "0") not in ("0", ""):
+                if page_h and st["max_y"] > st["page_idx"] * page_h + m_top:
+                    st["page_idx"] += 1
+                    st["prev_vpos"] = -1
+                    st["flow_y"] = st["page_idx"] * page_h + m_top
             # 이 문단의 최상위 표만(중첩표는 walk_table 이 재귀 배치)
             top_tbls = [t for t in child.iter()
                         if ln(t.tag) == "tbl" and _nearest_tbl(t) is None]
@@ -545,19 +379,36 @@ def extract(path):
                 # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
                 # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다.
                 # 같은 문단에 자체 텍스트가 있으면 유실 없이 먼저 방출.
-                if _own_text(child).strip():
+                if own_text(child).strip():
                     emit_para(child)
                 else:
                     _para_top_y(child)  # 페이지 상태 갱신용
+                # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
+                # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
+                # 신호로 마지막 표에 전달한다.
+                anchor_vpos = None
+                seen = False
+                for sib in el:
+                    if seen and ln(sib.tag) == "p":
+                        if any(ln(t.tag) == "tbl" for t in sib.iter()):
+                            break        # 다음 표 그룹 — 앵커 아님
+                        sgs = direct_linesegs(sib)
+                        if sgs and own_text(sib).strip():
+                            anchor_vpos = float(
+                                sgs[0].get("vertpos", "0")) * HU
+                            break
+                    if sib is child:
+                        seen = True
                 base_y = st["flow_y"]
-                for t in top_tbls:
-                    walk_table(t, m_left, base_y)
+                for ti, t in enumerate(top_tbls):
+                    walk_table(t, m_left, base_y,
+                               anchor_vpos if ti == len(top_tbls) - 1
+                               else None)
                     base_y = st["flow_y"]
             else:
                 emit_para(child)
 
     walk(root)
-    import math
     total_pages = max(st["page_idx"] + 1,
                       int(math.ceil(st["max_y"] / page_h)) if page_h else 1)
     return {
@@ -570,6 +421,41 @@ def extract(path):
         "boxes": boxes,
         "charPrDefs": char_prs,
     }
+
+
+def extract(path):
+    """HWPX → 좌표 레이아웃. 전 섹션(sectionN.xml)을 페이지 오프셋 누적으로
+    이어붙인다 — 단일 섹션이 대부분이나, 다중 섹션 문서에서 section0 외의
+    내용이 사라지지 않도록(표시/편집 누락 방지) 표준 처리한다."""
+    z = zipfile.ZipFile(path)
+    sec_files = [n for n in z.namelist()
+                 if re.search(r"section\d+\.xml$", n.lower())]
+    sec_files.sort(key=lambda n: int(re.search(r"section(\d+)",
+                                                n.lower()).group(1)))
+    if not sec_files:
+        sec_files = [n for n in z.namelist()
+                     if "section0" in n.lower() and n.endswith(".xml")][:1]
+    if len(sec_files) <= 1:
+        return _extract_section(path, sec_files[0])
+
+    merged_lines, merged_boxes = [], []
+    page_base = 0
+    first = None
+    for sec in sec_files:
+        r = _extract_section(path, sec)
+        if first is None:
+            first = r
+        off = page_base * (r["pageHeightPx"] or 1)
+        for line in r["lines"]:
+            line["y"] = round(line["y"] + off, 1)
+            merged_lines.append(line)
+        for box in r["boxes"]:
+            box["y"] = round(box["y"] + off, 1)
+            merged_boxes.append(box)
+        page_base += r["pages"]
+    out = dict(first)
+    out.update(pages=page_base, lines=merged_lines, boxes=merged_boxes)
+    return out
 
 
 import pathlib as _pathlib  # noqa: E402
