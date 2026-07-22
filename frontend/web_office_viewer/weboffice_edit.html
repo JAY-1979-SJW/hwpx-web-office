@@ -16,6 +16,14 @@
   .rb-title h1{ font-size:14px; margin:0; } .rb-title .sp{ flex:1; }
   .rb-title .k{ font-size:12px; color:#cdd6df; }
   .rb-row{ display:flex; align-items:stretch; padding:6px 10px; overflow-x:auto; }
+  /* 리본 탭 */
+  .rb-tabs{ display:flex; gap:2px; padding:0 10px; background:#e8ecf1; border-bottom:1px solid #cfd6dd; }
+  .rbtab{ min-height:26px; border:0; border-radius:6px 6px 0 0; background:transparent; padding:4px 16px;
+          font-size:12.5px; color:#4a5663; cursor:pointer; }
+  .rbtab:hover{ background:#dde4ec; }
+  .rbtab.on{ background:#f3f5f8; color:#1a2530; font-weight:700; box-shadow:0 -2px 0 #3a7be0 inset; }
+  .grp[hidden]{ display:none; }
+  @media print{ .rb-tabs{ display:none !important; } }
   .grp{ display:flex; flex-direction:column; align-items:center; padding:0 12px; border-right:1px solid #dde3e9; }
   .grp:last-child{ border-right:0; }
   .grp .btns{ display:flex; gap:5px; align-items:center; }
@@ -49,6 +57,15 @@
   .pe-para.ai-filled{ background:#fff5d6; box-shadow:inset 0 0 0 1px #e8c766; border-radius:3px; }
   td.ai-cell{ background:#fffbe8; }
   .pe-ch{ white-space:pre; } .pe-ch.sel{ background:#b9d4ff; }
+  .pe-ch.find-hit{ background:#fff3a0; }
+  .pe-ch.find-cur{ background:#ffcf33; box-shadow:inset 0 -2px 0 #e0a800; }
+  /* 찾기 바 */
+  .findbar{ display:none; align-items:center; gap:6px; padding:6px 12px; background:#fbfce8; border-bottom:1px solid #e3e0b8; font-size:12.5px; }
+  .findbar.on{ display:flex; }
+  .findbar input{ font:inherit; padding:3px 7px; border:1px solid #c9c9a0; border-radius:5px; }
+  .findbar .cnt{ color:#7a6a1a; min-width:60px; }
+  .findbar button{ min-height:26px; padding:2px 8px; }
+  @media print{ .findbar{ display:none !important; } }
   .rev{ list-style:none; margin:0 0 12px; padding:0; font-size:11px; }
   .rev li{ padding:4px 5px; border-bottom:1px solid #eef1f4; cursor:pointer; }
   .rev li:hover{ background:#fff8e1; }
@@ -97,39 +114,62 @@
       <span class="sp"></span>
       <span class="k" data-role="doc">문서 없음</span>
     </div>
+    <div class="rb-tabs">
+      <button class="rbtab on" data-tab="home" type="button">홈</button>
+      <button class="rbtab" data-tab="review" type="button">검토 · 출력</button>
+    </div>
     <div class="rb-row">
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="home"><div class="btns">
         <button data-role="sample" type="button">샘플 열기</button>
       </div><div class="lbl">파일</div></div>
 
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="home"><div class="btns">
         <button data-role="undo" type="button" disabled>↶ 실행취소</button>
         <button data-role="redo" type="button" disabled>↷ 재실행</button>
       </div><div class="lbl">편집 이력</div></div>
 
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="home"><div class="btns">
         <button class="b-ico"    data-fmt="bold"      type="button" disabled>가</button>
         <button class="b-ico b-i" data-fmt="italic"    type="button" disabled>가</button>
         <button class="b-ico b-u" data-fmt="underline" type="button" disabled>가</button>
         <button class="b-ico"    data-fmt="strikeout" type="button" disabled style="text-decoration:line-through">가</button>
       </div><div class="lbl">글자 모양</div></div>
 
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="home"><div class="btns">
+        <select data-role="font" disabled title="글꼴"><option>글꼴</option></select>
         <select data-role="size" disabled title="글자 크기"><option>크기</option></select>
         <select data-role="color" disabled title="글자 색"><option>색</option></select>
       </div><div class="lbl">크기 · 색</div></div>
 
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="review"><div class="btns">
         <button data-role="srcconnect" type="button" disabled>📄 소스 연결</button>
         <button class="b-ai" data-role="aifill" type="button" disabled>✨ AI 자동채움</button>
         <button data-role="aiclear" type="button" disabled>지우기</button>
       </div><div class="lbl">AI 자동입력</div></div>
 
-      <div class="grp"><div class="btns">
+      <div class="grp" data-tab="review"><div class="btns">
         <button data-role="save" type="button" disabled>저장(dry-run)</button>
         <button data-role="print" type="button" disabled>🖨 인쇄</button>
       </div><div class="lbl">저장 · 인쇄</div></div>
+
+      <div class="grp" data-tab="home"><div class="btns">
+        <button data-role="findbtn" type="button" disabled>🔍 찾기</button>
+      </div><div class="lbl">찾기</div></div>
     </div>
+  </div>
+
+  <div class="findbar" data-role="findbar">
+    <span>🔍</span>
+    <input data-role="findq" type="text" placeholder="찾을 내용" size="24" />
+    <button data-role="findprev" type="button" title="이전(Shift+Enter)">◀</button>
+    <button data-role="findnext" type="button" title="다음(Enter)">▶</button>
+    <span class="cnt" data-role="findcnt"></span>
+    <span style="width:12px"></span>
+    <input data-role="findr" type="text" placeholder="바꿀 내용" size="18" />
+    <button data-role="findrone" type="button" title="현재 매치 바꾸기">바꾸기</button>
+    <button data-role="findrall" type="button" title="모두 바꾸기">모두바꾸기</button>
+    <span style="flex:1"></span>
+    <button data-role="findclose" type="button" title="닫기(Esc)">✕</button>
   </div>
 
   <div class="wo-status" data-role="status" data-k="">«샘플 열기»로 실제 HWPX 문서를 불러오세요. 셀·문단을 클릭해 편집합니다.</div>
@@ -150,10 +190,11 @@
 <script type="module">
 import {
   makeParagraphEditorState, setCaret, setRange, applyFormatToSelection,
-  typeTextAtCaret, buildSaveDryRunPayload,
+  typeTextAtCaret, deleteRange, buildSaveDryRunPayload,
 } from "./para_edit_state.mjs";
 import { onKeyDown } from "./para_edit_runtime.mjs";
 import { matchToggle, matchAxisChange, extractAxisValues } from "./format_charpr_matcher.mjs";
+import { findMatches, buildReplacePlan } from "./weboffice/editor_find.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
 const $ = (s) => document.querySelector(`[data-role=${s}]`);
@@ -172,6 +213,76 @@ function styleOf(cid){ const d=defs[cid]; if(!d) return ""; let s="";
   if(d.textColor)s+="color:"+d.textColor+";"; if(d.fontSizePt)s+="font-size:"+Math.max(9,Math.min(20,d.fontSizePt))+"pt;"; return s; }
 const paraLen=(p)=>p.runs.reduce((a,r)=>a+r.text.length,0);
 const activePara=()=>state&&state.paragraphs.find(p=>p.paragraphId===state.activeParagraphId);
+
+/* ── M1: 찾기(하이라이트+이동) ── */
+let findState={query:"",matches:[],cur:-1};
+let _findByPara=new Map();
+function recomputeFind(){
+  _findByPara=new Map();
+  if(!state||!findState.query){ findState.matches=[]; findState.cur=-1; return; }
+  findState.matches=findMatches(state.paragraphs,findState.query,{caseSensitive:false});
+  if(findState.matches.length===0){ findState.cur=-1; }
+  else if(findState.cur<0||findState.cur>=findState.matches.length) findState.cur=0;
+  findState.matches.forEach((m,i)=>{
+    if(!_findByPara.has(m.paragraphId)) _findByPara.set(m.paragraphId,[]);
+    _findByPara.get(m.paragraphId).push({start:m.start,end:m.end,cur:i===findState.cur});
+  });
+}
+function findHitClass(pid,off){
+  const arr=_findByPara.get(pid); if(!arr) return "";
+  for(const m of arr){ if(off>=m.start&&off<m.end) return m.cur?" find-hit find-cur":" find-hit"; }
+  return "";
+}
+function updateFindCount(){
+  const n=findState.matches.length;
+  $("findcnt").textContent = n?`${findState.cur+1}/${n}`:(findState.query?"0/0":"");
+}
+function findRun(){ recomputeFind(); renderDoc(); updateFindCount(); scrollToCur(); }
+function findStep(d){
+  const n=findState.matches.length; if(!n) return;
+  findState.cur=(findState.cur+d+n)%n;
+  recomputeFind(); renderDoc(); updateFindCount(); scrollToCur();
+}
+function scrollToCur(){
+  const el=$("sheet").querySelector(".pe-ch.find-cur");
+  if(el) el.scrollIntoView({block:"center",behavior:"smooth"});
+}
+function toggleFindBar(show){
+  const bar=$("findbar"); const on=show!==undefined?show:!bar.classList.contains("on");
+  bar.classList.toggle("on",on);
+  if(on){ $("findq").focus(); $("findq").select(); }
+  else { findState.query=""; recomputeFind(); renderDoc(); }
+}
+/* 바꾸기: buildReplacePlan(검증됨)을 편집 원시연산으로 적용. typeTextAtCaret는
+   caret의 기존 charPr을 계승 → §4(신규 charPr 없음) 준수. */
+/* setRange/setCaret은 state 직접 반환, deleteRange/typeTextAtCaret은 {state,command,reason} 반환 */
+function applyReplaceAt(pid,start,end,repl){
+  state=setRange(state,pid,start,end);
+  const d=deleteRange(state);
+  if(!d.command){ lastReason=d.reason||"DELETE_REJECTED"; return false; }
+  state=d.state;                       // caret이 start로 이동
+  if(repl){
+    const t=typeTextAtCaret(state,repl);
+    if(!t.command){ lastReason=t.reason||"TYPE_REJECTED"; return false; }
+    state=t.state;
+  }
+  return true;
+}
+function replaceCur(){
+  const m=findState.matches[findState.cur]; if(!m) return;
+  const ok=applyReplaceAt(m.paragraphId,m.start,m.end,$("findr").value);
+  findRun(); renderAll();
+  setStatus(ok?"ok":"rej", ok?("1건 바꿈 · 편집 "+state.commandLog.length):("바꾸기 거부: "+lastReason));
+}
+function replaceAll(){
+  if(!findState.query) return;
+  const repl=$("findr").value;
+  const plan=buildReplacePlan(state.paragraphs,findState.query,repl,{caseSensitive:false});
+  let ok=0,rej=0;
+  for(const it of plan){ if(applyReplaceAt(it.paragraphId,it.start,it.end,repl)) ok++; else rej++; }  // 문단별 역순
+  findRun(); renderAll();
+  setStatus(rej?"rej":"ok", `${ok}건 바꿈`+(rej?` · ${rej}건 거부(${lastReason})`:"")+` · 편집 ${state.commandLog.length}`);
+}
 function charPrAt(p,off){ let pos=0; for(const r of p.runs){ if(off<pos+r.text.length||(off===paraLen(p)&&r===p.runs[p.runs.length-1])) return r.charPrIDRef; pos+=r.text.length; } return p.runs[0]?.charPrIDRef??null; }
 function cellKey(cs){ return cs&&cs.kind==="cell"?`${cs.tableIndex}:${cs.rowIndex}:${cs.colIndex}`:null; }
 // 표 셀 텍스트를 평탄화 중복 출력하는 컨테이너 문단 감지(표와 90%+ 문자 겹침)
@@ -226,7 +337,7 @@ function renderPara(p){
   const put=(ch,cid)=>{
     if(isA&&selA===null&&state.caretOffset===off) div.appendChild(mkCaret());
     const s=document.createElement("span");
-    s.className="pe-ch"+(selA!==null&&isA&&off>=selA&&off<selB?" sel":"");
+    s.className="pe-ch"+(selA!==null&&isA&&off>=selA&&off<selB?" sel":"")+findHitClass(p.paragraphId,off);
     s.style.cssText=styleOf(cid); s.dataset.pid=p.paragraphId; s.dataset.off=off;
     s.textContent=ch; div.appendChild(s); off++;
   };
@@ -307,6 +418,7 @@ function renderRibbon(){
     btn.onclick=()=>{ const r=applyFormatToSelection(state,matched,defs); state=r.state; lastReason=r.reason||""; renderAll(); };
   }
   // 크기·색 셀렉트 — 현재 문서에 존재하는 값만 채운다
+  fillAxis($("font"),"fontName",hasRange,curDef,(v)=>v);
   fillAxis($("size"),"fontSizePt",hasRange,curDef,(v)=>v+"pt");
   fillAxis($("color"),"textColor",hasRange,curDef,(v)=>v);
   $("undo").disabled=!state||state.undoStack.length===0;
@@ -314,7 +426,7 @@ function renderRibbon(){
   $("save").disabled=!state||state.commandLog.length===0;
 }
 function fillAxis(sel,axis,hasRange,curDef,fmt){
-  const label=axis==="fontSizePt"?"크기":"색";
+  const label=axis==="fontSizePt"?"크기":(axis==="fontName"?"글꼴":"색");
   if(!hasRange||!curDef){ sel.disabled=true; sel.innerHTML=`<option>${label}</option>`; sel.onchange=null; return; }
   const vals=extractAxisValues(defs,axis,curDef)||[];
   sel.disabled=false; sel.innerHTML=`<option disabled>${label}</option>`;
@@ -454,6 +566,42 @@ $("undo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"z",ctrlKe
 $("redo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"y",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
 $("save").addEventListener("click",()=>{ const pl=buildSaveDryRunPayload(state); setStatus("ok",`저장 dry-run — 편집 ${state.commandLog.length}건 · ${pl.status||"READY"} (전송 안 함)`); });
 $("print").addEventListener("click",()=>{ if(!state){ setStatus("fail","인쇄할 문서가 없습니다. 먼저 서식을 불러오세요."); return; } window.print(); });
+
+/* ── 찾기 이벤트 ── */
+$("findbtn").addEventListener("click",()=>toggleFindBar());
+$("findq").addEventListener("input",(e)=>{ findState.query=e.target.value; findState.cur=0; findRun(); });
+$("findq").addEventListener("keydown",(e)=>{
+  if(e.key==="Enter"){ e.preventDefault(); findStep(e.shiftKey?-1:1); }
+  else if(e.key==="Escape"){ e.preventDefault(); toggleFindBar(false); }
+});
+$("findnext").addEventListener("click",()=>findStep(1));
+$("findprev").addEventListener("click",()=>findStep(-1));
+$("findrone").addEventListener("click",replaceCur);
+$("findrall").addEventListener("click",replaceAll);
+$("findclose").addEventListener("click",()=>toggleFindBar(false));
+/* 리본 탭 전환 */
+function setRibbonTab(tab){
+  document.querySelectorAll(".rbtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+  document.querySelectorAll(".grp[data-tab]").forEach(g=>{ g.hidden=(g.dataset.tab!==tab); });
+}
+document.querySelectorAll(".rbtab").forEach(b=>b.addEventListener("click",()=>setRibbonTab(b.dataset.tab)));
+setRibbonTab("home");
+
+/* 단축키: Ctrl+F 찾기, Ctrl+B/I/U 서식(검증된 리본 버튼 경로 재사용 —
+   매칭 charPr 없으면 버튼이 disabled라 자동 무시 → §4 준수) */
+const FMT_KEYS={b:"bold",i:"italic",u:"underline"};
+document.addEventListener("keydown",(e)=>{
+  if(!state||!(e.ctrlKey||e.metaKey)) return;
+  const k=(e.key||"").toLowerCase();
+  if(k==="f"){ e.preventDefault(); toggleFindBar(true); return; }
+  const dim=FMT_KEYS[k];
+  if(dim){
+    const btn=document.querySelector(`[data-fmt=${dim}]`);
+    e.preventDefault();
+    if(btn&&!btn.disabled) btn.click();
+    else setStatus("rej","선택 영역이 없거나 매칭되는 기존 charPr이 없습니다(신규 생성 금지)");
+  }
+});
 $("srcconnect").addEventListener("click",connectSource);
 $("aifill").addEventListener("click",aiAutoFill);
 $("aiclear").addEventListener("click",()=>aiClear(true));
@@ -475,7 +623,7 @@ async function loadForm(sourcePath){
     aiFilled=new Set(); aiProposals=[];
     const sm=d.summary||{};
     $("doc").textContent=`표 ${sm.tables??"?"} · 셀 ${sm.cells??"?"} · 문단 ${paragraphs.length}`;
-    $("aifill").disabled=false; $("aiclear").disabled=false; $("srcconnect").disabled=false; $("print").disabled=false;
+    $("aifill").disabled=false; $("aiclear").disabled=false; $("srcconnect").disabled=false; $("print").disabled=false; $("findbtn").disabled=false;
     setStatus("ok",`불러옴 · 원본 무수정. «✨ AI 자동채움»을 누르거나, 셀을 클릭해 직접 편집하세요.`);
     renderAll();
     return true;
