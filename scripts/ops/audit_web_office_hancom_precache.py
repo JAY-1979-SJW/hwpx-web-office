@@ -23,7 +23,8 @@ sys.path.insert(0, str(ROOT / "scripts/hwpx"))
 from scripts.hwpx.web_office.coordinate_layout import (  # noqa: E402
     extract, layout_quality)
 from scripts.hwpx.web_office.hancom_layout_refresh import (  # noqa: E402
-    hancom_available, normalize_for_layout, render_truth_pages)
+    calibrate_row_scale, get_row_scale, hancom_available,
+    normalize_for_layout, render_truth_pages)
 
 PASS_VERDICT = "PASS_WEB_OFFICE_HANCOM_PRECACHE"
 FAIL_VERDICT = "FAIL_WEB_OFFICE_HANCOM_PRECACHE"
@@ -47,7 +48,15 @@ def precache_one(path: Path, project_root: Path) -> dict:
             except (OSError, ValueError):
                 pass
         rec["hancomPages"] = hancom_pages
-        lay = extract(str(norm))
+        # 캘리브레이션 — 쪽수 불일치 시 배율 탐색(공장 1회), 이후 적용 추출
+        k = get_row_scale(path, project_root=project_root)
+        if (hancom_pages is not None and abs(k - 1.0) < 1e-3
+                and extract(str(norm)).get("pages") != hancom_pages):
+            kk = calibrate_row_scale(path, project_root=project_root)
+            if kk:
+                k = kk
+        rec["rowScale"] = round(k, 4)
+        lay = extract(str(norm), row_scale=k)
         rec["ourPages"] = lay.get("pages")
         q = layout_quality(lay)
         rec["quality"] = q

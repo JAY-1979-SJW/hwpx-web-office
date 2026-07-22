@@ -48,7 +48,7 @@ _parse_char_prs = parse_char_prs
 _parse_border_fills = parse_border_fills
 
 
-def _extract_section(path, secname):
+def _extract_section(path, secname, row_scale=1.0):
     z = zipfile.ZipFile(path)
     root = ET.fromstring(z.read(secname))
     parent_map = {c: p for p in root.iter() for c in p}
@@ -220,16 +220,50 @@ def _extract_section(path, secname):
             if _az and _r > 0:
                 _zero_rows.add(_r)
                 row_h[_r] = 0.0
+        # 공장 캘리브레이션 배율 — 한컴 실제 쪽수에 맞춘 행높이 미세 배율
+        # (truth 캐시의 calib.json). 축소 시엔 내용 하한(floor)을 지켜
+        # 물림을 만들지 않는다. 확대는 그대로(잘림 없음).
+        _calib_alpha = 0.0
+        if row_scale and abs(row_scale - 1.0) > 1e-3:
+            if row_scale > 1.0:
+                row_h = [row_h[i] * row_scale for i in range(nrow)]
+            else:
+                # 축소 — 내용 하한이 아니라 글리프-컴팩트 하한(줄간격 제거)
+                # 까지 허용하고, α 보간 기계로 줄 위치도 함께 압축한다
+                # (글리프 크기 유지 → 물림 없음). 한컴이 조밀 문서에서
+                # 실제로 쓰는 압축 방식과 동일 모델.
+                _comp = [0.0] * nrow
+                for c in cells:
+                    if c["rowSpan"] == 1 and c["row"] not in _zero_rows:
+                        _cv = c["hCompact"] + c["mt"]
+                        if _cv > _comp[c["row"]]:
+                            _comp[c["row"]] = _cv
+                for i in range(nrow):
+                    if _comp[i] > row_h[i]:
+                        _comp[i] = row_h[i]
+                _new = [max(_comp[i], row_h[i] * row_scale)
+                        for i in range(nrow)]
+                # 행별 α — 각 행의 실제 압축률(원↔컴팩트 사이 위치).
+                # 표 전역 단일 α는 꽉 찬 행(압축률 1.0)과 여유 행(0.x)을
+                # 평균내 꽉 찬 행의 줄이 밖으로 밀린다(물림).
+                _row_alpha = [0.0] * nrow
+                for i in range(nrow):
+                    d = row_h[i] - _comp[i]
+                    if d > 1e-6:
+                        _row_alpha[i] = min(1.0, max(
+                            0.0, (row_h[i] - _new[i]) / d))
+                _calib_alpha = _row_alpha
+                row_h = _new
         # 표 압축 폐지 — 원본 해부 결과 한컴은 다중페이지 표를 압축하지 않고
         # 페이지를 늘린다(검증: cellSz 합 2091 = p1 964+p2 1009+p3 118,
         # 각주 저장 vpos 239 = p3 표 하단 바로 아래 — 픽셀 정합). 행은
         # cellSz(한컴 저장 실높이) 그대로 두고, 표 뒤 본문은 emit_para 의
         # 흐름 불변식이 올바른 페이지로 보낸다. (α압축은 2쪽 오가정 위에서
         # 행을 글리프 밀착까지 눌러 서식이 뭉개지는 결함이었다)
-        alpha = 0.0
+        alpha = _calib_alpha   # 0.0 | 행별 α 리스트(캘리브레이션 축소 시)
         if os.environ.get("COORD_DEBUG"):
             print(f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
-                  f"nrow={nrow} ncol={ncol} th={th:.0f} a={alpha:.3f} "
+                  f"nrow={nrow} ncol={ncol} th={th:.0f} "
                   f"sum={sum(row_h):.0f} row_h="
                   f"{[round(h, 1) for h in row_h]}", file=sys.stderr)
         col_x = [0.0] * (ncol + 1)
@@ -292,14 +326,21 @@ def _extract_section(path, secname):
                     nested.append((nt, nvpos, nh))
             # α 압축 시 줄 위치 보간 — 각 줄을 [원 ry ↔ 글리프-밀착 스택]
             # 사이에서 α 만큼 이동(줄간격만 줄고 글리프는 유지 → 물림 없음).
-            mt_eff = c["mt"] * (1.0 - 0.5 * alpha)
-            if alpha > 0 and cell_lines:
+            # 행별 α 배열이면 이 셀 span 의 최대 α 를 사용.
+            if isinstance(alpha, list):
+                _a = max((alpha[r] for r in range(
+                    c["row"], min(c["row"] + c["rowSpan"], nrow))),
+                    default=0.0)
+            else:
+                _a = alpha
+            mt_eff = c["mt"] * (1.0 - 0.5 * _a)
+            if _a > 0 and cell_lines:
                 order = sorted(range(len(cell_lines)),
                                key=lambda i: cell_lines[i]["ry"])
                 cum = 0.0
                 for i in order:
                     cl = cell_lines[i]
-                    cl["ryEff"] = cl["ry"] - alpha * (cl["ry"] - cum)
+                    cl["ryEff"] = cl["ry"] - _a * (cl["ry"] - cum)
                     cum += cl["h"]
             else:
                 for cl in cell_lines:
@@ -351,7 +392,7 @@ def _extract_section(path, secname):
             # 드묾; 위치만 완만히 당긴다)
             for nt, nvpos, _ in nested:
                 walk_table(nt, cx + c["ml"],
-                           _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * alpha)))
+                           _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * _a)))
             table_bottom = max(table_bottom, row_bot[_last])
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
@@ -523,10 +564,11 @@ def _extract_section(path, secname):
     }
 
 
-def extract(path):
+def extract(path, row_scale=1.0):
     """HWPX → 좌표 레이아웃. 전 섹션(sectionN.xml)을 페이지 오프셋 누적으로
     이어붙인다 — 단일 섹션이 대부분이나, 다중 섹션 문서에서 section0 외의
-    내용이 사라지지 않도록(표시/편집 누락 방지) 표준 처리한다."""
+    내용이 사라지지 않도록(표시/편집 누락 방지) 표준 처리한다.
+    row_scale: 공장 캘리브레이션 행높이 배율(기본 1.0 = 무변화)."""
     z = zipfile.ZipFile(path)
     sec_files = [n for n in z.namelist()
                  if re.search(r"section\d+\.xml$", n.lower())]
@@ -536,13 +578,13 @@ def extract(path):
         sec_files = [n for n in z.namelist()
                      if "section0" in n.lower() and n.endswith(".xml")][:1]
     if len(sec_files) <= 1:
-        return _extract_section(path, sec_files[0])
+        return _extract_section(path, sec_files[0], row_scale)
 
     merged_lines, merged_boxes, merged_pd = [], [], []
     page_base = 0
     first = None
     for sec in sec_files:
-        r = _extract_section(path, sec)
+        r = _extract_section(path, sec, row_scale)
         if first is None:
             first = r
         off = page_base * (r["pageHeightPx"] or 1)
@@ -645,7 +687,22 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
             normalized = True
     except Exception:
         pass
-    layout = extract(str(extract_from))
+    _rs = 1.0
+    try:
+        from .hancom_layout_refresh import get_row_scale
+        _rs = get_row_scale(cand, project_root=root)
+    except Exception:
+        _rs = 1.0
+    layout = extract(str(extract_from), row_scale=_rs)
+    if abs(_rs - 1.0) > 1e-3:
+        # 품질 게이트 — 캘리브레이션 배율이 물림/겹침을 만들면 자동 철회
+        # (쪽수 정합보다 무결 표시가 우선). 철회 시 기본 배율로 재추출.
+        _q = layout_quality(layout)
+        if _q["ok"]:
+            layout["rowScale"] = _rs
+        else:
+            layout = extract(str(extract_from))
+            layout["rowScaleRejected"] = _rs
     layout["verdict"] = "PASS"
     layout["sourcePath"] = cand.relative_to(root).as_posix()
     layout["hancomNormalized"] = normalized

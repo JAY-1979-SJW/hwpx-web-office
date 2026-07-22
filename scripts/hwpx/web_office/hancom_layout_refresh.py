@@ -357,6 +357,68 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
     return changed
 
 
+def get_row_scale(source_path: Path,
+                  project_root: Path = PROJECT_ROOT) -> float:
+    """공장 캘리브레이션 배율 조회(truth 캐시의 calib.json, 없으면 1.0)."""
+    src = Path(source_path)
+    try:
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+        import json as _json
+        cj = _truth_dir(Path(project_root)) / digest / "calib.json"
+        if cj.is_file():
+            v = float(_json.loads(cj.read_text(encoding="utf-8"))
+                      .get("rowScale", 1.0))
+            if 0.85 <= v <= 1.15:
+                return v
+    except Exception:
+        pass
+    return 1.0
+
+
+def calibrate_row_scale(source_path: Path,
+                        project_root: Path = PROJECT_ROOT) -> float | None:
+    """±1쪽 캘리브레이션 — 한컴 실제 쪽수에 우리 쪽수가 일치하는 행높이
+    배율 k 를 1.0 에서 가까운 순으로 탐색해 truth 캐시에 저장한다.
+
+    공장(한컴 산출물 보유) 공정: 축소는 추출기에서 내용 하한이 지켜지므로
+    물림을 만들지 않고, 확대는 잘림이 없다. 일치 k 가 없으면 저장 안 함
+    (기본 1.0 유지 — 캘리브레이션 불가 문서로 기록)."""
+    src = Path(source_path)
+    try:
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return None
+    tdir = _truth_dir(Path(project_root)) / digest
+    done = tdir / "DONE"
+    if not done.is_file():
+        return None
+    try:
+        hancom_pages = int(done.read_text(encoding="ascii").strip())
+    except (OSError, ValueError):
+        return None
+    # 정규화 사본이 있으면 그것으로(로더와 동일 경로), 없으면 원본으로 탐색
+    norm = _cache_dir(Path(project_root)) / f"norm_{digest}.hwpx"
+    target = norm if norm.is_file() else src
+    try:
+        from .coordinate_layout import extract as _extract
+    except ImportError:
+        from coordinate_layout import extract as _extract
+    cands = [1.0]
+    for step in (0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06,
+                 0.08, 0.10, 0.12):
+        cands.extend([1.0 - step, 1.0 + step])
+    for k in cands:
+        try:
+            if _extract(str(target), row_scale=k).get("pages") == hancom_pages:
+                import json as _json
+                (tdir / "calib.json").write_text(
+                    _json.dumps({"rowScale": round(k, 4)}), encoding="utf-8")
+                return k
+        except Exception:
+            continue
+    return None
+
+
 if __name__ == "__main__":
     p = normalize_for_layout(Path(sys.argv[1]))
     print(str(p))
