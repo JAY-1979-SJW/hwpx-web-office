@@ -118,21 +118,33 @@ def _apply_subject(fields: list[dict]) -> int:
     return third
 
 
-def run(limit: int = 0, size_cap_mb: float = 1.5) -> None:
+def run(limit: int = 0, size_cap_mb: float = 1.5,
+        shard: int = 0, shards: int = 1) -> None:
+    """shards>1 이면 form_id % shards == shard 인 것만 처리한다.
+
+    파싱이 CPU 바운드 단일 프로세스라 16코어 기계에서 1코어만 쓴다.
+    샤드를 나눠 여러 프로세스로 돌리면 그만큼 줄어든다. 같은 스테이징
+    테이블에 쓰지만 SQLite WAL 이 쓰기를 직렬화하고 커밋이 100건마다
+    짧게 끝나므로 경합은 무시할 수준이다(connect timeout 600초).
+    """
     con = _connect()
     con.executescript(DDL)
     con.commit()
 
+    shard_sql = ""
+    if shards > 1:
+        shard_sql = f" AND (f.form_id % {int(shards)}) = {int(shard)}"
     rows = con.execute(
         f"SELECT f.form_id, f.source_path, f.name FROM forms f "
         f"LEFT JOIN {STAGING} s ON s.form_id = f.form_id "
-        f"WHERE f.status='OK' AND s.form_id IS NULL "
+        f"WHERE f.status='OK' AND s.form_id IS NULL{shard_sql} "
         f"ORDER BY f.form_id").fetchall()
     if limit:
         rows = rows[:limit]
     done_already = con.execute(
         f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
-    _log(f"[start] 재생성 대상 {len(rows):,}종 "
+    tag = f"[shard {shard}/{shards}] " if shards > 1 else ""
+    _log(f"{tag}[start] 재생성 대상 {len(rows):,}종 "
          f"(이미 쌓인 {done_already:,}건 제외 — 재개형)")
 
     t0 = time.time()
@@ -224,8 +236,8 @@ def run(limit: int = 0, size_cap_mb: float = 1.5) -> None:
             el = time.time() - t0
             rate = i / el if el else 0
             eta = (len(rows) - i) / rate / 60 if rate else 0
-            _log(f"  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} 스킵 {skip} "
-                 f"[{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
+            _log(f"{tag}  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} "
+                 f"스킵 {skip} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
                  f"신청인칸 {agg_app:,} 제3자칸 {agg_third:,}")
 
     con.commit()
@@ -324,6 +336,9 @@ def main() -> None:
                     help="스테이징을 forms/fields 에 반영")
     ap.add_argument("--force", action="store_true",
                     help="--promote 시 미완이어도 강행")
+    ap.add_argument("--shard", type=int, default=0)
+    ap.add_argument("--shards", type=int, default=1,
+                    help="여러 프로세스로 나눠 돌릴 때 총 개수")
     args = ap.parse_args()
     if args.status:
         _log(json.dumps(status(), ensure_ascii=False, indent=2))
@@ -331,7 +346,7 @@ def main() -> None:
     if args.promote:
         _log(json.dumps(promote(args.force), ensure_ascii=False, indent=2))
         return
-    run(args.limit, args.size_cap_mb)
+    run(args.limit, args.size_cap_mb, args.shard, args.shards)
 
 
 if __name__ == "__main__":
