@@ -9,6 +9,7 @@ text range edit 을 적용한다. 본 어댑터는 input/output 파일 경로를
 table/row/cell 탐색 helper 만 호출한다. 신규 mutation primitive 작성 금지.
 """
 from __future__ import annotations
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -131,10 +132,76 @@ def _strip_lineseg(paragraph_elem: ET.Element) -> None:
     반면 linesegarray 요소 자체를 완전히 없애면 한컴이 셀 폭 기준으로
     올바르게 재조판(여러 줄로 줄바꿈 + 행 높이 자동 확장)한다 —
     "근사값을 넣는다"가 아니라 "완전히 비운다"가 맞는 처방이었다.
-    APPLY_FORMAT/APPLY_PARA_FORMAT(텍스트 불변)에는 호출하지 않는다."""
+
+    (2026-07-24) 대표님 지시로 편집 경로에서는 더 이상 호출하지 않는다
+    — 웹뷰어 자체 좌표 렌더러가 lineseg 없는 문단을 그릴 좌표를 못
+    만들어(그 문단이 화면에서 통째로 사라짐) 저장 직후 화면이 클라
+    이언트 캐시 오버레이("덧방")에 의존하게 되는 부작용이 있었다.
+    후속 대체 로직은 _fix_lineseg_on_text_edit — 기존 lineseg 는
+    보존하고, 줄 수가 늘어난다고 추정될 때만 부족한 줄만큼 근사
+    lineseg 를 이어붙인다. 이 함수 자체는 과거 회귀 비교/문서화 목적
+    으로 남겨두되 편집 경로에서는 미사용."""
     for child in list(paragraph_elem):
         if _local_tag(child) == "linesegarray":
             paragraph_elem.remove(child)
+
+
+def _fix_lineseg_on_text_edit(paragraph_elem: ET.Element,
+                               before_text: str,
+                               after_text: str) -> None:
+    """텍스트 편집 후 lineseg 처리 (2026-07-24, 대표님 지시).
+
+    "lineseg 삭제 로직을 제거하고, 텍스트 편집 시 기존 lineseg를
+    보존한다. 줄 수가 늘어난 경우에만 해당 문단의 lineseg를 추정
+    보정한다. 한컴 COM은 편집 경로에서 호출하지 않는다."
+
+    기존 lineseg 들의 textpos 경계로 "한컴이 실제로 배치했던 줄당
+    문자수(capacity)"를 역산한다 — 근사 폭/폰트 계산이 아니라 한컴
+    자신의 과거 결과를 기준으로 삼는 편이 더 신뢰할 수 있다. 편집 후
+    텍스트가 그 capacity 로 기존 줄 수 안에 다 안 들어간다고 추정되면
+    (줄 수 증가), 마지막 lineseg 를 복제해 부족한 줄만큼만 근사
+    좌표로 이어붙인다. 줄 수가 늘지 않으면(같거나 줄어들면)
+    linesegarray 는 전혀 건드리지 않고 그대로 보존한다.
+
+    새로 이어붙이는 lineseg 의 vertpos/textpos 는 어디까지나 추정치
+    — 한컴이 실제로 열면 스스로 재조판해 정확한 값으로 대체한다.
+    본 함수의 목적은 "완전히 비워서 화면에서 사라지게" 하지 않고,
+    최소한 그럴듯한 임시 좌표를 남겨 자체 좌표 렌더러가 계속 무언가
+    그릴 수 있게 하는 것뿐이다.
+    """
+    import xml.etree.ElementTree as _ET  # noqa: WPS433
+    arr = next((c for c in paragraph_elem
+                if _local_tag(c) == "linesegarray"), None)
+    if arr is None:
+        return
+    segs = [c for c in arr if _local_tag(c) == "lineseg"]
+    n = len(segs)
+    if n == 0 or len(after_text) <= len(before_text):
+        return  # 늘지 않음(또는 lineseg 없음) — 손대지 않고 보존
+    positions = [int(float(s.get("textpos", "0") or "0")) for s in segs]
+    bounds = positions + [len(before_text)]
+    counts = [bounds[i + 1] - bounds[i] for i in range(n)]
+    # capacity — "꽉 찬 줄"의 문자수 추정. 마지막 줄은 보통 덜 차 있어
+    # 대표값에서 제외(줄이 1개뿐이면 그 줄 자체가 유일한 근거).
+    capacity = max(counts) if n == 1 else max(counts[:-1])
+    if capacity <= 0:
+        return
+    estimated_lines = math.ceil(len(after_text) / capacity)
+    if estimated_lines <= n:
+        return  # 추정상 줄 수 증가 없음 — 보존
+    extra = estimated_lines - n
+    last_attrib = dict(segs[-1].attrib)
+    vertpos0 = float(last_attrib.get("vertpos", "0") or "0")
+    spacing = (float(last_attrib.get("spacing", "0") or "0")
+               or float(last_attrib.get("vertsize", "0") or "0"))
+    base_textpos = bounds[-2] if n > 1 else 0
+    for i in range(1, extra + 1):
+        new_attrib = dict(last_attrib)
+        new_attrib["vertpos"] = str(int(vertpos0 + spacing * i))
+        new_attrib["textpos"] = str(
+            min(len(after_text) - 1, base_textpos + capacity * i))
+        new_el = _ET.SubElement(arr, segs[-1].tag)
+        new_el.attrib.update(new_attrib)
 
 
 def _read_header_para_pr_ids(package: HwpxPackage) -> set[str]:
@@ -1105,7 +1172,9 @@ def apply_paragraph_edits_plan(
                                             mutation["status"]),
                         mutation=mutation))
                     continue
-                _strip_lineseg(paragraph_elem)
+                _fix_lineseg_on_text_edit(
+                    paragraph_elem, para_full,
+                    para_full[:rs_raw] + after_text + para_full[rs_raw:])
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1209,7 +1278,9 @@ def apply_paragraph_edits_plan(
                         item, mr_reason_map.get(mr_status, mr_status),
                         mutation=mr))
                     continue
-                _strip_lineseg(paragraph_elem)
+                _fix_lineseg_on_text_edit(
+                    paragraph_elem, para_full,
+                    para_full[:rs_raw] + after_text + para_full[re_raw:])
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1305,7 +1376,9 @@ def apply_paragraph_edits_plan(
                                                 mutation["status"]),
                                     mutation=mutation))
             continue
-        _strip_lineseg(paragraph_elem)
+        _fix_lineseg_on_text_edit(
+            paragraph_elem, para_full,
+            para_full[:rs_raw] + after_text + para_full[re_raw:])
         package.write_xml(entry, root)
         touched_entries.add(entry)
         applied.append({
