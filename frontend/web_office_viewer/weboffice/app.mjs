@@ -167,7 +167,9 @@ export function mountWebOffice(root) {
       }
       const paragraphId = command.target.paragraphId;
       if (opts.onOk) opts.onOk();
-      setStatus("ok", "문단 저장 완료(새 sandbox 사본) · 재로딩 …");
+      setStatus("ok", (d.editedInPlace
+        ? "문단 저장 완료(원본 파일에 반영됨)"
+        : "문단 저장 완료(새 sandbox 사본)") + " · 재로딩 …");
       // writer 가 이제 편집된 문단의 lineseg 를 보존(줄 수 증가 추정 시만
       // 근사 보정)하므로, 새 레이아웃을 다시 물어보면 그 문단의 실제 줄
       // 좌표가 나온다 — 더 이상 "편집 전 좌표를 계속 쓰는" 임시방편이
@@ -350,9 +352,12 @@ export function mountWebOffice(root) {
         setStatus("fail", "서식 적용 거부: " + msg);
         return;
       }
-      // 서버가 만든 새 sandbox 파일을 다음 편집의 기준으로 이어받는다.
+      // editInPlace 면 원본 그대로, 아니면 서버가 만든 새 sandbox 파일을
+      // 다음 편집의 기준으로 이어받는다.
       loaded.sourcePath = d.sourcePath;
-      setStatus("ok", "서식 적용 완료(새 sandbox 사본) · 재로딩 …");
+      setStatus("ok", (d.editedInPlace
+        ? "서식 적용 완료(원본 파일에 반영됨)"
+        : "서식 적용 완료(새 sandbox 사본)") + " · 재로딩 …");
       // truthBase 선-초기화 — saveParagraphText 와 동일 이유(이전 파일의
       // 낡은 실렌더 사진이 새 파일 렌더에도 그대로 남아, probeTruth 가
       // 실패(404, 정상 폴백 신호)하면 화면이 그 이전 상태에 영영
@@ -776,11 +781,12 @@ export function mountWebOffice(root) {
   });
   $("[data-role=save]").addEventListener("click", async () => {
     if (!cell) return;
-    setStatus("load", "저장 중(sandbox 사본 + readback 검증) …");
+    setStatus("load", "저장 중(검증 통과 후 원본 반영) …");
     const r = await save.save();
     if (!r.ok) setStatus("fail", "저장 거부: " + r.code);
-    else setStatus("ok",
-      "저장 완료 — verify7 통과 · 원본 무수정 · 편집본 다운로드 가능.");
+    else setStatus("ok", r.editedInPlace
+      ? "저장 완료 — verify7 통과 · 원본 파일에 반영됨."
+      : "저장 완료 — verify7 통과 · 원본 무수정 · 편집본 다운로드 가능.");
     renderSide();
   });
   $("[data-role=download]").addEventListener("click", () => {
