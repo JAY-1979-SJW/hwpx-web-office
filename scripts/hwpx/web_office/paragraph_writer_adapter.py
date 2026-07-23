@@ -146,9 +146,59 @@ def _strip_lineseg(paragraph_elem: ET.Element) -> None:
             paragraph_elem.remove(child)
 
 
+# 한 문단의 추정 보정이 넘어서는 안 되는 안전 상한(HWPUNIT). A4 인쇄
+# 가능 높이의 보수적 근사치(coord_styles.parse_page_geometry 기본
+# 페이지 높이 84186 HWPUNIT 대비 여유 있게 낮춰 잡음) — 이 함수는
+# header.xml 의 실제 페이지 규격에 접근하지 않으므로(paragraph_elem
+# 만 받음) 정확한 페이지 경계 대신 "명백히 페이지를 넘는" 수준만
+# 걸러내는 안전장치다. 실제 페이지 폭/여백 기반 정밀 판정은 여기서
+# 하지 않는다 — 대표님 지시("페이지 초과 시 경고 정도로 막아두면
+# 충분") 수준의 최소 가드.
+_LINESEG_FIX_PAGE_OVERFLOW_GUARD_HU = 70000
+
+_LINESEG_FIX_AUDIT_DIR = _PR / "data/audit/web_office_lineseg_fix"
+
+
+def _log_lineseg_fix(*, context: dict[str, Any] | None, extra: int,
+                      capacity: int, before_len: int, after_len: int,
+                      capped: bool, capped_at: int | None) -> None:
+    """근사 보정 발동 기록 — append-only JSONL(data/audit, CLAUDE.md §5).
+
+    실측(2026-07-24) 대표님 지적: 이건 근사 보정이라 언젠가 정확도가
+    어긋나는 문서가 나온다. 그때 "어느 문서·문단에서 몇 줄을 보정했는지"
+    가 안 남아 있으면 원인 추적이 불가능해진다 — 지난 휴리스틱 가드
+    (오버랩 방지 가드 등) 때와 같은 이유로 반드시 남긴다.
+    """
+    import datetime as _dt
+    import json as _json
+    rec = {
+        "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        "event": "LINESEG_FIX_ON_TEXT_EDIT",
+        "sourcePath": (context or {}).get("sourcePath"),
+        "paragraphId": (context or {}).get("paragraphId"),
+        "containerScope": (context or {}).get("containerScope"),
+        "beforeLen": before_len,
+        "afterLen": after_len,
+        "estimatedCapacityCharsPerLine": capacity,
+        "extraLinesAppended": extra,
+        "pageOverflowGuardTriggered": capped,
+        "cappedAtLine": capped_at,
+    }
+    try:
+        _LINESEG_FIX_AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+        today = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+        p = _LINESEG_FIX_AUDIT_DIR / f"{today}.jsonl"
+        with p.open("a", encoding="utf-8") as fp:
+            fp.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # 로그 실패가 편집 자체를 막지는 않는다
+
+
 def _fix_lineseg_on_text_edit(paragraph_elem: ET.Element,
                                before_text: str,
-                               after_text: str) -> None:
+                               after_text: str,
+                               *, context: dict[str, Any] | None = None
+                               ) -> None:
     """텍스트 편집 후 lineseg 처리 (2026-07-24, 대표님 지시).
 
     "lineseg 삭제 로직을 제거하고, 텍스트 편집 시 기존 lineseg를
@@ -168,6 +218,15 @@ def _fix_lineseg_on_text_edit(paragraph_elem: ET.Element,
     본 함수의 목적은 "완전히 비워서 화면에서 사라지게" 하지 않고,
     최소한 그럴듯한 임시 좌표를 남겨 자체 좌표 렌더러가 계속 무언가
     그릴 수 있게 하는 것뿐이다.
+
+    경계 케이스(대표님 지적, 2026-07-24) — 알려진 미해결 사항:
+      · 줄 수가 "줄어드는" 경우는 대칭 처리하지 않는다(지시 범위 밖).
+        저장 파일 자체는 한컴이 재조판하므로 무해하지만, 화면에서는
+        문단 아래에 뜬 공간이 보일 수 있다. 실제로 관측되면 그때
+        대칭 로직을 추가한다.
+      · 페이지 경계를 넘는 수준의 증가는 _LINESEG_FIX_PAGE_OVERFLOW_GUARD_HU
+        에서 증분을 멈추고 경고를 남긴다(아래) — 근사치가 실제 페이지
+        수까지 넘겨 배치를 크게 어긋나게 하는 것을 막는 최소 가드.
     """
     import xml.etree.ElementTree as _ET  # noqa: WPS433
     arr = next((c for c in paragraph_elem
@@ -195,13 +254,25 @@ def _fix_lineseg_on_text_edit(paragraph_elem: ET.Element,
     spacing = (float(last_attrib.get("spacing", "0") or "0")
                or float(last_attrib.get("vertsize", "0") or "0"))
     base_textpos = bounds[-2] if n > 1 else 0
+    capped = False
+    capped_at: int | None = None
+    added = 0
     for i in range(1, extra + 1):
+        new_vertpos = vertpos0 + spacing * i
+        if new_vertpos - vertpos0 > _LINESEG_FIX_PAGE_OVERFLOW_GUARD_HU:
+            capped = True
+            capped_at = i
+            break
         new_attrib = dict(last_attrib)
-        new_attrib["vertpos"] = str(int(vertpos0 + spacing * i))
+        new_attrib["vertpos"] = str(int(new_vertpos))
         new_attrib["textpos"] = str(
             min(len(after_text) - 1, base_textpos + capacity * i))
         new_el = _ET.SubElement(arr, segs[-1].tag)
         new_el.attrib.update(new_attrib)
+        added += 1
+    _log_lineseg_fix(context=context, extra=added, capacity=capacity,
+                      before_len=len(before_text), after_len=len(after_text),
+                      capped=capped, capped_at=capped_at)
 
 
 def _read_header_para_pr_ids(package: HwpxPackage) -> set[str]:
@@ -1174,7 +1245,10 @@ def apply_paragraph_edits_plan(
                     continue
                 _fix_lineseg_on_text_edit(
                     paragraph_elem, para_full,
-                    para_full[:rs_raw] + after_text + para_full[rs_raw:])
+                    para_full[:rs_raw] + after_text + para_full[rs_raw:],
+                    context={"sourcePath": str(package.path),
+                             "paragraphId": item.get("paragraphId"),
+                             "containerScope": scope})
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1280,7 +1354,10 @@ def apply_paragraph_edits_plan(
                     continue
                 _fix_lineseg_on_text_edit(
                     paragraph_elem, para_full,
-                    para_full[:rs_raw] + after_text + para_full[re_raw:])
+                    para_full[:rs_raw] + after_text + para_full[re_raw:],
+                    context={"sourcePath": str(package.path),
+                             "paragraphId": item.get("paragraphId"),
+                             "containerScope": scope})
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1378,7 +1455,10 @@ def apply_paragraph_edits_plan(
             continue
         _fix_lineseg_on_text_edit(
             paragraph_elem, para_full,
-            para_full[:rs_raw] + after_text + para_full[re_raw:])
+            para_full[:rs_raw] + after_text + para_full[re_raw:],
+            context={"sourcePath": str(package.path),
+                     "paragraphId": item.get("paragraphId"),
+                     "containerScope": scope})
         package.write_xml(entry, root)
         touched_entries.add(entry)
         applied.append({
