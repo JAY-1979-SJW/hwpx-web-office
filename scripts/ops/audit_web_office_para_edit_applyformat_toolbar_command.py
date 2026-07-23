@@ -21,7 +21,7 @@ PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "para_edit_apply_format_smoke.mjs")
-BASELINE_COMMIT = "f119308"  # lineseg 보정 로그/가드 준공 후 갱신 (6111a9e -> f119308)
+BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
 
 REQUIRED_STATE_PATTERNS = [
     r"export\s+function\s+applyFormatToSelection\(",
