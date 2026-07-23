@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from .editor_file_bridge import load_hwpx_for_editor
+from .para_save_apply_bridge import apply_para_save_request
 from .save_apply_bridge import apply_cell_save_request
 
 
@@ -171,6 +172,38 @@ def call_cell_save_apply(
     }])
 
 
+def call_para_save_apply(
+    request: dict[str, Any],
+    *,
+    project_root: Path = PROJECT_ROOT,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    """문단 편집 저장 — 브라우저 편집기가 쓰는 경로.
+
+    셀 저장(/cell-save-apply)은 SET_CELL_TEXT 만 받는다. 브라우저는 문단
+    명령(TYPE_TEXT 등)을 만들므로 별도 경로가 필요하다.
+    """
+    out_dir = output_dir if output_dir is not None else _api_output_dir()
+
+    def _load(rel: str) -> dict[str, Any]:
+        env = call_hwpx_load(
+            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
+            project_root=project_root)
+        return (env or {}).get("data") or {}
+
+    result = apply_para_save_request(
+        request, project_root=project_root, output_dir=out_dir,
+        load_document=_load)
+    public_result = _strip_public_paths(result)
+    if result.get("verdict") in {"PASS", "PARTIAL", "PARTIAL_DRY_RUN_OK",
+                                 "DRY_RUN_OK", "NOOP"}:
+        return _envelope("SUCCESS", public_result)
+    return _envelope("FAILED", public_result, [{
+        "code": result.get("reason", result.get("verdict", "SAVE_REJECTED")),
+        "message": str(result.get("reason") or result.get("verdict") or ""),
+    }])
+
+
 def call_ai_fill(request: dict[str, Any]) -> dict[str, Any]:
     """AI 서식 자동채움 — Claude CLI(Haiku)로 입력칸 값 제안. §7/§9 준수.
 
@@ -310,6 +343,14 @@ if _FASTAPI_AVAILABLE:
         requestId: str | None = None
         dryRunOnly: bool = False
 
+    class ParaSaveApplyRequest(BaseModel):
+        operation: str
+        sourcePath: str
+        sourceDocumentHash: str | None = None
+        commandLog: list[dict[str, Any]] = []
+        requestId: str | None = None
+        dryRunOnly: bool = False
+
     class HwpxLayoutRequest(BaseModel):
         sourcePath: str
 
@@ -384,6 +425,10 @@ def create_app() -> Any:
     @app.post("/api/web-office/cell-save-apply")
     def cell_save_apply(req: CellSaveApplyRequest) -> dict[str, Any]:
         return call_cell_save_apply(req.model_dump())
+
+    @app.post("/api/web-office/para-save-apply")
+    def para_save_apply(req: ParaSaveApplyRequest) -> dict[str, Any]:
+        return call_para_save_apply(req.model_dump())
 
     @app.post("/api/web-office/hwpx-layout")
     def hwpx_layout(req: HwpxLayoutRequest) -> dict[str, Any]:

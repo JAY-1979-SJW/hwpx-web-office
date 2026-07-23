@@ -155,7 +155,7 @@
       </div><div class="lbl">AI 자동입력</div></div>
 
       <div class="grp" data-tab="review"><div class="btns">
-        <button data-role="save" type="button" disabled>저장(dry-run)</button>
+        <button data-role="save" type="button" disabled>💾 저장</button>
         <button data-role="print" type="button" disabled>🖨 인쇄</button>
       </div><div class="lbl">저장 · 인쇄</div></div>
 
@@ -599,7 +599,59 @@ for(const [type,handler] of [["compositionstart",onCompositionStart],
 }
 $("undo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"z",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
 $("redo").addEventListener("click",()=>{ const r=onKeyDown(state,{key:"y",ctrlKey:true,preventDefault(){}}); state=r.state; lastReason=r.reason||""; renderAll(); });
-$("save").addEventListener("click",()=>{ const pl=buildSaveDryRunPayload(state); setStatus("ok",`저장 dry-run — 편집 ${state.commandLog.length}건 · ${pl.status||"READY"} (전송 안 함)`); });
+/* 저장 — dry-run 으로 게이트를 먼저 확인하고, 통과할 때만 실제 저장한다.
+ * 원본은 절대 수정되지 않는다(V6_OUTPUT_ISOLATED). 결과는 별도 파일로 나온다. */
+async function saveDocument(){
+  if(!state||!state.commandLog||state.commandLog.length===0){
+    setStatus("warn","저장할 편집이 없습니다."); return;
+  }
+  const pl=buildSaveDryRunPayload(state);
+  if(pl.status==="NOOP"){ setStatus("warn","저장할 편집이 없습니다."); return; }
+  const base={operation:"PARA_SAVE_APPLY", sourcePath:currentSource,
+              sourceDocumentHash:pl.sourceDocumentHash, commandLog:pl.commandLog};
+  const post=async(dryRunOnly)=>{
+    const res=await fetch("/api/web-office/para-save-apply",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({...base, dryRunOnly})});
+    const env=await res.json();
+    return env.data||env;
+  };
+  $("save").disabled=true;
+  try{
+    setStatus("ok",`저장 검증 중 — 편집 ${pl.commandLog.length}건 …`);
+    const dry=await post(true);
+    if(dry.verdict==="REJECTED"){
+      setStatus("fail","저장 거부(검증): "+(dry.reason||dry.detail||"UNKNOWN")); return;
+    }
+    const real=await post(false);
+    const rej=(real.rejected||[]).length;
+    // 원본 무변경은 §4 의 핵심 보장이라 매번 표시한다
+    const orig=real.sourceUnchanged===false?" ⚠원본변경감지":" · 원본 무변경";
+    // outputPath 는 보안상 응답에서 제거된다(_strip_public_paths).
+    // 파일 생성 판정은 outputCreated/outputFileName 으로 한다.
+    if(real.outputCreated){
+      // 문단 저장은 V1/V7(readback) 검증기가 아직 없어 항상 FAIL 로 나온다.
+      // 그냥 "게이트 FAIL" 이라 쓰면 저장이 잘못된 것처럼 읽히므로,
+      // 실제로 검증되는 안전 관문(V4 charPr · V5 parPr · V6 격리)을 밝힌다.
+      const g=real.verify7Results||{};
+      const safe=["V4_CHARPR_PRESERVED","V5_PARPR_PRESERVED","V6_OUTPUT_ISOLATED"];
+      const safeOk=safe.filter(k=>g[k]==="PASS").length;
+      const pend=["V1_RANGE_POSITION_OK","V7_READBACK_MATCH"].filter(k=>g[k]!=="PASS");
+      setStatus("ok",`저장 완료 — ${real.outputFileName||"(파일)"}`
+        +` · 적용 ${real.acceptedCount||0}건`+(rej?` · 거부 ${rej}건`:"")
+        +orig+` · 안전관문 ${safeOk}/3 통과`
+        +(pend.length?` (readback 검증 미구현: ${pend.length}항목)`:""));
+    }else{
+      setStatus("fail",`저장 실패 — ${real.verdict||"?"}`
+        +(real.reason?` (${real.reason})`:"")+(rej?` · 거부 ${rej}건`:""));
+    }
+  }catch(e){
+    setStatus("fail","저장 오류: "+(e&&e.message||e));
+  }finally{
+    $("save").disabled=false;
+  }
+}
+$("save").addEventListener("click",saveDocument);
 $("print").addEventListener("click",()=>{ if(!state){ setStatus("fail","인쇄할 문서가 없습니다. 먼저 서식을 불러오세요."); return; } window.print(); });
 
 /* ── 찾기 이벤트 ── */

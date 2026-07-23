@@ -121,6 +121,9 @@ def build_input_schema(doc_model: dict, render_payload: dict, *,
             "role": f["role"],            # applicant | office
             "inputType": f["inputType"] or "text",
             "semantic": f["semantic"],
+            # self = 신청인 본인 정보 · thirdParty = 대리인·상대방 등 남의 정보.
+            # thirdParty 는 프로필에서 자동으로 채우면 안 된다.
+            "subject": f.get("subject") or "self",
             "sensitive": f["inputType"] == "secret",
             "tableIndex": f["tableIndex"],
             "row": f["row"],

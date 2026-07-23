@@ -75,7 +75,11 @@ _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
     ("address", "address", re.compile(r"주소|소재지|주소지|사업장\s*소재")),
     ("name", "text", re.compile(r"^성명|성\s*명|이름|신청인|신고인|청구인|제출인|"
                                 r"대표자|성명\s*\(")),
-    ("orgName", "text", re.compile(r"상호|법인명|기관명|업체명|^명칭|단체명|아파트명")),
+    # 건물·장소 이름은 신청인의 상호가 아니다. 실측에서 '아파트명' 칸에
+    # 프로필 법인명이 들어가는 오채움이 확인돼 분리했다.
+    ("buildingName", "text", re.compile(r"아파트\s*명|건물\s*명|공동주택\s*명|"
+                                        r"단지\s*명|시설\s*명|점포\s*명")),
+    ("orgName", "text", re.compile(r"상호|법인명|기관명|업체명|^명칭|단체명")),
     ("birth", "date", re.compile(r"생년월일|생일")),
     ("date", "date", re.compile(r"년\s*월\s*일|일자$|일시$|^기간|^.{0,6}일$")),
     ("amount", "number", re.compile(r"금액|요금|비용|단가|원\)$|수량|사용량|면적")),
@@ -228,6 +232,22 @@ def _procedure_bands(render_payload: dict) -> dict[int, int]:
 _BARE = re.compile(r"^(\d{1,3}|계|합계|소계|총계|[가-힣]|[A-Za-z])$")
 
 
+# 이 칸이 '누구의' 정보인가 — 신청인 본인이 아닌 제3자를 가리키는 표지.
+# 실측 사고: '법정대리인성명' 이 name 태그를 받아 신청인 이름이 대리인 칸에
+# 자동으로 들어갈 뻔했다. '피신청인 주소' 에 신청인 주소가 들어가는 것도
+# 같은 부류다. 태그(입력형식·검증)는 그대로 두되 주체를 갈라 표시한다.
+_THIRD_PARTY = re.compile(
+    r"법정\s*대리인|대리인|임대|임차|피신청|피청구|피고|상대방|거래처|"
+    r"수급인|도급인|발주자|양도인|양수인|배우자|보호자|채무자|채권자|"
+    r"공급자|수급자|상속인|피상속인|대상자|위임자|수임자|보증인|"
+    r"동거인|세대주(?!\s*본인)|가입자(?!\s*본인)")
+
+
+def _subject_of(label: str) -> str:
+    """'self' = 신청인 본인 정보 · 'thirdParty' = 남의 정보."""
+    return "thirdParty" if _THIRD_PARTY.search(label) else "self"
+
+
 def _semantic_of(label: str) -> tuple[str, str]:
     for sem, typ, rx in _SEMANTIC:
         if rx.search(label):
@@ -275,8 +295,9 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
         else:
             role, why = "applicant", "DEFAULT_APPLICANT"
         sem, typ = _semantic_of(lab) if role == "applicant" else ("", "")
+        subj = _subject_of(lab) if role == "applicant" else ""
         fields.append({**f, "role": role, "reason": why,
-                       "semantic": sem, "inputType": typ})
+                       "semantic": sem, "inputType": typ, "subject": subj})
 
     ap = [f for f in fields if f["role"] == "applicant"]
     return {
