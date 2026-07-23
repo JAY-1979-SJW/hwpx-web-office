@@ -89,6 +89,16 @@ def _apply_in_place_if_requested(
     out_path = Path(out_path_str)
     if not out_path.is_file():
         return source_rel
+    # §4.4 — 읽기 전용 자산(카탈로그 템플릿 등)은 절대 in-place 로 덮지
+    # 않는다. 원본 직접 수정은 사용자 소유 문서에만 허용한다. 여기서 막지
+    # 않으면 카탈로그 서식(채움의 원천 라이브러리)이 편집 저장 한 번에
+    # 사라진다. 사본(out_path)은 지우지 않고 그대로 돌려준다.
+    from .read_only_zones import is_read_only, zone_of
+    if is_read_only(source_rel):
+        result["editedInPlace"] = False
+        result["inPlaceRefused"] = "READ_ONLY_ZONE"
+        result["readOnlyZone"] = zone_of(source_rel)
+        return source_rel
     src_path = (project_root / source_rel).resolve()
     import shutil
     shutil.copyfile(out_path, src_path)
