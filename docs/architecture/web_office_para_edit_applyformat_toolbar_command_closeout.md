@@ -189,3 +189,7 @@
 ## 재고정 이력 (append-only)
 
 - 2026-07-24: baseline → `6111a9e` (문단 텍스트 편집 시 lineseg 보존 로직 준공 — _strip_lineseg 전체삭제 대신 _fix_lineseg_on_text_edit 로 교체, 한컴 COM 실측 재검증 완료)
+
+## 재고정 이력 (append-only)
+
+- 2026-07-24: baseline → `f119308` (lineseg 추정 보정 로그 + 페이지 초과 가드 준공)

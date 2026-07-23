@@ -23,7 +23,7 @@ STATE_MJS = (PR / "frontend/web_office_viewer/para_edit_state.mjs")
 CMD_MJS = (PR / "frontend/web_office_viewer/para_edit_command.mjs")
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (517849c -> 6111a9e)
+BASELINE_COMMIT = "f119308"  # lineseg 보정 로그/가드 준공 후 갱신 (6111a9e -> f119308)
 
 
 def _node_ok() -> bool:

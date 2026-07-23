@@ -14,7 +14,7 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_fontsize_matching_closeout.md")
-BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (517849c -> 6111a9e)
+BASELINE_COMMIT = "f119308"  # lineseg 보정 로그/가드 준공 후 갱신 (6111a9e -> f119308)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────
