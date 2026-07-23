@@ -179,3 +179,7 @@ PARA-EDIT 동 (cell containerScope · 단일 run)
 > _resolve_header_footer_paragraph 추가(CLAUDE.md §4.2), hwpx_edit_tool.py 의 containerScope.kind
 > 허용 집합에 header/footer 추가. 실제 Hancom Office COM 으로 머리말 텍스트 편집 확인 후
 > 정당 변경으로 베이스라인 갱신.
+
+## 재고정 이력 (append-only)
+
+- 2026-07-24: baseline → `6111a9e` (문단 텍스트 편집 시 lineseg 보존 로직 준공 — _strip_lineseg 전체삭제 대신 _fix_lineseg_on_text_edit 로 교체, 한컴 COM 실측 재검증 완료)

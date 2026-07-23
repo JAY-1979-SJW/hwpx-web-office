@@ -23,7 +23,7 @@ TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatToolbar.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "517849c"  # 빈 입력칸 기입 준공 후 갱신 (e9517fc → 517849c)
+BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (517849c -> 6111a9e)
 
 
 def _node_ok() -> bool:

@@ -16,7 +16,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_matching_existing_charpr_closeout.md")
-BASELINE_COMMIT = "517849c"  # 빈 입력칸 기입 준공 후 갱신 (e9517fc → 517849c)
+BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (517849c -> 6111a9e)
 
 DOC_REQUIRED_IN_SCOPE = [
     "format_charpr_matcher.mjs",

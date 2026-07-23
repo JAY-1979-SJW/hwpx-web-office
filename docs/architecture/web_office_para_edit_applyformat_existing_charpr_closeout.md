@@ -217,3 +217,7 @@ PARA-EDIT 동 · ApplyFormat (existing charPr 전용)
 > 정당 변경으로 베이스라인 갱신.
 
 > **baseline 갱신**: 517849c (빈 입력칸 기입 준공, 2026-07-24) — 서식의 빈 입력칸은 run 은 있는데 `<hp:t>` 텍스트 노드가 없어 writer 가 `RUN_TEXT_NODE_MISSING` 으로 거부했다. **자동채움이 노리는 칸은 정의상 전부 빈 칸이므로 채울 수 있는 칸이 하나도 없었다.** 삽입에 한해 빈 run 에 `<hp:t>` 를 생성하도록 교정(교체·삭제이거나 `hp:ctrl` 등 다른 자식이 있는 run 은 종전대로 거부). `charPrIDRef` 는 run 의 것을 그대로 쓰므로 신규 charPr 을 만들지 않는다. 전기사용신청서 HTTP 종단 시험 3/3 제자리·옆칸 유출 0. 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+## 재고정 이력 (append-only)
+
+- 2026-07-24: baseline → `6111a9e` (문단 텍스트 편집 시 lineseg 보존 로직 준공 — _strip_lineseg 전체삭제 대신 _fix_lineseg_on_text_edit 로 교체, 한컴 COM 실측 재검증 완료)

@@ -14,7 +14,7 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_fontname_matching_closeout.md")
-BASELINE_COMMIT = "517849c"  # 빈 입력칸 기입 준공 후 갱신 (e9517fc → 517849c)
+BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (517849c -> 6111a9e)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────

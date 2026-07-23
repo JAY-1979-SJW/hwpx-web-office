@@ -50,7 +50,7 @@ LOCKED_FILES = [
 # 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정.
 # 셀 텍스트 손실·중첩 표 중복 수리 준공 후 재갱신 (b9782a5 → 3f94c2a) —
 # hp:t 인라인 tail 유실 + 중첩 표 내용 중복 제거. 정당 변경 확인 후 재고정.
-BASELINE_COMMIT = "e9517fc"  # 머리말/꼬리말 텍스트 편집 준공 후 갱신 (3f94c2a → e9517fc)
+BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (e9517fc -> 6111a9e)
 
 # 안전 게이트가 코드에 존재하는지 정적 검증
 SAFETY_GATE_PATTERNS = {

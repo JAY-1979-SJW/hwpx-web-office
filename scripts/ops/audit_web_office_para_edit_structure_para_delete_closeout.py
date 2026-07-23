@@ -16,7 +16,7 @@ if str(PR) not in sys.path:
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_structure_para_delete_closeout.md")
-BASELINE_COMMIT = "e9517fc"  # 머리말/꼬리말 텍스트 편집 준공 후 갱신 (2f7db75 → e9517fc)
+BASELINE_COMMIT = "6111a9e"  # lineseg 보존 로직 준공 후 갱신 (e9517fc -> 6111a9e)
 FEATURE_COMMIT  = "1f442ec"
 
 DOC_REQUIRED_IN_SCOPE = [
