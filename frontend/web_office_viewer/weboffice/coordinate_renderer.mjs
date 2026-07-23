@@ -45,6 +45,23 @@ function segmentsHtml(line, defs, fallbackFs) {
   return `<span class="co-in" style="display:inline-block">${inner}</span>`;
 }
 
+/* 줄 안 세그먼트 중 charPr 명시 폰트 크기(pt→px)의 최댓값. 명시 크기가
+ * 없는 세그먼트는 fallbackFs(줄높이 추정치)를 후보로 둔다. */
+function lineMaxFontPx(line, defs, fallbackFs) {
+  const segs = (line.segments && line.segments.length)
+    ? line.segments
+    : [{ charPr: null }];
+  let maxPx = fallbackFs;
+  for (const sg of segs) {
+    const def = sg.charPr != null ? defs[sg.charPr] : null;
+    if (def && def.fontSizePt) {
+      const px = def.fontSizePt * (96 / 72);
+      if (px > maxPx) maxPx = px;
+    }
+  }
+  return maxPx;
+}
+
 /* auto-fit — 렌더 후 호출. 각 줄의 실제 내용폭(scrollWidth)이 줄상자
  * 폭(clientWidth)을 넘으면(폰트 차/justify 미작동으로 자연폭이 넓을 때)
  * transform:scaleX 로 가로 압축해 줄상자 안에 맞춘다. 한컴의 justify
@@ -138,9 +155,21 @@ export function renderCoordinateLayout(layout, opts = {}) {
       if (pageTruth) break;           // 원본 배경 페이지 — 텍스트는 배경에 있음
       if (l.cellId && editedIds.has(l.cellId)) continue;  // 편집셀 원본 숨김
       const fs = Math.max(7, l.h * 0.72);
-      // line-height 는 반드시 박스 높이와 같게 둔다. 더 크게 주면
+      // line-height 는 기본적으로 박스 높이와 같게 둔다. 더 크게 주면
       // overflow:hidden 이 글자 위/아래(받침 포함)를 세로로 잘라 문자가
       // 깨진다. 한컴 baseline 정밀 정렬은 클리핑 없는 방식으로 후속 처리.
+      //
+      // 다만 charPr 에 명시된 실제 폰트 크기가 이 줄의 lineseg 높이보다
+      // 큰 경우(실사례: 18pt 제목 문단인데 vertsize 로는 13.3px 만
+      // 기록돼 있어 글자 위쪽이 잘리던 결함)는 예외 — 한컴은 vertsize 를
+      // 흐름 간격으로만 쓰고 글자 자체를 그 안에 가두지 않는다. 박스 자체
+      // (top/height)를 키우면 line-height 가 남는 공간을 위아래로 반씩
+      // 나눠 글자가 아래로도 밀려 다음 줄·표와 겹친다(실측 확인). 대신
+      // 박스 크기·위치는 그대로 두고 overflow-clip-margin 만 필요한 만큼
+      // 늘려 — 레이아웃(다른 요소 위치)에 영향 없이 글자만 박스 밖으로
+      // 그려지게(paint) 한다.
+      const neededFontPx = lineMaxFontPx(l, defs, fs);
+      const clipMargin = Math.max(3, Math.ceil((neededFontPx - l.h) / 2) + 3);
       const al = l.align ? `text-align:${l.align};` : "";
       // 세로쓰기(자리수 헤더: 조/천억/백억 등 좁고 긴 금액칸) — 한자/한글은
       // 회전 없이 위→아래로 쌓는 게 정상(upright), 라틴/숫자만 회전.
@@ -149,8 +178,9 @@ export function renderCoordinateLayout(layout, opts = {}) {
         : "";
       parts.push(`<div class="co-line" style="left:${l.x}px;`
         + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
-        + `height:${l.h}px;line-height:${l.h}px;${al}${vert}">`
-        + `${segmentsHtml(l, defs, fs)}</div>`);
+        + `height:${l.h}px;line-height:${l.h}px;`
+        + `overflow-clip-margin:${clipMargin}px;`
+        + `${al}${vert}">${segmentsHtml(l, defs, fs)}</div>`);
     }
     // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만)
     for (const cid of editedIds) {

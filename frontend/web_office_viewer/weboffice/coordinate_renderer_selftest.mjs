@@ -106,6 +106,26 @@ assert(/height:20px;line-height:20px/.test(bl),
 assert(!/line-height:34/.test(bl), "no oversized line-height (clip regression)");
 checks.noClip = true;
 
+// 7b) charPr 실폰트가 lineseg 높이보다 크면(촘촘한 헤딩 등) 박스 크기·
+//     위치는 그대로 두고(다음 줄·표와 안 겹치게) overflow-clip-margin 만
+//     늘려 글자가 밖으로 그려지게 한다 — 실사례: 18pt 글자가 vertsize
+//     유래 13.3px 박스에 갇혀 위쪽이 잘리던 결함(회귀 가드).
+const bigFont = renderCoordinateLayout({
+  pageWidthPx: 400, pageHeightPx: 400, pages: 1,
+  charPrDefs: { "1": { fontSizePt: 18 } },
+  lines: [{
+    text: "제목", x: 0, y: 0, w: 100, h: 13.3,
+    segments: [{ text: "제목", charPr: "1" }],
+  }],
+  boxes: [],
+});
+assert(/height:13\.3px;line-height:13\.3px/.test(bigFont),
+  "박스 크기·위치는 불변(다음 줄과 안 겹침)");
+assert(/overflow-clip-margin:\d+px/.test(bigFont)
+  && !bigFont.includes("overflow-clip-margin:3px"),
+  "폰트가 크면 clip-margin 을 늘려 그려지게 함(레이아웃은 안 건드림)");
+checks.noClipBigFont = true;
+
 // 8) 문단 정렬(text-align) 반영 + Wingdings PUA 화살표 → 유니코드 정규화
 const al = renderCoordinateLayout({
   pageWidthPx: 300, pageHeightPx: 300, pages: 1,
