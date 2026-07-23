@@ -98,6 +98,28 @@ def _extract_section(path, secname, row_scale=1.0):
         txt, spans = own_runs(p)
         segs = direct_linesegs(p)
         align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
+        # 인라인 개체(이미지 container 등, pos.treatAsChar=1) 앵커 lineseg
+        # 검출 — 텍스트는 없지만(own_runs 는 개체를 문자로 안 셈) 한컴이
+        # 그 개체 높이를 vertsize 에 그대로 기록해 둔다(실측: curSz.height
+        # 73900 = 해당 lineseg vertsize 73900, 정확히 일치). "빈 줄은 흐름을
+        # 안 민다"는 유령페이지 방지 규칙이 이 개체 줄까지 빈 줄로 오인해
+        # 삼켜, 이미지 있는 문서에서 페이지가 통째로 결측되는 원인이었다
+        # (실무 서식에 흔한 직인·로고·도면 삽입 — 안전보건계획 문서 45쪽
+        # 중 5쪽 결측 실사례). 원본 무수정 원칙상 이미지는 그리지 않되,
+        # 문단 안 개체들의 curSz.height 를 미리 모아 두면, 어느 lineseg
+        # 든 그 높이와 근사 일치하는 빈 줄을 '개체 자리'로 인정해 흐름에
+        # 반영할 수 있다(개체 자체를 렌더/편집하는 것은 아님).
+        _obj_heights: set[int] = set()
+        for ctrl_container in p.iter():
+            if ln(ctrl_container.tag) != "container":
+                continue
+            sz_el = next((e for e in ctrl_container.iter()
+                          if ln(e.tag) == "curSz"), None)
+            if sz_el is not None:
+                try:
+                    _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
+                except (TypeError, ValueError):
+                    pass
         for i, s in enumerate(segs):
             vpos = float(s.get("vertpos", "0"))
             a = int(s.get("textpos", "0") or "0")
@@ -108,7 +130,12 @@ def _extract_section(path, secname, row_scale=1.0):
             # 만들지 않는다. 문서 끝의 빈 문단 수백 개가 vpos 리셋을 반복해
             # 유령 페이지 6쪽+를 만들던 결함(한컴은 빈 문단으로 쪽을 늘리지
             # 않음 — 별지2: 한컴 12쪽 vs 우리 18쪽의 근본 원인).
-            _vis = bool(line_txt.strip())
+            _obj_h = 0
+            if not line_txt.strip() and _obj_heights:
+                _raw_vsz = int(float(s.get("vertsize", 0) or 0))
+                _obj_h = next(
+                    (h for h in _obj_heights if abs(h - _raw_vsz) <= 5), 0)
+            _vis = bool(line_txt.strip()) or _obj_h > 0
             if _vis:
                 if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
                     st["page_idx"] += 1  # vpos 리셋 → 새 페이지
