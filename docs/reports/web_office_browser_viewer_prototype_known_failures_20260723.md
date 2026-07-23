@@ -58,12 +58,14 @@ git 이력으로 확인했다.
 (`index.html` 모듈 구조, `corpus.sqlite3` 존재 여부)과 무관하다.
 두 실패는 이번 세션 이전부터 존재했다(회귀 아님).
 
-## 4. 제안 조치 (미착수 — 별도 승인 필요)
+## 4. 처리 결과 (2026-07-23 조치 완료)
 
-| 실패 | 제안 | 비고 |
+| 실패 | 조치 | 결과 |
 |---|---|---|
-| `test_index_html_loads_payload_via_fetch_only` | 모듈형 구조(`editor_ui_bridge.mjs`)에 맞게 계약을 재작성하거나, 구 프로토타입 테스트를 폐기 | 프로토타입 계약 자체를 다시 정의해야 하므로 스코프 판단 필요 |
-| `test_audit_returns_pass` | `test_audit_returns_pass` 에도 다른 3개 테스트와 동일한 `skipif(len(FIXTURES) < 1)` 가드 추가 | 로컬 실행 환경 일관성 문제이므로 저위험 수정으로 보이나, "기능 금지선" 밖 여부 확인 후 진행 |
+| `test_index_html_loads_payload_via_fetch_only` | `test_index_html_loads_via_editor_bridge_module_only` 로 재작성 — 모듈형 구조(`editor_ui_bridge.mjs` import + `mountWebOfficeEditor` 호출)를 검증하도록 계약 갱신. HWPX XML 직접 파싱 금지 검사는 그대로 유지 | PASS |
+| `test_audit_returns_pass` | 같은 파일의 다른 3개 fixture 의존 테스트와 동일한 `@pytest.mark.skipif(len(FIXTURES) < 1, reason="need ≥1 fixture")` 가드 추가 | 로컬 코퍼스 DB 부재 시 SKIP (FAIL 아님) |
 
-이 문서는 실패를 등록·설명하는 것으로 그친다. 수정은 대표님 승인 후
-별도 작업으로 진행한다.
+재실행: `4 passed, 4 skipped` (기존 `2 failed, 3 passed, 3 skipped` 에서
+개선, 신규 실패 없음). 기능 코드는 변경하지 않았고(테스트 파일만
+수정), header/footer·image/shape·table structure·charPr·header.xml
+등 금지 영역과 무관.

@@ -148,11 +148,14 @@ def test_source_sha_and_mtime_unchanged_after_render(tmp_path):
     assert f.stat().st_mtime_ns == mt_before
 
 
-def test_index_html_loads_payload_via_fetch_only():
-    """브라우저는 payload.json 만 fetch 한다. HWPX XML 직접 파싱 금지."""
+def test_index_html_loads_via_editor_bridge_module_only():
+    """브라우저는 editor_ui_bridge.mjs 모듈 경유로만 로드한다(모듈형 전환
+    이후 계약 — 정적 payload.json 프로토타입은 폐기됨). HWPX XML 직접
+    파싱은 여전히 금지."""
     src = (VIEWER_DIR / "index.html").read_text(encoding="utf-8")
-    assert "fetch(\"./payload.json\")" in src
-    # HWPX XML 직접 파싱 금지
+    assert 'from "./editor_ui_bridge.mjs"' in src
+    assert "mountWebOfficeEditor" in src
+    # HWPX XML 직접 파싱 금지 — 모듈형 전환 후에도 유효한 안전검사
     forbidden_browser = ["DOMParser", "<hwpx", ".hwpx",
                                           "XMLHttpRequest"]
     for tok in forbidden_browser:
@@ -171,6 +174,7 @@ def test_react_components_have_no_editable_inputs():
             assert tok not in src, f"{name} has forbidden: {tok}"
 
 
+@pytest.mark.skipif(len(FIXTURES) < 1, reason="need ≥1 fixture")
 def test_audit_returns_pass():
     out = audit()
     assert out["verdict"] == "PASS", json.dumps(
