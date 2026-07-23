@@ -49,8 +49,10 @@ LOCKED_FILES = [
     "frontend/web_office_viewer/para_edit_runtime.mjs",
 ]
 # 좌표조회 수리 준공 후 갱신 (334d665 → b9782a5) — ro_view_importer._find_cell_elem
-# 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정. 정당 변경 확인 후 재고정.
-BASELINE_COMMIT = "b9782a5"  # PARA_INSERT 준공 후 갱신 (c7810b3 → bb0939b)
+# 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정.
+# 셀 텍스트 손실·중첩 표 중복 수리 준공 후 재갱신 (b9782a5 → 3f94c2a) —
+# hp:t 인라인 tail 유실 + 중첩 표 내용 중복 제거. 정당 변경 확인 후 재고정.
+BASELINE_COMMIT = "3f94c2a"  # PARA_INSERT 준공 후 갱신 (c7810b3 → bb0939b)
 
 FORBIDDEN_WRITER_SYMBOLS = [
     r"apply_paragraph_edits_plan\(",
