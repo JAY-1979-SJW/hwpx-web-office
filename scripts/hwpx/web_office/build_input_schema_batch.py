@@ -162,13 +162,83 @@ def backfill_subject() -> dict:
             "scanned": len(rows)}
 
 
+def backfill_semantics() -> dict:
+    """저장된 스키마의 **모든 입력칸**에 의미·민감·주체를 라벨로 재계산.
+
+    이전에는 신청인 칸에만 의미를 붙였다. 발급증서·대장으로 분류된 서식에서
+    성명·주민등록번호 같은 칸이 role='office' 라는 이유로 의미도 민감 표시도
+    없이 방치됐다(실측 40,096칸, 주민등록번호 672칸). 역할(office)은 그대로
+    둔다 — 자동채움 차단은 유지하되 '무슨 칸인지'와 '민감한가'만 채운다.
+
+    의미·주체는 라벨만으로 계산되므로 HWPX 재파싱이 필요 없다(수초).
+    잡음 칸은 애초에 스키마에 없으므로(form_input_schema 가 제외) 여기 오는
+    칸은 전부 applicant/office 다.
+    """
+    from scripts.hwpx.web_office.form_field_roles import (
+        _semantic_of, _subject_of)
+    con = sqlite3.connect(CATALOG, timeout=600)
+    con.execute("PRAGMA journal_mode=WAL")
+    rows = con.execute(
+        "SELECT form_id, input_schema FROM forms WHERE schema_status='OK' "
+        "AND input_schema IS NOT NULL").fetchall()
+    forms_updated = cells_gained_sem = cells_gained_sensitive = 0
+    for fid, raw in rows:
+        try:
+            fields = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        changed = False
+        for f in fields:
+            lab = f.get("label", "")
+            sem, typ = _semantic_of(lab)
+            subj = _subject_of(lab)
+            sensitive = typ == "secret"
+            if f.get("semantic") != sem:
+                if not f.get("semantic") and sem:
+                    cells_gained_sem += 1
+                f["semantic"] = sem
+                changed = True
+            new_type = typ or f.get("inputType") or "text"
+            if f.get("inputType") != new_type:
+                f["inputType"] = new_type
+                changed = True
+            if f.get("subject") != subj:
+                f["subject"] = subj
+                changed = True
+            if bool(f.get("sensitive")) != sensitive:
+                if sensitive:
+                    cells_gained_sensitive += 1
+                f["sensitive"] = sensitive
+                changed = True
+        if changed:
+            sens_ct = sum(1 for f in fields if f.get("sensitive"))
+            con.execute(
+                "UPDATE forms SET input_schema=?, sensitive_count=? "
+                "WHERE form_id=?",
+                (json.dumps(fields, ensure_ascii=False), sens_ct, fid))
+            forms_updated += 1
+    con.commit()
+    con.close()
+    return {"scanned": len(rows), "formsUpdated": forms_updated,
+            "cellsGainedSemantic": cells_gained_sem,
+            "cellsGainedSensitive": cells_gained_sensitive}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--size-cap-mb", type=float, default=1.5)
     ap.add_argument("--backfill-subject", action="store_true",
                     help="저장된 스키마에 subject 만 보정 (재파싱 없음)")
+    ap.add_argument("--backfill-semantics", action="store_true",
+                    help="모든 입력칸에 의미·민감·주체 재계산 (재파싱 없음)")
     args = ap.parse_args()
+    if args.backfill_semantics:
+        r = backfill_semantics()
+        _log(f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "
+             f"의미획득 {r['cellsGainedSemantic']:,}칸 · "
+             f"민감획득 {r['cellsGainedSensitive']:,}칸")
+        return
     if args.backfill_subject:
         r = backfill_subject()
         _log(f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "

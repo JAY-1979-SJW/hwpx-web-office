@@ -304,8 +304,14 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
             role, why = "office", f"FORM_KIND:{kind}"
         else:
             role, why = "applicant", "DEFAULT_APPLICANT"
-        sem, typ = _semantic_of(lab) if role == "applicant" else ("", "")
-        subj = _subject_of(lab) if role == "applicant" else ""
+        # 의미·주체·민감은 **잡음이 아닌 모든 입력칸**에 계산한다. 역할이
+        # office 라도(자동채움 차단은 유지) '무슨 칸인지'와 '민감한가'는 알아야
+        # 물어볼 수 있고 보호할 수 있다. 이전엔 applicant 에만 계산해,
+        # 발급증서·대장으로 분류된 서식의 성명·주민등록번호 칸이 의미도 민감
+        # 표시도 없이 방치됐다(실측 40,096칸, 주민등록번호 672칸 포함).
+        _known = role != "noise"
+        sem, typ = _semantic_of(lab) if _known else ("", "")
+        subj = _subject_of(lab) if _known else ""
         fields.append({**f, "role": role, "reason": why,
                        "semantic": sem, "inputType": typ, "subject": subj})
 
