@@ -59,7 +59,7 @@ Excel·기타 비HWPX 도메인은 이 저장소 범위 밖이다.
 - commit 전 `git diff --cached --name-only` 검증 필수 — Excel/타 도메인 파일 있으면 STOP
 
 ### 기능 금지
-- header/footer paragraph 편집 활성화 금지
+- header/footer paragraph 편집 활성화 금지 (단, §4.2 조건 충족 시 예외 — **텍스트 내용만**)
 - image/shape/media 편집 구현 금지
 - table structure edit 구현 금지
 - 신규 charPr 생성 금지 (단, §4.1 서식 편집 조건 충족 시 예외)
@@ -80,6 +80,23 @@ Excel·기타 비HWPX 도메인은 이 저장소 범위 밖이다.
 - 글꼴(fontFace)은 **문서 안에 이미 존재하는 폰트 리소스만** 참조 —
   header.xml 의 fontfaces 테이블에 신규 폰트 항목 추가는 금지(기존
   글꼴 중 선택만 허용, 폰트 리소스 자체의 신규 등록 아님)
+- 커밋 게이트: 한컴 정상 열림 + 무편집 라운드트립 동일 + 구조 diff 기준선 미초과
+
+### 4.2 머리말/꼬리말 편집 (조건부 허용, 2026-07-24 신설)
+
+`<hp:header>`/`<hp:footer>` 안 문단의 **텍스트 내용 편집**(삭제·삽입·
+치환)에 한해 허용한다. 본문 문단과 동일한 명령(TYPE_TEXT/
+REPLACE_TEXT_RANGE/DELETE_TEXT_RANGE)만 쓰고, 신규 프리미티브를
+만들지 않는다 — §11-6 자재 재사용 원칙과 동일.
+
+- 허용: header/footer 안 문단의 텍스트 삭제·삽입·치환
+- 금지(그대로 유지): header/footer **구조** 변경(신규 header/footer
+  추가·삭제, applyPageType 변경), header/footer 안 **표 구조** 변경
+  (표는 이미 위 "table structure edit 구현 금지"로 막혀 있음 — 표
+  안 텍스트 편집은 본문 표 셀과 동일하게 허용, 행/열 자체는 불가),
+  header/footer 안 이미지/도형 편집
+- 페이지 번호 자동필드(pageNumCtrl) 등 자동 갱신 필드는 텍스트로
+  취급하지 않는다 — 편집 대상에서 제외
 - 커밋 게이트: 한컴 정상 열림 + 무편집 라운드트립 동일 + 구조 diff 기준선 미초과
 
 ### 보안/개인정보 금지

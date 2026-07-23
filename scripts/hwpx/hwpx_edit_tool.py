@@ -566,14 +566,20 @@ def validate_edit_plan(plan: dict[str, Any], *, base_dir: Path | None = None) ->
                 errors.append({"path": f"paragraph_edits[{index}].{k}",
                                "message": f"{k} is required"})
         scope = item.get("containerScope") or {}
-        if scope.get("kind") not in {"cell", "block"}:
+        # CLAUDE.md §4.2 — header/footer 는 텍스트 편집만(구조 변경 아님).
+        if scope.get("kind") not in {"cell", "block", "header", "footer"}:
             errors.append({"path": f"paragraph_edits[{index}].containerScope.kind",
-                           "message": "kind must be 'cell' or 'block'"})
+                           "message": "kind must be 'cell', 'block', 'header' or 'footer'"})
         if scope.get("kind") == "cell":
             for k in ("tableIndex", "rowIndex", "colIndex", "paragraphIndex"):
                 if k not in scope:
                     errors.append({"path": f"paragraph_edits[{index}].containerScope.{k}",
                                    "message": f"{k} is required for cell scope"})
+        if scope.get("kind") in ("header", "footer"):
+            for k in ("sectionIndex", "objectId", "paragraphIndex"):
+                if k not in scope:
+                    errors.append({"path": f"paragraph_edits[{index}].containerScope.{k}",
+                                   "message": f"{k} is required for {scope.get('kind')} scope"})
         if ct not in {"TYPE_TEXT", "REPLACE_TEXT_RANGE", "DELETE_TEXT_RANGE",
                             "APPLY_FORMAT"}:
             errors.append({"path": f"paragraph_edits[{index}].commandType",

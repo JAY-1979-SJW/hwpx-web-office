@@ -60,6 +60,8 @@ REASON_SCOPE_MISSING = "SCOPE_MISSING"
 # WEB-OFFICE-BODY-PARAGRAPH-WRITER-01 신규 reject 사유.
 REASON_SECTION_NOT_FOUND = "SECTION_NOT_FOUND"
 REASON_BODY_BLOCK_NOT_PARAGRAPH = "BODY_BLOCK_NOT_PARAGRAPH"
+# CLAUDE.md §4.2 머리말/꼬리말 텍스트 편집 신규 reject 사유.
+REASON_HEADER_FOOTER_NOT_FOUND = "HEADER_FOOTER_NOT_FOUND"
 # WEB-OFFICE-PARA-EDIT-MULTI-RUN-01 신규 reject 사유.
 REASON_UNSAFE_RUN_CHILDREN = "UNSAFE_RUN_CHILDREN"
 REASON_NEW_CHARPR_INTRODUCED = "NEW_CHARPR_INTRODUCED"
@@ -251,6 +253,38 @@ def _resolve_body_paragraph(package: HwpxPackage, section_idx: int,
             return (entry, root, elem), None
         cur += 1
     return None, REASON_PARAGRAPH_NOT_FOUND
+
+
+def _resolve_header_footer_paragraph(
+    package: HwpxPackage, section_idx: int, kind: str,
+    object_id: str, paragraph_index: int):
+    """containerScope.kind="header"/"footer" 의 (sectionIndex, objectId,
+    paragraphIndex) → (entry, root, paragraph_elem) 또는 (None, reason).
+
+    CLAUDE.md §4.2 — <hp:header>/<hp:footer> 안 문단의 텍스트 내용
+    편집만 허용(구조 변경·표 구조 변경은 그대로 금지). object_id 는
+    header/footer element 의 @id 속성(같은 섹션에 여러 개 있을 수
+    있음 — BOTH_PAGE/EVEN_PAGE/ODD_PAGE 등)."""
+    secs = package.section_entries()
+    if section_idx < 0 or section_idx >= len(secs):
+        return None, REASON_SECTION_NOT_FOUND
+    entry = secs[section_idx]
+    try:
+        root = package.read_xml(entry)
+    except Exception:  # noqa: BLE001
+        return None, REASON_SECTION_NOT_FOUND
+
+    container = next(
+        (e for e in root.iter()
+         if _local_tag(e) == kind and e.get("id") == str(object_id)),
+        None)
+    if container is None:
+        return None, REASON_HEADER_FOOTER_NOT_FOUND
+
+    paras = [e for e in container.iter() if _local_tag(e) == "p"]
+    if paragraph_index < 0 or paragraph_index >= len(paras):
+        return None, REASON_PARAGRAPH_NOT_FOUND
+    return (entry, root, paras[paragraph_index]), None
 
 
 def _resolve_cell(package: HwpxPackage, table_idx: int, row_idx: int,
@@ -602,7 +636,7 @@ def apply_paragraph_edits_plan(
         if not kind:
             rejected.append(_reject(item, REASON_SCOPE_MISSING))
             continue
-        if kind not in ("cell", "block"):
+        if kind not in ("cell", "block", "header", "footer"):
             rejected.append(_reject(item, REASON_SCOPE_MISSING,
                                     kind=kind))
             continue
@@ -638,6 +672,25 @@ def apply_paragraph_edits_plan(
                                         REASON_PARAGRAPH_NOT_FOUND,
                                         paragraphIndex=para_idx))
                 continue
+        elif kind in ("header", "footer"):
+            # CLAUDE.md §4.2 — 머리말/꼬리말 안 문단 텍스트 편집.
+            try:
+                sec_idx = int(scope["sectionIndex"])
+                object_id = str(scope["objectId"])
+                para_idx = int(scope["paragraphIndex"])
+            except (KeyError, ValueError, TypeError) as e:
+                rejected.append(_reject(item, REASON_SCOPE_MISSING,
+                                        detail=str(e)))
+                continue
+            resolved, err = _resolve_header_footer_paragraph(
+                package, sec_idx, kind, object_id, para_idx)
+            if err is not None:
+                rejected.append(_reject(item, err,
+                                        sectionIndex=sec_idx,
+                                        objectId=object_id,
+                                        paragraphIndex=para_idx))
+                continue
+            entry, root, paragraph_elem = resolved
         else:
             # WEB-OFFICE-BODY-PARAGRAPH-WRITER-01 — body paragraph 경로.
             try:
