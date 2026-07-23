@@ -21,6 +21,9 @@ export function mountWebOffice(root) {
   let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
   let pendingEditId = null; // 재렌더 후 이어서 열 즉석 편집 대상(이동 연속)
   let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
+  let paraSelTarget = null;    // 서식 툴바 대상(흐름 상자 안 텍스트 선택)
+                                // {paragraphId, start, end} — 있으면 셀
+                                // 선택보다 우선.
   let fmtBusy = false;         // 서식 적용 중 중복 클릭 방지
   const paraEdits = new Map();  // paragraphId → 편집된 텍스트(표 셀 아님)
   let paraBusy = false;        // 본문 문단 저장 중 표시(상태줄 용)
@@ -158,73 +161,135 @@ export function mountWebOffice(root) {
       probeTruth(loaded.sourcePath);
   }
 
-  // 실시간 줄바꿈 편집기(대표님 지시, 2026-07-24: "한컴과 같은 레이아웃
-  // 엔진 구현해") — 브라우저 자체의 실제 텍스트 흐름(contentEditable +
-  // white-space:pre-wrap)을 그대로 이용해, 타이핑하는 매 글자마다
-  // 그 문단 폭 안에서 실시간으로 줄바꿈이 일어나게 한다. 한컴의 정확한
-  // 조판 알고리즘(자간·justify 압축 등)을 재구현한 것은 아니다 —
-  // 브라우저 자체 폰트 렌더링에 기반한 근사이며, 편집 중인 "그 문단
-  // 안"에서만 실시간 반응하고 뒤 문단들이 함께 밀리는 건 저장 후
-  // 재조판(다음 fetchLayout)에서 반영된다.
-  function openLiveWrapEditor(pid) {
-    const lines = [...$("[data-role=sheet]").querySelectorAll(
-      `.co-line[data-paragraph-id="${CSS.escape(pid)}"]`)];
-    if (!lines.length) return;
-    const page = lines[0].closest(".co-page");
-    const rects = lines.map((l) => l.getBoundingClientRect());
-    const pageRect = page.getBoundingClientRect();
-    const left = Math.min(...rects.map((r) => r.left)) - pageRect.left;
-    const top = Math.min(...rects.map((r) => r.top)) - pageRect.top;
-    const width = Math.max(...lines.map((l) => parseFloat(l.style.width) || 0));
-    const cur = paraEdits.has(pid) ? paraEdits.get(pid)
-      : ((loaded.documentModel.paragraphs || [])
-          .find((p) => p.paragraphId === pid) || {}).text || "";
-    // 원본 서식 근사 — 첫 줄 첫 세그먼트의 실제 렌더 스타일을 그대로
-    // 물려받는다(정확한 한컴 자간·justify 계산은 아니지만 같은
-    // font-family/size/color 로 시각적으로 근접하게).
-    const sampleSpan = lines[0].querySelector(".co-in > span");
-    const fontCss = sampleSpan
-      ? sampleSpan.getAttribute("style") || "" : "";
-    lines.forEach((l) => { l.style.visibility = "hidden"; });
-    const box = document.createElement("div");
-    box.contentEditable = "true";
-    box.className = "wo-livewrap";
-    box.textContent = cur;
-    box.style.cssText = `position:absolute; left:${left}px; top:${top}px; `
-      + `width:${width}px; min-height:${lines[0].style.height || "20px"}; `
-      + "white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; "
-      + "background:#fff; border:2px solid #2d6cdf; outline:none; "
-      + "box-sizing:border-box; padding:1px; z-index:6; " + fontCss;
-    let done = false;
-    const restoreLines = () => lines.forEach((l) => {
-      l.style.visibility = "";
-    });
-    const commit = () => {
-      if (done) return;
-      done = true;
-      const v = box.textContent;
-      box.remove();
-      if (v !== cur) saveParagraphText(pid, v);
-      else { restoreLines(); render(); }
-    };
-    box.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        done = true; box.remove(); restoreLines(); render();
-      } else if (e.key === "Enter") {
-        e.preventDefault(); commit();
+  // 상시 편집 가능한 문단 흐름 상자(대표님 지시, 2026-07-24: "워드
+  // 프로그램으로 개발해") — 페이지마다 본문 문단들을 클릭 없이도 항상
+  // contentEditable 상태인 하나의 흐름 상자로 묶는다. 브라우저 자체
+  // 텍스트 흐름 엔진을 그대로 빌려 쓰므로:
+  //   · 클릭 즉시 타이핑(팝업 없음)
+  //   · 화살표/Home/End 키 이동은 브라우저 기본 동작 — 별도 구현 불필요
+  //   · 문단이 늘어나면 같은 상자 안 뒤 문단들이 즉시 아래로 밀림(정상
+  //     블록 흐름이라 절대좌표 재계산 없이 공짜로 됨)
+  // 한계(명시): 표가 문단들 사이에 끼어 있으면 표는 여전히 절대좌표라
+  // 겹칠 수 있다(이번 범위는 본문 문단 전용). 한컴의 정확한 조판
+  // 알고리즘(자간·justify 압축)을 재구현한 것도 아니다 — 브라우저
+  // 자체 렌더링 기반 근사.
+  function mountAlwaysOnParagraphFlow(sheet) {
+    sheet.querySelectorAll(".co-page").forEach((page) => {
+      const lines = [...page.querySelectorAll(".co-line[data-paragraph-id]")];
+      if (!lines.length) return;
+      const order = [];
+      const firstLineOf = new Map();
+      for (const l of lines) {
+        const pid = l.dataset.paragraphId;
+        if (!firstLineOf.has(pid)) { firstLineOf.set(pid, l); order.push(pid); }
       }
+      const pageRect = page.getBoundingClientRect();
+      let minX = Infinity, minY = Infinity, maxW = 0;
+      for (const pid of order) {
+        const r = firstLineOf.get(pid).getBoundingClientRect();
+        minX = Math.min(minX, r.left - pageRect.left);
+        minY = Math.min(minY, r.top - pageRect.top);
+        maxW = Math.max(maxW,
+          parseFloat(firstLineOf.get(pid).style.width) || r.width);
+      }
+      const flow = document.createElement("div");
+      flow.className = "wo-flowbox";
+      flow.contentEditable = "true";
+      flow.spellcheck = false;
+      // background:#fff 필수 — 원본 실렌더 배경(사진) 모드는 텍스트가
+      // .co-page 의 배경 사진 픽셀 자체라 DOM visibility 로 못 가린다.
+      // 불투명 배경으로 그 아래 사진 글자를 완전히 덮어야 이중 노출
+      // (사진 원문 + 편집 상자 겹쳐 보임)이 안 생긴다.
+      flow.style.cssText = `position:absolute; left:${minX}px; `
+        + `top:${minY}px; width:${maxW}px; z-index:4; outline:none; `
+        + "background:#fff;";
+      const origText = new Map();
+      // 각 문단이 원본에서 차지하던 세로 슬롯(다음 문단 시작 Y 까지의
+      // 간격)을 min-height 로 줘서, 안 고친 문단은 원본과 거의 같은
+      // 위치를 유지하고 뒤 표 등과 안 겹치게 한다. 실제로 늘어나면(줄
+      // 수 증가) min-height 를 넘어서며 자연스럽게 뒤 문단을 밀어낸다.
+      const tops = order.map((pid) =>
+        firstLineOf.get(pid).getBoundingClientRect().top - pageRect.top);
+      for (let i = 0; i < order.length; i++) {
+        const pid = order[i];
+        const l = firstLineOf.get(pid);
+        const sampleSpan = l.querySelector(".co-in > span");
+        const fontCss = sampleSpan
+          ? (sampleSpan.getAttribute("style") || "") : "";
+        const cur = paraEdits.has(pid) ? paraEdits.get(pid)
+          : ((loaded.documentModel.paragraphs || [])
+              .find((p) => p.paragraphId === pid) || {}).text || "";
+        origText.set(pid, cur);
+        const d = document.createElement("div");
+        d.dataset.paragraphId = pid;
+        d.textContent = cur;
+        const slot = (i + 1 < order.length)
+          ? Math.max(0, tops[i + 1] - tops[i])
+          : (parseFloat(l.style.height) || 20);
+        d.style.cssText = "white-space:pre-wrap; word-break:break-word; "
+          + `overflow-wrap:anywhere; min-height:${slot}px;` + fontCss;
+        flow.appendChild(d);
+      }
+      lines.forEach((l) => { l.style.visibility = "hidden"; });
+
+      let syncing = false;
+      const syncAndSave = () => {
+        if (syncing) return;
+        syncing = true;
+        try {
+          for (const d of [...flow.querySelectorAll("[data-paragraph-id]")]) {
+            const pid = d.dataset.paragraphId;
+            const before = origText.get(pid);
+            const now = d.textContent;
+            if (now !== before) {
+              origText.set(pid, now);
+              saveParagraphText(pid, now);
+            }
+          }
+        } finally {
+          syncing = false;
+        }
+      };
+      flow.addEventListener("blur", syncAndSave);
+      flow.addEventListener("keydown", (e) => {
+        // 문단 분할(PARA_INSERT)은 이번 범위 밖 — Enter 는 새 문단을
+        // 만들지 않고 지금까지 바뀐 문단들을 저장하는 커밋으로 취급.
+        if (e.key === "Enter") { e.preventDefault(); syncAndSave(); }
+      });
+      flow.addEventListener("mouseup", updateParaSelFromSelection);
+      flow.addEventListener("keyup", updateParaSelFromSelection);
+      page.appendChild(flow);
     });
-    box.addEventListener("blur", commit);
-    page.appendChild(box);
-    box.focus();
-    // 캐럿을 맨 끝으로 — 클릭 지점 정밀 매핑은 추후 개선 여지(지금은
-    // 실시간 줄바꿈 자체가 핵심이라 캐럿 위치는 단순화).
-    const range = document.createRange();
-    range.selectNodeContents(box);
-    range.collapse(false);
+  }
+
+  // 흐름 상자 안 텍스트 선택 → 서식 버튼 대상(paragraphId + 문자 범위)
+  // 갱신. 선택이 비어있거나 흐름 상자 밖이면 해제.
+  function updateParaSelFromSelection() {
     const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    if (!sel || sel.rangeCount === 0) { paraSelTarget = null; return; }
+    const range = sel.getRangeAt(0);
+    const startEl = (range.startContainer.nodeType === 1
+      ? range.startContainer : range.startContainer.parentElement);
+    const pdiv = startEl && startEl.closest
+      ? startEl.closest("[data-paragraph-id]") : null;
+    if (!pdiv || !pdiv.closest(".wo-flowbox")) { paraSelTarget = null; return; }
+    const startOff = _localTextOffset(pdiv, range.startContainer, range.startOffset);
+    const endOff = _localTextOffset(pdiv, range.endContainer, range.endOffset);
+    if (startOff === endOff) { paraSelTarget = null; return; }
+    paraSelTarget = { paragraphId: pdiv.dataset.paragraphId,
+      start: Math.min(startOff, endOff), end: Math.max(startOff, endOff) };
+    ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
+      .forEach((r) => { $(`[data-role=${r}]`).disabled = fmtBusy; });
+  }
+
+  function _localTextOffset(container, node, nodeOffset) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let total = 0, n;
+    while ((n = walker.nextNode())) {
+      if (n === node) return total + nodeOffset;
+      total += n.textContent.length;
+    }
+    return total;
   }
 
   // 서식 툴바 — 클릭된 칸을 서식 적용 대상으로 표시하고 버튼을 켠다.
@@ -241,13 +306,25 @@ export function mountWebOffice(root) {
   // 서버가 charPr 해석(기존 매칭/신규 append)까지 담당(§4.1). 결과는
   // 항상 새 sandbox 파일 — 원본은 무수정, 다음 편집은 그 파일을 이어받는다.
   async function applyFormat(overrides) {
-    if (!selectedCellId || !loaded || fmtBusy) return;
-    const text = cell.currentText(selectedCellId);
-    if (text == null) return;
-    const model = loaded.documentModel || {};
-    const c = (model.cells || []).find((x) => x.cellId === selectedCellId);
-    const pid = c && c.paragraphs && c.paragraphs[0]
-      && c.paragraphs[0].paragraphId;
+    if (!loaded || fmtBusy) return;
+    // 흐름 상자 안 텍스트 선택이 있으면 그 문단·범위 우선(대표님 지시:
+    // "선택 영역 지정 후 서식 버튼 적용"), 없으면 기존 셀 전체 서식 경로.
+    let pid, rangeAnchor, rangeFocus;
+    if (paraSelTarget) {
+      pid = paraSelTarget.paragraphId;
+      rangeAnchor = paraSelTarget.start;
+      rangeFocus = paraSelTarget.end;
+    } else {
+      if (!selectedCellId) return;
+      const text = cell.currentText(selectedCellId);
+      if (text == null) return;
+      const model = loaded.documentModel || {};
+      const c = (model.cells || []).find((x) => x.cellId === selectedCellId);
+      pid = c && c.paragraphs && c.paragraphs[0]
+        && c.paragraphs[0].paragraphId;
+      rangeAnchor = 0;
+      rangeFocus = text.length;
+    }
     if (!pid) { setStatus("fail", "서식 대상 문단을 찾을 수 없음"); return; }
     fmtBusy = true;
     setStatus("load", "서식 적용 중 …");
@@ -257,7 +334,7 @@ export function mountWebOffice(root) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourcePath: loaded.sourcePath, paragraphId: pid,
-          rangeAnchor: 0, rangeFocus: text.length, overrides,
+          rangeAnchor, rangeFocus, overrides,
           // 대표님 지시(2026-07-24 정책 개정) — 원본 직접 수정.
           editInPlace: true,
         }),
@@ -504,17 +581,13 @@ export function mountWebOffice(root) {
         pendingEditId = null;
         if (nxt) openEditor(nxt);
       }
-      // 본문 문단(표 밖 제목·전문 등) 클릭 편집 — 표 셀과 별개 경로.
-      // 실시간 줄바꿈 편집기(브라우저 contentEditable 실제 텍스트 흐름)를
-      // 연다 — pageTruth(사진) 모드에서도 클릭 박스(.co-line)의 위치·
-      // 폭 자체는 항상 존재하므로 동일하게 동작한다.
-      sheet.querySelectorAll(".co-line[data-paragraph-id]").forEach((ln) => {
-        ln.addEventListener("click", () => {
-          if (ln.querySelector("textarea, .wo-caret-input")
-              || sheet.querySelector(".wo-livewrap")) return;
-          openLiveWrapEditor(ln.dataset.paragraphId);
-        });
-      });
+      // 본문 문단(표 밖 제목·전문 등) — 대표님 지시(2026-07-24: "워드
+      // 프로그램으로 개발해") 반영. 클릭해야 열리는 팝업형 편집기 대신,
+      // 페이지마다 문단들을 하나의 상시 편집 가능한 흐름 상자(contentEditable,
+      // 실제 브라우저 텍스트 흐름)로 묶어 렌더한다 — 클릭 즉시 타이핑,
+      // 화살표/Home/End 키 이동은 브라우저 기본 동작 그대로 무료로 따라오고,
+      // 문단이 늘어나면 같은 상자 안 뒤 문단들이 즉시 아래로 밀린다.
+      mountAlwaysOnParagraphFlow(sheet);
       root.classList.add("wo-faithful");
     } else {
       // 편집 모드 — 흐름 렌더러 + 셀 클릭 편집
