@@ -211,8 +211,15 @@ def _iter_paragraphs_in_cell_elem(
 def _find_cell_elem(
     section_root: ET.Element, row: int, col: int,
     table_position_in_section: int | None,
+    table_elem: ET.Element | None = None,
 ) -> ET.Element | None:
     """section root 안에서 (row, col) 좌표의 hp:tc 를 찾는다.
+
+    성능 주의 — `table_elem` 을 넘기면 표를 다시 찾지 않는다. 넘기지 않으면
+    셀마다 `_find_table_elem` 이 섹션 XML 전체를 훑어 O(셀수 × 섹션크기)가
+    된다. 실측(결산보고서 305KB·표 86개·셀 6,854개): 전체 로드 636초 중
+    `_find_table_elem` 이 470초, 그 안의 `local_name` 호출이 5억 9천만 회.
+    호출부는 표 원소를 이미 갖고 있으므로 그대로 넘겨 쓴다.
 
     좌표계 주의 — 여기서 row/col 은 table_parser 가 매긴 **행 안 셀 순번**
     (`enumerate` 인덱스, table_parser._parse_table_element 의 ri/ci)이다.
@@ -232,7 +239,8 @@ def _find_cell_elem(
     따라서 파서와 **같은 규칙(순번)** 으로 찾는다. 좌표계 자체는 건드리지
     않으므로 cellId·paragraphId 키와 renderPayload 격자는 그대로다.
     """
-    tbl = _find_table_elem(section_root, table_position_in_section)
+    tbl = (table_elem if table_elem is not None
+           else _find_table_elem(section_root, table_position_in_section))
     if tbl is None:
         return None
     # 직계 자식만 훑는다 — tbl.iter() 는 중첩 표의 tr/tc 까지 끌어와
@@ -1129,8 +1137,11 @@ def import_hwpx_as_ro_view(
             par_elems: list[ET.Element] = []
             xml_fallback = False
             if sec_root is not None:
+                # table_elem 은 이 표에 대해 위에서 이미 한 번 찾아뒀다.
+                # 넘기지 않으면 셀마다 섹션 전체를 다시 훑는다(O(셀×섹션)).
                 cell_elem = _find_cell_elem(sec_root, c.row, c.col,
-                                                              table_pos)
+                                                              table_pos,
+                                                              table_elem)
                 if cell_elem is not None:
                     header_attr = cell_elem.attrib.get("header")
                     header_cell = _normalize_header_flag(header_attr)
