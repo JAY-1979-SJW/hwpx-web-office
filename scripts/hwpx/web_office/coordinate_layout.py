@@ -92,7 +92,58 @@ def _extract_section(path, secname, row_scale=1.0):
     lines = []
     boxes = []
     warnings: list[dict] = []
-    st = {"page_idx": 0, "prev_vpos": -1, "flow_y": m_top, "max_y": m_top}
+    st = {"page_idx": 0, "prev_vpos": -1, "flow_y": m_top, "max_y": m_top,
+          "col_count": 1, "col_idx": 0}
+
+    def _update_col_state(p):
+        """다단(colPr colCount>=2) 구간 진입/이탈 반영 — 페이지 카운터용.
+
+        colPr 은 문단 안 secPr 제어문자로 중간 삽입돼(문서 전체가 아니라
+        구간별 단 수를 바꿈), vertpos 리셋이 "새 페이지"인지 "같은 페이지
+        안 다음 칼럼"인지 구별하는 데 반드시 필요하다. 새 단 구간 진입 시
+        칼럼 카운터를 0(첫 칼럼)으로 되돌린다 — 안 그러면 이전 구간에서
+        남은 칼럼 위상이 새 구간의 페이지 판정을 어긋나게 한다.
+
+        주의: x-오프셋(칼럼을 실제로 나란히 배치)은 아직 미구현이다 —
+        시도해본 결과 이 문서의 2단 구간이 물리적으로 여러 페이지에 걸쳐
+        있어(칼럼 하나가 content_h 를 넘김), 단순 "칼럼 인덱스 mod N" 만
+        으로는 페이지 경계를 못 잡고 오히려 품질 게이트(bodyOverlap) 회귀
+        가 발생해 되돌렸다. 페이지 카운터 이중 증가 방지(이 함수)만 유지.
+        """
+        col_pr = next((e for e in p.iter() if ln(e.tag) == "colPr"), None)
+        if col_pr is None:
+            return
+        try:
+            cc = int(col_pr.attrib.get("colCount", "1") or "1")
+        except (TypeError, ValueError):
+            return
+        if cc != st["col_count"]:
+            st["col_count"] = max(cc, 1)
+            st["col_idx"] = 0
+            if os.environ.get("COORD_DEBUG"):
+                print(f"[DBG col] colCount -> {st['col_count']}", file=sys.stderr)
+
+    def _on_vpos_reset():
+        """vertpos 리셋(감소) 시 페이지 전진 여부 판정.
+
+        단일 칼럼이면 리셋 즉시 새 페이지(기존 동작 보존). 다단(N>=2)이면
+        칼럼이 N 번 채워져야(칼럼 1→2→…→N 순환 완료) 비로소 실제 새
+        페이지다 — 그 전까지는 같은 페이지 안 다음 칼럼으로의 이동일 뿐.
+        실사례: colCount=2 구간에서 매 리셋마다 페이지를 전진시키면 표
+        앵커가 부풀려진 page_idx 기준으로 환산돼 실제보다 훨씬 아래(페이지
+        바닥 91%)로 계산되는 결함이 있었다(영천경마공원 79셀 표 사례).
+        """
+        if st["col_count"] > 1:
+            st["col_idx"] += 1
+            if st["col_idx"] >= st["col_count"]:
+                st["col_idx"] = 0
+                st["page_idx"] += 1
+        else:
+            st["page_idx"] += 1
+        if os.environ.get("COORD_DEBUG"):
+            print(f"[DBG reset] col_count={st['col_count']} "
+                  f"col_idx={st['col_idx']} page_idx={st['page_idx']}",
+                  file=sys.stderr)
 
     def emit_para(p):
         txt, spans = own_runs(p)
@@ -138,7 +189,7 @@ def _extract_section(path, secname, row_scale=1.0):
             _vis = bool(line_txt.strip()) or _obj_h > 0
             if _vis:
                 if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
-                    st["page_idx"] += 1  # vpos 리셋 → 새 페이지
+                    _on_vpos_reset()  # vpos 리셋 → 새 페이지(또는 다단 다음 칼럼)
                 st["prev_vpos"] = vpos
             y = (st["page_idx"] * page_h) + m_top + vpos * HU
             x = m_left + float(s.get("horzpos", "0")) * HU
@@ -528,7 +579,7 @@ def _extract_section(path, secname, row_scale=1.0):
             return None
         vpos = float(segs[0].get("vertpos", "0"))
         if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
-            st["page_idx"] += 1
+            _on_vpos_reset()
         st["prev_vpos"] = vpos
         return (st["page_idx"] * page_h) + m_top + vpos * HU
 
@@ -536,6 +587,7 @@ def _extract_section(path, secname, row_scale=1.0):
         for child in el:
             if ln(child.tag) != "p":
                 continue
+            _update_col_state(child)
             # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
             # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
             # (page_idx 전진 + vertpos 리셋). "0"/미지정이면 자동 흐름(무변화).

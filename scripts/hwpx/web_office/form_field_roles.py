@@ -71,7 +71,9 @@ _N_ADDRESSEE = re.compile(
 _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
     ("residentNo", "secret", re.compile(r"주민\s*등록\s*번호|주민번호")),
     ("bizNo", "text", re.compile(r"사업자\s*등록\s*번호|법인\s*등록\s*번호")),
-    ("phone", "tel", re.compile(r"전화|연락처|휴대폰|팩스|이메일|전자우편")),
+    # 이메일은 아래 email 태그가 따로 잡는다. 여기 두면 '주소(전자우편 주소:)'
+    # 같은 라벨이 전화로 잡혀 전화번호가 주소칸에 들어간다(실측 오채움).
+    ("phone", "tel", re.compile(r"전화|연락처|휴대폰|팩스")),
     ("address", "address", re.compile(r"주소|소재지|주소지|사업장\s*소재")),
     ("name", "text", re.compile(r"^성명|성\s*명|이름|신청인|신고인|청구인|제출인|"
                                 r"대표자|성명\s*\(")),
@@ -80,6 +82,9 @@ _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
     ("buildingName", "text", re.compile(r"아파트\s*명|건물\s*명|공동주택\s*명|"
                                         r"단지\s*명|시설\s*명|점포\s*명")),
     ("orgName", "text", re.compile(r"상호|법인명|기관명|업체명|^명칭|단체명")),
+    # email 은 date 보다 앞에 둔다 — date 의 '^.{0,6}일$' 이
+    # '이메일' 을 날짜로 오인한다(실측).
+    ("email", "email", re.compile(r"이메일|전자우편|E-?mail", re.I)),
     ("birth", "date", re.compile(r"생년월일|생일")),
     ("date", "date", re.compile(r"년\s*월\s*일|일자$|일시$|^기간|^.{0,6}일$")),
     ("amount", "number", re.compile(r"금액|요금|비용|단가|원\)$|수량|사용량|면적")),
@@ -92,7 +97,6 @@ _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
     ("affiliation", "text", re.compile(r"^소\s*속|부\s*서|근무\s*처|소속및직위")),
     ("occupation", "text", re.compile(r"^직\s*업|^업\s*종|업\s*태|종\s*목")),
     ("agent", "text", re.compile(r"대\s*리\s*인|담\s*당\s*자|대\s*표\s*자")),
-    ("email", "email", re.compile(r"이메일|전자우편|E-?mail", re.I)),
     ("zipcode", "text", re.compile(r"우편\s*번호")),
 ]
 
@@ -171,13 +175,18 @@ def classify_form_kind(name: str, doc_model: dict | None = None,
 
 def extract_field_cells(doc_model: dict, render_payload: dict) -> list[dict]:
     """빈 셀의 라벨을 위치와 함께 뽑는다 (구조 판정에 표 소속이 필요하다)."""
-    empty: set[tuple] = set()
+    # 좌표 대신 paragraphId 를 함께 들고 나간다. 채움은 좌표가 아니라 문단
+    # ID 로 겨냥해야 안전하다 — documentModel(셀 순번)과 renderPayload(격자
+    # 주소)의 좌표계가 확장 셀 뒤에서 어긋나는 결함이 있기 때문이다
+    # (tests/test_web_office_cell_coordinate_agreement.py 참조).
+    empty: dict[tuple, str] = {}
     for p in doc_model.get("paragraphs", []):
         cs = p.get("containerScope") or {}
         if cs.get("kind") != "cell":
             continue
         if not "".join(r.get("text", "") for r in p.get("runs", [])).strip():
-            empty.add((cs.get("tableIndex"), cs.get("rowIndex"), cs.get("colIndex")))
+            key = (cs.get("tableIndex"), cs.get("rowIndex"), cs.get("colIndex"))
+            empty.setdefault(key, p.get("paragraphId") or "")
     out: list[dict] = []
     seen: set[str] = set()
     for ti, table in enumerate(render_payload.get("tables", [])):
@@ -209,7 +218,8 @@ def extract_field_cells(doc_model: dict, render_payload: dict) -> list[dict]:
                         break
             if label and label not in seen and len(label) < 40:
                 seen.add(label)
-                out.append({"label": label, "tableIndex": ti, "row": r, "col": c})
+                out.append({"label": label, "tableIndex": ti, "row": r, "col": c,
+                            "paragraphId": empty.get((ti, r, c), "")})
     return out
 
 

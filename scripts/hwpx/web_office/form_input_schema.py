@@ -125,6 +125,8 @@ def build_input_schema(doc_model: dict, render_payload: dict, *,
             # thirdParty 는 프로필에서 자동으로 채우면 안 된다.
             "subject": f.get("subject") or "self",
             "sensitive": f["inputType"] == "secret",
+            # 채움은 좌표가 아니라 paragraphId 로 겨냥한다(좌표계 결함 우회)
+            "paragraphId": f.get("paragraphId") or "",
             "tableIndex": f["tableIndex"],
             "row": f["row"],
             "col": f["col"],

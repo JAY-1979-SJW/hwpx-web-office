@@ -204,6 +204,47 @@ def call_para_save_apply(
     }])
 
 
+def call_fill_plan(request: dict[str, Any],
+                   *, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
+    """채움 계획 — 무엇을 자동으로 넣고 무엇을 물어볼지.
+
+    프로필은 요청이 실어 보낸다(서버에 저장하지 않는다). 개인정보를 서버가
+    보관하지 않는 설계라 주민등록번호 같은 고유식별정보 처리 책임이 생기지
+    않는다. 값을 만들어내지 않으며, 모르는 칸은 질문 목록으로만 돌려준다.
+    """
+    from .form_fill_planner import plan_fill
+    from .form_input_schema import build_input_schema
+    rel = request.get("sourcePath")
+    if not isinstance(rel, str) or not rel:
+        return _envelope("FAILED", {"verdict": "REJECTED",
+                                    "reason": "SOURCE_PATH_MISSING"},
+                         [{"code": "SOURCE_PATH_MISSING", "message": "sourcePath 필요"}])
+    env = call_hwpx_load({"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
+                         project_root=project_root)
+    data = (env or {}).get("data") or {}
+    if data.get("verdict") != "PASS":
+        return env
+    schema = build_input_schema(data["documentModel"], data["renderPayload"],
+                                name=request.get("name") or Path(rel).name,
+                                field_count=None)
+    plan = plan_fill(schema["inputs"], request.get("profile") or {},
+                     history=request.get("history") or {})
+    return _envelope("SUCCESS", {
+        "docType": schema["docType"],
+        "formKind": schema["formKind"],
+        "cleanName": schema["cleanName"],
+        "inputCount": schema["inputCount"],
+        "applicantCount": schema["applicantCount"],
+        "officeCount": schema["officeCount"],
+        "sensitiveCount": schema["sensitiveCount"],
+        "autoFill": plan["autoFill"],
+        "questions": plan["questions"],
+        "autoFillCount": plan["autoFillCount"],
+        "questionCount": plan["questionCount"],
+        "coverage": round(plan["coverage"], 3),
+    })
+
+
 def call_ai_fill(request: dict[str, Any]) -> dict[str, Any]:
     """AI 서식 자동채움 — Claude CLI(Haiku)로 입력칸 값 제안. §7/§9 준수.
 
@@ -343,6 +384,12 @@ if _FASTAPI_AVAILABLE:
         requestId: str | None = None
         dryRunOnly: bool = False
 
+    class FillPlanRequest(BaseModel):
+        sourcePath: str
+        name: str | None = None
+        profile: dict[str, Any] = {}
+        history: dict[str, str] = {}
+
     class ParaSaveApplyRequest(BaseModel):
         operation: str
         sourcePath: str
@@ -425,6 +472,10 @@ def create_app() -> Any:
     @app.post("/api/web-office/cell-save-apply")
     def cell_save_apply(req: CellSaveApplyRequest) -> dict[str, Any]:
         return call_cell_save_apply(req.model_dump())
+
+    @app.post("/api/web-office/fill-plan")
+    def fill_plan(req: FillPlanRequest) -> dict[str, Any]:
+        return call_fill_plan(req.model_dump())
 
     @app.post("/api/web-office/para-save-apply")
     def para_save_apply(req: ParaSaveApplyRequest) -> dict[str, Any]:
