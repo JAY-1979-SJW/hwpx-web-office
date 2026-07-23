@@ -1,2 +1,6 @@
 #!/usr/bin/env sh
-python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only
+# 저장소 분류 가드 (기존)
+python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only || exit 1
+# 세션 점유 게이트 — 다른 세션이 점유한 파일이 staged 에 섞이면 중단.
+# 점유가 없거나 만료됐으면 통과한다(게이트 고장이 작업을 막지 않는다).
+python scripts/ops/gate_hwpx_session_claim.py --check || exit 1
