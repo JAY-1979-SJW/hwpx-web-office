@@ -40,7 +40,10 @@ REQUIRED_ADAPTER_PATTERNS = [
     r"REASON_SECTION_NOT_FOUND",
     r"REASON_BODY_BLOCK_NOT_PARAGRAPH",
     r'kind == "cell"',
-    r'kind not in \("cell", "block"\)',
+    # CLAUDE.md §4.2(머리말/꼬리말 텍스트 편집) 확장 후에도 cell/block
+    # 게이트 자체는 유지되는지만 확인 — 정확한 튜플 내용까지 고정하지
+    # 않는다(향후 정당한 kind 확장을 매번 이 정규식 때문에 막지 않게).
+    r'kind not in \("cell", "block"',
     r"sectionIndex",
     r"blockIndex",
 ]
