@@ -204,6 +204,63 @@ def call_para_save_apply(
     }])
 
 
+def call_apply_format(
+    request: dict[str, Any],
+    *,
+    project_root: Path = PROJECT_ROOT,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    """서식(글꼴/크기/색상/굵게/기울임/밑줄) 편집 — CLAUDE.md §4.1.
+
+    브라우저는 overrides(무엇을 바꿀지)만 보낸다. 실제 charPr id 해석
+    (기존 매칭 탐색 또는 append-only 신규 생성)은 서버가 담당한다 —
+    클라이언트가 임의 id 를 지정하면 검증(신규 charPr 생성 정책)을
+    우회할 수 있다.
+    """
+    from .editor_file_bridge import _resolve_project_hwpx
+    from .apply_format_bridge import resolve_and_apply_format
+
+    try:
+        source_path, source_rel = _resolve_project_hwpx(
+            project_root, request.get("sourcePath"))
+    except ValueError as exc:
+        return _envelope("FAILED", {"verdict": "REJECTED"}, [{
+            "code": "INVALID_SOURCE_PATH", "message": str(exc)}])
+
+    paragraph_id = request.get("paragraphId")
+    overrides = request.get("overrides")
+    if not paragraph_id or not isinstance(overrides, dict) or not overrides:
+        return _envelope("FAILED", {"verdict": "REJECTED"}, [{
+            "code": "INVALID_REQUEST",
+            "message": "paragraphId 와 overrides(비어있지 않은 dict) 필요"}])
+
+    out_dir = output_dir if output_dir is not None else _api_output_dir()
+    out_path = out_dir / f"applyformat_{uuid.uuid4().hex[:12]}.hwpx"
+    try:
+        result = resolve_and_apply_format(
+            source_path=source_path, output_path=out_path,
+            paragraph_id=str(paragraph_id),
+            range_anchor=int(request.get("rangeAnchor", 0)),
+            range_focus=int(request.get("rangeFocus", 0)),
+            overrides=overrides,
+            tmp_dir=out_dir,
+        )
+    except ValueError as exc:
+        return _envelope("FAILED", {"verdict": "REJECTED"}, [{
+            "code": "APPLY_FORMAT_ERROR", "message": str(exc)}])
+
+    if result.get("verdict") != "PASS":
+        return _envelope("FAILED", _strip_public_paths(result), [{
+            "code": "APPLY_FORMAT_REJECTED",
+            "message": str(result.get("rejected") or result.get("verdict"))}])
+
+    # 다음 편집이 이어받을 새 sourcePath(sandbox 산출물) — 원본은 무수정.
+    new_rel = out_path.resolve().relative_to(project_root.resolve()).as_posix()
+    public = _strip_public_paths(result)
+    public["sourcePath"] = new_rel
+    return _envelope("SUCCESS", public)
+
+
 def call_fill_plan(request: dict[str, Any],
                    *, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
     """채움 계획 — 무엇을 자동으로 넣고 무엇을 물어볼지.
@@ -401,6 +458,13 @@ if _FASTAPI_AVAILABLE:
     class HwpxLayoutRequest(BaseModel):
         sourcePath: str
 
+    class ApplyFormatRequest(BaseModel):
+        sourcePath: str
+        paragraphId: str
+        rangeAnchor: int = 0
+        rangeFocus: int = 0
+        overrides: dict[str, Any] = {}
+
     class AiFillRequest(BaseModel):
         fields: list[dict[str, Any]] = []
         sourceData: dict[str, Any] | None = None
@@ -484,6 +548,10 @@ def create_app() -> Any:
     @app.post("/api/web-office/hwpx-layout")
     def hwpx_layout(req: HwpxLayoutRequest) -> dict[str, Any]:
         return call_hwpx_layout(req.model_dump())
+
+    @app.post("/api/web-office/apply-format")
+    def apply_format(req: ApplyFormatRequest) -> dict[str, Any]:
+        return call_apply_format(req.model_dump())
 
     @app.post("/api/web-office/ai-fill")
     def ai_fill(req: AiFillRequest) -> dict[str, Any]:

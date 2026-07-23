@@ -39,6 +39,8 @@
   /* 라벨(원래 문구) — 단일 클릭 편집 안 함, 더블클릭으로만 수정 */
   .wo-app.wo-faithful .co-box.wo-label{ cursor:default; }
   .wo-app.wo-faithful .co-box.wo-label:hover{ background:rgba(120,130,140,.05); }
+  /* 서식 툴바 대상(마지막 클릭 칸) 표시 */
+  .wo-app.wo-faithful .co-box.wo-fmt-selected{ outline:2px solid #2d6cdf; outline-offset:-1px; }
   .co-box.wo-editing{ z-index:5; background:#fff; }
   /* 즉석 편집기 — 상시 입력창 없음. 입력칸을 클릭한 순간에만 그 칸에
      나타나는 임시 편집기 하나(커밋하면 사라지고 값은 문서 텍스트로 렌더). */
@@ -83,6 +85,14 @@
     <button data-role="redo" type="button" disabled>↷ 재실행</button>
     <span class="wo-div"></span>
     <button data-role="aifill" type="button" disabled>🤖 AI 자동입력</button>
+    <span class="wo-div"></span>
+    <button data-role="fmt-bold" type="button" disabled title="굵게"><b>B</b></button>
+    <button data-role="fmt-italic" type="button" disabled title="기울임"><i>I</i></button>
+    <button data-role="fmt-underline" type="button" disabled title="밑줄"><u>U</u></button>
+    <input data-role="fmt-size" type="number" min="6" max="72" step="1"
+           disabled title="글자 크기(pt)" style="width:52px;" />
+    <input data-role="fmt-color" type="color" disabled title="글자 색"
+           value="#000000" />
     <span class="wo-div"></span>
     <span class="wo-hint">원본 배치 충실 재현 · 셀 클릭 편집</span>
     <span class="wo-sp"></span>

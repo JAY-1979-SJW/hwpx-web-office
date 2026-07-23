@@ -20,6 +20,62 @@ export function mountWebOffice(root) {
   let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
   let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
   let pendingEditId = null; // 재렌더 후 이어서 열 즉석 편집 대상(이동 연속)
+  let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
+  let fmtBusy = false;         // 서식 적용 중 중복 클릭 방지
+
+  // 서식 툴바 — 클릭된 칸을 서식 적용 대상으로 표시하고 버튼을 켠다.
+  function selectCellForFormat(id, box) {
+    selectedCellId = id;
+    root.querySelectorAll(".co-box.wo-fmt-selected")
+      .forEach((b) => b.classList.remove("wo-fmt-selected"));
+    if (box) box.classList.add("wo-fmt-selected");
+    ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
+      .forEach((r) => { $(`[data-role=${r}]`).disabled = fmtBusy; });
+  }
+
+  // 서식 적용 — 선택된 칸의 전체 텍스트 범위에 overrides 를 적용한다.
+  // 서버가 charPr 해석(기존 매칭/신규 append)까지 담당(§4.1). 결과는
+  // 항상 새 sandbox 파일 — 원본은 무수정, 다음 편집은 그 파일을 이어받는다.
+  async function applyFormat(overrides) {
+    if (!selectedCellId || !loaded || fmtBusy) return;
+    const text = cell.currentText(selectedCellId);
+    if (text == null) return;
+    const model = loaded.documentModel || {};
+    const c = (model.cells || []).find((x) => x.cellId === selectedCellId);
+    const pid = c && c.paragraphs && c.paragraphs[0]
+      && c.paragraphs[0].paragraphId;
+    if (!pid) { setStatus("fail", "서식 대상 문단을 찾을 수 없음"); return; }
+    fmtBusy = true;
+    setStatus("load", "서식 적용 중 …");
+    try {
+      const res = await fetch("/api/web-office/apply-format", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePath: loaded.sourcePath, paragraphId: pid,
+          rangeAnchor: 0, rangeFocus: text.length, overrides,
+        }),
+      });
+      const env = await res.json();
+      const d = (env && env.data) || {};
+      if (!(env && env.status === "SUCCESS") || d.verdict !== "PASS") {
+        const msg = (env.errors && env.errors[0] && env.errors[0].message)
+          || d.verdict || "서식 적용 실패";
+        setStatus("fail", "서식 적용 거부: " + msg);
+        return;
+      }
+      // 서버가 만든 새 sandbox 파일을 다음 편집의 기준으로 이어받는다.
+      loaded.sourcePath = d.sourcePath;
+      setStatus("ok", "서식 적용 완료(새 sandbox 사본) · 재로딩 …");
+      coordLayout = await fetchLayout(loaded.sourcePath);
+      render();
+      probeTruth(loaded.sourcePath);
+    } catch (e) {
+      setStatus("fail", "서식 적용 실패: " + (e.message || e));
+    } finally {
+      fmtBusy = false;
+    }
+  }
 
   const setStatus = (k, msg) => {
     const e = $("[data-role=status]");
@@ -93,6 +149,8 @@ export function mountWebOffice(root) {
         const id = box.dataset.cellId;
         const isInput = cell.isInputCell(id);   // 파서(XML) 분류 단일 진실
         box.classList.add(isInput ? "wo-input" : "wo-label");
+        // 서식 툴바 대상 — 클릭된 어떤 칸(입력/라벨 무관)이든 선택 표시.
+        box.addEventListener("click", () => selectCellForFormat(id, box));
         if (isInput && !box.dataset.frag) {
           const r = box.getBoundingClientRect();
           // 방향키 이동용 기하 — 같은 스크롤 상태에서 일괄 측정하므로 상대
@@ -305,6 +363,9 @@ export function mountWebOffice(root) {
     loaded = d;
     coordLayout = null;
     truthBase = null;
+    selectedCellId = null;
+    ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
+      .forEach((r) => { $(`[data-role=${r}]`).disabled = true; });
     cell = createCellEditController(d.documentModel);
     save = createSaveController({
       getState: () => cell.getState(),
@@ -409,6 +470,19 @@ export function mountWebOffice(root) {
     const u = save && save.downloadUrl();
     if (u) window.location = u;
   });
+  // 서식 툴바 — 굵게/기울임/밑줄은 현재값을 뒤집어 보냄(토글).
+  $("[data-role=fmt-bold]").addEventListener("click",
+    () => applyFormat({ bold: true }));
+  $("[data-role=fmt-italic]").addEventListener("click",
+    () => applyFormat({ italic: true }));
+  $("[data-role=fmt-underline]").addEventListener("click",
+    () => applyFormat({ underline: true }));
+  $("[data-role=fmt-size]").addEventListener("change", (e) => {
+    const v = parseFloat(e.target.value);
+    if (v > 0) applyFormat({ fontSizePt: v });
+  });
+  $("[data-role=fmt-color]").addEventListener("change",
+    (e) => applyFormat({ textColor: e.target.value.toUpperCase() }));
 
   const drop = $("[data-role=drop]");
   ["dragenter", "dragover"].forEach((ev) =>
