@@ -68,6 +68,39 @@ def _strip_public_paths(response: dict[str, Any]) -> dict[str, Any]:
     return safe
 
 
+_INPLACE_OK_VERDICTS = {"PASS", "PARTIAL", "DRY_RUN_OK"}
+
+
+def _apply_in_place_if_requested(
+    result: dict[str, Any], *, source_rel: str, project_root: Path,
+) -> str:
+    """대표님 지시(2026-07-24 정책 개정) — "원본을 직접 수정하는 방식으로
+    해야 한다"(원본 무수정 원칙의 명시적 폐기, 이 기능 한정).
+
+    검증(verify7 등)은 기존 그대로 sandbox 출력에 대해 수행한 뒤,
+    PASS/PARTIAL/DRY_RUN_OK 로 확인된 결과물만 원본 파일에 그대로
+    덮어쓴다 — "검증 안 된 내용을 원본에 바로 쓰는" 것이 아니라
+    "검증까지 끝난 결과를 원본에 반영"하는 순서를 지킨다. 반환값은
+    다음 편집이 이어받을 sourcePath(원본 그대로, 새 사본 아님).
+    """
+    out_path_str = result.get("outputPath")
+    if not out_path_str or result.get("verdict") not in _INPLACE_OK_VERDICTS:
+        return source_rel
+    out_path = Path(out_path_str)
+    if not out_path.is_file():
+        return source_rel
+    src_path = (project_root / source_rel).resolve()
+    import shutil
+    shutil.copyfile(out_path, src_path)
+    try:
+        out_path.unlink()
+    except OSError:
+        pass
+    result["outputPath"] = str(src_path)
+    result["editedInPlace"] = True
+    return source_rel
+
+
 def call_health() -> dict[str, Any]:
     return _envelope("SUCCESS", {
         "loadEndpoint": "/api/web-office/hwpx-load",
@@ -163,6 +196,11 @@ def call_cell_save_apply(
     out_dir = output_dir if output_dir is not None else _api_output_dir()
     result = apply_cell_save_request(
         request, project_root=project_root, output_dir=out_dir)
+    if request.get("editInPlace") and result.get("verdict") in {
+            "PASS", "DRY_RUN_OK", "NOOP"}:
+        _apply_in_place_if_requested(
+            result, source_rel=request.get("sourcePath"),
+            project_root=project_root)
     public_result = _strip_public_paths(result)
     if result.get("verdict") in {"PASS", "DRY_RUN_OK", "NOOP"}:
         return _envelope("SUCCESS", public_result)
@@ -194,13 +232,20 @@ def call_para_save_apply(
     result = apply_para_save_request(
         request, project_root=project_root, output_dir=out_dir,
         load_document=_load)
+    if request.get("editInPlace") and result.get("verdict") in {
+            "PASS", "PARTIAL", "PARTIAL_DRY_RUN_OK", "DRY_RUN_OK", "NOOP"}:
+        _apply_in_place_if_requested(
+            result, source_rel=request.get("sourcePath"),
+            project_root=project_root)
     public_result = _strip_public_paths(result)
     if result.get("verdict") in {"PASS", "PARTIAL", "PARTIAL_DRY_RUN_OK",
                                  "DRY_RUN_OK", "NOOP"}:
-        # 다음 편집이 이어받을 새 sourcePath(sandbox 산출물) — apply-format 과
-        # 동일 관례. writer 미실행(NOOP/DRY_RUN)이면 outputPath 가 없어
-        # sourcePath 도 원본 그대로 둔다(체이닝 없음).
-        if result.get("outputCreated") and result.get("outputPath"):
+        # 다음 편집이 이어받을 sourcePath — editInPlace 면 원본 그대로
+        # (같은 경로에 이미 반영됨), 아니면 기존처럼 새 sandbox 산출물로
+        # 체이닝. writer 미실행(NOOP/DRY_RUN)이면 outputPath 가 없어
+        # sourcePath 도 원본 그대로 둔다.
+        if (not result.get("editedInPlace") and result.get("outputCreated")
+                and result.get("outputPath")):
             out_path = Path(result["outputPath"])
             public_result["sourcePath"] = out_path.resolve().relative_to(
                 project_root.resolve()).as_posix()
@@ -261,10 +306,23 @@ def call_apply_format(
             "code": "APPLY_FORMAT_REJECTED",
             "message": str(result.get("rejected") or result.get("verdict"))}])
 
-    # 다음 편집이 이어받을 새 sourcePath(sandbox 산출물) — 원본은 무수정.
-    new_rel = out_path.resolve().relative_to(project_root.resolve()).as_posix()
     public = _strip_public_paths(result)
-    public["sourcePath"] = new_rel
+    if request.get("editInPlace") and out_path.is_file():
+        # 대표님 지시(2026-07-24 정책 개정) — 검증까지 끝난 sandbox 결과를
+        # 원본 파일에 그대로 덮어쓴다. sourcePath 는 원본 그대로 유지.
+        import shutil
+        shutil.copyfile(out_path, source_path)
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+        public["sourcePath"] = source_rel
+        public["editedInPlace"] = True
+    else:
+        # 다음 편집이 이어받을 새 sourcePath(sandbox 산출물) — 원본은 무수정.
+        new_rel = out_path.resolve().relative_to(
+            project_root.resolve()).as_posix()
+        public["sourcePath"] = new_rel
     return _envelope("SUCCESS", public)
 
 
@@ -447,6 +505,9 @@ if _FASTAPI_AVAILABLE:
         commandLog: list[dict[str, Any]] = []
         requestId: str | None = None
         dryRunOnly: bool = False
+        # 대표님 지시(2026-07-24 정책 개정) — True 면 검증 통과한 결과를
+        # sandbox 사본이 아니라 원본 파일에 직접 반영한다.
+        editInPlace: bool = False
 
     class FillPlanRequest(BaseModel):
         sourcePath: str
@@ -461,6 +522,7 @@ if _FASTAPI_AVAILABLE:
         commandLog: list[dict[str, Any]] = []
         requestId: str | None = None
         dryRunOnly: bool = False
+        editInPlace: bool = False
 
     class HwpxLayoutRequest(BaseModel):
         sourcePath: str
@@ -471,6 +533,7 @@ if _FASTAPI_AVAILABLE:
         rangeAnchor: int = 0
         rangeFocus: int = 0
         overrides: dict[str, Any] = {}
+        editInPlace: bool = False
 
     class AiFillRequest(BaseModel):
         fields: list[dict[str, Any]] = []

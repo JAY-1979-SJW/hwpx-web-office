@@ -28,6 +28,9 @@ export function buildCellSaveApplyRequest({
     sourceDocumentHash: state.sourceDocumentHash,
     dryRunOnly,
     commandLog: state.commandLog,
+    // 대표님 지시(2026-07-24 정책 개정) — 검증 통과 결과를 원본 파일에
+    // 직접 반영한다(sandbox 사본 체이닝 대신).
+    editInPlace: true,
   };
 }
 

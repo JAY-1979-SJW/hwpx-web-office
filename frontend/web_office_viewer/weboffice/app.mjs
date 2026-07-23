@@ -151,6 +151,8 @@ export function mountWebOffice(root) {
           || (model.sourceRef && model.sourceRef.sha256),
         dryRunOnly: false,
         commandLog: [command],
+        // 대표님 지시(2026-07-24 정책 개정) — 원본 직접 수정.
+        editInPlace: true,
       }),
     });
     const env = await res.json();
@@ -336,6 +338,8 @@ export function mountWebOffice(root) {
         body: JSON.stringify({
           sourcePath: loaded.sourcePath, paragraphId: pid,
           rangeAnchor: 0, rangeFocus: text.length, overrides,
+          // 대표님 지시(2026-07-24 정책 개정) — 원본 직접 수정.
+          editInPlace: true,
         }),
       });
       const env = await res.json();
