@@ -221,3 +221,5 @@ PARA-EDIT 동 · 내용 편집 (cell + body, single + multi run)
 > _resolve_header_footer_paragraph 추가(CLAUDE.md §4.2), hwpx_edit_tool.py 의 containerScope.kind
 > 허용 집합에 header/footer 추가. 실제 Hancom Office COM 으로 머리말 텍스트 편집 확인 후
 > 정당 변경으로 베이스라인 갱신.
+
+> **baseline 갱신**: 517849c (빈 입력칸 기입 준공, 2026-07-24) — 서식의 빈 입력칸은 run 은 있는데 `<hp:t>` 텍스트 노드가 없어 writer 가 `RUN_TEXT_NODE_MISSING` 으로 거부했다. **자동채움이 노리는 칸은 정의상 전부 빈 칸이므로 채울 수 있는 칸이 하나도 없었다.** 삽입에 한해 빈 run 에 `<hp:t>` 를 생성하도록 교정(교체·삭제이거나 `hp:ctrl` 등 다른 자식이 있는 run 은 종전대로 거부). `charPrIDRef` 는 run 의 것을 그대로 쓰므로 신규 charPr 을 만들지 않는다. 전기사용신청서 HTTP 종단 시험 3/3 제자리·옆칸 유출 0. 잠금 파일 정당 변경 확인 후 베이스라인 갱신.

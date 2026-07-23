@@ -22,7 +22,7 @@ if str(PR) not in sys.path:
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 RENDER_PAYLOAD = (PR / "scripts/hwpx/web_office/render_payload.py")
-BASELINE_COMMIT = "e9517fc"  # 머리말/꼬리말 텍스트 편집 준공 후 갱신 (2f7db75 → e9517fc)
+BASELINE_COMMIT = "517849c"  # 빈 입력칸 기입 준공 후 갱신 (e9517fc → 517849c)
 
 # dc9e6ad ApplyFormat closeout 의 시공 자재 — 본 공정에서 무수정
 # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01: para_edit_state /
