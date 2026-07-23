@@ -121,6 +121,20 @@ _HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
 _HEADER_CHARPR_IDS_CACHE: dict[int, set[str]] = {}
 
 
+def _strip_lineseg(paragraph_elem: ET.Element) -> None:
+    """텍스트가 바뀐 문단의 <hp:linesegarray> 를 통째로 제거한다.
+
+    실측(2026-07-23): 텍스트 편집 후 lineseg 를 그대로(stale) 두면
+    한컴이 원래의 좁은 1줄 자리에 글자를 욱여넣어 서로 겹쳐 뭉갠다.
+    반면 linesegarray 요소 자체를 완전히 없애면 한컴이 셀 폭 기준으로
+    올바르게 재조판(여러 줄로 줄바꿈 + 행 높이 자동 확장)한다 —
+    "근사값을 넣는다"가 아니라 "완전히 비운다"가 맞는 처방이었다.
+    APPLY_FORMAT/APPLY_PARA_FORMAT(텍스트 불변)에는 호출하지 않는다."""
+    for child in list(paragraph_elem):
+        if _local_tag(child) == "linesegarray":
+            paragraph_elem.remove(child)
+
+
 def _read_header_para_pr_ids(package: HwpxPackage) -> set[str]:
     """Contents/header.xml 의 <hh:paraPr id="N"> id 집합 (M2 문단서식 검증용)."""
     header_bytes: bytes | None = None
@@ -1038,6 +1052,7 @@ def apply_paragraph_edits_plan(
                                             mutation["status"]),
                         mutation=mutation))
                     continue
+                _strip_lineseg(paragraph_elem)
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1141,6 +1156,7 @@ def apply_paragraph_edits_plan(
                         item, mr_reason_map.get(mr_status, mr_status),
                         mutation=mr))
                     continue
+                _strip_lineseg(paragraph_elem)
                 package.write_xml(entry, root)
                 touched_entries.add(entry)
                 applied.append({
@@ -1236,6 +1252,7 @@ def apply_paragraph_edits_plan(
                                                 mutation["status"]),
                                     mutation=mutation))
             continue
+        _strip_lineseg(paragraph_elem)
         package.write_xml(entry, root)
         touched_entries.add(entry)
         applied.append({
