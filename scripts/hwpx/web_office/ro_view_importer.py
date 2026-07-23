@@ -87,6 +87,13 @@ def _stable_run_id(paragraph_id: str, run_index: int) -> str:
 
 def _inline_text_content(elem: ET.Element) -> str:
     local = local_name(elem.tag).lower()
+    if local == "tbl":
+        # 중첩 표는 별도 표로 따로 실린다. 여기서 삼키면 같은 글자가 두 곳에
+        # 나오고 셀 텍스트(table_parser._cell_raw_text)와 어긋난다.
+        # 중첩 표는 문단이 아니라 **문단 안 hp:run 속**에 들어 있어서,
+        # 문단 단위로 걸러도(_iter_paragraphs_in_cell_elem) 이 경로로 다시
+        # 딸려 들어왔다. tail 은 run 의 것이므로 호출자가 따로 잇는다.
+        return ""
     if local == "linebreak":
         parts = ["\n"]
     elif local == "fwspace":
@@ -129,6 +136,19 @@ def _extract_runs_from_paragraph_elem(
     """
     par_pr_id_ref = paragraph_elem.attrib.get("paraPrIDRef")
     run_elems = _paragraph_runs(paragraph_elem)
+    # 중첩 표 안의 run 은 그 표의 셀이 따로 싣는다. hwpx_paragraph_ops
+    # .paragraph_runs 가 `.iter()` 라 중첩 표 속 run 까지 바깥 문단의 것으로
+    # 돌려주므로 여기서 걷어낸다. (공용 헬퍼는 편집 경로가 함께 쓰므로
+    # 건드리지 않고, 읽기 전용 임포터에서만 거른다.)
+    nested_runs = {
+        id(r)
+        for tbl in paragraph_elem.iter()
+        if local_name(tbl.tag).lower() == "tbl"
+        for r in tbl.iter()
+        if local_name(r.tag).lower() == "run"
+    }
+    if nested_runs:
+        run_elems = [r for r in run_elems if id(r) not in nested_runs]
     if not run_elems:
         # hp:run 0개 — paragraph text 만 합성 run 1개로 fallback
         # paragraph 내 hp:t / hp:lineBreak 직접 수집
@@ -166,9 +186,26 @@ def _extract_runs_from_paragraph_elem(
 def _iter_paragraphs_in_cell_elem(
     cell_elem: ET.Element,
 ) -> list[ET.Element]:
-    """cell element 의 hp:p 자손을 순서대로 반환."""
-    return [e for e in cell_elem.iter()
-                if local_name(e.tag).lower() == "p"]
+    """cell element 의 hp:p 자손을 순서대로 반환 — **중첩 표 안은 제외.**
+
+    중첩 표는 별도 표로 따로 실리므로, 바깥 셀이 그 문단까지 가져가면 같은
+    문단이 두 번 실리고 셀 텍스트(table_parser._cell_raw_text)와 어긋난다.
+    실측(굴착공사 협의서 표0 r1c0): 문단 81개 중 56개가 중첩 표 것이었고,
+    양쪽에서 중첩분을 빼면 텍스트와 문단 합이 정확히 일치한다.
+    """
+    out: list[ET.Element] = []
+
+    def walk(elem: ET.Element, root: bool = False) -> None:
+        tag = local_name(elem.tag).lower()
+        if not root and tag == "tbl":
+            return
+        if tag == "p":
+            out.append(elem)
+        for child in list(elem):
+            walk(child)
+
+    walk(cell_elem, root=True)
+    return out
 
 
 def _find_cell_elem(

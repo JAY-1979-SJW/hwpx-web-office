@@ -22,6 +22,8 @@ _TAG_CELLSPAN = f"{{{NS_HP}}}cellSpan"
 _TAG_RUN = f"{{{NS_HP}}}run"
 _TAG_P = f"{{{NS_HP}}}p"
 _TAG_SUBLIST = f"{{{NS_HP}}}subList"
+_TAG_LINEBREAK = f"{{{NS_HP}}}lineBreak"
+_TAG_FWSPACE = f"{{{NS_HP}}}fwSpace"
 
 
 def _normalize(text: str) -> str:
@@ -34,14 +36,57 @@ def _normalize(text: str) -> str:
     return t
 
 
-def _cell_raw_text(tc: ET.Element) -> str:
-    parts = []
-    for elem in tc.iter():
-        if elem.tag == _TAG_TBL:
-            continue
-        if elem.tag == _TAG_T and elem.text:
-            parts.append(elem.text)
+def _inline_text(elem: ET.Element) -> str:
+    """인라인 내용을 child.tail 까지 살려 잇는다.
+
+    `elem.text` 만 읽으면 인라인 자식(<hp:fwSpace/> 등) **뒤에 오는 글자가
+    통째로 사라진다.** ElementTree 에서 그 글자는 자식의 tail 에 들어가기
+    때문이다. 실측(별지 제13호서식 착공신고서):
+
+        <hp:t>(서명<hp:fwSpace/>또는<hp:fwSpace/></hp:t>
+            elem.text 만 → '(서명'
+            tail 포함     → '(서명 또는 '
+
+    이 손실은 셀 텍스트 전반을 갉아먹었다 — '[]천장재[]단열재…' 가 '[][][]'
+    로, '건축법시행령」제15조' 가 '건축법제15조' 로 줄었다.
+    ro_view_importer._inline_text_content 와 같은 규칙을 쓴다(두 뷰가 같은
+    글자를 보도록).
+    """
+    if elem.tag == _TAG_LINEBREAK:
+        parts = ["\n"]
+    elif elem.tag == _TAG_FWSPACE:
+        parts = [" "]
+    else:
+        parts = [elem.text or ""]
+    for child in list(elem):
+        parts.append(_inline_text(child))
+        parts.append(child.tail or "")
     return "".join(parts)
+
+
+def _iter_cell_content(elem: ET.Element, _root: bool = True):
+    """셀 자손을 문서 순서로 훑되 **중첩 표 서브트리로는 내려가지 않는다.**
+
+    기존 구현은 `tc.iter()` 를 돌며 `tbl` 태그만 `continue` 로 건너뛰었는데,
+    `continue` 는 그 원소 하나만 거르고 서브트리는 그대로 훑는다. 결국 중첩
+    표 안의 글자가 바깥 셀 텍스트에 딸려 들어왔다.
+
+    중첩 표는 renderPayload 에 **별도 표로 이미 실린다.** 바깥 셀이 그
+    내용까지 삼키면 같은 글자가 두 곳에 나오고, ro_view_importer 의 문단
+    수집과도 어긋난다. 실측(굴착공사 협의서 표0 r1c0, 중첩 표 3개):
+        텍스트 387자 → 배제 시 296자 · 문단 81개 → 배제 시 25개
+        배제 기준으로 맞추면 셀 텍스트와 문단 합이 정확히 일치한다.
+    """
+    if not _root and elem.tag == _TAG_TBL:
+        return
+    yield elem
+    for child in list(elem):
+        yield from _iter_cell_content(child, _root=False)
+
+
+def _cell_raw_text(tc: ET.Element) -> str:
+    return "".join(_inline_text(e) for e in _iter_cell_content(tc)
+                   if e.tag == _TAG_T)
 
 
 def _cell_span(tc: ET.Element) -> tuple[int, int]:
