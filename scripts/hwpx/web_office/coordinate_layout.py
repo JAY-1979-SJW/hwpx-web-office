@@ -201,13 +201,27 @@ def _extract_section(path, secname, row_scale=1.0):
             # 페이지에 놓는다(한컴 배치: 각주 vpos 는 표가 끝난 페이지 기준).
             # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
             # 증가), 1.5줄 이상 실침범 시에만 발동.
-            if i == 0 and page_h > 0 and line_txt.strip():
-                _guard = 0
-                while (y < st["flow_y"] - max(h * 1.5, 20.0)
-                        and _guard < 6):
-                    st["page_idx"] += 1
-                    y = (st["page_idx"] * page_h) + m_top + vpos * HU
-                    _guard += 1
+            if (i == 0 and page_h > 0 and line_txt.strip()
+                    and y < st["flow_y"] - max(h * 1.5, 20.0)):
+                if vpos < 1.0:
+                    # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
+                    # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
+                    # 뜻)인 경우가 흔하다 — 작은(한 페이지짜리) 표 바로
+                    # 뒤에 오는 제목 문단이 전부 이 패턴이라, 페이지를
+                    # 통째로 건너뛰면(과거 동작) 표마다 빈 페이지가
+                    # 하나씩 낭비된다(실사례: 표 6개 문서가 6쪽 → 실제로
+                    # 필요 없는 빈 페이지로 부풀려짐). 앵커처럼 흐름
+                    # 위치에 그대로 붙인다(페이지 전진 없음).
+                    y = st["flow_y"]
+                else:
+                    # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
+                    # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
+                    _guard = 0
+                    while (y < st["flow_y"] - max(h * 1.5, 20.0)
+                            and _guard < 6):
+                        st["page_idx"] += 1
+                        y = (st["page_idx"] * page_h) + m_top + vpos * HU
+                        _guard += 1
             line = {"text": line_txt,
                     "segments": slice_segments(txt, spans, a, b),
                     "x": round(x, 1),

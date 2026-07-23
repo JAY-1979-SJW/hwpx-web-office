@@ -46,7 +46,9 @@ LOCKED_FILES = [
     # para_edit_state.mjs 는 applyFormatToSelection 추가로 본 LOCKED 에서 제거.
 ]
 # Locked file drift is measured from the approved Web Office sandbox baseline.
-BASELINE_COMMIT = "334d665"
+# 좌표조회 수리 준공 후 갱신 (334d665 → b9782a5) — ro_view_importer._find_cell_elem
+# 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정. 정당 변경 확인 후 재고정.
+BASELINE_COMMIT = "b9782a5"
 
 # 안전 게이트가 코드에 존재하는지 정적 검증
 SAFETY_GATE_PATTERNS = {

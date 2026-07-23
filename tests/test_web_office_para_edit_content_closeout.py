@@ -14,7 +14,9 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_content_closeout.md")
-BASELINE_COMMIT = "334d665"
+# 좌표조회 수리 준공 후 갱신 (334d665 → b9782a5) — ro_view_importer._find_cell_elem
+# 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정. 정당 변경 확인 후 재고정.
+BASELINE_COMMIT = "b9782a5"
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────────

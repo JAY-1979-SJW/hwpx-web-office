@@ -204,3 +204,5 @@ PARA-EDIT 동 · ApplyFormat (existing charPr 전용)
 > **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)
 
 > **baseline 갱신**: 334d665 (WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01 준공, 2026-05-22) — charPr guard 추가로 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+> **baseline 갱신**: b9782a5 (셀 문단 조회 좌표 결함 수리 준공, 2026-07-23) — `ro_view_importer._find_cell_elem` 이 셀 문단을 격자주소(`cellAddr/@colAddr`)로 찾아 확장(colSpan>1) 셀 뒤 칸에서 옆 칸을 집어오던 결함을 교정. 파서(`table_parser`)와 같은 규칙인 **셀 순번**으로 조회하도록 바꿨다. 좌표계 자체는 불변이라 `cellId`·`paragraphId` 키와 renderPayload 격자는 보존된다. 실측 표본 40건 불일치 380건 → 39건. 감사 지적은 `LOCKED_FILE_CHANGED` 뿐이고 기능 회귀 0건임을 회귀 대조(HEAD 28 실패 → 수리후 36, 신규 8건 전부 잠금)로 확인 후 베이스라인 갱신.
