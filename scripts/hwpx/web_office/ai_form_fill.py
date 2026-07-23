@@ -18,8 +18,33 @@ import json
 import subprocess
 from typing import Any
 
+from .form_field_roles import _subject_of
+
 CLAUDE_MODEL = "haiku"   # §9 — 최하위 모델만
 DEFAULT_TIMEOUT_SEC = 120
+
+
+def _effective_subject(field: dict) -> str:
+    """이 칸이 신청인 본인 칸인지 제3자 칸인지 — **라벨로 서버가 판정한다.**
+
+    클라이언트가 보낸 subject 를 믿지 않는다(§4 원칙 4). '법정대리인성명'
+    같은 라벨은 신청인 프로필/소스로 채우면 관공서 제출물에 허위 대리인이
+    기재된다(§4 원칙 3). 라벨 판정과 클라이언트 값 중 **하나라도 thirdParty
+    면 thirdParty** 로 본다(안전한 쪽).
+    """
+    by_label = _subject_of(str(field.get("label", "")))
+    claimed = str(field.get("subject", "") or "")
+    if by_label == "thirdParty" or claimed == "thirdParty":
+        return "thirdParty"
+    return "self"
+
+
+def partition_by_subject(fields: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(신청인 본인 칸, 제3자 칸). 제3자 칸은 AI 채움 대상에서 뺀다."""
+    own, third = [], []
+    for f in fields:
+        (third if _effective_subject(f) == "thirdParty" else own).append(f)
+    return own, third
 
 
 def propose_values(fields: list[dict], *, source_data: dict | None = None,
@@ -31,11 +56,22 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
         source_data: {필드:값} — 있으면 이 실제 소스 값을 서식 라벨에 매핑(예시 아님).
 
     Returns:
-        {ok, provider, mode, proposals:[{key,label,value,confidence}], error?}
+        {ok, provider, mode, proposals, heldForThirdParty, error?}
+        proposals: [{key,label,value,confidence,subject,requiresConfirmation}]
+        heldForThirdParty: [{key,label,reason}] — AI 채움에서 제외한 제3자 칸.
     """
+    # 제3자 칸은 AI 채움 대상에서 원천 제외한다. 신청인 소스/프로필을
+    # '법정대리인성명' 같은 칸에 매핑하면 §4 원칙 3 위반이다. 모델에게
+    # 라벨조차 보내지 않는다(추측할 기회를 주지 않음).
+    own_fields, third_fields = partition_by_subject(fields)
+    held = [{"key": f.get("key"),
+             "label": str(f.get("label", "")).strip(),
+             "reason": "THIRD_PARTY_FIELD"}
+            for f in third_fields if str(f.get("label", "")).strip()]
+
     labels = []
     seen = set()
-    for f in fields:
+    for f in own_fields:
         lab = str(f.get("label", "")).strip()
         if lab and lab not in seen:
             seen.add(lab)
@@ -43,7 +79,8 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
 
     mode = "source_mapping" if source_data else "example"
     if not labels:
-        return {"ok": True, "provider": "claude_cli_haiku", "mode": mode, "proposals": []}
+        return {"ok": True, "provider": "claude_cli_haiku", "mode": mode,
+                "proposals": [], "heldForThirdParty": held}
 
     prompt = (_build_source_prompt(labels, source_data) if source_data
               else _build_prompt(labels))
@@ -71,7 +108,7 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
             by_label[lab] = r
 
     proposals: list[dict] = []
-    for f in fields:
+    for f in own_fields:      # 제3자 칸은 애초에 여기 없다
         lab = str(f.get("label", "")).strip()
         r = by_label.get(lab)
         if not r:
@@ -83,14 +120,20 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
             conf = float(r.get("confidence") or 0.0)
         except (TypeError, ValueError):
             conf = 0.0
+        # 민감칸(주민등록번호 등)은 제안하되 자동 확정 금지 — 매번 사람이
+        # 확인한다(§4 원칙 2). requiresConfirmation 로 프론트에 신호한다.
+        sensitive = bool(f.get("sensitive")) or f.get("inputType") == "secret"
         proposals.append({
             "key": f.get("key"),
             "label": lab,
             "value": val,
             "confidence": max(0.0, min(1.0, conf)),
+            "subject": "self",
+            "requiresConfirmation": sensitive,
         })
 
-    return {"ok": True, "provider": "claude_cli_haiku", "mode": mode, "proposals": proposals}
+    return {"ok": True, "provider": "claude_cli_haiku", "mode": mode,
+            "proposals": proposals, "heldForThirdParty": held}
 
 
 def _build_source_prompt(labels: list[str], source: dict) -> str:
