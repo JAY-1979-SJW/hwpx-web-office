@@ -62,10 +62,22 @@ Excel·기타 비HWPX 도메인은 이 저장소 범위 밖이다.
 - header/footer paragraph 편집 활성화 금지
 - image/shape/media 편집 구현 금지
 - table structure edit 구현 금지
-- 신규 charPr 생성 금지
-- `header.xml` mutation 금지
+- 신규 charPr 생성 금지 (단, §4.1 서식 편집 조건 충족 시 예외)
+- `header.xml` mutation 금지 (단, §4.1 charProperties append 는 예외)
 - Excel 파일 수정 금지
 - push 전 사용자 명시 승인 필수
+
+### 4.1 서식 편집 (조건부 허용, 2026-07-23 개정)
+
+폰트 **크기** 변경만을 위한 신규 charPr 추가에 한해 아래 조건 전부를
+만족하면 허용한다. 그 외(폰트 종류 변경, table structure, image/shape,
+header/footer paragraph 등)는 위 금지선을 그대로 유지한다.
+
+- `header.xml` charProperties 에 신규 charPr 추가 허용 — **append-only**
+- 기존 charPr 의 수정·삭제·ID 재사용 금지
+- 신규 ID 는 기존 최대값+1부터 순차 부여
+- `fontFace`(글꼴)는 변경하지 않음 — 기존 글꼴만 참조, 크기(속성)만 변경
+- 커밋 게이트: 한컴 정상 열림 + 무편집 라운드트립 동일 + 구조 diff 기준선 미초과
 
 ### 보안/개인정보 금지
 - `secret / token / password / env` 값 출력 금지
