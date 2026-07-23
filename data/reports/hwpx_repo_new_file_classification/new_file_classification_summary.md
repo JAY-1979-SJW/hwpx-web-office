@@ -1,10 +1,10 @@
 # HWPX Repo New File Classification Gate
 
-- verdict: PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE
-- newFiles: 295
+- verdict: FAIL_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE
+- newFiles: 720
 - ignoredFiles: 0
-- passedFiles: 295
-- failedFiles: 0
+- passedFiles: 719
+- failedFiles: 1
 - security: pii=0 rawPath=0 rawFilename=0
 
 ## Contract

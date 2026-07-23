@@ -48,6 +48,13 @@ _parse_char_prs = parse_char_prs
 _parse_border_fills = parse_border_fills
 
 
+# 인접 셀 테두리 중복 그리기(지시문 5.3) — 시도했으나 pinned 회귀 게이트
+# (test_web_office_visual_regression.py 격자선 검출)를 깨뜨려 보류.
+# 되돌린 이유·원인 분석은 커밋 메시지/세션 기록 참조 — 별도 워크스트림으로
+# 재시도 필요(단순 인접-억제만으로는 부족, 격자선 검출 알고리즘과의 상호작용
+# 추가 조사 필요).
+
+
 def _extract_section(path, secname, row_scale=1.0):
     z = zipfile.ZipFile(path)
     root = ET.fromstring(z.read(secname))
@@ -180,6 +187,11 @@ def _extract_section(path, secname, row_scale=1.0):
             "hCompact": min(compact, content) if compact > 0 else content,
             "bfRef": tc.attrib.get("borderFillIDRef"),
             "vAlign": sub.get("vertAlign", "TOP"),
+            # 세로쓰기(textDirection=VERTICAL/VERTICALALL) — 자리수 헤더
+            # (조/천억/백억 등 좁고 긴 금액칸)에서 흔함. CSS writing-mode
+            # 로 렌더러가 처리하도록 셀 단위로 전달.
+            "vertical": str(sub.get("textDirection", "")).startswith(
+                "VERTICAL"),
             "tc": tc,
         }
 
@@ -210,15 +222,19 @@ def _extract_section(path, secname, row_scale=1.0):
         # (별표2: 병합 5~8줄 셀이 최대 57px 물림). 멱등 재호출로 재보장.
         row_h = expand_rowspan_content(cells, row_h, nrow)
         # 높이0 반복 헤더행 접기 — 한컴 '표 머리행 반복'의 저장 잔재(전 셀
-        # cellSz=0)를 흐름 중간에 평행으로 그리면 페이지 꼬리 문구와 겹친다.
-        # 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음). 페이지 수 왜곡도
-        # 제거된다.
+        # cellSz=0, 내용도 없음)를 흐름 중간에 평행으로 그리면 페이지 꼬리
+        # 문구와 겹친다. 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음).
+        # 회귀 수리 — 선언 높이(c["h"])만 보고 내용(hContent)은 확인하지
+        # 않아, 흐름도형 표(신고서 접수→등록증발급 등, 화살표 셀)처럼
+        # "높이 0 선언 + 실제 텍스트" 인 정상 행까지 통째로 숨기던 실사례
+        # 결함(107셀 표 중 82셀 소실) 확인 — hContent>0(실제 내용 있음)인
+        # 행은 절대 접지 않는다.
         _zero_rows = set()
         _zr = {}
         for c in cells:
             if c["rowSpan"] == 1:
                 _zr.setdefault(c["row"], True)
-                if c["h"] > 0:
+                if c["h"] > 0 or c["hContent"] > 0:
                     _zr[c["row"]] = False
         for _r, _az in _zr.items():
             if _az and _r > 0:
@@ -316,6 +332,10 @@ def _extract_section(path, secname, row_scale=1.0):
             for cp in c["tc"].iter():
                 if ln(cp.tag) == "p" and _nearest_cell(cp) is c["tc"]:
                     cell_lines.extend(_cell_para_lines(cp))
+            # 세로쓰기(vertical) 2글자 이상 헤더의 w/h 스왑 시도는 라인이
+            # DOM 에서 통째로 사라지는 부작용이 있어 보류(별도 조사 필요).
+            # 1글자 헤더(연/월 등 코퍼스 다수)는 writing-mode CSS 만으로
+            # 이미 정상 렌더 — 렌더러 쪽 vertical 플래그는 유지.
             # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
             nested = []
             for nt in c["tc"].iter():
@@ -375,6 +395,8 @@ def _extract_section(path, secname, row_scale=1.0):
                     "w": round(wpx, 1), "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
                     "cell": True, "cellId": cid}
+                if c.get("vertical"):
+                    cline["vertical"] = True
                 if cl.get("align"):
                     cline["align"] = cl["align"]
                 lines.append(cline)
@@ -494,10 +516,17 @@ def _extract_section(path, secname, row_scale=1.0):
                 # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
                 # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다.
                 # 같은 문단에 자체 텍스트가 있으면 유실 없이 먼저 방출.
+                # 텍스트 없는 표-호스트 문단은 자체 lineseg 1개(표 배치
+                # 앵커, vertpos=표가 문단 흐름 안에서 시작하는 오프셋)를
+                # 갖는 경우가 흔하다 — 이 반환값을 버리면(과거 "페이지 상태
+                # 갱신용"으로만 씀) 표 전체가 그 오프셋만큼 위로 밀려
+                # 렌더된다(실사례: vertpos=2312HU=30.8px 누락 → 표 전체가
+                # 31px 위로 어긋남). 반환된 앵커 y 를 표 시작 기준으로 사용.
+                _anchor_top = None
                 if own_text(child).strip():
                     emit_para(child)
                 else:
-                    _para_top_y(child)  # 페이지 상태 갱신용
+                    _anchor_top = _para_top_y(child)
                 # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
                 # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
                 # 신호로 마지막 표에 전달한다.
@@ -514,7 +543,13 @@ def _extract_section(path, secname, row_scale=1.0):
                             break
                     if sib is child:
                         seen = True
-                base_y = st["flow_y"]
+                # 안전장치 — 다중 표 문서에서 뒤쪽 표의 호스트 문단 앵커가
+                # (page_idx 갱신 어긋남 등으로) 이전 표보다 앞선 y 를 내면
+                # 표끼리 겹쳐 쪽수가 왜곡되는 회귀가 실사례로 확인됨(마커
+                # 문서 7→5쪽). 앵커는 흐름 위치보다 뒤로 당길 수만 있고
+                # (전진), 이미 채워진 flow_y 이전으로 되돌리지 않는다.
+                base_y = (max(_anchor_top, st["flow_y"])
+                          if _anchor_top is not None else st["flow_y"])
                 for ti, t in enumerate(top_tbls):
                     walk_table(t, m_left, base_y,
                                anchor_vpos if ti == len(top_tbls) - 1
@@ -744,8 +779,21 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         from .hancom_layout_refresh import normalize_for_layout
         norm = normalize_for_layout(cand, project_root=root)
         if norm != cand and norm.is_file():
-            extract_from = norm
-            normalized = True
+            # 안전장치 — 한컴 재저장이 표 구조를 파괴하는 실사례 확인
+            # ([별표 24] 극단 병합 rowSpan/colSpan=283 문서: 원본 tbl=3/
+            # tc=46 → 정규화본 tbl=0/tc=0, 표가 통째로 문단으로 풀림).
+            # 정규화본의 표 수가 원본보다 뚜렷이 적으면(소실) 정규화를
+            # 버리고 원본을 그대로 쓴다 — 쪽수 정합보다 내용 무결이 우선.
+            try:
+                orig_tbls = _table_id_sequence(str(cand))
+                norm_tbls = _table_id_sequence(str(norm))
+            except Exception:
+                orig_tbls, norm_tbls = [], []
+            if orig_tbls and len(norm_tbls) < len(orig_tbls) * 0.5:
+                pass  # 정규화 폐기 — extract_from 은 cand 유지
+            else:
+                extract_from = norm
+                normalized = True
     except Exception:
         pass
     _rs = 1.0

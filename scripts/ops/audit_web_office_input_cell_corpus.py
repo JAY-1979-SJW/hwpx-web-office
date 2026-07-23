@@ -34,6 +34,9 @@ _CHAR_PX = 13.0
 _HU2PX = 96.0 / 7200.0
 
 
+_LINE_PX = 22.0   # 12pt 기준 근사 줄높이(px) — 줄바꿈 가능 줄 수 계산용
+
+
 def _text_px(text: str) -> float:
     """텍스트 폭 근사 — 전각(한글 등) 1.0, 반각 0.55 문자폭."""
     w = 0.0
@@ -97,12 +100,20 @@ def audit_one(path: Path, project_root: Path) -> dict:
                 if sz is None:
                     continue
                 w_px = float(sz.attrib.get("width", 0)) * _HU2PX
+                h_px = float(sz.attrib.get("height", 0)) * _HU2PX
                 if w_px <= 0:
                     continue
+                # 셀 높이만큼 줄바꿈 가능(HWPX 표 셀은 자동 줄바꿈이 기본) —
+                # 폭 초과만으로는 결함이 아니다. 줄바꿈해도 셀 안에 못 들어갈
+                # 때만(필요 줄 수 > 보유 줄 수) 진짜 원본 결함으로 본다.
+                lines_avail = max(1, int(h_px / _LINE_PX))
                 for p in (e for e in tc.iter() if _ln(e.tag) == "p"):
                     txt = "".join(t.text or "" for t in p.iter()
                                   if _ln(t.tag) == "t")
-                    if txt.strip() and _text_px(txt) > w_px * 1.15 + 8:
+                    if not txt.strip():
+                        continue
+                    lines_needed = _text_px(txt) / max(1.0, w_px)
+                    if lines_needed > lines_avail * 1.25 + 0.5:
                         overflow.append(txt.strip()[:16])
                         break
         rec["textOverflowCells"] = len(overflow)

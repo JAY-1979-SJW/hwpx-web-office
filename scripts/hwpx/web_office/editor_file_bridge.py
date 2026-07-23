@@ -100,8 +100,13 @@ def _recognize_input_fields(
                         addr = next((x for x in tc.iter()
                                      if _ln(x.tag) == "cellAddr"), None)
                         if addr is not None:
-                            amap[(int(addr.attrib.get("rowAddr", 0)),
-                                  int(addr.attrib.get("colAddr", 0)))] = (r, c)
+                            # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
+                            # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
+                            # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
+                            # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
+                            amap.setdefault(
+                                (int(addr.attrib.get("rowAddr", 0)),
+                                 int(addr.attrib.get("colAddr", 0))), (r, c))
                 addr_maps.append(amap)
 
         cells_by_id = {c.get("cellId"): c
@@ -124,8 +129,13 @@ def _recognize_input_fields(
                     cid = f"cell_{table_ids[int(ti)]}_r{occ[0]}_c{occ[1]}"
                     entry["cellId"] = cid
                     cell = cells_by_id.get(cid)
-                    # 인식 타깃 셀 잠금 해제 + 라벨 부여(기존 라벨 우선)
-                    if cell is not None and not cell.get("isCoveredByMerge"):
+                    # 인식기는 새 입력창을 만들 권한이 없다 — 셀에 이미 실제
+                    # 텍스트(라벨 원문)가 있으면 잠금 해제하지 않는다
+                    # (INLINE_LABEL_CELL 이 인접 빈칸을 못 찾고 라벨 셀
+                    # 자신을 타깃으로 오인하는 실사례 결함 방지). 원본
+                    # 서식상 빈 칸(파서 분류)일 때만 라벨을 달아 연결한다.
+                    if (cell is not None and not cell.get("isCoveredByMerge")
+                            and not (cell.get("text") or "").strip()):
                         cell["isInputCell"] = True
                         if not cell.get("inputLabel"):
                             cell["inputLabel"] = f.get("label")

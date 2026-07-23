@@ -1,15 +1,6 @@
 [
   {
-    "safePath": "frontend/web_office_viewer/weboffice/editor_find.mjs",
-    "category": "FRONTEND_VIEWER",
-    "zone": "browser_ui",
-    "separationPlan": "keep_frontend_viewer",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/convert_law_forms_batch.py",
+    "safePath": "scripts/hwpx/web_office/hwpx_sample_source.py",
     "category": "ACTIVE_HWPX_CORE",
     "zone": "hwpx_core",
     "separationPlan": "keep_hwpx_core",
@@ -18,37 +9,30 @@
     "failures": []
   },
   {
-    "safePath": "scripts/hwpx/harvest_gov_forms.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
+    "safePath": "tests/hwpx_fixture_source.py",
+    "category": "TEST_ONLY",
+    "zone": "unassigned",
+    "separationPlan": "keep_test",
+    "moduleDeclared": false,
+    "status": "FAIL",
+    "failures": [
+      "FAIL_NEW_FILE_UNASSIGNED_ZONE"
+    ]
+  },
+  {
+    "safePath": "tmp/final_sample.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
   },
   {
-    "safePath": "scripts/hwpx/harvest_kepco_forms.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/web_office/hancom_layout_refresh.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/web_office/index_form_corpus.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
+    "safePath": "tmp/gt_sample.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
@@ -90,7 +74,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/holdout_sample.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/input_cell_corpus_report.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_004d2075.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_00d6b560.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -153,6 +164,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_05cb01ab.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_064904ac.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -162,7 +182,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_06f161af.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_075e289b.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_079fa187.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_0b33d27f.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -234,7 +281,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_0f40438c.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_0faa1a68.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_0fc6cf97.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_0fe47bd8.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -261,7 +335,52 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_146bfeb8.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_1485240c.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_14ea9dde.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_1501d1a6.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_152f33de.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_1629fa5c.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -280,6 +399,33 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_165218a4.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_171a3c1d.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_176186de.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_18b78ffc.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -324,6 +470,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_1c022f49.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_1c8d6761.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -343,6 +498,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_1f86f13b.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_2005d688.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -423,6 +587,33 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_2663bdac.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_267e564c.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_27384ca6.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_286fa9d3.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -459,6 +650,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_2b7cd265.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_2bfe80c1.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -487,6 +687,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_2e5662e5.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_2ed8e729.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -567,6 +776,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_3190d7a9.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_3241af9d.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -577,6 +795,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_332835ae.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_339bbc54.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -612,6 +839,33 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_36ad46ef.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_37727e18.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_3942b1a2.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_39bc24e7.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -639,7 +893,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_3e6fc268.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_3f27d40d.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_3f9dc932.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_3fc27c2e.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -658,6 +939,24 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_4109ddbe.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_417a65f9.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_41f9ef20.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -685,6 +984,33 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_440afdb4.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_452dec21.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_452f68c7.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_461c66bd.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -756,7 +1082,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_491c3beb.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_4960f2fc.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_4999917d.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_4a043542.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -792,6 +1145,33 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_4fcb1dcf.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_4fccece8.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_5001de6b.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_505d234e.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -802,6 +1182,24 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_51054cf2.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_51341b38.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_52265689.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -855,7 +1253,25 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_53e952d2.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_53fe3b6f.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_54691d00.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -891,6 +1307,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_57243cb8.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_57ba37e3.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -909,7 +1334,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_594fa846.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_59d2ea6f.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_5af1ab43.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_5afd7cdd.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1026,6 +1478,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_67bb9370.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_68a1a2cb.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1116,7 +1577,25 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_70516d65.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_7369dab4.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_744ea184.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1153,6 +1632,24 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_76837b9e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_7816bffc.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_79b26d83.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1242,7 +1739,25 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_7fb4e86e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_801a757b.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_80a93782.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1287,6 +1802,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_821fbd7f.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_824b8bf8.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1306,6 +1830,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_845a6696.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_847aaada.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1360,6 +1893,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_888c3edd.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_88915e22.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1467,6 +2009,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_8f7fac0f.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_8f80c8ab.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1522,6 +2073,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_926afa12.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_933c8f76.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1629,6 +2189,24 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_990e22b3.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_9937943e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_993984f4.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1639,6 +2217,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_994ead81.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_9a15a3db.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1728,6 +2315,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_9f143b20.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_9f234e73.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1738,6 +2334,24 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_a068f457.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_a155bdee.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_a1b0a99d.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1791,6 +2405,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_a5e23e1d.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_a7d484f7.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1801,6 +2424,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_a9bb2a3e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_aa4510e4.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1828,6 +2460,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_ac547027.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_adb9f2bd.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1899,7 +2540,25 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b42c9daf.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_b5205742.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b5b2d89b.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1917,6 +2576,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b6d17acb.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_b6dad795.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1926,7 +2594,34 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b7702e6b.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_b8267015.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b841efca.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_b89712d6.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -1971,6 +2666,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_bd281c97.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_bd771cbc.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -1989,7 +2693,25 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_bdfa7e9e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_bebec0e1.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_bf2b2d84.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2025,6 +2747,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_c3cfbcf8.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_c3e9bba1.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2035,6 +2766,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_c4701b02.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_c488b0be.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2097,6 +2837,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_c9427f36.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_c9d44f53.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2116,6 +2865,33 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_ca7507bd.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_ca9ac762.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_cb7f54e7.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_cbbe453f.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2169,7 +2945,43 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d1333c28.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d152e4d0.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_d21322f2.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d2291987.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d2c7d53c.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2196,6 +3008,24 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d322163c.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d757d063.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_d841eaa1.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2205,7 +3035,43 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d8a53c8e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d8df9fc0.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d8ebcb53.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_d92c6666.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_d9498a4d.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2242,6 +3108,24 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_db5fc4fe.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_dbca22c8.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_dc2416e6.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2313,6 +3197,24 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_df7fe47a.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_df86724e.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_df8a4a0c.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2340,6 +3242,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_e1f524de.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_e3448622.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2359,6 +3270,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_e521db6f.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_e571fb00.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2430,6 +3350,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_ee494510.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_eed93d01.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2440,6 +3369,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_ef496a0d.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_f001a1b2.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2466,6 +3404,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_f36e7da5.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_f41eac1d.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2476,6 +3423,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_f54d6185.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_f5b83acc.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2556,6 +3512,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_fc3ff3f4.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_fcb12270.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2574,6 +3539,15 @@
     "failures": []
   },
   {
+    "safePath": "tmp/law_convert_diag/persistent_batch_fdb8b533.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
     "safePath": "tmp/law_convert_diag/persistent_batch_fe3c95f3.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
@@ -2584,6 +3558,15 @@
   },
   {
     "safePath": "tmp/law_convert_diag/persistent_batch_fe66f599.jsonl",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/law_convert_diag/persistent_batch_fffc5dfa.jsonl",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",
@@ -2647,6 +3630,2850 @@
   },
   {
     "safePath": "tmp/web_office_convert_diag/hancom_hwp_to_hwpx_d6185503.stdout.log",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/00d2e6599a941e21/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/00d2e6599a941e21/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/00d2e6599a941e21/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/00d2e6599a941e21/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1a445e8c18abdc07/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1a445e8c18abdc07/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1a445e8c18abdc07/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1db01db2d3517491/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1db01db2d3517491/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1db01db2d3517491/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1e492f753fe97e9b/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1e492f753fe97e9b/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/1e492f753fe97e9b/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p10.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p11.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p12.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/2665fb56a29bf9ef/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p10.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p11.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p12.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/3000b7e781755e64/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/31df368a49d6a0c4/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/32fbe4ff359b8c80/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/32fbe4ff359b8c80/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/32fbe4ff359b8c80/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/356e5a070fcff836/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/356e5a070fcff836/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/356e5a070fcff836/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392d043cec34f3c9/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392d043cec34f3c9/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392d043cec34f3c9/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392ea5c67782ed07/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392ea5c67782ed07/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/392ea5c67782ed07/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/398a7fb4f58a8100/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/398a7fb4f58a8100/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/398a7fb4f58a8100/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/471f5500232f4530/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/471f5500232f4530/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/471f5500232f4530/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/4f81bdd494ffdcab/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/4f81bdd494ffdcab/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/4f81bdd494ffdcab/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/533f31baf61fef25/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6433ff1be687813c/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6433ff1be687813c/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6433ff1be687813c/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6857e9b06dfe573f/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6857e9b06dfe573f/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6857e9b06dfe573f/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6e12fb82dc6b130b/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6e12fb82dc6b130b/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/6e12fb82dc6b130b/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7be8fe31f56cc33f/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7f1c610adaf93cff/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7f1c610adaf93cff/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/7f1c610adaf93cff/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8019a95f495377fc/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8019a95f495377fc/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8019a95f495377fc/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8019a95f495377fc/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8019a95f495377fc/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/866185e7144228e9/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/866185e7144228e9/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/866185e7144228e9/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/883d479a4025e355/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/883d479a4025e355/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/883d479a4025e355/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8882814b65bd1594/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b19d1b85585f9ed/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b19d1b85585f9ed/calib.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b19d1b85585f9ed/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b19d1b85585f9ed/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b19d1b85585f9ed/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b2f71b5d963b4a5/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b2f71b5d963b4a5/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/8b2f71b5d963b4a5/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p10.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p11.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p12.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p13.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p14.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p15.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p16.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p17.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p18.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p19.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p20.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p21.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p22.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p23.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p24.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p25.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p26.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p27.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p28.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p29.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p30.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p31.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p32.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p33.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p34.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p35.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p36.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p37.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p38.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p39.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p40.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p41.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p42.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p43.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97598d3d5fb459df/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/97d68045bfb9103b/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/99d0309e1e6c566e/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/99d0309e1e6c566e/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/99d0309e1e6c566e/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/9bbfa731367370b6/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/9bbfa731367370b6/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/9bbfa731367370b6/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p10.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p11.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p12.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p13.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p14.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p15.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p16.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p17.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p18.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p19.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p20.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p21.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p22.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p23.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p24.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p25.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p26.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p27.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p28.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p29.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p30.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p31.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p32.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p33.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p34.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p35.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p36.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p37.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p38.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p39.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p40.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p41.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p42.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p43.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p44.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p45.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p46.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p47.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p48.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p49.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p50.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p51.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p52.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a36d3effddd75d34/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a649b421a4f47b74/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a649b421a4f47b74/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/a649b421a4f47b74/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ac4eae473932ef45/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ac4eae473932ef45/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ac4eae473932ef45/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/b460ba11ab207585/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/b460ba11ab207585/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/b460ba11ab207585/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bb1fdbbf88b070f7/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bb1fdbbf88b070f7/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bb1fdbbf88b070f7/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bd0b1847bc68407e/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bd0b1847bc68407e/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/bd0b1847bc68407e/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c18bd3fd7a8d2485/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c4195672706be6c1/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c4195672706be6c1/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c4195672706be6c1/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c4195672706be6c1/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/calib.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/c7cfd6cbb2b8599c/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/calib.json",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p10.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p8.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/p9.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ce7a229ac619e188/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/da61aa8555031d23/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/da61aa8555031d23/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/da61aa8555031d23/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ea88f880e161f9f6/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ea88f880e161f9f6/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ea88f880e161f9f6/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ee8e5faf9a3406cb/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ee8e5faf9a3406cb/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/ee8e5faf9a3406cb/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f0da27106bce279f/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f0da27106bce279f/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f0da27106bce279f/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f37454569178842d/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f37454569178842d/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f37454569178842d/truth.pdf",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/DONE",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p1.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p2.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p3.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p4.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p5.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p6.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/p7.png",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_experiment",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tmp/web_office_truth/f9de0e268e20fc73/truth.pdf",
     "category": "LEGACY_EXPERIMENT",
     "zone": "unassigned",
     "separationPlan": "review_legacy_experiment",

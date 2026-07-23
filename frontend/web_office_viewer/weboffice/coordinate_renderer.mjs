@@ -142,9 +142,14 @@ export function renderCoordinateLayout(layout, opts = {}) {
       // overflow:hidden 이 글자 위/아래(받침 포함)를 세로로 잘라 문자가
       // 깨진다. 한컴 baseline 정밀 정렬은 클리핑 없는 방식으로 후속 처리.
       const al = l.align ? `text-align:${l.align};` : "";
+      // 세로쓰기(자리수 헤더: 조/천억/백억 등 좁고 긴 금액칸) — 한자/한글은
+      // 회전 없이 위→아래로 쌓는 게 정상(upright), 라틴/숫자만 회전.
+      const vert = l.vertical
+        ? "writing-mode:vertical-rl;text-orientation:upright;"
+        : "";
       parts.push(`<div class="co-line" style="left:${l.x}px;`
         + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
-        + `height:${l.h}px;line-height:${l.h}px;${al}">`
+        + `height:${l.h}px;line-height:${l.h}px;${al}${vert}">`
         + `${segmentsHtml(l, defs, fs)}</div>`);
     }
     // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만)
