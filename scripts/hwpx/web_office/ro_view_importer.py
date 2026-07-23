@@ -807,6 +807,19 @@ def _classify_input_cell(text, header_attr, header_cell, covered,
     return True
 
 
+def _classify_editable_cell(header_attr, header_cell, covered) -> bool:
+    """사람 편집 가능 여부 — isInputCell(AI 자동입력 대상, 빈칸 전용)과
+    분리한 별도 판정. 헤더/병합피복 칸은 여전히 제외하지만, 텍스트가
+    이미 있는 칸도 사람은 클릭해 고치거나 지울 수 있어야 하므로 텍스트
+    유무는 보지 않는다(AI-fill 덮어쓰기 방지 가드는 isInputCell 로만
+    유지 — 여기서 완화하면 그 가드가 새어버린다)."""
+    if header_cell is True or str(header_attr) in ("1", "true"):
+        return False
+    if covered:
+        return False
+    return True
+
+
 def _extract_border_fill_defs_from_header(header: ET.Element) -> dict[str, dict[str, Any]]:
     defs: dict[str, dict[str, Any]] = {}
     for border_fill in header.iter():
@@ -1187,7 +1200,9 @@ def import_hwpx_as_ro_view(
                 text=c.normalizedText or "",
                 isInputCell=_classify_input_cell(
                     c.normalizedText, header_attr, header_cell,
-                    bool(c.isCoveredByMerge), border_fill)))
+                    bool(c.isCoveredByMerge), border_fill),
+                isEditable=_classify_editable_cell(
+                    header_attr, header_cell, bool(c.isCoveredByMerge))))
         tables.append(WebOfficeTable(
             tableId=tid,
             blockId=_stable_block_id("table", t.sectionIndex,

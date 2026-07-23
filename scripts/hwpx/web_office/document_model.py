@@ -53,6 +53,11 @@ class WebOfficeCell:
     # 마커 문서의 필드 라벨([입력필요: 문서번호] → "문서번호") — 뷰어가
     # placeholder 로 표시. 마커 없는 문서는 None.
     inputLabel: str | None = None
+    # 사람 편집 가능 여부 — isInputCell(AI 자동입력 대상, 빈칸 전용)과는
+    # 별개다. 이미 텍스트가 있는 칸도 사람은 클릭해 고치거나 지울 수
+    # 있어야 하므로, 헤더/병합피복만 걸러내고 텍스트 유무는 안 본다.
+    # AI-fill 가드("이미 채워진 칸은 안 덮어씀")는 isInputCell 로만 유지.
+    isEditable: bool = False
 
 
 @dataclass

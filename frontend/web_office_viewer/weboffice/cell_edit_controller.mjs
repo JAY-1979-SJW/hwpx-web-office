@@ -11,26 +11,20 @@ import {
 export function createCellEditController(documentModel) {
   let state = makeEditorState(documentModel);
   const editedIds = new Set();
-  // 입력칸 분류 — 파서(서버)가 문서 파싱 시 셀 서식으로 정확 분류한
-  // isInputCell 을 단일 진실로 사용한다(빈칸+비헤더+비병합커버+무채색 채움).
+  // 클릭 편집 가능 칸 분류 — 파서(서버)가 정확 분류한 isEditable 을
+  // 단일 진실로 사용한다(비헤더+비병합커버 — 텍스트 유무는 안 봄).
+  // isInputCell(AI 자동입력 대상, 빈칸 전용)과는 목적이 다르다: 이미
+  // 값이 있는 칸도 사람은 클릭해 고치거나 지울 수 있어야 한다.
   // 서버 필드가 없는 구버전 payload 만 프런트 휴리스틱으로 폴백.
-  // 값 채운 뒤에도 입력칸 유지(원본 기준 스냅샷 — 편집으로 분류 불변).
-  const _hasFill = (c) => {
-    const f = c.borderFill && c.borderFill.fill;
-    return !!(f && String(f).toUpperCase() !== "#FFFFFF");
-  };
   // header 원시 속성은 "0"(문자열)도 오므로 truthy 검사 금지 —
   // 정규화 불리언(headerCell) 또는 명시 "1"/"true" 만 헤더로 본다.
   const _isHeader = (c) => c.headerCell === true
     || c.header === "1" || c.header === "true";
-  const _legacyInput = (c) => !((c.text || "").trim())
-    && !_isHeader(c)
-    && !c.isCoveredByMerge
-    && !_hasFill(c);
+  const _legacyEditable = (c) => !_isHeader(c) && !c.isCoveredByMerge;
   const inputCells = new Set(
     (documentModel.cells || [])
-      .filter((c) => (typeof c.isInputCell === "boolean")
-        ? c.isInputCell : _legacyInput(c))
+      .filter((c) => (typeof c.isEditable === "boolean")
+        ? c.isEditable : _legacyEditable(c))
       .map((c) => c.cellId));
 
   const cellOf = (id) =>
