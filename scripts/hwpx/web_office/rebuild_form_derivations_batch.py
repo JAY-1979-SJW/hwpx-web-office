@@ -96,10 +96,58 @@ def _log(m: str) -> None:
     print(m, flush=True)
 
 
+STAGING_COLS = [
+    "form_id", "rebuild_status", "field_count", "labels",
+    "doc_type", "fillable", "clean_name", "doc_reason",
+    "form_kind", "input_schema", "input_count", "applicant_count",
+    "office_count", "sensitive_count", "schema_status",
+    "attachments", "attachment_count", "processing_time", "fee",
+    "legal_basis", "submit_to", "req_status",
+]
+
+
 def _connect() -> sqlite3.Connection:
-    con = sqlite3.connect(CATALOG, timeout=600)
+    # isolation_level=None → 자동 트랜잭션 없음. 쓰기 잠금을 잡는 시점을
+    # 우리가 직접 정한다(_flush 참조). 기본값이면 첫 INSERT 에서 트랜잭션이
+    # 열려 커밋까지 유지되는데, 그 사이에 파싱이 끼면 워커 하나가 쓰기
+    # 잠금을 수 분씩 붙든다 — 샤드 병렬 실행이 전부 'database is locked'
+    # 로 죽은 실제 원인이었다.
+    con = sqlite3.connect(CATALOG, timeout=120, isolation_level=None)
     con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA busy_timeout=120000")
     return con
+
+
+def _flush(con: sqlite3.Connection, pending: list[dict],
+           retries: int = 10) -> None:
+    """모아둔 행을 짧은 트랜잭션 하나로 쓴다.
+
+    잠금을 잡는 구간이 밀리초 단위라 샤드가 여럿이어도 서로 거의 안 기다린다.
+    그래도 겹치면 물러났다 다시 시도한다.
+    """
+    if not pending:
+        return
+    sql = (f"INSERT OR REPLACE INTO {STAGING}"
+           f"({', '.join(STAGING_COLS)}) "
+           f"VALUES({', '.join('?' * len(STAGING_COLS))})")
+    payload = [tuple(r.get(c) for c in STAGING_COLS) for r in pending]
+    for attempt in range(retries):
+        try:
+            con.execute("BEGIN IMMEDIATE")
+            con.executemany(sql, payload)
+            con.execute("COMMIT")
+            pending.clear()
+            return
+        except sqlite3.OperationalError as e:
+            try:
+                con.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            if "locked" not in str(e).lower() and "busy" not in str(e).lower():
+                raise
+            time.sleep(0.4 * (attempt + 1))
+    raise sqlite3.OperationalError(
+        f"스테이징 쓰기 실패 — {retries}회 재시도 후에도 잠김")
 
 
 def _apply_subject(fields: list[dict]) -> int:
@@ -123,13 +171,14 @@ def run(limit: int = 0, size_cap_mb: float = 1.5,
     """shards>1 이면 form_id % shards == shard 인 것만 처리한다.
 
     파싱이 CPU 바운드 단일 프로세스라 16코어 기계에서 1코어만 쓴다.
-    샤드를 나눠 여러 프로세스로 돌리면 그만큼 줄어든다. 같은 스테이징
-    테이블에 쓰지만 SQLite WAL 이 쓰기를 직렬화하고 커밋이 100건마다
-    짧게 끝나므로 경합은 무시할 수준이다(connect timeout 600초).
+    샤드를 나눠 여러 프로세스로 돌리면 그만큼 줄어든다.
+
+    쓰기는 파싱이 끝난 뒤 `_flush` 로 모아서 짧게 한다. 파싱 도중에 쓰기
+    트랜잭션을 물고 있으면 워커 하나가 잠금을 수 분씩 붙들어 나머지가 전부
+    'database is locked' 로 죽는다 — 첫 시도에서 실제로 그렇게 됐다.
     """
     con = _connect()
     con.executescript(DDL)
-    con.commit()
 
     shard_sql = ""
     if shards > 1:
@@ -152,6 +201,7 @@ def run(limit: int = 0, size_cap_mb: float = 1.5,
     agg_third = agg_app = agg_off = agg_sec = 0
     kinds: dict[str, int] = {}
     cap = size_cap_mb * 1024 * 1024
+    pending: list[dict] = []
 
     for i, (fid, rel, name) in enumerate(rows, 1):
         row = {"form_id": fid, "rebuild_status": "OK"}
@@ -225,13 +275,9 @@ def run(limit: int = 0, size_cap_mb: float = 1.5,
             row["rebuild_status"] = f"FAIL:{type(e).__name__}"
             fail += 1
 
-        cols = ", ".join(row)
-        marks = ", ".join("?" * len(row))
-        con.execute(f"INSERT OR REPLACE INTO {STAGING}({cols}) VALUES({marks})",
-                    tuple(row.values()))
-
-        if i % COMMIT_EVERY == 0:
-            con.commit()
+        pending.append(row)
+        if len(pending) >= COMMIT_EVERY:
+            _flush(con, pending)
         if i % 500 == 0:
             el = time.time() - t0
             rate = i / el if el else 0
@@ -240,10 +286,10 @@ def run(limit: int = 0, size_cap_mb: float = 1.5,
                  f"스킵 {skip} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
                  f"신청인칸 {agg_app:,} 제3자칸 {agg_third:,}")
 
-    con.commit()
+    _flush(con, pending)
     con.close()
     el = time.time() - t0
-    _log(f"[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el/60:.1f}분")
+    _log(f"{tag}[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el/60:.1f}분")
     _log(f"[집계] 신청인칸 {agg_app:,} · 관공서칸 {agg_off:,} · "
          f"민감칸 {agg_sec:,} · 제3자칸 {agg_third:,}")
     if kinds:
