@@ -365,16 +365,13 @@ def _extract_section(path, secname, row_scale=1.0):
             for cp in c["tc"].iter():
                 if ln(cp.tag) == "p" and _nearest_cell(cp) is c["tc"]:
                     cell_lines.extend(_cell_para_lines(cp))
-            if c.get("vertical"):
-                # 세로쓰기 — lineseg 는 흐름방향(세로)을 horzsize, 두께
-                # (가로)를 vertsize 에 담는다(실측: '천억' 2글자 →
-                # horzsize=2348HU≈31px[2글자 세로길이], vertsize=900HU
-                # ≈12px[글자두께]). 스왑 안 하면 2글자 이상 헤더가 줄높이
-                # (12px, 1글자분) 부족으로 overflow:clip 에 잘린다.
-                # (이전 시도에서 "DOM 소실"로 오판했던 건 truth 배경모드
-                # 테스트 오류였음 — 자체렌더 모드로 재검증 후 재적용.)
-                for cl in cell_lines:
-                    cl["w"], cl["h"] = cl["h"], cl["w"]
+            # 세로쓰기(vertical) 2글자 이상 헤더의 w/h 스왑 — 재적용 후
+            # 회귀 발견(별지 제20호서식 등에서 layout_quality cellOverflow
+            # 324건, 최대 15.3px) 확인돼 재차 되돌림. 코퍼스 세로쓰기 비율
+            # 0.6%(142/24153건)로 극소수라, 회귀를 0으로 만드는 쪽이 이득
+            # 이라는 대표님 판단에 따라 미완성 기능으로 별도 워크스트림에
+            # 미룬다(1글자 헤더는 CSS writing-mode 만으로 정상 렌더돼
+            # cline["vertical"] 플래그는 유지 — 그쪽은 회귀 없음).
             # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
             nested = []
             for nt in c["tc"].iter():
