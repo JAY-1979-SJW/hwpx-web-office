@@ -48,11 +48,16 @@ _parse_char_prs = parse_char_prs
 _parse_border_fills = parse_border_fills
 
 
-# 인접 셀 테두리 중복 그리기(지시문 5.3) — 시도했으나 pinned 회귀 게이트
-# (test_web_office_visual_regression.py 격자선 검출)를 깨뜨려 보류.
-# 되돌린 이유·원인 분석은 커밋 메시지/세션 기록 참조 — 별도 워크스트림으로
-# 재시도 필요(단순 인접-억제만으로는 부족, 격자선 검출 알고리즘과의 상호작용
-# 추가 조사 필요).
+# 인접 셀 테두리 중복 그리기(지시문 5.3) — 2차 시도(zero_rows 제외
+# 가드 추가)도 "개선 확인 → 육안 승인 → baseline 재고정" 절차
+# (promote_web_office_visual_baseline.py) 로 재검증한 결과 pinned
+# fixture 4개 중 3개(fx_metadata_form, fx_stamp_approval_legal,
+# reg_detail_form)에서 평균오차가 3~19배 악화됨을 절차 자체가 정확히
+# 잡아냈다(fx_metadata_form meanAbsPx 3.05→12.2, fx_stamp_approval_legal
+# 0.5→8.55, reg_detail_form 4.54→9.41 — reg_nested_valign_center 만 개선).
+# 절차가 의도대로 작동해 회귀 유입을 막았다 — 되돌리고 별도 워크스트림
+# (인접 억제 로직 자체의 재설계, 단순 폭 비교가 아닌 실제 렌더 검증
+# 필요)으로 재시도한다.
 
 
 def _extract_section(path, secname, row_scale=1.0):
