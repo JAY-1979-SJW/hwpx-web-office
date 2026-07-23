@@ -13,7 +13,7 @@ PR = Path(__file__).parents[1]
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_structure_para_delete_closeout.md")
-BASELINE_COMMIT = "685e8c9"  # M2 문단서식 준공 후 갱신 (685e8c9 → 685e8c9)
+BASELINE_COMMIT = "334d665"  # M2 문단서식 준공 후 갱신 (334d665 → 334d665)
 FEATURE_COMMIT  = "1f442ec"
 
 LOCKED_VS_BASELINE = [

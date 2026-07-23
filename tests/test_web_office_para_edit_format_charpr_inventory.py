@@ -24,7 +24,7 @@ from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
 from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
     import_hwpx_as_ro_view)
 
-BASELINE_COMMIT = "685e8c9"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
+BASELINE_COMMIT = "334d665"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
 
 
 def _sha(p: Path) -> str:

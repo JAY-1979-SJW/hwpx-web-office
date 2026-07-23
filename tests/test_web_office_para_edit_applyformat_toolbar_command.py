@@ -23,7 +23,7 @@ STATE_MJS = (PR / "frontend/web_office_viewer/para_edit_state.mjs")
 CMD_MJS = (PR / "frontend/web_office_viewer/para_edit_command.mjs")
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
-BASELINE_COMMIT = "685e8c9"  # M2 문단서식 준공 후 갱신 (685e8c9 → 685e8c9)
+BASELINE_COMMIT = "334d665"  # M2 문단서식 준공 후 갱신 (334d665 → 334d665)
 
 
 def _node_ok() -> bool:

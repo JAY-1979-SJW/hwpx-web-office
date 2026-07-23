@@ -21,7 +21,7 @@ TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatToolbar.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "685e8c9"  # M2 문단서식 준공 후 갱신 (685e8c9 → 685e8c9)
+BASELINE_COMMIT = "334d665"  # M2 문단서식 준공 후 갱신 (334d665 → 334d665)
 
 
 def _node_ok() -> bool:
