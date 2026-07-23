@@ -23,13 +23,27 @@ export function mountWebOffice(root) {
   let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
   let fmtBusy = false;         // 서식 적용 중 중복 클릭 방지
   const paraEdits = new Map();  // paragraphId → 편집된 텍스트(표 셀 아님)
-  let paraBusy = false;        // 본문 문단 저장 중 중복 클릭 방지
+  let paraBusy = false;        // 본문 문단 저장 중 표시(상태줄 용)
+  // 저장 요청 직렬화 큐 — 실측(2026-07-24) 확인된 결함: 이전 저장이
+  // 아직 끝나기 전(한컴 실렌더 배경 재계산은 수 초 걸림) 사용자가 다음
+  // 문단을 편집·커밋하면, 예전에는 paraBusy 가드가 그 요청을 "조용히
+  // 버렸다"(편집기는 이미 닫혀 텍스트 유실, 에러 표시도 없음) — 이게
+  // "클릭은 되는데 저장은 안 된다" 신고의 실제 원인이었다. 이제는
+  // 버리지 않고 큐에 이어 붙여 이전 저장이 끝나면 순서대로 실행한다.
+  let paraSaveQueue = Promise.resolve();
+
+  function saveParagraphText(paragraphId, newText) {
+    paraSaveQueue = paraSaveQueue
+      .then(() => _doSaveParagraphText(paragraphId, newText))
+      .catch((e) => setStatus("fail", "문단 저장 실패: " + (e.message || e)));
+    return paraSaveQueue;
+  }
 
   // 본문 문단(표 밖 제목·전문 등) 저장 — 셀과 달리 undo/redo 명령 로그가
   // 없다. apply-format 과 동일하게 즉시 서버에 저장하고 sourcePath 를
   // 이어받는다(원본은 무수정, 결과는 항상 새 sandbox 사본).
-  async function saveParagraphText(paragraphId, newText) {
-    if (!loaded || paraBusy) return;
+  async function _doSaveParagraphText(paragraphId, newText) {
+    if (!loaded) return;
     const model = loaded.documentModel || {};
     const p = (model.paragraphs || []).find(
       (x) => x.paragraphId === paragraphId);
@@ -116,6 +130,15 @@ export function mountWebOffice(root) {
       // 이 문단은 이제 실제 좌표로 다시 그려질 것이므로 클라이언트 캐시
       // 오버레이는 걷어낸다("덧방" 제거) — 아래 재로딩된 좌표가 진실.
       paraEdits.delete(paragraphId);
+      // truthBase(한컴 실렌더 배경 URL) 를 먼저 비운다 — 안 비우면 아래
+      // render() 가 "이전 파일"의 낡은 사진을 그대로 보여준다(실측
+      // 확인: 연속 저장 시 두 번째부터 화면이 안 바뀌는 것처럼 보이던
+      // 결함 — probeTruth 가 새 사진을 못 구해오면(한컴 렌더 실패
+      // → 404, 설계상 정상 폴백 신호) truthBase 가 영영 갱신 안 돼
+      // 화면이 그 이전 상태에 멈춰 있었다). 좌표 렌더러는 항상 최신
+      // documentModel 기준으로 정확하므로, truthBase 없이 먼저
+      // 보여주고 사진은 준비되면 probeTruth 가 덮어씌운다.
+      truthBase = null;
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
@@ -170,6 +193,11 @@ export function mountWebOffice(root) {
       // 서버가 만든 새 sandbox 파일을 다음 편집의 기준으로 이어받는다.
       loaded.sourcePath = d.sourcePath;
       setStatus("ok", "서식 적용 완료(새 sandbox 사본) · 재로딩 …");
+      // truthBase 선-초기화 — saveParagraphText 와 동일 이유(이전 파일의
+      // 낡은 실렌더 사진이 새 파일 렌더에도 그대로 남아, probeTruth 가
+      // 실패(404, 정상 폴백 신호)하면 화면이 그 이전 상태에 영영
+      // 멈춰 있던 결함).
+      truthBase = null;
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
