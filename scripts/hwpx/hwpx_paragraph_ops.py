@@ -37,11 +37,39 @@ def _is_text_node(elem: ET.Element) -> bool:
     return local_name(elem.tag).lower() == "t"
 
 
+def _is_table(elem: ET.Element) -> bool:
+    return local_name(elem.tag).lower() == "tbl"
+
+
+def _iter_own(elem: ET.Element, _root: bool = True):
+    """자손을 문서 순서로 훑되 **중첩 표 서브트리로는 내려가지 않는다.**
+
+    중첩 표는 자기 표로 따로 실리므로(renderPayload/documentModel 모두)
+    바깥 셀·문단의 소유물이 아니다. 읽기 쪽(ro_view_importer)은 이미 이
+    규칙을 쓰는데 쓰기 쪽만 `.iter()` 로 중첩까지 세면, 같은 좌표를 두고
+    두 쪽이 **다른 문단을 가리킨다.**
+
+    실측(종합소득세 신고서 t_s1_000 r1c2, 중첩 표 1개):
+        읽기 셀 직속 문단  1개
+        쓰기 중첩 포함    13개
+    그래서 "빈 칸"이라 겨냥한 곳에 쓰면 중첩 표 안 문단에 글자가 들어가,
+    200칸 전량 기입 시험에서 1칸이 다른 표로 샜다.
+    """
+    if not _root and _is_table(elem):
+        return
+    yield elem
+    for child in list(elem):
+        yield from _iter_own(child, _root=False)
+
+
 def find_paragraph_in_cell(cell_elem: ET.Element,
                             paragraph_index: int) -> ET.Element | None:
-    """cell 내 <hp:p> 자손을 순서대로 탐색해 paragraph_index 위치 반환."""
+    """cell 직속 <hp:p> 를 순서대로 탐색해 paragraph_index 위치 반환.
+
+    중첩 표 안 문단은 제외한다 — 그것들은 자기 표 좌표로 겨냥해야 한다.
+    """
     paragraphs: list[ET.Element] = [
-        e for e in cell_elem.iter() if _is_paragraph(e)
+        e for e in _iter_own(cell_elem) if _is_paragraph(e)
     ]
     if paragraph_index < 0 or paragraph_index >= len(paragraphs):
         return None
@@ -50,36 +78,37 @@ def find_paragraph_in_cell(cell_elem: ET.Element,
 
 def find_run_in_paragraph(paragraph_elem: ET.Element,
                           run_index: int) -> ET.Element | None:
-    """paragraph 내 <hp:run> 자식을 순서대로 탐색해 run_index 위치 반환."""
-    runs = [c for c in paragraph_elem.iter() if _is_run(c)]
+    """paragraph 직속 <hp:run> 을 순서대로 탐색해 run_index 위치 반환."""
+    runs = paragraph_runs(paragraph_elem)
     if run_index < 0 or run_index >= len(runs):
         return None
     return runs[run_index]
 
 
 def paragraph_runs(paragraph_elem: ET.Element) -> list[ET.Element]:
-    return [c for c in paragraph_elem.iter() if _is_run(c)]
+    """문단 직속 run — 중첩 표 안 run 은 그 표의 셀이 따로 싣는다."""
+    return [c for c in _iter_own(paragraph_elem) if _is_run(c)]
 
 
 def paragraph_text(paragraph_elem: ET.Element) -> str:
-    """paragraph 내 <hp:t> 텍스트 모두 concat."""
+    """paragraph 직속 <hp:t> 텍스트 concat (중첩 표 제외)."""
     parts: list[str] = []
-    for elem in paragraph_elem.iter():
+    for elem in _iter_own(paragraph_elem):
         if _is_text_node(elem):
             parts.append(elem.text or "")
     return "".join(parts)
 
 
 def run_text(run_elem: ET.Element) -> str:
-    """run 내 첫 <hp:t> text 또는 ""."""
-    for elem in run_elem.iter():
+    """run 직속 첫 <hp:t> text 또는 "" (중첩 표 제외)."""
+    for elem in _iter_own(run_elem):
         if _is_text_node(elem):
             return elem.text or ""
     return ""
 
 
 def _first_text_node_in_run(run_elem: ET.Element) -> ET.Element | None:
-    for elem in run_elem.iter():
+    for elem in _iter_own(run_elem):
         if _is_text_node(elem):
             return elem
     return None

@@ -1,45 +1,18 @@
 [
   {
-    "safePath": "scripts/hwpx/web_office/build_input_schema_batch.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/web_office/form_fill_planner.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/web_office/ingest_external_hwpx.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/hwpx/web_office/para_save_apply_bridge.py",
-    "category": "ACTIVE_HWPX_CORE",
-    "zone": "hwpx_core",
-    "separationPlan": "keep_hwpx_core",
-    "moduleDeclared": false,
-    "status": "PASS",
-    "failures": []
-  },
-  {
-    "safePath": "scripts/ops/audit_web_office_border_duplicate_dump.py",
+    "safePath": "scripts/ops/gate_hwpx_session_claim.py",
     "category": "AUDIT_GATE",
     "zone": "closeout_security",
     "separationPlan": "keep_gate_audit",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "tests/test_ops_gate_hwpx_session_claim.py",
+    "category": "TEST_ONLY",
+    "zone": "closeout_security",
+    "separationPlan": "keep_test",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
