@@ -197,6 +197,13 @@ def call_para_save_apply(
     public_result = _strip_public_paths(result)
     if result.get("verdict") in {"PASS", "PARTIAL", "PARTIAL_DRY_RUN_OK",
                                  "DRY_RUN_OK", "NOOP"}:
+        # 다음 편집이 이어받을 새 sourcePath(sandbox 산출물) — apply-format 과
+        # 동일 관례. writer 미실행(NOOP/DRY_RUN)이면 outputPath 가 없어
+        # sourcePath 도 원본 그대로 둔다(체이닝 없음).
+        if result.get("outputCreated") and result.get("outputPath"):
+            out_path = Path(result["outputPath"])
+            public_result["sourcePath"] = out_path.resolve().relative_to(
+                project_root.resolve()).as_posix()
         return _envelope("SUCCESS", public_result)
     return _envelope("FAILED", public_result, [{
         "code": result.get("reason", result.get("verdict", "SAVE_REJECTED")),

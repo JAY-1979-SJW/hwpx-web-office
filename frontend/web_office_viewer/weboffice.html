@@ -31,8 +31,14 @@
   .co-line{ position:absolute; white-space:pre; overflow:clip; overflow-clip-margin:3px; }
   .co-box{ position:absolute; }
   .co-empty{ color:#8a94a0; text-align:center; padding:40px; }
-  /* 충실 보기 편집: 줄은 클릭 통과, 셀 박스가 편집 대상 */
+  /* 충실 보기 편집: 줄은 클릭 통과, 셀 박스가 편집 대상 —
+     단, 본문 문단(표 밖 제목·전문 등, data-paragraph-id) 줄은 그 자체가
+     편집 대상이라 클릭을 받아야 한다. */
   .wo-app.wo-faithful .co-line{ pointer-events:none; }
+  .wo-app.wo-faithful .co-line[data-paragraph-id]{
+    pointer-events:auto; cursor:text; }
+  .wo-app.wo-faithful .co-line[data-paragraph-id]:hover{
+    background:rgba(45,108,223,.08); outline:1px solid rgba(45,108,223,.35); }
   /* 입력칸(로드 시 빈칸) — 단일 클릭으로 값 입력 */
   .wo-app.wo-faithful .co-box.wo-input{ cursor:text; }
   .wo-app.wo-faithful .co-box.wo-input:hover{ background:rgba(45,108,223,.10); outline:1px solid rgba(45,108,223,.45); }

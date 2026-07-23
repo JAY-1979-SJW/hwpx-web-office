@@ -145,7 +145,7 @@ def _extract_section(path, secname, row_scale=1.0):
                   f"col_idx={st['col_idx']} page_idx={st['page_idx']}",
                   file=sys.stderr)
 
-    def emit_para(p):
+    def emit_para(p, block_idx=None):
         txt, spans = own_runs(p)
         segs = direct_linesegs(p)
         align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
@@ -230,6 +230,16 @@ def _extract_section(path, secname, row_scale=1.0):
                     "baseline": round(bl, 1), "cell": False}
             if align:
                 line["align"] = align
+            # 본문 문단(표 셀 아님) 클릭 편집 배선용 — block_idx 는
+            # block_parser.parse_blocks_from_section 과 동일 규칙(section
+            # root 직계 p 자식 순서)으로 walk() 가 부여한다. paragraphId 는
+            # ro_view_importer._stable_paragraph_id 와 동일 포맷(local_index
+            # 는 문단 안 여러 lineseg 를 한 문단으로 묶으므로 항상 0).
+            if block_idx is not None and line_txt.strip():
+                line["paragraphId"] = f"par_s{_sec_idx}_b{block_idx}_p0"
+                line["containerScope"] = {
+                    "kind": "block", "sectionIndex": _sec_idx,
+                    "blockIndex": block_idx}
             lines.append(line)
             if _vis:
                 st["max_y"] = max(st["max_y"], y + h)
@@ -598,9 +608,12 @@ def _extract_section(path, secname, row_scale=1.0):
         return (st["page_idx"] * page_h) + m_top + vpos * HU
 
     def walk(el):
+        block_idx = 0
         for child in el:
             if ln(child.tag) != "p":
                 continue
+            this_block_idx = block_idx
+            block_idx += 1
             _update_col_state(child)
             # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
             # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
@@ -626,7 +639,7 @@ def _extract_section(path, secname, row_scale=1.0):
                 # 31px 위로 어긋남). 반환된 앵커 y 를 표 시작 기준으로 사용.
                 _anchor_top = None
                 if own_text(child).strip():
-                    emit_para(child)
+                    emit_para(child, this_block_idx)
                 else:
                     _anchor_top = _para_top_y(child)
                 # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
@@ -670,7 +683,7 @@ def _extract_section(path, secname, row_scale=1.0):
                                else None)
                     base_y = st["flow_y"]
             else:
-                emit_para(child)
+                emit_para(child, this_block_idx)
 
     walk(root)
     total_pages = max(st["page_idx"] + 1,

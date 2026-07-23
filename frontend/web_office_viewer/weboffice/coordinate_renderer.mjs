@@ -86,6 +86,8 @@ export function autoFitLines(root) {
  *   editable         : true 면 셀 박스에 data-cell-id 부여(클릭 편집 대상)
  *   getCellText(id)  : 편집된 셀 텍스트(없으면 null). 편집된 셀은 원본 줄을
  *                      숨기고 이 텍스트를 박스 안에 렌더한다.
+ *   getParaText(id)  : 편집된 본문 문단(표 셀 아님) 텍스트(없으면 null).
+ *                      cell 과 동일 패턴 — line.paragraphId 로 매칭.
  *   truthBase        : '원본 그대로' 모드 — 페이지 배경을 한컴 실렌더
  *                      PNG(truthBase + 페이지번호)로 깔고, 우리 텍스트/
  *                      테두리는 그리지 않는다(이중 표시 방지). 셀 박스는
@@ -98,6 +100,7 @@ export function renderCoordinateLayout(layout, opts = {}) {
   const pages = layout.pages || 1;
   const defs = layout.charPrDefs || {};
   const getCellText = opts.getCellText || (() => null);
+  const getParaText = opts.getParaText || (() => null);
   const boxByCell = new Map();       // cellId → box (편집 텍스트 렌더 위치)
   const editedIds = new Set();       // 편집된 셀(원본 줄 숨김)
   for (const b of layout.boxes || []) {
@@ -152,7 +155,21 @@ export function renderCoordinateLayout(layout, opts = {}) {
         + `height:${b.h}px;${bd}${fill}"></div>`);
     }
     for (const l of pLines) {
-      if (pageTruth) break;           // 원본 배경 페이지 — 텍스트는 배경에 있음
+      // 본문 문단(표 셀 아님) 클릭 편집 — 편집됐으면 원본 줄 숨김(셀과 동일).
+      if (!l.cellId && l.paragraphId
+          && getParaText(l.paragraphId) != null) continue;
+      if (pageTruth) {
+        // 원본 배경 페이지 — 텍스트는 이미 사진에 있어 다시 그리지 않는다.
+        // 다만 본문 문단 줄은 co-box(표 셀 전용) 같은 별도 클릭 타깃이
+        // 없으므로, 투명 클릭 박스만 최소한으로 남겨 편집 진입로를 유지.
+        if (opts.editable && !l.cellId && l.paragraphId) {
+          parts.push(`<div class="co-line" data-paragraph-id="`
+            + `${esc(l.paragraphId)}" style="left:${l.x}px;`
+            + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
+            + `height:${l.h}px;"></div>`);
+        }
+        continue;
+      }
       if (l.cellId && editedIds.has(l.cellId)) continue;  // 편집셀 원본 숨김
       const fs = Math.max(7, l.h * 0.72);
       // line-height 는 기본적으로 박스 높이와 같게 둔다. 더 크게 주면
@@ -176,11 +193,34 @@ export function renderCoordinateLayout(layout, opts = {}) {
       const vert = l.vertical
         ? "writing-mode:vertical-rl;text-orientation:upright;"
         : "";
-      parts.push(`<div class="co-line" style="left:${l.x}px;`
+      const paraAttr = (opts.editable && !l.cellId && l.paragraphId)
+        ? ` data-paragraph-id="${esc(l.paragraphId)}"` : "";
+      parts.push(`<div class="co-line"${paraAttr} style="left:${l.x}px;`
         + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
         + `height:${l.h}px;line-height:${l.h}px;`
         + `overflow-clip-margin:${clipMargin}px;`
         + `${al}${vert}">${segmentsHtml(l, defs, fs)}</div>`);
+    }
+    // 편집된 본문 문단 — 새 텍스트를 원래 첫 줄 자리에 렌더(셀 편집과 동일
+    // 패턴, pageTruth 여부 무관 — 편집된 셀 오버레이도 사진 위에 그대로
+    // 얹힌다). 여러 줄로 늘어나면 white-space:pre-wrap 으로 자연 개행.
+    {
+      const seenPara = new Set();
+      for (const l of pLines) {
+        if (l.cellId || !l.paragraphId || seenPara.has(l.paragraphId)) {
+          continue;
+        }
+        const t = getParaText(l.paragraphId);
+        if (t == null) continue;
+        seenPara.add(l.paragraphId);
+        parts.push(`<div class="co-line co-edited" data-paragraph-id="`
+          + `${esc(l.paragraphId)}" style="left:${l.x}px;`
+          + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
+          + `min-height:${l.h}px;line-height:1.3;white-space:pre-wrap;`
+          + `font-size:10pt;background:#fff">`
+          + `<span class="co-in" style="display:inline-block">${esc(t)}`
+          + `</span></div>`);
+      }
     }
     // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만)
     for (const cid of editedIds) {

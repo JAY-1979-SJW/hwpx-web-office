@@ -22,6 +22,106 @@ export function mountWebOffice(root) {
   let pendingEditId = null; // 재렌더 후 이어서 열 즉석 편집 대상(이동 연속)
   let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
   let fmtBusy = false;         // 서식 적용 중 중복 클릭 방지
+  const paraEdits = new Map();  // paragraphId → 편집된 텍스트(표 셀 아님)
+  let paraBusy = false;        // 본문 문단 저장 중 중복 클릭 방지
+
+  // 본문 문단(표 밖 제목·전문 등) 저장 — 셀과 달리 undo/redo 명령 로그가
+  // 없다. apply-format 과 동일하게 즉시 서버에 저장하고 sourcePath 를
+  // 이어받는다(원본은 무수정, 결과는 항상 새 sandbox 사본).
+  async function saveParagraphText(paragraphId, newText) {
+    if (!loaded || paraBusy) return;
+    const model = loaded.documentModel || {};
+    const p = (model.paragraphs || []).find(
+      (x) => x.paragraphId === paragraphId);
+    if (!p) { setStatus("fail", "편집 대상 문단을 찾을 수 없음"); return; }
+    // 재편집 시 서버 기준값은 직전 편집 결과(이미 sourcePath 가 그
+    // sandbox 사본으로 갱신돼 있음) — 원본 documentModel.text 가 아니라
+    // paraEdits 에 남은 마지막 저장값을 expectedBefore 로 써야 두 번째
+    // 편집부터 EXPECTED_BEFORE_MISMATCH 로 거부되지 않는다.
+    const before = paraEdits.has(paragraphId)
+      ? paraEdits.get(paragraphId) : (p.text || "");
+    // 전체 교체는 첫 run(오프셋 0)의 charPr 을 그대로 적용 — 신규 charPr
+    // 생성 없음(§4 유지). 다중 run 문단도 anchor(첫 run) 서식으로 통일.
+    const applyPr = (p.runs && p.runs[0] && p.runs[0].charPrIDRef) || null;
+    if (before === newText) return;   // 무변경 — 저장 안 함
+    paraBusy = true;
+    setStatus("load", "문단 저장 중 …");
+    try {
+      const res = await fetch("/api/web-office/para-save-apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "PARA_SAVE_APPLY",
+          sourcePath: loaded.sourcePath,
+          sourceDocumentHash: model.sourceDocumentHash
+            || (model.sourceRef && model.sourceRef.sha256),
+          dryRunOnly: false,
+          commandLog: [{
+            commandId: `pc_${Date.now()}_${Math.random()
+              .toString(36).slice(2, 8)}`,
+            commandType: "REPLACE_TEXT_RANGE",
+            target: { paragraphId },
+            payload: { rangeAnchor: 0, rangeFocus: before.length,
+              afterText: newText, policy: "ANCHOR_CHARPR" },
+            forward: { kind: "REPLACE_TEXT_RANGE", paragraphId,
+              rangeAnchor: 0, rangeFocus: before.length,
+              afterText: newText, applyCharPrIDRef: applyPr,
+              policy: "ANCHOR_CHARPR" },
+            expectedBefore: before,
+            // 서버는 command 개별 sourceDocumentHash 를 검증한다(요청
+            // 최상위 필드가 아니라) — para_save_apply_bridge._hydrate_command.
+            sourceDocumentHash: model.sourceDocumentHash
+              || (model.sourceRef && model.sourceRef.sha256),
+          }],
+        }),
+      });
+      const env = await res.json();
+      const d = (env && env.data) || {};
+      const okVerdicts = new Set(["PASS", "PARTIAL"]);
+      if (!(env && env.status === "SUCCESS") || !okVerdicts.has(d.verdict)) {
+        const msg = (env.errors && env.errors[0] && env.errors[0].message)
+          || (d.rejected && d.rejected[0] && d.rejected[0].reason)
+          || d.verdict || "문단 저장 실패";
+        setStatus("fail", "문단 저장 거부: " + msg);
+        return;
+      }
+      paraEdits.set(paragraphId, newText);
+      setStatus("ok", "문단 저장 완료(새 sandbox 사본)");
+      // 좌표 레이아웃(coordLayout)은 재요청하지 않는다 — writer 가 편집된
+      // 문단의 lineseg 를 지워 저장하므로(한컴 재-flow 유도, 이번 세션
+      // 확립 규칙) 새 레이아웃엔 이 문단 줄 자체가 사라져 편집 오버레이를
+      // 그릴 위치를 잃는다. 셀 편집과 동일하게 "편집 전 좌표"를 계속 써서
+      // 그 자리에 새 텍스트를 얹는다(다음 전체 재로딩 전까지).
+      // documentModel/sourcePath 는 조용히 새 sandbox 기준으로 갱신 —
+      // 다음 편집이 SOURCE_HASH_MISMATCH 로 거부되지 않게 하려는 목적뿐,
+      // 화면 재렌더와는 무관.
+      if (d.sourcePath) {
+        try {
+          const res2 = await fetch("/api/web-office/hwpx-load", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ operation: "HWPX_EDITOR_LOAD",
+              sourcePath: d.sourcePath }),
+          });
+          const env2 = await res2.json();
+          const d2 = (env2 && env2.data) || {};
+          if (env2 && env2.status === "SUCCESS" && d2.verdict === "PASS") {
+            loaded.sourcePath = d2.sourcePath;
+            loaded.documentModel = d2.documentModel;
+          } else {
+            loaded.sourcePath = d.sourcePath;   // 최소한 체이닝은 유지
+          }
+        } catch (_e) {
+          loaded.sourcePath = d.sourcePath;
+        }
+      }
+      render();
+    } catch (e) {
+      setStatus("fail", "문단 저장 실패: " + (e.message || e));
+    } finally {
+      paraBusy = false;
+    }
+  }
 
   // 서식 툴바 — 클릭된 칸을 서식 적용 대상으로 표시하고 버튼을 켠다.
   function selectCellForFormat(id, box) {
@@ -137,6 +237,7 @@ export function mountWebOffice(root) {
         // 편집된 셀은 원본 줄 대신 새 텍스트를 문서 텍스트로 렌더 —
         // AI fill 주입과 동일하게 '문서에 직접 기입'된 모습만 남는다.
         getCellText: (id) => (cell ? cell.getCellText(id) : null),
+        getParaText: (id) => (paraEdits.has(id) ? paraEdits.get(id) : null),
         truthBase,   // 가용 시 '원본 그대로'(한컴 실렌더 배경 + 편집 오버레이)
       });
       autoFitLines(sheet);
@@ -289,6 +390,41 @@ export function mountWebOffice(root) {
         pendingEditId = null;
         if (nxt) openEditor(nxt);
       }
+      // 본문 문단(표 밖 제목·전문 등) 클릭 편집 — 표 셀과 별개 경로.
+      // 이미 편집기가 열려 있으면 무시(중복 방지).
+      sheet.querySelectorAll(".co-line[data-paragraph-id]").forEach((ln) => {
+        ln.addEventListener("click", () => {
+          if (ln.querySelector("textarea")) return;
+          const pid = ln.dataset.paragraphId;
+          const cur = paraEdits.has(pid) ? paraEdits.get(pid)
+            : ((loaded.documentModel.paragraphs || [])
+                .find((p) => p.paragraphId === pid) || {}).text || "";
+          const ta = document.createElement("textarea");
+          ta.className = "wo-fld";
+          ta.value = cur;
+          ta.style.cssText = "position:absolute;left:0;top:0;width:100%;"
+            + "min-height:100%;resize:vertical;font:inherit;";
+          let done = false;
+          const commit = () => {
+            if (done) return;
+            done = true;
+            const v = ta.value;
+            ta.remove();
+            if (v !== cur) saveParagraphText(pid, v);
+            else render();
+          };
+          ta.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") { done = true; ta.remove(); render(); }
+            else if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault(); commit();
+            }
+          });
+          ta.addEventListener("blur", commit);
+          ln.appendChild(ta);
+          ta.focus();
+          ta.select();
+        });
+      });
       root.classList.add("wo-faithful");
     } else {
       // 편집 모드 — 흐름 렌더러 + 셀 클릭 편집
