@@ -174,3 +174,8 @@ PARA-EDIT 동 (cell containerScope · 단일 run)
 *생성: WEB-OFFICE-PARA-EDIT-E2E-FULL-CLOSEOUT-01 (2026-05-21)*
 
 > **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)
+
+> **baseline 갱신**: e9517fc (머리말/꼬리말 텍스트 편집 준공, 2026-07-24) — paragraph_writer_adapter.py 에
+> _resolve_header_footer_paragraph 추가(CLAUDE.md §4.2), hwpx_edit_tool.py 의 containerScope.kind
+> 허용 집합에 header/footer 추가. 실제 Hancom Office COM 으로 머리말 텍스트 편집 확인 후
+> 정당 변경으로 베이스라인 갱신.

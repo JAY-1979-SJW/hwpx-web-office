@@ -210,3 +210,8 @@ PARA-EDIT 동 · ApplyFormat (existing charPr 전용)
 > **baseline 갱신**: 3f94c2a (셀 텍스트 손실·중첩 표 중복 수리 준공, 2026-07-23) — 잔존 불일치 39건을 파고드니 좌표가 아닌 결함 두 개였다. ① `table_parser._cell_raw_text` 가 `elem.text` 만 읽어 `<hp:fwSpace/>` 같은 인라인 자식 **뒤 글자(child.tail)를 통째로 버렸다** — `'(서명 또는 인)'` → `'(서명인)'`, `'[]천장재[]단열재…'` → `'[][][]'`. 이 손실은 `renderPayload.cells[].text` 를 타고 뷰어 표시와 라벨 추출까지 갔다. ② 중첩 표는 별도 표로 이미 실리는데 바깥 셀이 그 내용까지 삼켰고, 문단·run·인라인 세 경로를 모두 막아야 했다(중첩 표는 문단이 아니라 문단 안 `hp:run` 속에 있다). 표본 40건 비교 셀 12,727개에서 **불일치 39 → 0건, 영향 서식 13/40 → 0/40**. 정당 변경 확인 후 베이스라인 갱신. 다만 적재된 입력 스키마 31,350건의 라벨은 ①의 손실된 텍스트로 만들어졌으므로 재생성이 필요하다.
 
 > **baseline 갱신**: 2f7db75 (텍스트 편집 시 lineseg 완전 제거 → 한컴 재조판 유도 준공, 2026-07-23) — paragraph_writer_adapter.py 에 _strip_lineseg() 추가(TYPE_TEXT/REPLACE_TEXT_RANGE/DELETE_TEXT_RANGE 저장 직전 호출). 실제 Hancom Office COM으로 줄바꿈 재조판 확인 후 정당 변경으로 베이스라인 갱신.
+
+> **baseline 갱신**: e9517fc (머리말/꼬리말 텍스트 편집 준공, 2026-07-24) — paragraph_writer_adapter.py 에
+> _resolve_header_footer_paragraph 추가(CLAUDE.md §4.2), hwpx_edit_tool.py 의 containerScope.kind
+> 허용 집합에 header/footer 추가. 실제 Hancom Office COM 으로 머리말 텍스트 편집 확인 후
+> 정당 변경으로 베이스라인 갱신.

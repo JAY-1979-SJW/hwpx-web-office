@@ -21,7 +21,7 @@ PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "para_edit_apply_format_smoke.mjs")
-BASELINE_COMMIT = "2f7db75"  # 줄바꿈 편집(lineseg 완전 제거) 준공 후 갱신 (334d665 → 2f7db75)
+BASELINE_COMMIT = "e9517fc"  # 머리말/꼬리말 텍스트 편집 준공 후 갱신 (2f7db75 → e9517fc)
 
 REQUIRED_STATE_PATTERNS = [
     r"export\s+function\s+applyFormatToSelection\(",

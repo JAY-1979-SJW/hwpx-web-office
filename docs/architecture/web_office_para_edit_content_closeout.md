@@ -216,3 +216,8 @@ PARA-EDIT 동 · 내용 편집 (cell + body, single + multi run)
 > **baseline 갱신**: b9782a5 (셀 문단 조회 좌표 결함 수리 준공, 2026-07-23) — `ro_view_importer._find_cell_elem` 이 셀 문단을 격자주소(`cellAddr/@colAddr`)로 찾아 확장(colSpan>1) 셀 뒤 칸에서 옆 칸을 집어오던 결함을 교정. 파서(`table_parser`)와 같은 규칙인 **셀 순번**으로 조회하도록 바꿨다. 좌표계 자체는 불변이라 `cellId`·`paragraphId` 키와 renderPayload 격자는 보존된다. 실측 표본 40건 불일치 380건 → 39건. 감사 지적은 `LOCKED_FILE_CHANGED` 뿐이고 기능 회귀 0건임을 회귀 대조(HEAD 28 실패 → 수리후 36, 신규 8건 전부 잠금)로 확인 후 베이스라인 갱신.
 
 > **baseline 갱신**: 3f94c2a (셀 텍스트 손실·중첩 표 중복 수리 준공, 2026-07-23) — 잔존 불일치 39건을 파고드니 좌표가 아닌 결함 두 개였다. ① `table_parser._cell_raw_text` 가 `elem.text` 만 읽어 `<hp:fwSpace/>` 같은 인라인 자식 **뒤 글자(child.tail)를 통째로 버렸다** — `'(서명 또는 인)'` → `'(서명인)'`, `'[]천장재[]단열재…'` → `'[][][]'`. 이 손실은 `renderPayload.cells[].text` 를 타고 뷰어 표시와 라벨 추출까지 갔다. ② 중첩 표는 별도 표로 이미 실리는데 바깥 셀이 그 내용까지 삼켰고, 문단·run·인라인 세 경로를 모두 막아야 했다(중첩 표는 문단이 아니라 문단 안 `hp:run` 속에 있다). 표본 40건 비교 셀 12,727개에서 **불일치 39 → 0건, 영향 서식 13/40 → 0/40**. 정당 변경 확인 후 베이스라인 갱신. 다만 적재된 입력 스키마 31,350건의 라벨은 ①의 손실된 텍스트로 만들어졌으므로 재생성이 필요하다.
+
+> **baseline 갱신**: e9517fc (머리말/꼬리말 텍스트 편집 준공, 2026-07-24) — paragraph_writer_adapter.py 에
+> _resolve_header_footer_paragraph 추가(CLAUDE.md §4.2), hwpx_edit_tool.py 의 containerScope.kind
+> 허용 집합에 header/footer 추가. 실제 Hancom Office COM 으로 머리말 텍스트 편집 확인 후
+> 정당 변경으로 베이스라인 갱신.
