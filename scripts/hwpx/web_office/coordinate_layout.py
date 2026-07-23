@@ -240,6 +240,14 @@ def _extract_section(path, secname, row_scale=1.0):
                 line["containerScope"] = {
                     "kind": "block", "sectionIndex": _sec_idx,
                     "blockIndex": block_idx}
+                # 캐럿 위치 편집(문장 중 클릭 지점에 정확히 삽입)용 —
+                # 이 줄이 문단 전체 텍스트(txt) 중 몇 번째 글자부터
+                # 시작하는지. 프런트가 클릭된 화면 좌표를 이 줄 안
+                # 로컬 오프셋으로 바꾼 뒤 이 값을 더해 문단 전체
+                # 기준 캐럿 오프셋을 구한다(문단 전체를 통째로
+                # textarea 에 채워 바꾸는 대신, 클릭한 지점에만
+                # 삽입하는 캐럿 편집을 위해 필요).
+                line["paraTextOffset"] = a
             lines.append(line)
             if _vis:
                 st["max_y"] = max(st["max_y"], y + h)

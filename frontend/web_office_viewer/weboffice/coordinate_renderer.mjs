@@ -194,7 +194,8 @@ export function renderCoordinateLayout(layout, opts = {}) {
         ? "writing-mode:vertical-rl;text-orientation:upright;"
         : "";
       const paraAttr = (opts.editable && !l.cellId && l.paragraphId)
-        ? ` data-paragraph-id="${esc(l.paragraphId)}"` : "";
+        ? ` data-paragraph-id="${esc(l.paragraphId)}"`
+          + ` data-para-offset="${l.paraTextOffset ?? 0}"` : "";
       parts.push(`<div class="co-line"${paraAttr} style="left:${l.x}px;`
         + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
         + `height:${l.h}px;line-height:${l.h}px;`

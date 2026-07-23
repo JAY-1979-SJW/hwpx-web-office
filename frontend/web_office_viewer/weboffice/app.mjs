@@ -39,6 +39,61 @@ export function mountWebOffice(root) {
     return paraSaveQueue;
   }
 
+  // 캐럿 위치 삽입(문장 중 클릭한 지점에만 타이핑) — 문단 전체를
+  // 통째로 바꾸는 REPLACE_TEXT_RANGE 대신, 그 지점에만 글자를 끼워
+  // 넣는 TYPE_TEXT 를 쓴다. 실측: 서버(paragraph_writer_adapter)는
+  // applyCharPrIDRef 를 안 주면 그 지점 run 의 기존 charPr 을 그대로
+  // 쓰므로(신규 charPr 미생성) 여기서 서식을 계산할 필요가 없다.
+  function insertAtCaret(paragraphId, caretOffset, insertText) {
+    if (!insertText) return Promise.resolve();
+    paraSaveQueue = paraSaveQueue
+      .then(() => _doInsertAtCaret(paragraphId, caretOffset, insertText))
+      .catch((e) => setStatus("fail", "문단 저장 실패: " + (e.message || e)));
+    return paraSaveQueue;
+  }
+
+  // 캐럿 위치가 속한 run 의 charPrIDRef — verify7 V4(신규 charPr 도입
+  // 금지) 게이트가 applyCharPrIDRef==null 을 "원본에 없던 서식"으로
+  // 보고 거부하므로(실측 확인), null 을 보내면 안 되고 반드시 그
+  // 위치의 실제 run 서식을 지정해야 한다.
+  function _charPrAtOffset(paragraph, offset) {
+    let pos = 0;
+    for (const r of (paragraph.runs || [])) {
+      const len = (r.text || "").length;
+      if (offset <= pos + len) return r.charPrIDRef ?? null;
+      pos += len;
+    }
+    const runs = paragraph.runs || [];
+    return runs.length ? runs[runs.length - 1].charPrIDRef : null;
+  }
+
+  async function _doInsertAtCaret(paragraphId, caretOffset, insertText) {
+    if (!loaded) return;
+    const model = loaded.documentModel || {};
+    const p = (model.paragraphs || []).find(
+      (x) => x.paragraphId === paragraphId);
+    const applyPr = p ? _charPrAtOffset(p, caretOffset) : null;
+    paraBusy = true;
+    setStatus("load", "문단 저장 중 …");
+    try {
+      await _runParaSaveCommand(model, {
+        commandId: `pc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        commandType: "TYPE_TEXT",
+        target: { paragraphId },
+        payload: { caretOffset, insertText },
+        forward: { kind: "TYPE_TEXT", paragraphId,
+          caretOffset, insertText, inheritCharPrIDRef: applyPr },
+        expectedBefore: "",
+        sourceDocumentHash: model.sourceDocumentHash
+          || (model.sourceRef && model.sourceRef.sha256),
+      });
+    } catch (e) {
+      setStatus("fail", "문단 저장 실패: " + (e.message || e));
+    } finally {
+      paraBusy = false;
+    }
+  }
+
   // 본문 문단(표 밖 제목·전문 등) 저장 — 셀과 달리 undo/redo 명령 로그가
   // 없다. apply-format 과 동일하게 즉시 서버에 저장하고 sourcePath 를
   // 이어받는다(원본은 무수정, 결과는 항상 새 sandbox 사본).
@@ -61,35 +116,44 @@ export function mountWebOffice(root) {
     paraBusy = true;
     setStatus("load", "문단 저장 중 …");
     try {
-      const res = await fetch("/api/web-office/para-save-apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation: "PARA_SAVE_APPLY",
-          sourcePath: loaded.sourcePath,
-          sourceDocumentHash: model.sourceDocumentHash
-            || (model.sourceRef && model.sourceRef.sha256),
-          dryRunOnly: false,
-          commandLog: [{
-            commandId: `pc_${Date.now()}_${Math.random()
-              .toString(36).slice(2, 8)}`,
-            commandType: "REPLACE_TEXT_RANGE",
-            target: { paragraphId },
-            payload: { rangeAnchor: 0, rangeFocus: before.length,
-              afterText: newText, policy: "ANCHOR_CHARPR" },
-            forward: { kind: "REPLACE_TEXT_RANGE", paragraphId,
-              rangeAnchor: 0, rangeFocus: before.length,
-              afterText: newText, applyCharPrIDRef: applyPr,
-              policy: "ANCHOR_CHARPR" },
-            expectedBefore: before,
-            // 서버는 command 개별 sourceDocumentHash 를 검증한다(요청
-            // 최상위 필드가 아니라) — para_save_apply_bridge._hydrate_command.
-            sourceDocumentHash: model.sourceDocumentHash
-              || (model.sourceRef && model.sourceRef.sha256),
-          }],
-        }),
-      });
-      const env = await res.json();
+      await _runParaSaveCommand(model, {
+        commandId: `pc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        commandType: "REPLACE_TEXT_RANGE",
+        target: { paragraphId },
+        payload: { rangeAnchor: 0, rangeFocus: before.length,
+          afterText: newText, policy: "ANCHOR_CHARPR" },
+        forward: { kind: "REPLACE_TEXT_RANGE", paragraphId,
+          rangeAnchor: 0, rangeFocus: before.length,
+          afterText: newText, applyCharPrIDRef: applyPr,
+          policy: "ANCHOR_CHARPR" },
+        expectedBefore: before,
+        sourceDocumentHash: model.sourceDocumentHash
+          || (model.sourceRef && model.sourceRef.sha256),
+      }, { onOk: () => paraEdits.set(paragraphId, newText) });
+    } catch (e) {
+      setStatus("fail", "문단 저장 실패: " + (e.message || e));
+    } finally {
+      paraBusy = false;
+    }
+  }
+
+  // 두 편집 경로(전체 교체/캐럿 삽입) 공용 — 요청 전송 + 결과 반영 +
+  // 재로딩. 서버는 command 개별 sourceDocumentHash 를 검증한다(요청
+  // 최상위 필드가 아니라) — para_save_apply_bridge._hydrate_command.
+  async function _runParaSaveCommand(model, command, opts = {}) {
+    const res = await fetch("/api/web-office/para-save-apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "PARA_SAVE_APPLY",
+        sourcePath: loaded.sourcePath,
+        sourceDocumentHash: model.sourceDocumentHash
+          || (model.sourceRef && model.sourceRef.sha256),
+        dryRunOnly: false,
+        commandLog: [command],
+      }),
+    });
+    const env = await res.json();
       const d = (env && env.data) || {};
       const okVerdicts = new Set(["PASS", "PARTIAL"]);
       if (!(env && env.status === "SUCCESS") || !okVerdicts.has(d.verdict)) {
@@ -99,7 +163,8 @@ export function mountWebOffice(root) {
         setStatus("fail", "문단 저장 거부: " + msg);
         return;
       }
-      paraEdits.set(paragraphId, newText);
+      const paragraphId = command.target.paragraphId;
+      if (opts.onOk) opts.onOk();
       setStatus("ok", "문단 저장 완료(새 sandbox 사본) · 재로딩 …");
       // writer 가 이제 편집된 문단의 lineseg 를 보존(줄 수 증가 추정 시만
       // 근사 보정)하므로, 새 레이아웃을 다시 물어보면 그 문단의 실제 줄
@@ -142,11 +207,102 @@ export function mountWebOffice(root) {
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
-    } catch (e) {
-      setStatus("fail", "문단 저장 실패: " + (e.message || e));
-    } finally {
-      paraBusy = false;
+  }
+
+  // 클릭 좌표 → 그 지점의 DOM 텍스트 노드/로컬 오프셋. 브라우저 자체
+  // 캐럿 히트테스트를 재사용(문자 폭 직접 계산 불필요 — 실제 렌더된
+  // 글꼴/자간 그대로 정확).
+  function caretNodeOffsetFromPoint(x, y) {
+    if (document.caretRangeFromPoint) {
+      const r = document.caretRangeFromPoint(x, y);
+      return r ? { node: r.startContainer, offset: r.startOffset } : null;
     }
+    if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      return p ? { node: p.offsetNode, offset: p.offset } : null;
+    }
+    return null;
+  }
+
+  // container(줄 div) 안에서 node/nodeOffset 이 몇 번째 글자인지 —
+  // 그 줄의 data-para-offset(문단 전체 기준 이 줄의 시작 글자 수, 서버가
+  // lineseg textpos 로 계산해 내려줌) 에 더하면 문단 전체 기준 캐럿
+  // 오프셋이 된다.
+  function textOffsetWithin(container, node, nodeOffset) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let total = 0, n;
+    while ((n = walker.nextNode())) {
+      if (n === node) return total + nodeOffset;
+      total += n.textContent.length;
+    }
+    return total;
+  }
+
+  // 문단 전체를 통째로 바꾸는 폴백 편집기(원본 실렌더 배경 모드처럼
+  // 캐럿 위치를 계산할 텍스트가 화면에 없을 때만 사용).
+  function openWholeParagraphEditor(ln, pid) {
+    const cur = paraEdits.has(pid) ? paraEdits.get(pid)
+      : ((loaded.documentModel.paragraphs || [])
+          .find((p) => p.paragraphId === pid) || {}).text || "";
+    const ta = document.createElement("textarea");
+    ta.className = "wo-fld";
+    ta.value = cur;
+    ta.style.cssText = "position:absolute;left:0;top:0;width:100%;"
+      + "min-height:100%;resize:vertical;font:inherit;";
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      const v = ta.value;
+      ta.remove();
+      if (v !== cur) saveParagraphText(pid, v);
+      else render();
+    };
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { done = true; ta.remove(); render(); }
+      else if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault(); commit();
+      }
+    });
+    ta.addEventListener("blur", commit);
+    ln.appendChild(ta);
+    ta.focus();
+    ta.select();
+  }
+
+  // 캐럿 위치 삽입 편집기 — 클릭한 그 지점에만 작은 입력창을 띄운다
+  // (문단 전체를 채우지 않음). 커밋하면 그 지점에 타이핑한 글자만
+  // TYPE_TEXT 로 삽입한다.
+  function openCaretInsertEditor(ln, pid, caretOffset, clientX) {
+    const inp = document.createElement("input");
+    inp.className = "wo-caret-input";
+    inp.value = "";
+    const lnRect = ln.getBoundingClientRect();
+    const left = Math.max(0, clientX - lnRect.left);
+    inp.style.cssText = `position:absolute; left:${left}px; top:0; `
+      + "min-width:14px; height:100%; border:2px solid #2d6cdf; "
+      + "background:#fff; font:inherit; padding:0 1px; z-index:6; "
+      + "box-sizing:border-box;";
+    inp.size = 1;
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      const v = inp.value;
+      inp.remove();
+      if (v) insertAtCaret(pid, caretOffset, v);
+      else render();
+    };
+    inp.addEventListener("input", () => {
+      inp.size = Math.max(1, inp.value.length);
+    });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { done = true; inp.remove(); render(); }
+      else if (e.key === "Enter") { e.preventDefault(); commit(); }
+    });
+    inp.addEventListener("blur", commit);
+    ln.appendChild(inp);
+    inp.focus();
   }
 
   // 서식 툴바 — 클릭된 칸을 서식 적용 대상으로 표시하고 버튼을 켠다.
@@ -422,38 +578,28 @@ export function mountWebOffice(root) {
         if (nxt) openEditor(nxt);
       }
       // 본문 문단(표 밖 제목·전문 등) 클릭 편집 — 표 셀과 별개 경로.
-      // 이미 편집기가 열려 있으면 무시(중복 방지).
+      // 문장 중 클릭한 정확한 지점에 캐럿을 놓고 그 자리에만 타이핑한
+      // 글자를 끼워 넣는다(대표님 지적: 전에는 어디를 클릭해도 문단
+      // 전체가 "박스 단위"로 통째로 편집됐다 — 실제 워드프로세서처럼
+      // 캐럿 단위 삽입이 되어야 함). 원본 실렌더 배경(사진) 모드는
+      // 텍스트 자체가 화면에 안 그려져 있어 캐럿 위치를 계산할 수
+      // 없으므로, 그 경우만 문단 전체 편집(기존 방식)으로 폴백한다.
       sheet.querySelectorAll(".co-line[data-paragraph-id]").forEach((ln) => {
-        ln.addEventListener("click", () => {
-          if (ln.querySelector("textarea")) return;
+        ln.addEventListener("click", (e) => {
+          if (ln.querySelector("textarea, .wo-caret-input")) return;
           const pid = ln.dataset.paragraphId;
-          const cur = paraEdits.has(pid) ? paraEdits.get(pid)
-            : ((loaded.documentModel.paragraphs || [])
-                .find((p) => p.paragraphId === pid) || {}).text || "";
-          const ta = document.createElement("textarea");
-          ta.className = "wo-fld";
-          ta.value = cur;
-          ta.style.cssText = "position:absolute;left:0;top:0;width:100%;"
-            + "min-height:100%;resize:vertical;font:inherit;";
-          let done = false;
-          const commit = () => {
-            if (done) return;
-            done = true;
-            const v = ta.value;
-            ta.remove();
-            if (v !== cur) saveParagraphText(pid, v);
-            else render();
-          };
-          ta.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") { done = true; ta.remove(); render(); }
-            else if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault(); commit();
-            }
-          });
-          ta.addEventListener("blur", commit);
-          ln.appendChild(ta);
-          ta.focus();
-          ta.select();
+          if (!ln.querySelector(".co-in")) {
+            openWholeParagraphEditor(ln, pid);
+            return;
+          }
+          const hit = caretNodeOffsetFromPoint(e.clientX, e.clientY);
+          if (!hit || !ln.contains(hit.node)) {
+            openWholeParagraphEditor(ln, pid);
+            return;
+          }
+          const localOffset = textOffsetWithin(ln, hit.node, hit.offset);
+          const baseOffset = parseInt(ln.dataset.paraOffset || "0", 10);
+          openCaretInsertEditor(ln, pid, baseOffset + localOffset, e.clientX);
         });
       });
       root.classList.add("wo-faithful");
