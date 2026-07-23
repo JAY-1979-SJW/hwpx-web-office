@@ -21,7 +21,7 @@ TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatToolbar.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "334d665"
+BASELINE_COMMIT = "2f7db75"  # 줄바꿈 편집(lineseg 완전 제거) 준공 후 갱신 (334d665 → 2f7db75)
 
 REQUIRED_MATCHER_PATTERNS = [
     r"export\s+function\s+matchAxisChange\(",

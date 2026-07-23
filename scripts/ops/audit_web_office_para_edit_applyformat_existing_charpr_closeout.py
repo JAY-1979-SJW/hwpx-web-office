@@ -20,7 +20,7 @@ CLOSEOUT_DOC = (PR / "docs/architecture/"
 # 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정.
 # 셀 텍스트 손실·중첩 표 중복 수리 준공 후 재갱신 (b9782a5 → 3f94c2a) —
 # hp:t 인라인 tail 유실 + 중첩 표 내용 중복 제거. 정당 변경 확인 후 재고정.
-BASELINE_COMMIT = "3f94c2a"
+BASELINE_COMMIT = "2f7db75"  # 줄바꿈 편집(lineseg 완전 제거) 준공 후 갱신 (3f94c2a → 2f7db75)
 
 REQUIRED_DOC_PHRASES_IN_SCOPE = [
     "CT_APPLY_FORMAT", "make_apply_format_command",

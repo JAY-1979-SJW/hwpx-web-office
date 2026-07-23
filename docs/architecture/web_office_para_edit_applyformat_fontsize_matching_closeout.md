@@ -235,3 +235,5 @@ fontSize 매칭은 운영 paragraph 모두 적용 가능 — 1차 공정 운영 
 > **저장소 분리 기준**: e04d325 (hwpx-web-office 신규 저장소 초기 커밋, 2026-05-22)
 
 > **baseline 갱신**: 334d665 (WEB-OFFICE-P3-RUN-SPLIT-MERGE-CHARPR-GUARD-01 준공, 2026-05-22) — charPr guard 추가로 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+> **baseline 갱신**: 2f7db75 (텍스트 편집 시 lineseg 완전 제거 → 한컴 재조판 유도 준공, 2026-07-23) — paragraph_writer_adapter.py 에 _strip_lineseg() 추가(TYPE_TEXT/REPLACE_TEXT_RANGE/DELETE_TEXT_RANGE 저장 직전 호출). 실제 Hancom Office COM으로 줄바꿈 재조판 확인 후 정당 변경으로 베이스라인 갱신.

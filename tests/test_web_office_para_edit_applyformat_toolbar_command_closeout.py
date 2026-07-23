@@ -14,7 +14,7 @@ sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_applyformat_toolbar_command_closeout.md")
-BASELINE_COMMIT = "334d665"  # M2 문단서식 준공 후 갱신 (334d665 → 334d665)
+BASELINE_COMMIT = "2f7db75"  # 줄바꿈 편집(lineseg 완전 제거) 준공 후 갱신 (334d665 → 2f7db75)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────────
