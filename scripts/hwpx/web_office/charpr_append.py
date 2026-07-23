@@ -128,6 +128,14 @@ def append_char_pr_with_overrides(
             fr.set(slot, face_id)
 
     char_pr_container.append(new_elem)
+    # itemCnt 보정 — <hh:charProperties itemCnt="N"> 은 charPr 개수를
+    # 선언한다. 실측(2026-07-24, 실제 Hancom Office COM): 요소만 append
+    # 하고 itemCnt 를 안 늘리면 textColor 가 검정으로 렌더링된다(bold/
+    # height 는 itemCnt 와 무관하게 정상 반영되지만, 색상은 이 카운트
+    # 기준 조회 테이블을 쓰는 것으로 보인다). 반드시 +1 해야 한다.
+    cnt_raw = char_pr_container.get("itemCnt")
+    if cnt_raw is not None and cnt_raw.isdigit():
+        char_pr_container.set("itemCnt", str(int(cnt_raw) + 1))
 
     new_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     return new_bytes, new_id

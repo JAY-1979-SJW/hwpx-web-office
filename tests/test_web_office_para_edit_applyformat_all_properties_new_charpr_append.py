@@ -36,6 +36,27 @@ def _char_prs(header_bytes: bytes) -> dict[str, ET.Element]:
 
 
 @pytest.mark.skipif(not FIXTURE.is_file(), reason="fixture missing")
+def test_item_cnt_incremented_on_append():
+    """실측(2026-07-24, 실제 Hancom Office COM) — charProperties itemCnt
+    를 안 늘리면 신규 charPr 의 textColor 가 검정으로 렌더링된다(bold/
+    height 는 itemCnt 무관하게 정상). 회귀 가드."""
+    before = _header_bytes()
+    before_root = ET.fromstring(before)
+    before_cnt = next(int(e.get("itemCnt"))
+                       for e in before_root.iter()
+                       if _ln(e.tag) == "charProperties")
+
+    after, _ = append_char_pr_with_overrides(before, "1", {"bold": True})
+    after_root = ET.fromstring(after)
+    after_cnt = next(int(e.get("itemCnt"))
+                      for e in after_root.iter()
+                      if _ln(e.tag) == "charProperties")
+
+    assert after_cnt == before_cnt + 1, (
+        "itemCnt 가 +1 되지 않음 — 실제 Hancom 에서 textColor 미반영 재현됨")
+
+
+@pytest.mark.skipif(not FIXTURE.is_file(), reason="fixture missing")
 def test_bold_italic_underline_toggle_append_only():
     before = _header_bytes()
     before_prs = _char_prs(before)
