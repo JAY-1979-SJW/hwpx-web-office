@@ -100,13 +100,21 @@ def _recognize_input_fields(
                         addr = next((x for x in tc.iter()
                                      if _ln(x.tag) == "cellAddr"), None)
                         if addr is not None:
+                            key = (int(addr.attrib.get("rowAddr", 0)),
+                                   int(addr.attrib.get("colAddr", 0)))
                             # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
                             # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
                             # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
                             # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
-                            amap.setdefault(
-                                (int(addr.attrib.get("rowAddr", 0)),
-                                 int(addr.attrib.get("colAddr", 0))), (r, c))
+                            # 발동 로그 필수(대표님 지적) — 무음이면 가드가
+                            # 정당한 규칙인지 임시방편인지 판별 불가.
+                            if key in amap:
+                                print(f"[COORD_WARN] ADDR_COLLISION_FIRST_WINS: "
+                                      f"{source_path} table=t_s{si}_{ti:03d} "
+                                      f"cellAddr={key} 첫 occ={amap[key]} "
+                                      f"무시된 occ=({r},{c})", file=_sys.stderr)
+                            else:
+                                amap[key] = (r, c)
                 addr_maps.append(amap)
 
         cells_by_id = {c.get("cellId"): c

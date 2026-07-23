@@ -86,6 +86,7 @@ def _extract_section(path, secname, row_scale=1.0):
 
     lines = []
     boxes = []
+    warnings: list[dict] = []
     st = {"page_idx": 0, "prev_vpos": -1, "flow_y": m_top, "max_y": m_top}
 
     def emit_para(p):
@@ -332,10 +333,16 @@ def _extract_section(path, secname, row_scale=1.0):
             for cp in c["tc"].iter():
                 if ln(cp.tag) == "p" and _nearest_cell(cp) is c["tc"]:
                     cell_lines.extend(_cell_para_lines(cp))
-            # 세로쓰기(vertical) 2글자 이상 헤더의 w/h 스왑 시도는 라인이
-            # DOM 에서 통째로 사라지는 부작용이 있어 보류(별도 조사 필요).
-            # 1글자 헤더(연/월 등 코퍼스 다수)는 writing-mode CSS 만으로
-            # 이미 정상 렌더 — 렌더러 쪽 vertical 플래그는 유지.
+            if c.get("vertical"):
+                # 세로쓰기 — lineseg 는 흐름방향(세로)을 horzsize, 두께
+                # (가로)를 vertsize 에 담는다(실측: '천억' 2글자 →
+                # horzsize=2348HU≈31px[2글자 세로길이], vertsize=900HU
+                # ≈12px[글자두께]). 스왑 안 하면 2글자 이상 헤더가 줄높이
+                # (12px, 1글자분) 부족으로 overflow:clip 에 잘린다.
+                # (이전 시도에서 "DOM 소실"로 오판했던 건 truth 배경모드
+                # 테스트 오류였음 — 자체렌더 모드로 재검증 후 재적용.)
+                for cl in cell_lines:
+                    cl["w"], cl["h"] = cl["h"], cl["w"]
             # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
             nested = []
             for nt in c["tc"].iter():
@@ -550,6 +557,18 @@ def _extract_section(path, secname, row_scale=1.0):
                 # (전진), 이미 채워진 flow_y 이전으로 되돌리지 않는다.
                 base_y = (max(_anchor_top, st["flow_y"])
                           if _anchor_top is not None else st["flow_y"])
+                if _anchor_top is not None and _anchor_top < st["flow_y"] - 0.5:
+                    # 가드 발동 로그 — 무음이면 진짜 앵커 계산 버그가 가드에
+                    # 가려져 diff 만 미세하게 나빠지는 원인추적 불가 상태가
+                    # 된다(대표님 지적). 발동 빈도를 코퍼스 통계로 뽑아
+                    # 가드가 정당한 규칙인지 임시방편인지 판별하는 근거.
+                    warnings.append({
+                        "code": "ANCHOR_CLAMPED",
+                        "message": (f"table anchor {_anchor_top:.1f}px < "
+                                    f"flow_y {st['flow_y']:.1f}px — "
+                                    "anchor 무시하고 flow_y 사용"),
+                        "anchorTop": round(_anchor_top, 1),
+                        "flowY": round(st["flow_y"], 1)})
                 for ti, t in enumerate(top_tbls):
                     walk_table(t, m_left, base_y,
                                anchor_vpos if ti == len(top_tbls) - 1
@@ -600,6 +619,7 @@ def _extract_section(path, secname, row_scale=1.0):
         "boxes": boxes,
         "pagesDetail": pages_detail,
         "charPrDefs": char_prs,
+        "warnings": warnings,
     }
 
 
@@ -619,7 +639,7 @@ def extract(path, row_scale=1.0):
     if len(sec_files) <= 1:
         return _extract_section(path, sec_files[0], row_scale)
 
-    merged_lines, merged_boxes, merged_pd = [], [], []
+    merged_lines, merged_boxes, merged_pd, merged_warnings = [], [], [], []
     page_base = 0
     first = None
     for sec in sec_files:
@@ -637,10 +657,11 @@ def extract(path, row_scale=1.0):
             pd = dict(pd)
             pd["no"] = page_base + pd["no"]
             merged_pd.append(pd)
+        merged_warnings.extend(r.get("warnings", []))
         page_base += r["pages"]
     out = dict(first)
     out.update(pages=page_base, lines=merged_lines, boxes=merged_boxes,
-               pagesDetail=merged_pd)
+               pagesDetail=merged_pd, warnings=merged_warnings)
     return out
 
 
@@ -775,6 +796,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
     # 표시 전용: sourcePath(편집·저장 대상)는 원본 유지.
     extract_from = cand
     normalized = False
+    normalization_discarded = None
     try:
         from .hancom_layout_refresh import normalize_for_layout
         norm = normalize_for_layout(cand, project_root=root)
@@ -790,7 +812,11 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
             except Exception:
                 orig_tbls, norm_tbls = [], []
             if orig_tbls and len(norm_tbls) < len(orig_tbls) * 0.5:
-                pass  # 정규화 폐기 — extract_from 은 cand 유지
+                # 정규화 폐기 — extract_from 은 cand 유지. 발동 로그 필수
+                # (대표님 지적) — 무음이면 진짜 정규화 회귀가 조용히 쌓여
+                # 원인추적 불가 상태가 된다.
+                normalization_discarded = {
+                    "origTables": len(orig_tbls), "normTables": len(norm_tbls)}
             else:
                 extract_from = norm
                 normalized = True
@@ -820,6 +846,22 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
                 layout, str(cand), str(extract_from))
         except Exception:
             layout["cellIdRemapped"] = False
+    layout.setdefault("warnings", [])
+    if normalization_discarded is not None:
+        layout["warnings"].append({
+            "code": "NORMALIZATION_DISCARDED",
+            "message": (
+                f"한컴 재저장 표 수 {normalization_discarded['normTables']} "
+                f"< 원본 {normalization_discarded['origTables']}*0.5 — "
+                "정규화 폐기, 원본으로 폴백"),
+            **normalization_discarded})
+        print(f"[COORD_WARN] NORMALIZATION_DISCARDED: {sp} "
+              f"({normalization_discarded})", file=sys.stderr)
+    for w in layout["warnings"]:
+        if w.get("code") == "ANCHOR_CLAMPED":
+            print(f"[COORD_WARN] ANCHOR_CLAMPED: {sp} "
+                  f"anchor={w['anchorTop']} flow_y={w['flowY']}",
+                  file=sys.stderr)
     layout["verdict"] = "PASS"
     layout["sourcePath"] = cand.relative_to(root).as_posix()
     layout["hancomNormalized"] = normalized
