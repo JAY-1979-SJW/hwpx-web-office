@@ -175,40 +175,38 @@ def _find_cell_elem(
     section_root: ET.Element, row: int, col: int,
     table_position_in_section: int | None,
 ) -> ET.Element | None:
-    """section root 안에서 (row, col) 좌표의 hp:tc 자손을 찾는다.
+    """section root 안에서 (row, col) 좌표의 hp:tc 를 찾는다.
 
-    table_position_in_section 이 주어지면 그 인덱스의 table 만 검색.
-    매칭은 hp:tc 의 cellAddr (rowAddr / colAddr) attribute 기반.
+    좌표계 주의 — 여기서 row/col 은 table_parser 가 매긴 **행 안 셀 순번**
+    (`enumerate` 인덱스, table_parser._parse_table_element 의 ri/ci)이다.
+    XML 의 `cellAddr/@rowAddr·@colAddr` 은 colSpan 을 반영한 **격자 주소**라
+    두 값은 병합 셀 뒤부터 갈라진다.
+
+    예전 구현은 순번을 격자 주소로 조회해 **옆 칸을 집어왔다.**
+    실측(fx_metadata_form.hwpx, 셀 53개 중 19개가 순번≠격자주소):
+
+        r5 순번c2  '전화번호'  ← colAddr=8 로 조회되어 '성명' 을 가져옴
+        r8 순번c2  '대표자 성명' ← 같은 이유로 '명칭'
+        r3 순번c6  '120일'     ← '처리일'
+
+    조회가 빗나가 None 이 되는 경우도 결함이었다. 합성 fallback 으로 빠져
+    텍스트는 맞지만 run·charPr 정밀도를 잃었다(RO_VIEW_PARAGRAPH_XML_FALLBACK).
+
+    따라서 파서와 **같은 규칙(순번)** 으로 찾는다. 좌표계 자체는 건드리지
+    않으므로 cellId·paragraphId 키와 renderPayload 격자는 그대로다.
     """
-    # tables in section, in document order
-    tables: list[ET.Element] = [
-        e for e in section_root.iter()
-        if local_name(e.tag).lower() == "tbl"
-    ]
-    if not tables:
+    tbl = _find_table_elem(section_root, table_position_in_section)
+    if tbl is None:
         return None
-    if table_position_in_section is not None:
-        if 0 <= table_position_in_section < len(tables):
-            candidates = [tables[table_position_in_section]]
-        else:
-            candidates = tables
-    else:
-        candidates = tables
-    for tbl in candidates:
-        for tc in tbl.iter():
-            if local_name(tc.tag).lower() != "tc":
-                continue
-            # cellAddr child 확인
-            for child in tc:
-                if local_name(child.tag).lower() == "celladdr":
-                    try:
-                        r = int(child.attrib.get("rowAddr", "-1"))
-                        c = int(child.attrib.get("colAddr", "-1"))
-                    except (TypeError, ValueError):
-                        r, c = -1, -1
-                    if r == row and c == col:
-                        return tc
-    return None
+    # 직계 자식만 훑는다 — tbl.iter() 는 중첩 표의 tr/tc 까지 끌어와
+    # 바깥 표의 순번을 안쪽 표 셀로 잘못 해석한다.
+    rows = [e for e in tbl if local_name(e.tag).lower() == "tr"]
+    if not 0 <= row < len(rows):
+        return None
+    cols = [e for e in rows[row] if local_name(e.tag).lower() == "tc"]
+    if not 0 <= col < len(cols):
+        return None
+    return cols[col]
 
 
 def _find_table_elem(
