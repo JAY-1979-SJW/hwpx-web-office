@@ -86,15 +86,13 @@ export function mountWebOffice(root) {
         return;
       }
       paraEdits.set(paragraphId, newText);
-      setStatus("ok", "문단 저장 완료(새 sandbox 사본)");
-      // 좌표 레이아웃(coordLayout)은 재요청하지 않는다 — writer 가 편집된
-      // 문단의 lineseg 를 지워 저장하므로(한컴 재-flow 유도, 이번 세션
-      // 확립 규칙) 새 레이아웃엔 이 문단 줄 자체가 사라져 편집 오버레이를
-      // 그릴 위치를 잃는다. 셀 편집과 동일하게 "편집 전 좌표"를 계속 써서
-      // 그 자리에 새 텍스트를 얹는다(다음 전체 재로딩 전까지).
-      // documentModel/sourcePath 는 조용히 새 sandbox 기준으로 갱신 —
-      // 다음 편집이 SOURCE_HASH_MISMATCH 로 거부되지 않게 하려는 목적뿐,
-      // 화면 재렌더와는 무관.
+      setStatus("ok", "문단 저장 완료(새 sandbox 사본) · 재로딩 …");
+      // writer 가 이제 편집된 문단의 lineseg 를 보존(줄 수 증가 추정 시만
+      // 근사 보정)하므로, 새 레이아웃을 다시 물어보면 그 문단의 실제 줄
+      // 좌표가 나온다 — 더 이상 "편집 전 좌표를 계속 쓰는" 임시방편이
+      // 필요 없다(실측 확인: 재요청 시 해당 paragraphId 줄 정상 반환).
+      // documentModel/sourcePath 도 함께 갱신 — 다음 편집이
+      // SOURCE_HASH_MISMATCH 로 거부되지 않게 한다.
       if (d.sourcePath) {
         try {
           const res2 = await fetch("/api/web-office/hwpx-load", {
@@ -115,7 +113,12 @@ export function mountWebOffice(root) {
           loaded.sourcePath = d.sourcePath;
         }
       }
+      // 이 문단은 이제 실제 좌표로 다시 그려질 것이므로 클라이언트 캐시
+      // 오버레이는 걷어낸다("덧방" 제거) — 아래 재로딩된 좌표가 진실.
+      paraEdits.delete(paragraphId);
+      coordLayout = await fetchLayout(loaded.sourcePath);
       render();
+      probeTruth(loaded.sourcePath);
     } catch (e) {
       setStatus("fail", "문단 저장 실패: " + (e.message || e));
     } finally {
