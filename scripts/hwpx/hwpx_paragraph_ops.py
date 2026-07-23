@@ -85,6 +85,35 @@ def _first_text_node_in_run(run_elem: ET.Element) -> ET.Element | None:
     return None
 
 
+def _text_tag_like(run_elem: ET.Element) -> str:
+    """run 과 같은 네임스페이스의 <hp:t> 태그명."""
+    tag = run_elem.tag
+    if "}" in tag:
+        return tag.rsplit("}", 1)[0] + "}t"
+    return "t"
+
+
+def _create_text_node_in_empty_run(run_elem: ET.Element) -> ET.Element:
+    """자식이 하나도 없는 run 에 빈 <hp:t> 를 만들어 넣는다.
+
+    서식의 빈 입력칸은 run 은 있는데 그 안에 텍스트 노드가 없다:
+
+        <hp:run charPrIDRef="11"/>                    ← 빈 칸
+        <hp:run charPrIDRef="10"><hp:t>성명</hp:t></hp:run>   ← 채운 칸
+
+    글자를 넣을 자리가 없어 writer 가 RUN_TEXT_NODE_MISSING 으로 거부했고,
+    **자동채움이 노리는 칸은 정의상 전부 빈 칸이라 채울 수 있는 칸이 하나도
+    없었다.** (기존 문단 편집 시험이 통과해온 것은 이미 글자가 있는 칸을
+    고치는 경우였다.)
+
+    charPrIDRef 는 run 의 것을 그대로 쓴다 — 신규 charPr 을 만들지 않으므로
+    CLAUDE.md §4 금지선에 저촉되지 않는다.
+    """
+    node = ET.SubElement(run_elem, _text_tag_like(run_elem))
+    node.text = ""
+    return node
+
+
 # ── single-run text range edit ─────────────────────────────────
 
 def apply_text_range_edit(
@@ -108,15 +137,25 @@ def apply_text_range_edit(
     """
     text_node = _first_text_node_in_run(run_elem)
     if text_node is None:
-        return {
-            "status": STATUS_RUN_TEXT_NODE_MISSING,
-            "beforeText": None,
-            "afterText": None,
-            "charPrIDRef": run_elem.attrib.get("charPrIDRef"),
-            "paraPrIDRef": paragraph_elem.attrib.get("paraPrIDRef"),
-            "runIndexInPara": _index_of(paragraph_runs(paragraph_elem),
-                                        run_elem),
-        }
+        # 빈 칸에 **처음** 글자를 넣는 경우에 한해 텍스트 노드를 만든다.
+        #   · range 가 [0,0] — 삽입이지 교체·삭제가 아니다
+        #   · expected_before 가 비어 있다 — 지울 기존 글자가 없다
+        #   · run 에 자식이 하나도 없다 — hp:ctrl/hp:br 등이 섞인 run 은
+        #     건드리지 않고 종전대로 거부한다(안전한 쪽으로 실패)
+        if (range_start == 0 and range_end == 0
+                and (expected_before is None or expected_before == "")
+                and len(list(run_elem)) == 0):
+            text_node = _create_text_node_in_empty_run(run_elem)
+        else:
+            return {
+                "status": STATUS_RUN_TEXT_NODE_MISSING,
+                "beforeText": None,
+                "afterText": None,
+                "charPrIDRef": run_elem.attrib.get("charPrIDRef"),
+                "paraPrIDRef": paragraph_elem.attrib.get("paraPrIDRef"),
+                "runIndexInPara": _index_of(paragraph_runs(paragraph_elem),
+                                            run_elem),
+            }
     original = text_node.text or ""
     if (range_start < 0 or range_end < range_start
             or range_end > len(original)):

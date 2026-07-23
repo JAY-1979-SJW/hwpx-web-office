@@ -82,17 +82,25 @@ def test_unknown_header_object_id_rejected():
 
 @pytest.mark.skipif(not FIXTURE.is_file(), reason="fixture missing")
 def test_footer_kind_without_matching_object_rejected_not_crash():
-    """이 fixture 는 footer 가 없다 — 존재하지 않는 footer id 요청은
-    깨지지 않고 정상 반려돼야 한다(구조 예외 아님)."""
+    """매칭되지 않는 footer id 요청은 깨지지 않고 정상 반려돼야 한다.
+
+    주의 — 이 fixture 에는 `<hp:footer id="0">` 이 **실재한다**(문단 5개).
+    예전 이 테스트는 objectId="0" 을 썼고, 그 footer 의 첫 문단 run 이
+    비어 있어 RUN_TEXT_NODE_MISSING 으로 반려되면서 통과했다. 즉
+    'footer 를 못 찾아서'가 아니라 '빈 run 이라 못 써서' 통과한 것이라,
+    이 테스트의 이름과 다른 것을 검증하고 있었다.
+
+    빈 칸 기입이 가능해지면서(자동채움 전제) 그 우연한 방어벽이 사라져
+    드러났다. 이름대로 **매칭되지 않는 id** 로 바로잡는다.
+    """
     package = HwpxPackage(FIXTURE)
     source_hash = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
     item = _make_item(sourceDocumentHash=source_hash)
     item["containerScope"] = {"kind": "footer", "sectionIndex": 0,
-                              "objectId": "0", "paragraphIndex": 0}
+                              "objectId": "__no_such_footer__",
+                              "paragraphIndex": 0}
     result = apply_paragraph_edits_plan(
         package, [item], source_hash, dry_run=False, conflict_cells=set())
-    # 핵심은 "깨지지 않고 반려된다" — 정확한 사유는 fixture 구조에 따라
-    # 갈릴 수 있어(빈 run 등) 반려 자체만 확인한다.
     assert result["applied"] == []
     assert result["rejected"]
-    assert result["rejected"][0]["reason"]
+    assert result["rejected"][0]["reason"] == "HEADER_FOOTER_NOT_FOUND"
