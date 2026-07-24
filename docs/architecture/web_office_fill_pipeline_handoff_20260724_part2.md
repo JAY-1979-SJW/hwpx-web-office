@@ -72,8 +72,12 @@ a9f96fe  docs 입력 census 범위 명시 (미푸시)
 
 ## 5. 남은 것 (전부 채움 "바깥" 별도 공정 — 우선순위 순)
 
-1. 🟡 **프론트 질문 패널** — 백엔드(`/fill-plan`·`/ai-fill`) 준비 완료, **UI 미구현**.
-   사용자가 실제로 쓰려면 이게 다음 관문. `weboffice.html`/`app.mjs`(병행 세션 영역).
+1. ✅ **프론트 질문 패널 — 완료** (`048c0e7`, 독립). `frontend/web_office_viewer/
+   form_question_panel.html`+`.mjs`. app.mjs(병행 세션 영역)를 안 건드리고
+   기존 엔드포인트(hwpx-load→fill-plan→para-save-apply→download)만 쓴다.
+   HTTP 종단 검증: 로드·계획·기입 PASS·다운로드 200·저장본 제자리 5/5.
+   **남은 것**: 병행 세션의 메인 편집기(app.mjs)에 통합(선택). 지금도
+   form_question_panel.html 단독으로 채움 전 흐름 구동 가능.
 2. 🟡 **OCR 실촬영 종단** — `/source-extract` 를 더미가 아닌 **진짜 이미지**로 1회.
 3. 🟡 **V1/V7 readback 검증기** — 여전히 하드코딩 FAIL(`V1_READBACK_UNSUPPORTED`).
    좌표가 수리됐으므로 이제 구현 가능. 기입은 되지만 파이프라인 내 위치검증이 스텁.
