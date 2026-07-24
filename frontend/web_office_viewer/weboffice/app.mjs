@@ -46,11 +46,11 @@ export function mountWebOffice(root) {
   // 없다. apply-format 과 동일하게 즉시 서버에 저장하고 sourcePath 를
   // 이어받는다(원본은 무수정, 결과는 항상 새 sandbox 사본).
   async function _doSaveParagraphText(paragraphId, newText) {
-    if (!loaded) return;
+    if (!loaded) return false;
     const model = loaded.documentModel || {};
     const p = (model.paragraphs || []).find(
       (x) => x.paragraphId === paragraphId);
-    if (!p) { setStatus("fail", "편집 대상 문단을 찾을 수 없음"); return; }
+    if (!p) { setStatus("fail", "편집 대상 문단을 찾을 수 없음"); return false; }
     // 재편집 시 서버 기준값은 직전 편집 결과(이미 sourcePath 가 그
     // sandbox 사본으로 갱신돼 있음) — 원본 documentModel.text 가 아니라
     // paraEdits 에 남은 마지막 저장값을 expectedBefore 로 써야 두 번째
@@ -60,11 +60,11 @@ export function mountWebOffice(root) {
     // 전체 교체는 첫 run(오프셋 0)의 charPr 을 그대로 적용 — 신규 charPr
     // 생성 없음(§4 유지). 다중 run 문단도 anchor(첫 run) 서식으로 통일.
     const applyPr = (p.runs && p.runs[0] && p.runs[0].charPrIDRef) || null;
-    if (before === newText) return;   // 무변경 — 저장 안 함
+    if (before === newText) return true;   // 무변경 — 저장 안 함(이미 반영됨)
     paraBusy = true;
     setStatus("load", "문단 저장 중 …");
     try {
-      await _runParaSaveCommand(model, {
+      return !!(await _runParaSaveCommand(model, {
         commandId: `pc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         commandType: "REPLACE_TEXT_RANGE",
         target: { paragraphId },
@@ -77,9 +77,10 @@ export function mountWebOffice(root) {
         expectedBefore: before,
         sourceDocumentHash: model.sourceDocumentHash
           || (model.sourceRef && model.sourceRef.sha256),
-      }, { onOk: () => paraEdits.set(paragraphId, newText) });
+      }, { onOk: () => paraEdits.set(paragraphId, newText) }));
     } catch (e) {
       setStatus("fail", "문단 저장 실패: " + (e.message || e));
+      return false;
     } finally {
       paraBusy = false;
     }
@@ -111,7 +112,7 @@ export function mountWebOffice(root) {
           || (d.rejected && d.rejected[0] && d.rejected[0].reason)
           || d.verdict || "문단 저장 실패";
         setStatus("fail", "문단 저장 거부: " + msg);
-        return;
+        return false;
       }
       const paragraphId = command.target.paragraphId;
       if (opts.onOk) opts.onOk();
@@ -159,6 +160,7 @@ export function mountWebOffice(root) {
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
+      return true;
   }
 
   // 상시 편집 가능한 문단 흐름 상자(대표님 지시, 2026-07-24: "워드
@@ -242,8 +244,13 @@ export function mountWebOffice(root) {
             const before = origText.get(pid);
             const now = d.textContent;
             if (now !== before) {
-              origText.set(pid, now);
-              saveParagraphText(pid, now);
+              // origText 는 저장이 실제로 성공했을 때만 갱신한다 —
+              // 거부(REJECTED)된 뒤에도 낙관적으로 먼저 갱신해버리면,
+              // 실패한 편집이 "이미 반영됨"으로 착각돼 다음 blur 에서
+              // 다시 시도되지 않고 조용히 유실된다(코드 검증 중 발견).
+              saveParagraphText(pid, now).then((ok) => {
+                if (ok) origText.set(pid, now);
+              });
             }
           }
         } finally {
@@ -265,17 +272,26 @@ export function mountWebOffice(root) {
   // 흐름 상자 안 텍스트 선택 → 서식 버튼 대상(paragraphId + 문자 범위)
   // 갱신. 선택이 비어있거나 흐름 상자 밖이면 해제.
   function updateParaSelFromSelection() {
+    const clearAndDisable = () => {
+      paraSelTarget = null;
+      // 셀이 별도로 선택돼 있으면(selectCellForFormat) 그 서식 버튼
+      // 상태를 건드리지 않는다 — 흐름 상자 선택 해제와 무관한 대상.
+      if (!selectedCellId) {
+        ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
+          .forEach((r) => { $(`[data-role=${r}]`).disabled = true; });
+      }
+    };
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) { paraSelTarget = null; return; }
+    if (!sel || sel.rangeCount === 0) { clearAndDisable(); return; }
     const range = sel.getRangeAt(0);
     const startEl = (range.startContainer.nodeType === 1
       ? range.startContainer : range.startContainer.parentElement);
     const pdiv = startEl && startEl.closest
       ? startEl.closest("[data-paragraph-id]") : null;
-    if (!pdiv || !pdiv.closest(".wo-flowbox")) { paraSelTarget = null; return; }
+    if (!pdiv || !pdiv.closest(".wo-flowbox")) { clearAndDisable(); return; }
     const startOff = _localTextOffset(pdiv, range.startContainer, range.startOffset);
     const endOff = _localTextOffset(pdiv, range.endContainer, range.endOffset);
-    if (startOff === endOff) { paraSelTarget = null; return; }
+    if (startOff === endOff) { clearAndDisable(); return; }
     paraSelTarget = { paragraphId: pdiv.dataset.paragraphId,
       start: Math.min(startOff, endOff), end: Math.max(startOff, endOff) };
     ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
@@ -295,6 +311,11 @@ export function mountWebOffice(root) {
   // 서식 툴바 — 클릭된 칸을 서식 적용 대상으로 표시하고 버튼을 켠다.
   function selectCellForFormat(id, box) {
     selectedCellId = id;
+    // 흐름 상자 쪽 텍스트 선택은 셀 클릭보다 오래된 상태일 수 있다 —
+    // 지우지 않으면 applyFormat 이 우선순위상 그 낡은 선택을 계속 쓰게
+    // 되어 방금 클릭한 셀이 아니라 엉뚱한 문단에 서식이 적용된다
+    // (코드 검증 중 발견).
+    paraSelTarget = null;
     root.querySelectorAll(".co-box.wo-fmt-selected")
       .forEach((b) => b.classList.remove("wo-fmt-selected"));
     if (box) box.classList.add("wo-fmt-selected");
@@ -663,6 +684,7 @@ export function mountWebOffice(root) {
     coordLayout = null;
     truthBase = null;
     selectedCellId = null;
+    paraSelTarget = null;
     ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]
       .forEach((r) => { $(`[data-role=${r}]`).disabled = true; });
     cell = createCellEditController(d.documentModel);
