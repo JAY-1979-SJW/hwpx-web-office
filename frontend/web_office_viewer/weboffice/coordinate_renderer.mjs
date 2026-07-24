@@ -62,6 +62,30 @@ function lineMaxFontPx(line, defs, fallbackFs) {
   return maxPx;
 }
 
+/* 줄 안에서 가장 큰 폰트를 쓰는 세그먼트의 charPr 을 이 줄의 "대표 서식"
+ * 으로 골라 CSS 문자열로 반환. data-font-css 로 co-line 에 실어, 편집기
+ * (app.mjs mountAlwaysOnParagraphFlow)가 항상(원본 실렌더 배경 모드처럼
+ * <span> 이 아예 없는 경우에도) 실제 폰트 크기/굵기를 그대로 적용할 수
+ * 있게 한다 — 이전엔 첫 <span> 을 DOM 에서 샘플링했는데, 그 span 이 없는
+ * 모드(사진 배경)에서 항상 빈 문자열로 떨어져 편집 상자가 원본과 다른
+ * (더 작은) 기본 크기로 그려지는 결함이 있었다(실사례: "10-3." 문단이
+ * 다른 목록 항목보다 큰 서식이라 편집 상자가 사진 글자를 다 못 가려
+ * 겹쳐 보임). */
+function lineFontCss(line, defs, fallbackFs) {
+  const segs = (line.segments && line.segments.length)
+    ? line.segments
+    : [{ charPr: null }];
+  let bestDef = null, bestPx = -1;
+  for (const sg of segs) {
+    const def = sg.charPr != null ? defs[sg.charPr] : null;
+    const px = (def && def.fontSizePt) ? def.fontSizePt * (96 / 72) : fallbackFs;
+    if (px > bestPx) { bestPx = px; bestDef = def; }
+  }
+  let css = bestDef ? charPrToCss(bestDef) : "";
+  if (!bestDef || !bestDef.fontSizePt) css += `font-size:${fallbackFs.toFixed(1)}px;`;
+  return css;
+}
+
 /* auto-fit — 렌더 후 호출. 각 줄의 실제 내용폭(scrollWidth)이 줄상자
  * 폭(clientWidth)을 넘으면(폰트 차/justify 미작동으로 자연폭이 넓을 때)
  * transform:scaleX 로 가로 압축해 줄상자 안에 맞춘다. 한컴의 justify
@@ -163,8 +187,10 @@ export function renderCoordinateLayout(layout, opts = {}) {
         // 다만 본문 문단 줄은 co-box(표 셀 전용) 같은 별도 클릭 타깃이
         // 없으므로, 투명 클릭 박스만 최소한으로 남겨 편집 진입로를 유지.
         if (opts.editable && !l.cellId && l.paragraphId) {
+          const fs0 = Math.max(7, l.h * 0.72);
           parts.push(`<div class="co-line" data-paragraph-id="`
-            + `${esc(l.paragraphId)}" style="left:${l.x}px;`
+            + `${esc(l.paragraphId)}" data-font-css="`
+            + `${esc(lineFontCss(l, defs, fs0))}" style="left:${l.x}px;`
             + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
             + `height:${l.h}px;"></div>`);
         }
@@ -195,7 +221,8 @@ export function renderCoordinateLayout(layout, opts = {}) {
         : "";
       const paraAttr = (opts.editable && !l.cellId && l.paragraphId)
         ? ` data-paragraph-id="${esc(l.paragraphId)}"`
-          + ` data-para-offset="${l.paraTextOffset ?? 0}"` : "";
+          + ` data-para-offset="${l.paraTextOffset ?? 0}"`
+          + ` data-font-css="${esc(lineFontCss(l, defs, fs))}"` : "";
       parts.push(`<div class="co-line"${paraAttr} style="left:${l.x}px;`
         + `top:${localY(l.y).toFixed(1)}px;width:${l.w}px;`
         + `height:${l.h}px;line-height:${l.h}px;`

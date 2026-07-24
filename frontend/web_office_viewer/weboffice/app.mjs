@@ -215,9 +215,14 @@ export function mountWebOffice(root) {
       for (let i = 0; i < order.length; i++) {
         const pid = order[i];
         const l = firstLineOf.get(pid);
-        const sampleSpan = l.querySelector(".co-in > span");
-        const fontCss = sampleSpan
-          ? (sampleSpan.getAttribute("style") || "") : "";
+        // data-font-css(렌더러가 실제 charPr 에서 뽑은 대표 서식)를 우선
+        // 쓴다 — "원본 실렌더 배경" 모드는 .co-in > span 자체가 없어(사진
+        // 위 투명 클릭 타깃만 존재) 예전 span 샘플링은 늘 빈 문자열로
+        // 떨어져 편집 상자가 원본보다 작은 기본 크기로 그려지는 결함이
+        // 있었다(실사례: "10-3." 문단이 목록 다른 항목보다 큰 서식이라
+        // 편집 상자 덮개가 사진 글자를 다 못 가려 겹쳐 보임).
+        const fontCss = l.dataset.fontCss
+          || (l.querySelector(".co-in > span")?.getAttribute("style") || "");
         const cur = paraEdits.has(pid) ? paraEdits.get(pid)
           : ((loaded.documentModel.paragraphs || [])
               .find((p) => p.paragraphId === pid) || {}).text || "";

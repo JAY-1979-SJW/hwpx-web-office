@@ -254,8 +254,16 @@ def call_para_save_apply(
         # (같은 경로에 이미 반영됨), 아니면 기존처럼 새 sandbox 산출물로
         # 체이닝. writer 미실행(NOOP/DRY_RUN)이면 outputPath 가 없어
         # sourcePath 도 원본 그대로 둔다.
-        if (not result.get("editedInPlace") and result.get("outputCreated")
-                and result.get("outputPath")):
+        #
+        # 실측(2026-07-24)으로 발견한 결함: editedInPlace 분기에서
+        # public_result["sourcePath"] 를 아예 안 채우고 있었다 — 응답에
+        # sourcePath 자체가 없으니 프런트의 "if (d.sourcePath) { 재로딩 }"
+        # 가드가 통째로 건너뛰어져, 저장 후 documentModel 이 갱신되지
+        # 않고 영원히 예전 상태로 남았다(화면에 "겹침"으로 나타난 결함의
+        # 근본 원인 — 좌표는 새로 받아오는데 문단 텍스트만 옛날 것).
+        if result.get("editedInPlace"):
+            public_result["sourcePath"] = request.get("sourcePath")
+        elif result.get("outputCreated") and result.get("outputPath"):
             out_path = Path(result["outputPath"])
             public_result["sourcePath"] = out_path.resolve().relative_to(
                 project_root.resolve()).as_posix()
@@ -666,7 +674,15 @@ def create_app() -> Any:
         if not png.is_file():
             return JSONResponse(status_code=404,
                                 content={"error": "PAGE_OUT_OF_RANGE"})
-        return FileResponse(str(png), media_type="image/png")
+        # 원본 직접 수정(§4.3) 이후 sourcePath 가 편집마다 바뀌지 않고
+        # 그대로 유지되므로, 브라우저가 이 URL(?src=<같은 경로>)을 예전
+        # 응답(수정 전 사진)으로 캐시해버리면 편집 후에도 낡은 배경 위에
+        # 새 텍스트가 겹쳐 보이는 "겹침"이 생긴다(실측 확인 — 화면에서
+        # 같은 줄이 두 번 보이던 결함의 원인). out_dir 자체가 내용 해시
+        # 기준이라 서버 캐시는 정확하지만, 브라우저 HTTP 캐시가 문제이므로
+        # 명시적으로 매번 재검증하도록 강제한다.
+        return FileResponse(str(png), media_type="image/png",
+                            headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
     @app.get("/api/web-office/download/{filename}")
     def download(filename: str):
