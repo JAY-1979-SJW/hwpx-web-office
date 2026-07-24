@@ -18,6 +18,23 @@
     button:disabled { opacity: .5; cursor: default; }
     [data-testid="download-link"] { display: inline-block; margin-top: .5rem;
              font-weight: 600; }
+    /* 충실 뷰어 — 좌표 렌더러(coordinate_renderer)가 내는 .co-page 절대배치.
+       원본대로 페이지를 끊어 그린다(weboffice.html 의 .co-* 규칙과 동일). */
+    [data-testid="viewer"] { border: 1px solid #d7dde3; border-radius: 8px;
+             padding: 8px; height: 84vh; overflow: auto; background: #e9edf1; }
+    .wo-a4-toolbar { text-align: center; margin-bottom: 8px; }
+    .co-scaler { position: relative; overflow: hidden; }  /* 축소 후 실제 크기로 스크롤 정합 */
+    .co-page { position: relative; background: #fff; margin: 0 auto 20px;
+             box-shadow: 0 1px 8px rgba(0,0,0,.16);
+             font-family: "함초롬바탕","바탕","Malgun Gothic",serif;
+             overflow: clip; }
+    .co-line { position: absolute; white-space: pre; overflow: clip;
+             overflow-clip-margin: 3px; }
+    .co-box { position: absolute; }
+    .co-role { position: absolute; pointer-events: none; }
+    .co-empty { color: #8a94a0; text-align: center; padding: 40px; }
+    .co-role[data-fill-role="applicant"] { background: rgba(45,108,223,.13); }
+    .co-role[data-fill-role="office"] { background: rgba(120,120,120,.13); }
   </style>
 </head>
 <body>

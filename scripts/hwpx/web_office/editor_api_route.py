@@ -379,8 +379,16 @@ def call_fill_plan(request: dict[str, Any],
         "sensitiveCount": schema["sensitiveCount"],
         "autoFill": plan["autoFill"],
         "questions": plan["questions"],
+        # 관계자(관공서) 칸 — 민원인이 채우지 않는다. 뷰어에서 구분 표시하고
+        # 사용자가 '내 칸/남의 칸'을 알 수 있게 목록을 실어 보낸다(예전엔
+        # 버려서 패널이 못 봤다). 좌표만 주고 값은 없다.
+        "skipped": [{"label": s.get("label"), "paragraphId": s.get("paragraphId"),
+                     "role": s.get("role"), "tableIndex": s.get("tableIndex"),
+                     "row": s.get("row"), "col": s.get("col")}
+                    for s in plan.get("skipped", [])],
         "autoFillCount": plan["autoFillCount"],
         "questionCount": plan["questionCount"],
+        "officeCount": len(plan.get("skipped", [])),
         "coverage": round(plan["coverage"], 3),
     })
 

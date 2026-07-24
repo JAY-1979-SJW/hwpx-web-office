@@ -176,6 +176,22 @@ def load_hwpx_for_editor(
         return {"verdict": "REJECTED", "reason": "INVALID_REQUEST",
                 "detail": str(exc)}
 
+    # 파싱 캐시 — 같은 파일을 두 번 파싱하지 않는다. '서식 불러오기' 한 번에
+    # /hwpx-load 와 /fill-plan 이 같은 파일을 각각 로드해 이중 파싱하던 것을,
+    # 두 번째가 캐시 적중으로 즉시 끝나게 한다. 같은 서식 재로드도 즉시.
+    # 키는 파일 내용 sha + 파서버전이라, 파서가 바뀌면 자동 무효화된다.
+    _pc = None
+    _digest = None
+    try:
+        from . import parse_cache as _pc
+        _digest = _pc.source_digest(source_path)
+        _hit = _pc.read_entry(_digest)
+        if _hit is not None:
+            return _pc._refresh_volatile(_hit)
+    except Exception:      # noqa: BLE001 — 캐시 고장이 로드를 막지 않는다
+        _pc = None
+        _digest = None
+
     doc = import_hwpx_as_ro_view(source_path)
     document_model = _sanitize_document_model(doc.to_dict(), source_rel)
     # AI 필드 인식 — 라벨·빈칸 짝을 해부해 입력 지점을 열고 라벨을 단다
@@ -186,7 +202,7 @@ def load_hwpx_for_editor(
     render_payload = _sanitize_render_payload(build_render_payload(doc), source_rel)
     cells = document_model.get("cells") or []
     header_cells = [c for c in cells if c.get("headerCell") is True]
-    return {
+    result = {
         "operation": "HWPX_EDITOR_LOAD",
         "verdict": "PASS",
         "sourcePath": source_rel,
@@ -203,6 +219,12 @@ def load_hwpx_for_editor(
             "warnings": len(document_model.get("warnings") or []),
         },
     }
+    if _pc is not None and _digest is not None:
+        try:
+            _pc.write_entry(_digest, result)
+        except Exception:      # noqa: BLE001 — 캐시 저장 실패는 로드를 막지 않는다
+            pass
+    return result
 
 
 def load_and_apply_cell_save(

@@ -75,17 +75,24 @@ def by_category(domain: str, *, limit: int = 40) -> dict[str, Any]:
         clause = " OR ".join("name LIKE ?" for _ in kws)
         params = [f"%{k}%" for k in kws] + [limit]
         rows = con.execute(
-            f"SELECT form_id,form_type,statute_no,name,field_count,table_count,cell_count "
+            f"SELECT form_id,form_type,statute_no,name,field_count,table_count,cell_count,source_path "
             f"FROM forms WHERE status='OK' AND ({clause}) "
             f"ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?", params).fetchall()
         results = []
         for r in rows:
             labels = [x[0] for x in con.execute(
                 "SELECT label FROM fields WHERE form_id=? LIMIT 12", (r["form_id"],))]
+            # sourcePath: 프론트가 hwpx-load/fill-plan 에 그대로 넘겨 서식을
+            # 연다. 이미 그 두 엔드포인트의 입력 계약이라 노출 일관성 유지.
+            # 프로젝트 밖 절대경로는 로드가 거부하므로 목록에서도 뺀다.
+            rel = r["source_path"] or ""
+            if rel.startswith(("/", "\\")) or ":" in rel[:3]:
+                continue
             results.append({"formId": r["form_id"], "formType": r["form_type"],
                             "statuteNo": r["statute_no"], "name": r["name"],
                             "fieldCount": r["field_count"], "tableCount": r["table_count"],
-                            "cellCount": r["cell_count"], "sampleFields": labels})
+                            "cellCount": r["cell_count"], "sampleFields": labels,
+                            "sourcePath": rel})
         con.close()
         return {"ready": True, "domain": domain, "results": results}
     except sqlite3.Error as e:

@@ -7,6 +7,8 @@
  */
 import {
   charPrIndex, buildFillCommands, partitionPlan, initialAnswers,
+  parseSourceLines, applyAiProposals, planFieldRows, roleCellMap,
+  roleByCellId,
 } from "./form_question_panel.mjs";
 
 let failed = 0;
@@ -95,6 +97,93 @@ const flowDoc = { paragraphs: [{ paragraphId: "a1",
   runs: [{ text: "", charPrIDRef: "1" }] }] };
 const flowCmds = buildFillCommands({ a1: "서울" }, flowDoc, HASH);
 assert(flowCmds.length === 1, "통합 흐름 명령화");
+
+// ── parseSourceLines: "항목: 값" 파싱 ───────────────────────────────────
+const src = parseSourceLines("상호: 가나다전기\n대표자 : 홍길동\n빈줄\n전화： 02-1\n무값:");
+assert(src["상호"] === "가나다전기", "콜론 파싱");
+assert(src["대표자"] === "홍길동", "공백 허용");
+assert(src["전화"] === "02-1", "전각 콜론 허용");
+assert(!("무값" in src), "값 없는 줄 제외");
+assert(!("빈줄" in src), "콜론 없는 줄 제외");
+
+// ── applyAiProposals: 제3자 칸 자동 안 채움 ─────────────────────────────
+const planItems = [
+  { label: "상호", paragraphId: "p_org" },
+  { label: "법정대리인성명", paragraphId: "p_rep" },
+  { label: "주소", paragraphId: "p_addr" },
+];
+const aiResult = {
+  proposals: [
+    { label: "상호", value: "가나다전기", key: "p_org" },
+    { label: "주소", value: "서울시", key: "p_addr" },
+    { label: "법정대리인성명", value: "홍길동", key: "p_rep" },  // 모델이 잘못 냄
+  ],
+  heldForThirdParty: [{ label: "법정대리인성명" }],
+};
+const merged = applyAiProposals({}, aiResult, planItems);
+assert(merged["p_org"] === "가나다전기", "본인 칸 제안 반영");
+assert(merged["p_addr"] === "서울시", "본인 칸 제안 반영2");
+assert(!("p_rep" in merged), "제3자 칸은 held 라 자동 안 채움");
+
+// ── applyAiProposals: 사용자 입력 우선(안 덮음) ─────────────────────────
+const merged2 = applyAiProposals({ p_org: "내가입력" }, aiResult, planItems);
+assert(merged2["p_org"] === "내가입력", "기존 사용자 입력 보존");
+
+// ── planFieldRows: 서식이 바뀌면 필드 목록이 통째로 바뀐다 ──────────────
+// (신고된 버그 "서식 변경 시 입력창이 안 바뀜" 의 회귀 감시)
+const planA = {
+  autoFill: [{ paragraphId: "A_p1", label: "성명" }],
+  questions: [{ paragraphId: "A_q1", label: "사용용도" }],
+  skipped: [],
+};
+const planB = {
+  autoFill: [],
+  questions: [{ paragraphId: "B_q1", label: "전기사용장소" },
+              { paragraphId: "B_q2", label: "소유자명" }],
+  skipped: [],
+};
+const rowsA = planFieldRows(planA, initialAnswers(planA));
+const rowsB = planFieldRows(planB, initialAnswers(planB));
+const pidsA = rowsA.map((r) => r.paragraphId).sort();
+const pidsB = rowsB.map((r) => r.paragraphId).sort();
+assert(JSON.stringify(pidsA) === JSON.stringify(["A_p1", "A_q1"]),
+  "서식 A 필드");
+assert(JSON.stringify(pidsB) === JSON.stringify(["B_q1", "B_q2"]),
+  "서식 B 필드");
+assert(pidsA.every((p) => !pidsB.includes(p)),
+  "서식 바꾸면 이전 서식 필드가 하나도 안 남는다");
+// 값도 새 서식 기준(A의 값이 B로 새지 않음)
+const rowsB2 = planFieldRows(planB, { A_p1: "옛값" });
+assert(rowsB2.every((r) => r.value === ""), "이전 서식 답이 새 서식에 안 샘");
+
+// ── roleCellMap: 민원인/관계자 셀 좌표 구분 ─────────────────────────────
+const planRC = {
+  autoFill: [{ paragraphId: "a", tableIndex: 0, row: 1, col: 1 }],
+  questions: [{ paragraphId: "q", tableIndex: 0, row: 2, col: 1 }],
+  skipped: [{ paragraphId: "s", tableIndex: 0, row: 0, col: 0 }],
+};
+const rc = roleCellMap(planRC);
+assert(rc["0:1:1"] === "applicant", "자동채움 칸 = 민원인");
+assert(rc["0:2:1"] === "applicant", "질문 칸 = 민원인");
+assert(rc["0:0:0"] === "office", "skipped 칸 = 관계자");
+assert(Object.keys(rc).length === 3, "좌표 없는 항목은 제외");
+
+// ── roleByCellId: paragraphId → 좌표 렌더러 cellId 역할 매핑 ──────────────
+// (충실 뷰어 .co-box[data-cell-id] / 레이아웃 박스 색칠의 근거)
+const planCid = {
+  autoFill: [{ paragraphId: "par_t_s0_000_r1_c1_p0" }],
+  questions: [{ paragraphId: "par_t_s0_002_r3_c2_p1" }],
+  skipped: [{ paragraphId: "par_t_s1_005_r6_c1_p0" },
+            { paragraphId: "본문문단_없음" }],   // 표 셀 아님 → 제외
+};
+const cid = roleByCellId(planCid);
+assert(cid["cell_t_s0_000_r1_c1"] === "applicant",
+  "자동채움 paragraphId → cellId(민원인)");
+assert(cid["cell_t_s0_002_r3_c2"] === "applicant",
+  "질문 paragraphId → cellId(민원인), _p1 제거");
+assert(cid["cell_t_s1_005_r6_c1"] === "office",
+  "skipped paragraphId → cellId(관계자)");
+assert(Object.keys(cid).length === 3, "표 셀 아닌 paragraphId 는 제외");
 
 if (failed) { console.error(`\n${failed} FAIL`); process.exit(1); }
 console.log("form_question_panel_self_test: ALL PASS");
