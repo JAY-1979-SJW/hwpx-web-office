@@ -296,6 +296,16 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
         # 생략(무관한 선에 끌려 오정렬되는 것 방지).
         if len(ys) < 4 or len(xs) < 3:
             continue
+        # 박스 원위치 스냅샷 — 아래 스냅 단계들은 박스(클릭 타깃/테두리)
+        # 만 옮기고 그 칸의 텍스트 줄(lines)은 그대로 둔다. 박스만 실제
+        # 사진 격자에 맞춰 수십 px 이동하면, 줄은 옛 위치에 남아 칸
+        # 경계와 줄 위치가 어긋나 옆 칸(덜 이동한 칸) 쪽으로 글자가
+        # 침범해 보이는 결함이 생긴다(실사례: fx_metadata_form "귀하"
+        # 칸이 +19px 이동했는데 그 줄은 안 옮겨져 왼쪽 이웃 칸 글자와
+        # 겹쳐 보임). 스냅이 끝난 뒤 칸별 이동량(dx,dy)만큼 그 칸 소속
+        # 줄도 같이 옮겨 박스-줄 정합을 유지한다.
+        _orig_box_pos = {id(b): (b["x"], b["y"])
+                          for b in pd["boxes"] if b.get("cellId")}
         # 1단: 표 단위 정합등록 — 페이지 안에서도 표마다 흐름 누적 오차가
         # 달라(위 표 0px·아래 표 20px 등) 페이지 단일 보정으론 부족하다.
         # cellId 의 표 접두(cell_t_sX_TTT)로 묶어 표별 계통 이동(dy/dx)을
@@ -424,15 +434,78 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                     shared = top1
                 else:
                     shared = (bottom0 + top1) / 2
-                for b in boxes0:
-                    if b["y"] + b["h"] > shared:
-                        b["h"] = round(shared - b["y"], 1)
-                for b in boxes1:
-                    if b["y"] < shared:
-                        new_h = b["y"] + b["h"] - shared
-                        b["y"] = round(shared, 1)
-                        b["h"] = round(new_h, 1)
-                changed = True
+                # 내용 수용 하한/상한 — 순수 기하 절충(중점/테두리)만으로
+                # 자르면, 위 행 글자의 실제 줄 높이(line.y+line.h, 박스
+                # 안 상단 여백까지 포함한 실측값)보다 짧게 잘려 글자
+                # 아래쪽(받침)이 다시 잘리는 결함이 실사례로 확인됨
+                # (제목행 자체 재봉합 직후). 위 행은 자기 줄의 실제 하단
+                # 아래로는 절대 안 자르고(하한), 아래 행도 자기 줄의 실제
+                # 상단 위로는 안 자른다(상한) — 둘 다 만족 못 하면 위 행
+                # 보호를 우선(겹침이 지나치게 큰 극단 사례만 잔여 겹침
+                # 허용, 글자 잘림보다 안전).
+                # 줄(lines)은 이 시점까지 아직 안 옮겨져 있다(박스-줄
+                # 정합 동기화는 아래에서 한 번에 처리) — 원본 대비 박스가
+                # 이미 이동한 만큼(dy)을 여기서 즉석 보정해 비교해야
+                # 정확한 하한/상한이 나온다.
+                cids0 = {b.get("cellId") for b in boxes0}
+                cids1 = {b.get("cellId") for b in boxes1}
+                dy0 = (boxes0[0]["y"] - _orig_box_pos[id(boxes0[0])][1]
+                       if id(boxes0[0]) in _orig_box_pos else 0.0)
+                dy1 = (boxes1[0]["y"] - _orig_box_pos[id(boxes1[0])][1]
+                       if id(boxes1[0]) in _orig_box_pos else 0.0)
+                content_bottom0 = max(
+                    (l["y"] + l["h"] + dy0 for l in pd["lines"]
+                     if l.get("cellId") in cids0), default=None)
+                content_top1 = min(
+                    (l["y"] + dy1 for l in pd["lines"]
+                     if l.get("cellId") in cids1), default=None)
+                if content_bottom0 is not None and shared < content_bottom0:
+                    shared = content_bottom0
+                if (content_top1 is not None and shared > content_top1
+                        and content_top1 >= (content_bottom0 or 0)):
+                    shared = content_top1
+                # 안전장치 — 여러 행 쌍을 순차 처리하다 보면(예: r8-r9 처리
+                # 직후 r9-r10 처리) 앞선 조정이 뒤 계산의 전제를 바꿔,
+                # shared 가 어느 한쪽 박스의 원래 top 보다 위로 밀려
+                # 음수 높이(박스 상하 뒤집힘)를 만드는 사고가 실사례로
+                # 확인됨(r9 박스 height=-29.6). 결과가 두 박스 모두에
+                # 유효한 양수 높이를 줄 때만 적용하고, 아니면 이 쌍은
+                # 건드리지 않는다(잔여 겹침이 뒤집힌 박스보다 안전).
+                new_h0 = {id(b): shared - b["y"] for b in boxes0}
+                new_h1 = {id(b): b["y"] + b["h"] - shared for b in boxes1}
+                if (all(h >= 0.5 for h in new_h0.values())
+                        and all(h >= 0.5 for h in new_h1.values())):
+                    for b in boxes0:
+                        if b["y"] + b["h"] > shared:
+                            b["h"] = round(new_h0[id(b)], 1)
+                    for b in boxes1:
+                        if b["y"] < shared:
+                            b["h"] = round(new_h1[id(b)], 1)
+                            b["y"] = round(shared, 1)
+                    changed = True
+        # 박스-줄 정합 — 위 스냅 단계들이 옮긴 만큼(칸별 dx,dy) 그 칸 소속
+        # 텍스트 줄(lines)도 같이 옮긴다. 병합/조각(frag)으로 한 cellId 에
+        # 박스가 여럿이면 첫 박스 기준으로만 이동량을 잡는다(과도한 복잡화
+        # 방지 — 조각 이동량 차는 페이지 경계뿐이라 실무상 첫 박스로 충분).
+        _delta_by_cell = {}
+        for b in pd["boxes"]:
+            cid = b.get("cellId")
+            if not cid or cid in _delta_by_cell:
+                continue
+            orig = _orig_box_pos.get(id(b))
+            if orig is None:
+                continue
+            dx, dy = b["x"] - orig[0], b["y"] - orig[1]
+            if abs(dx) > 0.05 or abs(dy) > 0.05:
+                _delta_by_cell[cid] = (dx, dy)
+        if _delta_by_cell:
+            for l in pd["lines"]:
+                cid = l.get("cellId")
+                d = _delta_by_cell.get(cid) if cid else None
+                if d:
+                    l["x"] = round(l["x"] + d[0], 1)
+                    l["y"] = round(l["y"] + d[1], 1)
+                    changed = True
         # 페이지별 정합 판정 — 총 쪽수가 같아도 중간 페이지 경계가 달라
         # 특정 페이지 내용이 통째로 어긋날 수 있다(예: 우리 p6 내용이
         # 한컴 p6 그림과 다름). 스냅 후 잔여 중위가 크면 그 페이지만 배경
