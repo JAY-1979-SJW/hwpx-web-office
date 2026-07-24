@@ -261,6 +261,11 @@ python -m uvicorn scripts.hwpx.web_office.editor_api_route:app --port 8790
 
 - **입력셀 주소는 100% 확보** — 입력칸 전부가 `paragraphId` + `(표,행,열)`
   을 갖는다. 겨냥 못 하는 칸이 있는 서식 0건.
+- **입력 census 는 본문 표 셀(containerScope.kind=="cell") 한정** — 실측
+  (표본 60건): 빈 문단의 96.6%가 표 셀, 표 밖은 3.4%뿐이고 그마저 대부분
+  표 사이 여백(결산보고서류)이지 입력칸이 아니다. header/footer 입력칸은
+  0(헤더는 제목·페이지번호 등 고정 내용). 즉 "표 밖 산문 빈칸·헤더"는
+  census 대상이 아니며, 이는 누락이 아니라 **실익 없어 제외한 범위**다.
 - **OCR·AI 경로는 이미 구현돼 있다** — `/source-extract`(Claude 비전),
   `/ai-fill`, `/fill-plan`, `/para-save-apply`. 종단 시험에서 ①②③ 은 실제로
   작동했다.
