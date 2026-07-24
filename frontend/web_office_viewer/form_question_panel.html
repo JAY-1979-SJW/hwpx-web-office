@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서식 자동채움 — 질문 패널</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px;
+           margin: 2rem auto; padding: 0 1rem; color: #111; }
+    h2 { margin-bottom: .25rem; }
+    section { border: 1px solid #e5e7eb; border-radius: 8px;
+              padding: .75rem 1rem; margin: .75rem 0; }
+    h3 { margin: 0 0 .5rem; font-size: 1rem; }
+    label { display: inline-block; min-width: 12rem; }
+    input { padding: .3rem .5rem; border: 1px solid #d1d5db; border-radius: 6px; }
+    button { padding: .5rem 1rem; border-radius: 6px; border: 1px solid #9ca3af;
+             background: #f9fafb; cursor: pointer; margin: .5rem 0; }
+    button:disabled { opacity: .5; cursor: default; }
+    [data-testid="download-link"] { display: inline-block; margin-top: .5rem;
+             font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="panel-root"></div>
+  <!-- 독립 패널: app.mjs(메인 편집기)를 건드리지 않는다. 기존 엔드포인트만 사용. -->
+  <script type="module" src="./form_question_panel.mjs"></script>
+</body>
+</html>
