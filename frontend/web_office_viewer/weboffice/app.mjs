@@ -186,91 +186,125 @@ export function mountWebOffice(root) {
         if (!firstLineOf.has(pid)) { firstLineOf.set(pid, l); order.push(pid); }
       }
       const pageRect = page.getBoundingClientRect();
-      let minX = Infinity, minY = Infinity, maxW = 0;
-      for (const pid of order) {
-        const r = firstLineOf.get(pid).getBoundingClientRect();
-        minX = Math.min(minX, r.left - pageRect.left);
-        minY = Math.min(minY, r.top - pageRect.top);
-        maxW = Math.max(maxW,
-          parseFloat(firstLineOf.get(pid).style.width) || r.width);
-      }
-      const flow = document.createElement("div");
-      flow.className = "wo-flowbox";
-      flow.contentEditable = "true";
-      flow.spellcheck = false;
-      // background:#fff 필수 — 원본 실렌더 배경(사진) 모드는 텍스트가
-      // .co-page 의 배경 사진 픽셀 자체라 DOM visibility 로 못 가린다.
-      // 불투명 배경으로 그 아래 사진 글자를 완전히 덮어야 이중 노출
-      // (사진 원문 + 편집 상자 겹쳐 보임)이 안 생긴다.
-      flow.style.cssText = `position:absolute; left:${minX}px; `
-        + `top:${minY}px; width:${maxW}px; z-index:4; outline:none; `
-        + "background:#fff;";
-      const origText = new Map();
-      // 각 문단이 원본에서 차지하던 세로 슬롯(다음 문단 시작 Y 까지의
-      // 간격)을 min-height 로 줘서, 안 고친 문단은 원본과 거의 같은
-      // 위치를 유지하고 뒤 표 등과 안 겹치게 한다. 실제로 늘어나면(줄
-      // 수 증가) min-height 를 넘어서며 자연스럽게 뒤 문단을 밀어낸다.
       const tops = order.map((pid) =>
         firstLineOf.get(pid).getBoundingClientRect().top - pageRect.top);
-      for (let i = 0; i < order.length; i++) {
-        const pid = order[i];
-        const l = firstLineOf.get(pid);
-        // data-font-css(렌더러가 실제 charPr 에서 뽑은 대표 서식)를 우선
-        // 쓴다 — "원본 실렌더 배경" 모드는 .co-in > span 자체가 없어(사진
-        // 위 투명 클릭 타깃만 존재) 예전 span 샘플링은 늘 빈 문자열로
-        // 떨어져 편집 상자가 원본보다 작은 기본 크기로 그려지는 결함이
-        // 있었다(실사례: "10-3." 문단이 목록 다른 항목보다 큰 서식이라
-        // 편집 상자 덮개가 사진 글자를 다 못 가려 겹쳐 보임).
-        const fontCss = l.dataset.fontCss
-          || (l.querySelector(".co-in > span")?.getAttribute("style") || "");
-        const cur = paraEdits.has(pid) ? paraEdits.get(pid)
-          : ((loaded.documentModel.paragraphs || [])
-              .find((p) => p.paragraphId === pid) || {}).text || "";
-        origText.set(pid, cur);
-        const d = document.createElement("div");
-        d.dataset.paragraphId = pid;
-        d.textContent = cur;
-        const slot = (i + 1 < order.length)
-          ? Math.max(0, tops[i + 1] - tops[i])
-          : (parseFloat(l.style.height) || 20);
-        d.style.cssText = "white-space:pre-wrap; word-break:break-word; "
-          + `overflow-wrap:anywhere; min-height:${slot}px;` + fontCss;
-        flow.appendChild(d);
+      // 표 시작 y 목록(오름차순) — 문단 사이에 표가 끼어 있으면(표 호스트
+      // 문단은 자체 텍스트가 없어 order 에 안 잡히는 게 흔함) 그 표 앞뒤
+      // 문단을 같은 흐름상자 하나에 넣을 수 없다. 표는 흐름상자 DOM 밖의
+      // 별도 절대배치 요소라, 한 상자 안에 표 앞뒤 문단을 함께 두면
+      // (일반 블록 흐름이라) 표가 차지하는 세로 공간이 전혀 반영 안 돼
+      // 뒤 문단이 표가 없는 것처럼 바짝 붙어 표 위에 겹쳐 그려지는
+      // 결함이 있었다(실사례: Playwright 실측 — 표 입력칸 클릭이 항상
+      // 그 표 뒤에 있어야 할 문단의 흐름상자에 가로채임). 표를 사이에 두고
+      // 흐름상자를 별도로 쪼개, 뒤쪽 상자는 자기 문단의 실제 원본 위치에
+      // 새로 절대배치한다(표 공간을 건너뛰는 효과).
+      const tableTops = [...page.querySelectorAll(".co-box[data-cell-id]")]
+        .map((b) => b.getBoundingClientRect().top - pageRect.top)
+        .sort((a, b) => a - b);
+      const segments = [];
+      let segStart = 0;
+      for (let i = 0; i < order.length - 1; i++) {
+        const hasTableBetween = tableTops.some(
+          (tt) => tt > tops[i] + 1 && tt < tops[i + 1] - 1);
+        if (hasTableBetween) {
+          segments.push([segStart, i]);
+          segStart = i + 1;
+        }
+      }
+      segments.push([segStart, order.length - 1]);
+
+      for (const [segFrom, segTo] of segments) {
+        const segOrder = order.slice(segFrom, segTo + 1);
+        let minX = Infinity, minY = Infinity, maxW = 0;
+        for (const pid of segOrder) {
+          const r = firstLineOf.get(pid).getBoundingClientRect();
+          minX = Math.min(minX, r.left - pageRect.left);
+          minY = Math.min(minY, r.top - pageRect.top);
+          maxW = Math.max(maxW,
+            parseFloat(firstLineOf.get(pid).style.width) || r.width);
+        }
+        const flow = document.createElement("div");
+        flow.className = "wo-flowbox";
+        flow.contentEditable = "true";
+        flow.spellcheck = false;
+        // background:#fff 필수 — 원본 실렌더 배경(사진) 모드는 텍스트가
+        // .co-page 의 배경 사진 픽셀 자체라 DOM visibility 로 못 가린다.
+        // 불투명 배경으로 그 아래 사진 글자를 완전히 덮어야 이중 노출
+        // (사진 원문 + 편집 상자 겹쳐 보임)이 안 생긴다.
+        flow.style.cssText = `position:absolute; left:${minX}px; `
+          + `top:${minY}px; width:${maxW}px; z-index:4; outline:none; `
+          + "background:#fff;";
+        const origText = new Map();
+        // 각 문단이 원본에서 차지하던 세로 슬롯(다음 문단 시작 Y 까지의
+        // 간격, 세그먼트의 마지막 문단은 표 시작 지점까지)을 min-height
+        // 로 줘서, 안 고친 문단은 원본과 거의 같은 위치를 유지하고 뒤
+        // 표 등과 안 겹치게 한다. 실제로 늘어나면(줄 수 증가) min-height
+        // 를 넘어서며 자연스럽게 뒤 문단을 밀어낸다.
+        for (let i = segFrom; i <= segTo; i++) {
+          const pid = order[i];
+          const l = firstLineOf.get(pid);
+          // data-font-css(렌더러가 실제 charPr 에서 뽑은 대표 서식)를
+          // 우선 쓴다 — "원본 실렌더 배경" 모드는 .co-in > span 자체가
+          // 없어(사진 위 투명 클릭 타깃만 존재) 예전 span 샘플링은 늘
+          // 빈 문자열로 떨어져 편집 상자가 원본보다 작은 기본 크기로
+          // 그려지는 결함이 있었다(실사례: "10-3." 문단이 목록 다른
+          // 항목보다 큰 서식이라 편집 상자 덮개가 사진 글자를 다 못
+          // 가려 겹쳐 보임).
+          const fontCss = l.dataset.fontCss
+            || (l.querySelector(".co-in > span")?.getAttribute("style") || "");
+          const cur = paraEdits.has(pid) ? paraEdits.get(pid)
+            : ((loaded.documentModel.paragraphs || [])
+                .find((p) => p.paragraphId === pid) || {}).text || "";
+          origText.set(pid, cur);
+          const d = document.createElement("div");
+          d.dataset.paragraphId = pid;
+          d.textContent = cur;
+          let slot = (i < segTo)
+            ? Math.max(0, tops[i + 1] - tops[i])
+            : (parseFloat(l.style.height) || 20);
+          const nextTableTop = tableTops.find((tt) => tt > tops[i] + 1);
+          if (nextTableTop != null) {
+            slot = Math.min(slot, Math.max(0, nextTableTop - tops[i]));
+          }
+          d.style.cssText = "white-space:pre-wrap; word-break:break-word; "
+            + `overflow-wrap:anywhere; min-height:${slot}px;` + fontCss;
+          flow.appendChild(d);
+        }
+
+        let syncing = false;
+        const syncAndSave = () => {
+          if (syncing) return;
+          syncing = true;
+          try {
+            for (const d of [...flow.querySelectorAll("[data-paragraph-id]")]) {
+              const pid = d.dataset.paragraphId;
+              const before = origText.get(pid);
+              const now = d.textContent;
+              if (now !== before) {
+                // origText 는 저장이 실제로 성공했을 때만 갱신한다 —
+                // 거부(REJECTED)된 뒤에도 낙관적으로 먼저 갱신해버리면,
+                // 실패한 편집이 "이미 반영됨"으로 착각돼 다음 blur 에서
+                // 다시 시도되지 않고 조용히 유실된다(코드 검증 중 발견).
+                saveParagraphText(pid, now).then((ok) => {
+                  if (ok) origText.set(pid, now);
+                });
+              }
+            }
+          } finally {
+            syncing = false;
+          }
+        };
+        flow.addEventListener("blur", syncAndSave);
+        flow.addEventListener("keydown", (e) => {
+          // 문단 분할(PARA_INSERT)은 이번 범위 밖 — Enter 는 새 문단을
+          // 만들지 않고 지금까지 바뀐 문단들을 저장하는 커밋으로 취급.
+          if (e.key === "Enter") { e.preventDefault(); syncAndSave(); }
+        });
+        flow.addEventListener("mouseup", updateParaSelFromSelection);
+        flow.addEventListener("keyup", updateParaSelFromSelection);
+        page.appendChild(flow);
       }
       lines.forEach((l) => { l.style.visibility = "hidden"; });
-
-      let syncing = false;
-      const syncAndSave = () => {
-        if (syncing) return;
-        syncing = true;
-        try {
-          for (const d of [...flow.querySelectorAll("[data-paragraph-id]")]) {
-            const pid = d.dataset.paragraphId;
-            const before = origText.get(pid);
-            const now = d.textContent;
-            if (now !== before) {
-              // origText 는 저장이 실제로 성공했을 때만 갱신한다 —
-              // 거부(REJECTED)된 뒤에도 낙관적으로 먼저 갱신해버리면,
-              // 실패한 편집이 "이미 반영됨"으로 착각돼 다음 blur 에서
-              // 다시 시도되지 않고 조용히 유실된다(코드 검증 중 발견).
-              saveParagraphText(pid, now).then((ok) => {
-                if (ok) origText.set(pid, now);
-              });
-            }
-          }
-        } finally {
-          syncing = false;
-        }
-      };
-      flow.addEventListener("blur", syncAndSave);
-      flow.addEventListener("keydown", (e) => {
-        // 문단 분할(PARA_INSERT)은 이번 범위 밖 — Enter 는 새 문단을
-        // 만들지 않고 지금까지 바뀐 문단들을 저장하는 커밋으로 취급.
-        if (e.key === "Enter") { e.preventDefault(); syncAndSave(); }
-      });
-      flow.addEventListener("mouseup", updateParaSelFromSelection);
-      flow.addEventListener("keyup", updateParaSelFromSelection);
-      page.appendChild(flow);
     });
   }
 
