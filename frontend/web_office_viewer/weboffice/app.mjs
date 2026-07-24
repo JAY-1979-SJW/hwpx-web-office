@@ -597,12 +597,19 @@ export function mountWebOffice(root) {
           // 마커 칸([입력필요: ...])은 마커 원문을 값으로 노출하지 않고
           // 빈 값에서 시작 — placeholder 로만 항목명을 보여준다.
           const isMarker = ph && /\[입력필요:/.test(raw);
-          cur = isMarker ? "" : raw;
-          // "입력칸"이어도 원본에 이미 서식 있는 기본값이 채워진 경우가
-          // 있다(예: "문서번호 : 0000-000 호" — 라벨+값이 서로 다른
-          // charPr 로 한 칸에 같이 들어있음). 실제로 사용자가 고친 적
-          // 있을 때만(cell.getCellText != null) run 재현을 건너뛴다.
-          cellEdited = isMarker || cell.getCellText(id) != null;
+          const edited = cell.getCellText(id);
+          // "입력칸"이어도 원본에 이미 서식·줄바꿈이 있는 기본값이 채워진
+          // 경우가 있다(예: "문서번호 : 0000-000 호" — 라벨+값이 서로
+          // 다른 charPr 로 한 칸에 같이 들어있음, "국토교통부장관"/
+          // "교육관리기관의 장" — 원래 두 줄인데 모델 cell.text 는
+          // 정규화 과정에서 줄바꿈 없이 한 문자열로 합쳐 놓음). 아직
+          // 사용자가 고친 적 없으면(edited == null) faithfulCellText
+          // (줄 순서·개행 원형 보존)를 raw 보다 우선 — 실사례: 안 그러면
+          // 두 줄이 한 줄로 붙어 박스 폭 기준으로 엉뚱한 지점에서
+          // 줄바꿈돼 "국토교통부장관교육관리기 / 관의장"처럼 보임.
+          cur = isMarker ? "" : (edited != null ? raw
+            : (faithfulCellText(id) || raw));
+          cellEdited = isMarker || edited != null;
         } else {
           // 라벨(원래 문구): 편집된 적 있으면 현재값, 아니면 충실 원문
           // (정규화 아님)을 prefill — 자간·공백 원형 유지.
