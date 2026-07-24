@@ -9,6 +9,7 @@ import { renderCoordinateLayout, autoFitLines }
 import { createCellEditController } from "./cell_edit_controller.mjs";
 import { createSaveController } from "./save_controller.mjs";
 import { createUploadController } from "./upload_controller.mjs";
+import { charPrToCss } from "./style_resolver.mjs";
 
 const SAMPLE = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx";
 const LAYOUT_ENDPOINT = "/api/web-office/hwpx-layout";
@@ -19,7 +20,6 @@ export function mountWebOffice(root) {
   let loaded = null, cell = null, save = null;
   let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
   let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
-  let pendingEditId = null; // 재렌더 후 이어서 열 즉석 편집 대상(이동 연속)
   let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
   let paraSelTarget = null;    // 서식 툴바 대상(흐름 상자 안 텍스트 선택)
                                 // {paragraphId, start, end} — 있으면 셀
@@ -34,6 +34,40 @@ export function mountWebOffice(root) {
   // "클릭은 되는데 저장은 안 된다" 신고의 실제 원인이었다. 이제는
   // 버리지 않고 큐에 이어 붙여 이전 저장이 끝나면 순서대로 실행한다.
   let paraSaveQueue = Promise.resolve();
+
+  // cell 컨트롤러를 loaded.documentModel(최신 sourceDocumentHash 포함)
+  // 기준으로 재구성한다 — 문단 저장·서식 적용처럼 파일을 바꾸는 다른
+  // 편집 뒤에도 표 셀 저장이 SOURCE_HASH_MISMATCH 로 거부되지 않게
+  // 한다. 미저장 셀 편집(commandLog)이 있으면 재구성하지 않는다(재구성
+  // 하면 그 편집이 유실됨 — 유실보다는 다음 저장이 거부되는 편이 안전).
+  function resyncCellControllerIfIdle() {
+    if (cell && cell.commandLog().length === 0
+        && loaded && loaded.documentModel) {
+      cell = createCellEditController(loaded.documentModel);
+      save = createSaveController({
+        getState: () => cell.getState(),
+        getSourcePath: () => loaded.sourcePath,
+      });
+    }
+  }
+
+  // 원본 run 단위 서식을 편집 상자 안에 그대로 재현한다(대표님 지시:
+  // "원본 서식을 그대로 유지"). 한 문단/셀 안에 서로 다른 서식(굵게 구간
+  // + 일반 구간처럼)이 섞여 있어도, 지금까지는 "대표 서식 하나"만 상자
+  // 전체에 입혀 그 구분이 화면에서 사라졌었다 — runs 배열(문서모델의
+  // charPrIDRef 별 텍스트 조각)을 그대로 span 으로 나눠 넣으면 편집
+  // 전 상태는 원본과 서식까지 동일하게 보인다. textContent 대신 DOM
+  // span 을 직접 만들어 삽입(문자열 조립 아님 — 이스케이프 문제 없음).
+  function renderRunSpans(container, runs, defs) {
+    container.textContent = "";
+    for (const r of runs) {
+      const span = document.createElement("span");
+      span.textContent = r.text;
+      const def = defs ? defs[r.charPrIDRef] : null;
+      if (def) span.setAttribute("style", charPrToCss(def));
+      container.appendChild(span);
+    }
+  }
 
   function saveParagraphText(paragraphId, newText) {
     paraSaveQueue = paraSaveQueue
@@ -145,6 +179,14 @@ export function mountWebOffice(root) {
           loaded.sourcePath = d.sourcePath;
         }
       }
+      // cell 컨트롤러 재동기화 — 실측(2026-07-24)으로 발견한 결함: 문단
+      // 저장이 sourceDocumentHash 를 바꿔도(원본이 갱신됨) cell 컨트롤러는
+      // 최초 로드 시점의 documentModel(구 hash)을 그대로 들고 있어, 그
+      // 뒤에 표 셀을 편집·저장하면 서버가 SOURCE_HASH_MISMATCH 로 거부
+      // 한다("문단 먼저 고치고 표 셀 고치면 셀 저장이 안 되는" 결함).
+      // 미저장 셀 편집(commandLog)이 있으면 재구성 시 유실되므로, 그때는
+      // 건드리지 않는다(다음 셀 저장이 거부되는 게 편집 유실보다 안전).
+      resyncCellControllerIfIdle();
       // 이 문단은 이제 실제 좌표로 다시 그려질 것이므로 클라이언트 캐시
       // 오버레이는 걷어낸다("덧방" 제거) — 아래 재로딩된 좌표가 진실.
       paraEdits.delete(paragraphId);
@@ -252,13 +294,23 @@ export function mountWebOffice(root) {
           // 가려 겹쳐 보임).
           const fontCss = l.dataset.fontCss
             || (l.querySelector(".co-in > span")?.getAttribute("style") || "");
+          const srcPara = (loaded.documentModel.paragraphs || [])
+            .find((p) => p.paragraphId === pid);
           const cur = paraEdits.has(pid) ? paraEdits.get(pid)
-            : ((loaded.documentModel.paragraphs || [])
-                .find((p) => p.paragraphId === pid) || {}).text || "";
+            : (srcPara && srcPara.text) || "";
           origText.set(pid, cur);
           const d = document.createElement("div");
           d.dataset.paragraphId = pid;
-          d.textContent = cur;
+          // 편집 전(원본 그대로)이면 run 단위 서식을 그대로 재현 —
+          // 편집 후엔 어느 run 이 늘어났는지 알 수 없어(REPLACE_TEXT_RANGE
+          // 는 anchor-run 서식으로 전체 통일) 대표 서식 하나로 되돌아간다
+          // (백엔드 저장 정책과 동일 원칙: 전체 교체는 anchor charPr).
+          if (!paraEdits.has(pid) && srcPara && srcPara.runs
+              && srcPara.runs.length > 1 && coordLayout.charPrDefs) {
+            renderRunSpans(d, srcPara.runs, coordLayout.charPrDefs);
+          } else {
+            d.textContent = cur;
+          }
           let slot = (i < segTo)
             ? Math.max(0, tops[i + 1] - tops[i])
             : (parseFloat(l.style.height) || 20);
@@ -413,6 +465,25 @@ export function mountWebOffice(root) {
       setStatus("ok", (d.editedInPlace
         ? "서식 적용 완료(원본 파일에 반영됨)"
         : "서식 적용 완료(새 sandbox 사본)") + " · 재로딩 …");
+      // documentModel 도 함께 갱신 — 문단 저장과 동일한 이유(실측으로
+      // 발견한 결함: 서식 적용도 sourceDocumentHash 를 바꾸는데 여기서는
+      // documentModel 을 아예 안 갱신해, 그 뒤 표 셀 저장이
+      // SOURCE_HASH_MISMATCH 로 거부됐다).
+      try {
+        const res2 = await fetch("/api/web-office/hwpx-load", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ operation: "HWPX_EDITOR_LOAD",
+            sourcePath: d.sourcePath }),
+        });
+        const env2 = await res2.json();
+        const d2 = (env2 && env2.data) || {};
+        if (env2 && env2.status === "SUCCESS" && d2.verdict === "PASS") {
+          loaded.sourcePath = d2.sourcePath;
+          loaded.documentModel = d2.documentModel;
+        }
+      } catch (_e) { /* sourcePath 체이닝은 이미 반영됨 — 무시 */ }
+      resyncCellControllerIfIdle();
       // truthBase 선-초기화 — saveParagraphText 와 동일 이유(이전 파일의
       // 낡은 실렌더 사진이 새 파일 렌더에도 그대로 남아, probeTruth 가
       // 실패(404, 정상 폴백 신호)하면 화면이 그 이전 상태에 영영
@@ -489,157 +560,182 @@ export function mountWebOffice(root) {
         // AI fill 주입과 동일하게 '문서에 직접 기입'된 모습만 남는다.
         getCellText: (id) => (cell ? cell.getCellText(id) : null),
         getParaText: (id) => (paraEdits.has(id) ? paraEdits.get(id) : null),
-        truthBase,   // 가용 시 '원본 그대로'(한컴 실렌더 배경 + 편집 오버레이)
+        // 대표님 지시(2026-07-24: "한컴 원본 밑그림을 사용하고 화면에
+        // 노출 안되게") — probeTruth 는 그대로 돌려 한컴 실측 정렬
+        // (snap_layout_to_truth, 쪽수 정합 확인)은 계속 활용하되, 그
+        // 사진 자체를 배경으로 그리지는 않는다(truthBase 를 렌더러에
+        // 안 넘김). 사진을 화면에 노출하면 우리 근사 렌더링(폰트 대체·
+        // 좌표 추정)과 실제 한컴 픽셀이 어긋나는 지점마다 "원문이 편집
+        // 상자 밖으로 삐져나와 보이는" 결함이 반복 발생했다("10-3."
+        // 문단, 결재란 표 등 실사례) — 사진을 아예 안 그리면 이 결함
+        // 부류 전체가 원천 차단된다. 대신 우리 자체 CSS 렌더(테두리·
+        // 채움·charPr 기반 서식)만으로 그린다.
+        truthBase: null,
       });
       autoFitLines(sheet);
-      // 문서 직접 기입 방식 — 화면에 상시 입력창을 만들지 않는다. 문서는
-      // 원형 그대로 보이고, 입력칸을 클릭한 순간에만 그 칸에 즉석 편집기
-      // 하나가 나타나며, 커밋하면 AI fill 주입과 동일하게 값이 문서
-      // 텍스트로 렌더된다(입력 위젯 흔적 없음).
-      const inputBoxes = [];
+      // 상시 캐럿 편집(대표님 지시, 2026-07-24: "전체 문서를 어떤것이든
+      // 캐럿 방식으로") — 표 셀도 문단과 동일하게 클릭 즉시 그 자리에서
+      // 캐럿으로 끼워쓰는 방식으로 통일한다. 팝업형 <input> 은 없고, 칸의
+      // 실제 텍스트 자리에 contentEditable 상자가 상시 존재한다. 단, 저장
+      // 트리거는 문단과 다르게 유지(대표님 선택) — blur 는 로컬
+      // commandLog 에만 쌓고(cell.setCellText, 기존과 동일), 서버 반영은
+      // 여러 칸 편집 후 "저장(sandbox)" 버튼을 눌러야 한다(일괄 검토 후
+      // 저장하고 싶을 때 유리).
+      const cellFlowBoxes = [];
       sheet.querySelectorAll(".co-box[data-cell-id]").forEach((box) => {
+        if (box.dataset.frag) return;   // 병합 셀의 다음 페이지 조각은 스킵
         const id = box.dataset.cellId;
         const isInput = cell.isInputCell(id);   // 파서(XML) 분류 단일 진실
         box.classList.add(isInput ? "wo-input" : "wo-label");
         // 서식 툴바 대상 — 클릭된 어떤 칸(입력/라벨 무관)이든 선택 표시.
         box.addEventListener("click", () => selectCellForFormat(id, box));
-        if (isInput && !box.dataset.frag) {
-          const r = box.getBoundingClientRect();
-          // 방향키 이동용 기하 — 같은 스크롤 상태에서 일괄 측정하므로 상대
-          // 좌표계가 일관(페이지 세로 적층 → ↓ 가 다음 페이지로 이어짐).
-          inputBoxes.push({
-            id, box,
-            x0: r.left, x1: r.right, y0: r.top, y1: r.bottom,
-            cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2,
-          });
+
+        const ph = isInput ? cell.inputLabel(id) : null;
+        let cur, cellEdited;
+        if (isInput) {
+          const raw = cell.currentText(id);
+          // 마커 칸([입력필요: ...])은 마커 원문을 값으로 노출하지 않고
+          // 빈 값에서 시작 — placeholder 로만 항목명을 보여준다.
+          const isMarker = ph && /\[입력필요:/.test(raw);
+          cur = isMarker ? "" : raw;
+          // "입력칸"이어도 원본에 이미 서식 있는 기본값이 채워진 경우가
+          // 있다(예: "문서번호 : 0000-000 호" — 라벨+값이 서로 다른
+          // charPr 로 한 칸에 같이 들어있음). 실제로 사용자가 고친 적
+          // 있을 때만(cell.getCellText != null) run 재현을 건너뛴다.
+          cellEdited = isMarker || cell.getCellText(id) != null;
+        } else {
+          // 라벨(원래 문구): 편집된 적 있으면 현재값, 아니면 충실 원문
+          // (정규화 아님)을 prefill — 자간·공백 원형 유지.
+          const edited = cell.getCellText(id);
+          cur = edited != null ? edited : (faithfulCellText(id) || "");
+          cellEdited = edited != null;
         }
-        // 라벨(원래 문구): 더블클릭으로만 수정. 편집된 적 있으면 현재값,
-        // 아니면 충실 원문(정규화 아님)을 prefill — 자간·공백 원형 유지.
-        if (!isInput) {
-          box.addEventListener("dblclick", (e) => {
-            e.preventDefault();
-            const edited = cell.getCellText(id);
-            const pf = edited != null ? edited : faithfulCellText(id);
-            cell.startEdit(id, box, render,
-              { prefill: true, prefillText: pf });
-          });
+
+        const d = document.createElement("div");
+        d.contentEditable = "true";
+        d.spellcheck = false;
+        d.className = "wo-cell-flow";
+        d.dataset.cellId = id;
+        // 원본 그대로(미편집) 라벨 칸은 run 단위 서식을 그대로 재현한다
+        // (대표님 지시: "원본 서식을 그대로 유지") — 한 칸 안에 서식이
+        // 섞여 있어도(예: "문서번호 : "+"0000-000 "+"호" 가 서로 다른
+        // charPr) 이제 그 구분이 편집 상자 화면에도 그대로 보인다.
+        const srcCell = (loaded.documentModel.cells || [])
+          .find((c) => c.cellId === id);
+        const srcRuns = srcCell && srcCell.paragraphs
+          && srcCell.paragraphs[0] && srcCell.paragraphs[0].runs;
+        if (!cellEdited && srcRuns && srcRuns.length > 1
+            && coordLayout.charPrDefs) {
+          renderRunSpans(d, srcRuns, coordLayout.charPrDefs);
+        } else {
+          d.textContent = cur;
         }
+        // 대표님 지시(2026-07-24: "완전히 제거, 원본처럼 빈 칸으로") —
+        // 빈 입력칸 안내 문구(주황색 placeholder)를 없앤다. 실제 원본
+        // 문서는 이 칸들이 그냥 빈칸이라, 안내 문구가 라벨 옆에 겹쳐
+        // 보이는 게 "표가 원본과 다르다"는 인상을 줬다. 어떤 칸이
+        // 입력칸인지는 hover(.wo-input CSS)로만 알 수 있게 남긴다.
+        const fontCss = box.dataset.fontCss || "";
+        // 편집 상자 위치·크기 — 한컴이 저장한 실제 좌표(lineseg)를 그대로
+        // 쓴다(대표님 지시: "한컴 문서 좌표대로 폰트 위치도 동일해야").
+        // 사진 배경을 껐으므로(이전 턴) 더 이상 "사진 삐져나옴" 걱정 없이
+        // 정밀 좌표로 되돌릴 수 있다. 단, 첫 줄 하나만 보면(과거 결함)
+        // 세로쓰기·여러 줄 칸("결재" 6글자 세로쓰기)에서 상자가 실제 내용의
+        // 일부 크기로만 잡혀 표가 뒤틀리므로, 이 셀의 모든 줄을 모아
+        // 바운딩박스(좌상단 min, 우하단 max)로 잡는다 — 정확한 좌표 기반
+        // 이면서도 다중 줄/세로쓰기 모두 안전하다.
+        const pgIdx = [...sheet.querySelectorAll(".co-page")]
+          .indexOf(box.closest(".co-page"));
+        const pdc = (coordLayout.pagesDetail || [])[pgIdx];
+        const cellLines = pdc
+          ? pdc.lines.filter((l) => l.cellId === id) : [];
+        const boxTop = parseFloat(box.style.top) || 0;
+        const boxLeft = parseFloat(box.style.left) || 0;
+        const boxW = parseFloat(box.style.width) || 0;
+        const boxH = parseFloat(box.style.height) || 0;
+        let top, left, width, minHeight;
+        if (cellLines.length) {
+          const yMin = Math.min(...cellLines.map((l) => l.y));
+          const yMax = Math.max(...cellLines.map((l) => l.y + l.h));
+          const xMin = Math.min(...cellLines.map((l) => l.x));
+          top = Math.max(0, yMin - boxTop - 1);
+          left = Math.max(0, xMin - boxLeft - 1);
+          width = Math.max(10, boxW - (xMin - boxLeft) - 2);
+          minHeight = Math.max(14, yMax - yMin) + 4;
+        } else {
+          top = 1; left = 2;
+          width = Math.max(10, boxW - 4);
+          minHeight = Math.max(14, boxH - 2);
+        }
+        d.style.cssText = `position:absolute; left:${left}px; `
+          + `top:${top}px; width:${width}px; `
+          + `min-height:${minHeight}px; `
+          + "background:#fff; outline:none; z-index:5; "
+          + "white-space:pre-wrap; word-break:break-word; "
+          + `overflow-wrap:anywhere;${fontCss}`;
+        const origVal = cur;
+        const commit = () => {
+          const v = d.textContent;
+          // 마커 보존 — 빈 값이면 마커 원문 유지(문서 훼손 방지)
+          const changed = (v !== origVal) && !(ph && v === "")
+            && cell.setCellText(id, v);
+          if (changed) render();   // 값이 문서 텍스트로 렌더됨(재렌더)
+        };
+        d.addEventListener("blur", commit);
+        d.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); focusNav(id, "down"); }
+          else if (e.key === "Tab") {
+            e.preventDefault(); commit();
+            focusNav(id, e.shiftKey ? "left" : "right");
+          } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault(); commit();
+            focusNav(id, e.key === "ArrowUp" ? "up" : "down");
+          } else if (e.key === "Escape") {
+            d.textContent = origVal; d.blur();
+          }
+        });
+        box.appendChild(d);
+        cellFlowBoxes.push({ id, el: d });
       });
       // 엑셀식 이동 — 1차: 같은 열/행(구간 겹침)에서 방향으로 가장 가까운
       // 칸, 2차(없으면): 겹침 없이 방향만 맞는 최근접 칸. 표·페이지 경계를
-      // 넘어 입력칸들이 하나의 격자처럼 이어진다.
-      const navFrom = (cur, dir) => {
+      // 넘어 편집 상자들이 하나의 격자처럼 이어진다.
+      const cellGeom = cellFlowBoxes.map((it) => {
+        const r = it.el.getBoundingClientRect();
+        return { ...it, x0: r.left, x1: r.right, y0: r.top, y1: r.bottom,
+          cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 };
+      });
+      function focusNav(fromId, dir) {
+        const cur = cellGeom.find((g) => g.id === fromId);
+        if (!cur) return;
         const horiz = dir === "left" || dir === "right";
         const sgn = (dir === "right" || dir === "down") ? 1 : -1;
         let best = null, bestKey = Infinity;
         const scan = (needOverlap) => {
-          for (const g of inputBoxes) {
+          for (const g of cellGeom) {
             if (g === cur) continue;
-            const d = horiz ? (g.cx - cur.cx) * sgn : (g.cy - cur.cy) * sgn;
-            if (d <= 2) continue;
+            const d2 = horiz ? (g.cx - cur.cx) * sgn : (g.cy - cur.cy) * sgn;
+            if (d2 <= 2) continue;
             const ov = horiz
               ? Math.min(g.y1, cur.y1) - Math.max(g.y0, cur.y0)
               : Math.min(g.x1, cur.x1) - Math.max(g.x0, cur.x0);
             if (needOverlap && ov <= 0) continue;
             const perp = horiz
               ? Math.abs(g.cy - cur.cy) : Math.abs(g.cx - cur.cx);
-            const key = d + perp * 4;
+            const key = d2 + perp * 4;
             if (key < bestKey) { bestKey = key; best = g; }
           }
         };
         scan(true);
         if (!best) scan(false);
-        return best;
-      };
-      // 즉석 편집기 — 클릭된 입력칸에만 임시 <input> 하나. 커밋(Enter/이동/
-      // blur)하면 편집기는 사라지고 값은 문서 텍스트로 렌더된다.
-      const openEditor = (it) => {
-        if (it.box.querySelector("input")) return;   // 이미 편집 중
-        const inp = document.createElement("input");
-        inp.className = "wo-fld";
-        const ph = cell.inputLabel(it.id);
-        const cur = cell.currentText(it.id);
-        if (ph) {
-          // 마커 칸: 항목명을 placeholder 로, 마커 원문은 값으로 노출 안 함
-          inp.placeholder = ph;
-          inp.title = ph;
-          inp.classList.add("wo-fld-ph");
-          inp.value = /\[입력필요:/.test(cur) ? "" : cur;
-        } else {
-          inp.value = cur;
+        if (best) {
+          best.el.focus();
+          const range = document.createRange();
+          range.selectNodeContents(best.el);
+          const sel = window.getSelection();
+          sel.removeAllRanges(); sel.addRange(range);
+          best.el.scrollIntoView({ block: "nearest", inline: "nearest" });
         }
-        const initial = inp.value;
-        let done = false;
-        const close = () => { done = true; inp.remove(); };
-        const commit = (nxt) => {
-          if (done) return;
-          const v = inp.value;
-          // 마커 보존 — 빈 값이면 마커 원문 유지(문서 훼손 방지)
-          const changed = (v !== initial) && !(ph && v === "")
-            && cell.setCellText(it.id, v);
-          close();
-          if (nxt) pendingEditId = nxt.id;
-          if (changed) render();          // 값이 문서 텍스트로 렌더됨
-          else if (nxt) openEditor(nxt);
-        };
-        inp.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit(navFrom(it, "down"));   // 엑셀처럼 아래 칸으로
-          } else if (e.key === "Tab") {
-            e.preventDefault();
-            commit(navFrom(it, e.shiftKey ? "left" : "right"));
-          } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-            e.preventDefault();
-            commit(navFrom(it, e.key === "ArrowUp" ? "up" : "down"));
-          } else if (e.key === "ArrowLeft") {
-            // 캐럿이 맨 앞일 때만 칸 이동(텍스트 내 이동 보호)
-            if (inp.selectionStart === 0 && inp.selectionEnd === 0) {
-              e.preventDefault();
-              commit(navFrom(it, "left"));
-            }
-          } else if (e.key === "ArrowRight") {
-            if (inp.selectionStart === inp.value.length
-                && inp.selectionEnd === inp.value.length) {
-              e.preventDefault();
-              commit(navFrom(it, "right"));
-            }
-          } else if (e.key === "Escape") {
-            close();
-          }
-        });
-        inp.addEventListener("blur", () => commit(null));
-        // 편집기를 셀의 실제 텍스트 줄 y 에 정렬 — rowSpan 큰 셀에서
-        // 편집기가 위 줄에 떠 보이던 결함 수리. 줄 없으면 세로 중앙.
-        const pgIdx = [...sheet.querySelectorAll(".co-page")]
-          .indexOf(it.box.closest(".co-page"));
-        const pdc = (coordLayout.pagesDetail || [])[pgIdx];
-        const ln0 = pdc
-          ? pdc.lines.find((l) => l.cellId === it.id) : null;
-        const boxTop = parseFloat(it.box.style.top) || 0;
-        const boxH = parseFloat(it.box.style.height) || 0;
-        if (ln0) {
-          inp.style.top = Math.max(0, ln0.y - boxTop - 3) + "px";
-          inp.style.height = ((ln0.h || 14) + 8) + "px";
-          inp.style.bottom = "auto";
-        } else if (boxH > 40) {
-          inp.style.top = Math.max(0, (boxH - 24) / 2) + "px";
-          inp.style.height = "24px";
-          inp.style.bottom = "auto";
-        }
-        it.box.appendChild(inp);
-        inp.focus();
-        inp.select();
-        inp.scrollIntoView({ block: "nearest", inline: "nearest" });
-      };
-      inputBoxes.forEach((it) => {
-        it.box.addEventListener("click", () => openEditor(it));
-      });
-      // 재렌더 직후 이동 연속 — 직전 커밋이 지정한 다음 칸에서 이어서 편집
-      if (pendingEditId) {
-        const nxt = inputBoxes.find((b) => b.id === pendingEditId);
-        pendingEditId = null;
-        if (nxt) openEditor(nxt);
       }
       // 본문 문단(표 밖 제목·전문 등) — 대표님 지시(2026-07-24: "워드
       // 프로그램으로 개발해") 반영. 클릭해야 열리는 팝업형 편집기 대신,
@@ -685,7 +781,12 @@ export function mountWebOffice(root) {
     $("[data-role=aifill]").disabled = !cell;
   }
 
-  // '원본 그대로' 배경 준비 — 한컴 실렌더 페이지(서버 캐시). 첫 문서는
+  // 한컴 실측 정합 확인(대표님 지시, 2026-07-24: "한컴 원본 밑그림을
+  // 사용하고 화면에 노출 안되게") — 한컴 실렌더 페이지(서버 캐시)는
+  // snap_layout_to_truth 좌표 스냅·쪽수 정합 검증에만 쓰고, 사진 자체를
+  // 화면 배경으로 노출하지는 않는다(truthBase 는 render() 에 더 이상
+  // 안 넘김 — 사진과 우리 근사 렌더링의 미세한 어긋남이 "원문이 편집
+  // 상자 밖으로 삐져나와 보이는" 결함 부류의 원인이었다). 첫 문서는
   // 서버에서 한컴 조판(수 초)이 돌 수 있어 비동기 프로브 후 재렌더한다.
   // 404(한컴 미설치 서비스 환경)면 좌표 렌더 그대로 — 무중단 폴백.
   async function probeTruth(sourcePath) {
@@ -695,24 +796,22 @@ export function mountWebOffice(root) {
     try {
       const res = await fetch(base + "1", { method: "GET" });
       if (res.ok) {
-        // 배경 준비됨 → 레이아웃 재요청: 서버가 truth 격자선에 정합등록+
-        // 스냅한 오버레이 좌표(truthAligned)를 내려준다.
+        // 실측 준비됨 → 레이아웃 재요청: 서버가 truth 격자선에 정합등록+
+        // 스냅한 좌표(truthAligned)를 내려준다 — 화면엔 이 스냅된 좌표로
+        // 우리 자체 렌더만 그리고, 사진 자체는 그리지 않는다.
         const aligned = await fetchLayout(loaded && loaded.sourcePath);
         if (aligned) coordLayout = aligned;
-        // 안전 가드 — 한컴 쪽수와 우리 쪽수가 다르면 배경-오버레이 페이지
-        // 대응이 어긋나므로 배경 모드를 켜지 않는다(좌표 렌더 유지).
         const hp = aligned && aligned.hancomPages;
         if (hp && aligned.pages !== hp) {
-          truthBase = null;
           setStatus("ok", ($("[data-role=status]").textContent || "")
-            + ` · 원본배경 보류(쪽수 ${aligned.pages}≠한컴 ${hp})`);
+            + ` · 한컴 정합 보류(쪽수 ${aligned.pages}≠한컴 ${hp})`);
           render();
           return;
         }
-        truthBase = base;
+        truthBase = base;   // 화면엔 안 씀 — 정합 확인됐다는 내부 표시만
         setStatus("ok", ($("[data-role=status]").textContent || "")
-          + " · 원본 실렌더 배경"
-          + (aligned && aligned.truthAligned ? "(정렬)" : ""));
+          + " · 한컴 정합 확인"
+          + (aligned && aligned.truthAligned ? "(스냅됨)" : ""));
         render();
       }
     } catch (_e) { /* 폴백 유지 */ }

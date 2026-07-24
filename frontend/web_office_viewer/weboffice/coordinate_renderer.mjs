@@ -171,9 +171,19 @@ export function renderCoordinateLayout(layout, opts = {}) {
         if (b.border.b !== "none") bd += `border-bottom:${b.border.b};`;
       }
       const fill = (b.fill && !pageTruth) ? `background:${b.fill};` : "";
+      // 이 셀의 대표 서식(실제 charPr 기반) — 캐럿 편집 상자(app.mjs
+      // mountAlwaysOnCellFlow)가 문단과 동일하게 원본 서식을 그대로
+      // 물려받게 한다. "원본 실렌더 배경" 모드는 셀 줄도 <span> 이 없어
+      // (사진 위 클릭 타깃인 박스만 존재) 문단과 똑같이 대표서식을
+      // 미리 계산해 data 속성으로 실어 둬야 한다.
+      const cellLine = (opts.editable && b.cellId && !b.frag)
+        ? pLines.find((l) => l.cellId === b.cellId) : null;
+      const cellFontAttr = cellLine
+        ? ` data-font-css="${esc(lineFontCss(cellLine, defs,
+            Math.max(7, cellLine.h * 0.72)))}"` : "";
       const editAttr = ((opts.editable && b.cellId)
         ? ` data-cell-id="${esc(b.cellId)}"` : "")
-        + (b.frag ? ' data-frag="1"' : "");
+        + (b.frag ? ' data-frag="1"' : "") + cellFontAttr;
       parts.push(`<div class="co-box"${editAttr} style="left:${b.x}px;`
         + `top:${localY(b.y).toFixed(1)}px;width:${b.w}px;`
         + `height:${b.h}px;${bd}${fill}"></div>`);
@@ -196,7 +206,16 @@ export function renderCoordinateLayout(layout, opts = {}) {
         }
         continue;
       }
-      if (l.cellId && editedIds.has(l.cellId)) continue;  // 편집셀 원본 숨김
+      // 셀 원본 줄 숨김 — editable 모드는 app.mjs 가 모든 셀에 상시 캐럿
+      // 편집 상자(wo-cell-flow)를 씌우므로(대표님 지시, 2026-07-24:
+      // "전체 문서를 어떤것이든 캐럿 방식으로") 편집 여부와 무관하게 항상
+      // 숨긴다. 편집된 셀만 숨기던 이전 조건은 사진 배경 모드 때는
+      // 문제없었지만(그땐 애초에 이 분기 자체를 안 탔음), 사진을 끈 뒤
+      // (대표님 지시: "화면에 노출 안되게")로는 안 편집된 셀의 원본 줄이
+      // 실제 <span> 으로 다시 보이기 시작해 캐럿 상자와 겹쳐 표 전체가
+      // 이중 노출로 뒤죽박죽돼 보이는 결함이었다("표가 원본과 많이
+      // 다르다" 실사례).
+      if (l.cellId && opts.editable) continue;
       const fs = Math.max(7, l.h * 0.72);
       // line-height 는 기본적으로 박스 높이와 같게 둔다. 더 크게 주면
       // overflow:hidden 이 글자 위/아래(받침 포함)를 세로로 잘라 문자가
@@ -250,8 +269,12 @@ export function renderCoordinateLayout(layout, opts = {}) {
           + `</span></div>`);
       }
     }
-    // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만)
-    for (const cid of editedIds) {
+    // 편집된 셀 → 새 텍스트를 박스 안(좌상단)에 렌더 (첫 조각에만).
+    // editable 모드는 app.mjs 의 상시 캐럿 편집 상자(wo-cell-flow)가 편집
+    // 여부와 무관하게 모든 셀 텍스트 표시를 전담하므로(위 l.cellId 원본
+    // 줄 숨김과 같은 이유), 이 오버레이까지 같이 그리면 편집된 셀에서
+    // 캐럿 상자 글자 위에 이 구버전 오버레이 글자가 또 겹쳐 보인다.
+    for (const cid of (opts.editable ? [] : editedIds)) {
       const b = pd
         ? pd.boxes.find((x) => x.cellId === cid && !x.frag)
         : ((boxByCell.get(cid)

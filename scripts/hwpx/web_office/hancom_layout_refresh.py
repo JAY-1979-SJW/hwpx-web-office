@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -374,6 +375,64 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                         and new_w >= 20 and new_w >= 0.7 * b["w"]):
                     b["x"], b["w"] = round(lo, 1), round(new_w, 1)
                     changed = True
+        # 인접 행 겹침 봉합 — 위 세 단계(계통이동·개별스냅·재봉합)는 박스를
+        # 각자 독립적으로 실제 격자선에 흡착한다. 테두리 없는 행(예: 제목
+        # 문단 행)은 어떤 단계에서도 안 건드려지고, 테두리 있는 이웃 행만
+        # 개별 스냅되면 — "행 N 하단 = 행 N+1 상단"이라는, coord_table.py
+        # 원 계산이 항상 지키던 불변식이 스냅 후에 깨질 수 있다(실사례:
+        # fx_metadata_form 제목행이 사진 위에서 그 아래 빈 행과 11px
+        # 겹쳐, 제목 글자 아래쪽이 이웃 행의 흰 편집 상자에 가려 보이는
+        # 결함 — 사진 배경을 켰을 때는 사진 픽셀 자체가 보여 안 드러났지만
+        # (2026-07-24 사진 배경 제거 이후) 처음 드러남). 표별로 행 순서를
+        # 복원해 연속된 두 행이 겹치면(진짜 겹침만 — 틈은 손대지 않음,
+        # 회귀 위험 최소화) 테두리로 실측된 쪽 경계에 다른 쪽을 붙인다.
+        _row_re = re.compile(r"_r(\d+)_c\d+$")
+        tbl_groups = {}
+        for b in pd["boxes"]:
+            cid = b.get("cellId") or ""
+            m = _row_re.search(cid)
+            if not m:
+                continue
+            key = cid[:m.start()]
+            tbl_groups.setdefault(key, {}).setdefault(int(m.group(1)), []) \
+                .append(b)
+        for rows in tbl_groups.values():
+            row_idxs = sorted(rows)
+            for i in range(len(row_idxs) - 1):
+                r0, r1 = row_idxs[i], row_idxs[i + 1]
+                if r1 != r0 + 1:
+                    continue   # 병합으로 행 번호가 안 이어지면 스킵(안전)
+                boxes0, boxes1 = rows[r0], rows[r1]
+                bottom0 = max(b["y"] + b["h"] for b in boxes0)
+                top1 = min(b["y"] for b in boxes1)
+                overlap = bottom0 - top1
+                if overlap <= 0.3:
+                    continue   # 겹침 없음(또는 오차 이내) — 손대지 않음
+                # 실제 테두리로 스냅된 쪽(더 신뢰) 경계를 우선 채택 — 겹치는
+                # 그 변(위 행의 아래쪽 / 아래 행의 위쪽)에 정확히 테두리가
+                # 있는 경우만 "그 변이 실측됨"으로 인정한다(그 칸에 다른
+                # 변 테두리만 있는 경우까지 신뢰하면 안 됨).
+                bordered0 = [b for b in boxes0
+                             if (b.get("border") or {}).get("b", "none") != "none"
+                             and b["y"] + b["h"] == bottom0]
+                bordered1 = [b for b in boxes1
+                             if (b.get("border") or {}).get("t", "none") != "none"
+                             and b["y"] == top1]
+                if bordered0 and not bordered1:
+                    shared = bottom0
+                elif bordered1 and not bordered0:
+                    shared = top1
+                else:
+                    shared = (bottom0 + top1) / 2
+                for b in boxes0:
+                    if b["y"] + b["h"] > shared:
+                        b["h"] = round(shared - b["y"], 1)
+                for b in boxes1:
+                    if b["y"] < shared:
+                        new_h = b["y"] + b["h"] - shared
+                        b["y"] = round(shared, 1)
+                        b["h"] = round(new_h, 1)
+                changed = True
         # 페이지별 정합 판정 — 총 쪽수가 같아도 중간 페이지 경계가 달라
         # 특정 페이지 내용이 통째로 어긋날 수 있다(예: 우리 p6 내용이
         # 한컴 p6 그림과 다름). 스냅 후 잔여 중위가 크면 그 페이지만 배경
