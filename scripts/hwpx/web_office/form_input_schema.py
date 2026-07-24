@@ -23,7 +23,8 @@ import re
 from typing import Any
 
 from scripts.hwpx.web_office import form_field_roles as FR
-from scripts.hwpx.web_office.form_taxonomy import classify_document
+from scripts.hwpx.web_office.form_taxonomy import (
+    T_NOTICE, classify_document, clean_name)
 
 # 분류체계의 문서유형 → 칸 역할 판정에 쓰는 서식종류
 _DOCTYPE_TO_KIND = {
@@ -35,6 +36,21 @@ _DOCTYPE_TO_KIND = {
     "보고통지": FR.KIND_INTERNAL,
     "기준별표": FR.KIND_INTERNAL,
 }
+
+# '보고통지' 버킷은 두 성격을 섞어 담는다 — 신청인이 작성해 제출하는
+# '보고서'류(선임보고서·실적보고서 등)와, 관공서가 발급하는 통지·통보·
+# 고지·독촉·결정류다. 앞엣것은 신청인이 채우므로 민원신청으로 되살린다
+# (실측 결함: 선임보고서의 사업장명·사업주·공사기간이 전부 관공서 칸으로
+# 죽어 입력창이 0개였다). 뒤엣것(발급문서)은 그대로 내부문서로 둔다.
+# '보고' 포함으로 가른다 — 파일명 끝엔 시리얼(…보고서_32)이 붙어 끝-고정이
+# 안 통하고, 관공서 발급어(통지·통보·고지·독촉·결정)엔 '보고'가 없어
+# 안전하게 갈린다(통보 ⊅ 보고).
+_SUBMIT_REPORT = re.compile(r"보고")
+
+
+def _is_submitted_report(name: str) -> bool:
+    """이름에 '보고'(제출 보고서)가 있는가 — 관공서 발급 통지·고지류와 구분."""
+    return bool(_SUBMIT_REPORT.search(clean_name(name)))
 
 
 # 이름이 무엇이든 이 장치가 다 있으면 접수되는 민원서식이다.
@@ -82,7 +98,7 @@ def _issuer_seal_without_addressee(render_payload: dict) -> bool:
 
 
 def resolve_form_kind(doc_type: str, doc_model: dict,
-                      render_payload: dict) -> str:
+                      render_payload: dict, name: str = "") -> str:
     """서식종류 — 구조가 이름을 이긴다.
 
     이름 기반 문서유형은 틀릴 수 있다. 실측 사례: '…세액감면신청서 증여받은
@@ -95,6 +111,10 @@ def resolve_form_kind(doc_type: str, doc_model: dict,
         return FR.KIND_APPLICATION
     if _issuer_seal_without_addressee(render_payload):
         return FR.KIND_CERTIFICATE
+    # 보고통지 세분 — 신청인이 제출하는 '보고서'는 민원신청으로 되살린다
+    # (통지·고지·독촉 등 관공서 발급문서는 아래 매핑대로 내부문서 유지).
+    if doc_type == T_NOTICE and _is_submitted_report(name):
+        return FR.KIND_APPLICATION
     kind = _DOCTYPE_TO_KIND.get(doc_type)
     if kind:
         return kind
@@ -108,7 +128,7 @@ def build_input_schema(doc_model: dict, render_payload: dict, *,
                        ) -> dict[str, Any]:
     """서식 1건의 입력 스키마."""
     tax = classify_document(name, field_count)
-    kind = resolve_form_kind(tax["docType"], doc_model, render_payload)
+    kind = resolve_form_kind(tax["docType"], doc_model, render_payload, name=name)
     roles = FR.classify_fields(doc_model, render_payload, name=name,
                                force_kind=kind)
 
@@ -185,6 +205,18 @@ def _self_test() -> list[str]:
     eq("대장 문서유형", s2["docType"], "대장기록")
     eq("대장도 칸 보존", s2["inputCount"], 3)
     eq("대장은 신청인칸 0", s2["applicantCount"], 0)
+
+    # 선임보고서(보고통지) — 신청인이 작성해 제출하는 보고서라 신청인 칸으로 산다
+    # (실측 결함: 예전엔 보고통지=내부문서라 사업장명·사업주 칸이 전부 죽었다)
+    s3 = build_input_schema(dm, rp, name="관리책임자 등 선임보고서.hwpx", field_count=4)
+    eq("보고서 문서유형", s3["docType"], "보고통지")
+    eq("보고서는 민원신청 종류", s3["formKind"], FR.KIND_APPLICATION)
+    eq("보고서 신청인칸 2", s3["applicantCount"], 2)
+    # 통지서(보고통지) — 관공서 발급이라 그대로 내부문서(신청인칸 0), 오분류 아님
+    s4 = build_input_schema(dm, rp, name="체납자 명단공개 통지.hwpx", field_count=4)
+    eq("통지서 문서유형", s4["docType"], "보고통지")
+    eq("통지서는 내부문서", s4["formKind"], FR.KIND_INTERNAL)
+    eq("통지서 신청인칸 0", s4["applicantCount"], 0)
     return out
 
 
