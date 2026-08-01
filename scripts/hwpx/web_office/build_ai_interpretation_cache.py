@@ -90,6 +90,26 @@ COLS = ["form_id", "status", "model", "field_count", "interpreted_count",
         "input_count", "not_input_count", "semantic_count", "author_count",
         "coverage", "interpretations", "error", "elapsed_sec"]
 
+# 2차 독립 검증 결과(§4.6 두 신호) — 확신도 문턱을 대체한다.
+VERIFY_TABLE = "ai_field_verification"
+VERIFY_DDL = f"""
+CREATE TABLE IF NOT EXISTS {VERIFY_TABLE}(
+    form_id INTEGER PRIMARY KEY,
+    status TEXT,
+    model TEXT,
+    verdicts TEXT,
+    author_agreed TEXT,
+    disagreed_count INTEGER,
+    unverified_count INTEGER,
+    agreement_rate REAL,
+    error TEXT,
+    elapsed_sec REAL
+);
+"""
+VERIFY_COLS = ["form_id", "status", "model", "verdicts", "author_agreed",
+               "disagreed_count", "unverified_count", "agreement_rate",
+               "error", "elapsed_sec"]
+
 
 def _log(m: str) -> None:
     print(m, flush=True)
@@ -106,12 +126,14 @@ def _connect() -> sqlite3.Connection:
 
 
 def _flush(con: sqlite3.Connection, pending: list[dict],
-           retries: int = 10) -> None:
+           retries: int = 10, table: str = STAGING,
+           cols: list[str] | None = None) -> None:
     if not pending:
         return
-    sql = (f"INSERT OR REPLACE INTO {STAGING}({', '.join(COLS)}) "
-           f"VALUES({', '.join('?' * len(COLS))})")
-    payload = [tuple(r.get(c) for c in COLS) for r in pending]
+    cols = cols or COLS
+    sql = (f"INSERT OR REPLACE INTO {table}({', '.join(cols)}) "
+           f"VALUES({', '.join('?' * len(cols))})")
+    payload = [tuple(r.get(c) for c in cols) for r in pending]
     for attempt in range(retries):
         try:
             con.execute("BEGIN IMMEDIATE")
@@ -238,6 +260,95 @@ def run(limit: int = 0, shard: int = 0, shards: int = 1,
         promote()
 
 
+def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
+    """2차 독립 검증 — 이미 해석된 서식을 다른 각도로 다시 판정한다.
+
+    1차 판정을 검증자에게 보여주지 않는다(앵커링 차단). 일치 대조는
+    프로그램이 한다 — `ai_field_verification.agreement`.
+    """
+    from scripts.hwpx.web_office.ai_field_verification import (
+        CLAUDE_MODEL as V_MODEL, verify_fields)
+    from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor
+
+    con = _connect()
+    con.execute(DDL)
+    con.execute(VERIFY_DDL)
+    done = {r[0] for r in con.execute(f"SELECT form_id FROM {VERIFY_TABLE}")}
+    # 되살림 후보(죽은 서식 · 보호구역 아님)를 먼저 검증한다 — 살아있는
+    # 서식이나 대장·발급증서는 어차피 역할이 안 바뀌므로 검증해도 반영에
+    # 영향이 없다. 앞선 표본 12건이 전부 비후보라 되살림 0 으로 나왔다.
+    from scripts.hwpx.web_office.ai_field_interpretation import (
+        ROLE_PROTECTED_DOCTYPES, ROLE_PROTECTED_KINDS)
+    rows = con.execute(
+        f"SELECT s.form_id, s.interpretations, f.source_path, f.clean_name,"
+        f" f.input_schema, COALESCE(f.applicant_count,0),"
+        f" COALESCE(f.doc_type,''), COALESCE(f.form_kind,'')"
+        f" FROM {STAGING} s JOIN forms f ON f.form_id=s.form_id"
+        f" WHERE s.status='OK' AND s.interpretations IS NOT NULL"
+        f" ORDER BY s.form_id").fetchall()
+
+    def _is_candidate(r) -> bool:
+        return (r[5] == 0 and r[6] not in ROLE_PROTECTED_DOCTYPES
+                and r[7] not in ROLE_PROTECTED_KINDS)
+
+    pool = [r for r in rows
+            if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
+    pool.sort(key=lambda r: (0 if _is_candidate(r) else 1, r[0]))
+    cand = sum(1 for r in pool if _is_candidate(r))
+    _log(f"  (되살림 후보 {cand} / 전체 {len(pool)} — 후보 우선)")
+    targets = [r[:5] for r in pool]
+    if limit:
+        targets = targets[:limit]
+    _log(f"검증 대상 {len(targets)}건 (shard {shard}/{shards}, model={V_MODEL})")
+
+    pending: list[dict] = []
+    t0 = time.time()
+    for n, (form_id, interp_json, source_path, clean_name,
+            schema_json) in enumerate(targets, 1):
+        t1 = time.time()
+        rec: dict = {"form_id": form_id, "model": V_MODEL}
+        try:
+            res = load_hwpx_for_editor(
+                {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_path},
+                project_root=PROJECT_ROOT)
+            if res.get("verdict") != "PASS":
+                rec.update({"status": "LOAD_FAILED"})
+            else:
+                fields = build_context_fields(
+                    json.loads(schema_json), res["documentModel"],
+                    title=clean_name or "", roles=None)
+                interp = json.loads(interp_json)
+                out = verify_fields(fields, interp)
+                if not out.get("ok"):
+                    rec.update({"status": "AI_FAILED",
+                                "error": out.get("error", "")})
+                else:
+                    ag = out["agreement"]
+                    rec.update({
+                        "status": "OK",
+                        "verdicts": json.dumps(out["verdicts"],
+                                               ensure_ascii=False),
+                        "author_agreed": json.dumps(ag["authorAgreed"],
+                                                    ensure_ascii=False),
+                        "disagreed_count": len(ag["disagreed"]),
+                        "unverified_count": len(ag["unverified"]),
+                        "agreement_rate": ag["agreementRate"],
+                    })
+        except Exception as exc:  # noqa: BLE001
+            rec.update({"status": "ERROR",
+                        "error": f"{type(exc).__name__}: {exc}"[:200]})
+        rec["elapsed_sec"] = round(time.time() - t1, 1)
+        pending.append(rec)
+        if len(pending) >= FLUSH_EVERY:
+            _flush(con, pending, table=VERIFY_TABLE, cols=VERIFY_COLS)
+            rate = (time.time() - t0) / n
+            _log(f"[{n}/{len(targets)}] {rate:.1f}s/건 · 남은 예상 "
+                 f"{(len(targets) - n) * rate / 3600:.1f}시간")
+    _flush(con, pending, table=VERIFY_TABLE, cols=VERIFY_COLS)
+    _log(f"완료 {len(targets)}건 / {time.time() - t0:.0f}s")
+    con.close()
+
+
 def status() -> None:
     con = _connect()
     con.execute(DDL)
@@ -288,6 +399,20 @@ def promote() -> None:
              f" < 게이트 {PROMOTE_MIN_OK_RATIO:.0%}")
         return
 
+    # 2차 검증 결과 — 있으면 확신도 문턱 대신 이걸 둘째 신호로 쓴다(§4.6).
+    con.execute(VERIFY_DDL)
+    verified_by_form: dict[int, set[str]] = {}
+    for fid, agreed in con.execute(
+            f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
+            f" WHERE status='OK' AND author_agreed IS NOT NULL"):
+        try:
+            verified_by_form[fid] = set(json.loads(agreed))
+        except Exception:      # noqa: BLE001
+            pass
+    if verified_by_form:
+        _log(f"2차 검증 반영 — 검증된 서식 {len(verified_by_form)}건"
+             f" (확신도 문턱 대신 두 판정 일치를 씀)")
+
     updated = 0
     demoted = 0
     tagged = 0
@@ -305,6 +430,7 @@ def promote() -> None:
         schema = json.loads(row[0])
         doc_type, form_kind, app_before = row[1] or "", row[2] or "", row[3] or 0
         by_key = {i["key"]: i for i in json.loads(interp_json)}
+        agreed = verified_by_form.get(form_id)
         revived_here = 0
         for f in schema:
             it = by_key.get(f.get("paragraphId"))
@@ -320,7 +446,9 @@ def promote() -> None:
             # 역할 교정 — 통째로 죽은 문서(신청인칸 0)만 되살린다(§4.6).
             elif f.get("role") == "office" and should_promote_to_user(
                     judged, doc_type=doc_type, form_kind=form_kind,
-                    form_applicant_count=app_before):
+                    form_applicant_count=app_before,
+                    verified=(it.get("key") in agreed
+                              if agreed is not None else None)):
                 f["role"] = "applicant"
                 revived_here += 1
             if not (f.get("semantic") or "").strip() and it["semantic"]:
@@ -361,6 +489,8 @@ def main() -> None:
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--promote", action="store_true")
+    ap.add_argument("--verify", action="store_true",
+                    help="2차 독립 검증(확신도 문턱 대체)")
     ap.add_argument("--scope", choices=("all", "construction"), default="all",
                     help="construction = 건설·현장 서류만")
     ap.add_argument("--promote-on-pass", action="store_true",
@@ -368,6 +498,8 @@ def main() -> None:
     a = ap.parse_args()
     if a.status:
         status()
+    elif a.verify:
+        verify(limit=a.limit, shard=a.shard, shards=a.shards)
     elif a.promote:
         promote()
     else:

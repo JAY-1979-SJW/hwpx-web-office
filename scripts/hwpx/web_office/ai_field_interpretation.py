@@ -206,6 +206,7 @@ PROMOTE_MIN_CONFIDENCE = 0.7
 def should_promote_to_user(
     interp: dict, *, doc_type: str, form_kind: str,
     form_applicant_count: int,
+    verified: bool | None = None,
     min_confidence: float = PROMOTE_MIN_CONFIDENCE,
 ) -> bool:
     """이 칸을 관계자 → 작성자(사용자) 칸으로 되살려도 되는가.
@@ -223,6 +224,19 @@ def should_promote_to_user(
     시공사가 쓰는 `검측부위`·`검측요구일시`·`공사량`이 사용자에게 안 보인다.
     원인은 역할 축이 `민원인 ↔ 관공서` 2축뿐이라 `시공사 → 감리단` 문서를
     담을 자리가 없기 때문이다.
+
+    verified
+    --------
+    `ai_field_verification` 의 2차 독립 판정 결과. 주어지면 **이것이 둘째
+    신호가 되고 확신도 문턱은 쓰지 않는다.**
+
+    확신도를 버리는 이유(실측): Sonnet 이 '해한AI엔지니어링'을 "시공사
+    (회사명) 기재"로 정확히 읽고도 확신도 0.60 을 매겨 문턱 0.7 에 걸려
+    탈락했다. 작성자 판정 11,736칸 중 3,066칸(26%)이 같은 이유로 죽었다.
+    모델의 **자기 신고 숫자**는 판정 근거로 약하다 — 같은 문서를 다른
+    각도로 다시 물어 두 판정이 일치하는지 보는 편이 훨씬 강하다.
+
+    verified 가 None 이면(검증 미실시) 예전대로 확신도 문턱을 쓴다.
     """
     if form_applicant_count > 0:
         return False
@@ -234,6 +248,8 @@ def should_promote_to_user(
         return False
     if interp.get("filledBy") != "작성자":
         return False
+    if verified is not None:
+        return bool(verified)
     return float(interp.get("confidence") or 0.0) >= min_confidence
 
 
