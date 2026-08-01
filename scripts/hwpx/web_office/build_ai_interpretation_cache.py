@@ -51,7 +51,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from scripts.hwpx.web_office.ai_doc_context import (  # noqa: E402
     build_context_fields)
 from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
-    CLAUDE_MODEL, interpret_fields)
+    CLAUDE_MODEL, interpret_fields, should_demote)
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -232,7 +232,9 @@ def promote() -> None:
     """해석을 forms.input_schema 에 반영. 게이트 미달이면 거부.
 
     반영 규칙:
-      · isInput=false → role='noise' 로 낮춘다(입력칸 목록에서 빠진다).
+      · 강등(role='noise')은 `should_demote` 가 허락할 때만 — AI 와 규칙이
+        **둘 다** 입력칸이 아니라고 할 때. AI 단독 판정은 파일럿에서 정상
+        입력칸의 15.8% 를 죽였다(오탐은 오염 잔존보다 해롭다).
       · semantic 이 비어있던 칸만 AI 태그로 채운다(기존 태그 불변).
       · aiMeaning/aiQuestion/aiProfileKey 를 필드에 덧붙인다.
     """
@@ -269,7 +271,10 @@ def promote() -> None:
             it = by_key.get(f.get("paragraphId"))
             if not it:
                 continue
-            if not it["isInput"] and f.get("role") == "applicant":
+            # 라벨은 스키마 것이 원본이다 — 캐시 항목에 없어도 규칙 검사가
+            # 무력화되면 안 된다(라벨이 비면 규칙이 항상 통과시켜 버린다).
+            judged = {**it, "label": it.get("label") or f.get("label") or ""}
+            if f.get("role") == "applicant" and should_demote(judged):
                 f["role"] = "noise"
                 demoted += 1
             if not (f.get("semantic") or "").strip() and it["semantic"]:

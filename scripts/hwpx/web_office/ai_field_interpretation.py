@@ -28,6 +28,7 @@ paragraphId 인지, semantic 이 아는 어휘인지 기계 대조하고 아니�
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from typing import Any, Callable
 
@@ -44,6 +45,43 @@ Runner = Callable[[str], str]
 # 모르는 태그를 캐시에 넣으면 planner 가 조용히 무시해 '해석했는데 안
 # 채워지는' 상태가 된다.
 ALLOWED_SEMANTIC = set(_PROMPT) | {"buildingName"}
+
+# 사람이 값을 적는 칸이 아닌 것으로 **규칙이** 알아보는 라벨.
+# 용지규격·법령표시·안내문·자르는선 등 — 규칙 추출기가 이것들까지
+# 신청인칸으로 등록해 둔 오염이다(전수 6,653건).
+#
+# ※ 접두어만으로 거르면 안 된다 — 전수에서 "※ 건축면적(m2)",
+# "※ 연면적(m2)", "※ 12 특수구조건축물유형" 처럼 ※ 가 붙은 **진짜 입력
+# 항목**이 다수 확인됐다(관공서 서식에서 ※ 는 '담당자 기재'를 뜻하기도
+# 하지만 항목 자체는 실재한다). 안내 **문장**(…합니다/…습니다로 끝나는
+# 것)일 때만 오염으로 본다.
+POLLUTION_LABEL_RE = re.compile(
+    r"(\d+\s*mm\s*[×xX]\s*\d+\s*mm|백상지|중질지"
+    r"|■\s|별지\s*제?\s*\d+\s*호\s*서식|시행규칙\s*\[|시행령\s*\["
+    r"|^\s*※.*(합니다|습니다)|자르는\s*선|절취선"
+    r"|처리\s*기간|구비\s*서류|수수료\s*$)")
+
+# 강등 최소 확신도 — 이 아래면 AI 가 '입력칸 아님'이라 해도 손대지 않는다.
+DEMOTE_MIN_CONFIDENCE = 0.7
+
+
+def should_demote(interp: dict, *,
+                  min_confidence: float = DEMOTE_MIN_CONFIDENCE) -> bool:
+    """이 칸을 입력칸 목록에서 빼도 되는가 — AI 와 규칙이 **둘 다** 아니라 할 때만.
+
+    파일럿 실측(8서식·77칸, 2026-08-01): AI 단독 판정으로 강등하면 정상
+    입력칸의 **14.5%**(69개 중 10개)를 오탐으로 죽였다. 오탐은 사용자가
+    그 칸을 영영 못 채우게 만들어 오염이 남는 것보다 해롭다.
+
+    두 신호가 독립적으로 일치할 때만 강등하면 오탐이 구조적으로 0 이
+    된다 — 규칙 패턴에 걸리지 않는 정상 라벨은 후보에조차 오르지 못한다.
+    같은 파일럿에서 이 조건으로 오염 검출은 7/8(87.5%)을 유지했다.
+    """
+    if interp.get("isInput", True):
+        return False
+    if float(interp.get("confidence") or 0.0) < min_confidence:
+        return False
+    return bool(POLLUTION_LABEL_RE.search(interp.get("label") or ""))
 
 
 def _cli_runner_factory(timeout_sec: int) -> Runner:

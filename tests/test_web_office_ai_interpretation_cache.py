@@ -22,7 +22,7 @@ sys.path.insert(0, str(PR / "scripts/hwpx"))
 from scripts.hwpx.web_office import build_ai_interpretation_cache as B  # noqa: E402
 from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
     ALLOWED_SEMANTIC, build_interpretation_prompt, interpret_fields,
-    validate_interpretation)
+    should_demote, validate_interpretation)
 
 
 def _fields():
@@ -102,6 +102,45 @@ def test_interpret_fields_maps_runner_error():
         raise RunnerError("AI_TIMEOUT")
     out = interpret_fields(_fields(), runner=boom)
     assert out["ok"] is False and out["error"] == "AI_TIMEOUT"
+
+
+# ── 강등 안전장치 (AI 단독 판정 금지) ──────────────────────────
+
+def test_demote_requires_both_ai_and_rule_agreement():
+    # AI 가 '입력칸 아님'이라 해도 라벨이 정상이면 살린다 — 파일럿에서
+    # AI 단독 판정이 정상칸의 15.8% 를 죽였다.
+    assert should_demote({"isInput": False, "confidence": 0.99,
+                          "label": "사건과의관계"}) is False
+    # 두 신호가 일치할 때만 강등
+    assert should_demote({"isInput": False, "confidence": 0.9,
+                          "label": "210mm×297mm(백상지 80g/m2)"}) is True
+
+
+def test_demote_refuses_low_confidence_and_input_cells():
+    poll = "■ 수산자원관리법시행규칙[별지제17호서식]"
+    assert should_demote({"isInput": False, "confidence": 0.3,
+                          "label": poll}) is False       # 확신 부족
+    assert should_demote({"isInput": True, "confidence": 0.99,
+                          "label": poll}) is False       # AI 가 입력칸이라 함
+
+
+def test_pollution_patterns_cover_observed_real_labels():
+    # 전수 조사에서 실제로 신청인칸으로 등록돼 있던 라벨들
+    for label in ("210mm×297mm(백상지 80g/m2)",
+                  "■ 소방시설설치및관리에관한법률시행규칙 [별지제12호서식]",
+                  "※ [ ]에는해당되는곳에 √표를합니다.",
+                  "(자르는선)"):
+        assert should_demote({"isInput": False, "confidence": 0.9,
+                              "label": label}) is True, label
+    # 반대로 정상 입력 라벨은 절대 후보에 못 오른다.
+    # ※ 로 시작하는 뒤 3개는 실제 서식의 진짜 입력 항목이다 — ※ 접두어
+    # 만으로 거르면 이것들이 죽는다(전수에서 확인된 실사례).
+    for label in ("성명", "사업장소재지", "착공일년월일", "심판번호",
+                  "가축분뇨배출량(m3/일)",
+                  "※ 건축면적(m2)", "※ 연면적(m2)",
+                  "※ 12 특수구조건축물유형"):
+        assert should_demote({"isInput": False, "confidence": 0.99,
+                              "label": label}) is False, label
 
 
 # ── promote (임시 카탈로그) ─────────────────────────────────────
