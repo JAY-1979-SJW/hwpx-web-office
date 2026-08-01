@@ -51,7 +51,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from scripts.hwpx.web_office.ai_doc_context import (  # noqa: E402
     build_context_fields)
 from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
-    CLAUDE_MODEL, interpret_fields, should_demote)
+    CLAUDE_MODEL, interpret_fields, should_demote, should_promote_to_user)
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS {STAGING}(
     input_count INTEGER,
     not_input_count INTEGER,
     semantic_count INTEGER,
+    author_count INTEGER,
     coverage REAL,
     interpretations TEXT,
     error TEXT,
@@ -78,8 +79,8 @@ CREATE TABLE IF NOT EXISTS {STAGING}(
 """
 
 COLS = ["form_id", "status", "model", "field_count", "interpreted_count",
-        "input_count", "not_input_count", "semantic_count", "coverage",
-        "interpretations", "error", "elapsed_sec"]
+        "input_count", "not_input_count", "semantic_count", "author_count",
+        "coverage", "interpretations", "error", "elapsed_sec"]
 
 
 def _log(m: str) -> None:
@@ -152,8 +153,11 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
         return {"status": "LOAD_FAILED", "error": res.get("reason", "")}
 
     schema = json.loads(schema_json)
+    # roles=None — 규칙이 매긴 역할과 무관하게 **전 입력칸**을 싣는다(§4.6).
+    # 규칙이 AI 앞에서 자르면 검측요청서처럼 전 칸이 관계자로 판정된 문서를
+    # AI 가 아예 못 본다(실측: 보이는 칸 0).
     fields = build_context_fields(schema, res["documentModel"],
-                                  title=clean_name or "")
+                                  title=clean_name or "", roles=None)
     if not fields:
         return {"status": "NO_FIELDS", "field_count": 0}
 
@@ -168,6 +172,7 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
         "input_count": out["inputCount"],
         "not_input_count": out["notInputCount"],
         "semantic_count": out["semanticCount"],
+        "author_count": out["authorCount"],
         "coverage": out["coverage"],
         "interpretations": json.dumps(out["interpretations"],
                                       ensure_ascii=False),
@@ -256,27 +261,38 @@ def promote() -> None:
     updated = 0
     demoted = 0
     tagged = 0
+    revived = 0
+    revived_forms = 0
     pending: list[tuple] = []
     for form_id, interp_json in con.execute(
             f"SELECT form_id, interpretations FROM {STAGING}"
             f" WHERE status='OK' AND interpretations IS NOT NULL"):
         row = con.execute(
-            "SELECT input_schema FROM forms WHERE form_id=?",
-            (form_id,)).fetchone()
+            "SELECT input_schema, doc_type, form_kind, applicant_count"
+            " FROM forms WHERE form_id=?", (form_id,)).fetchone()
         if not row or not row[0]:
             continue
         schema = json.loads(row[0])
+        doc_type, form_kind, app_before = row[1] or "", row[2] or "", row[3] or 0
         by_key = {i["key"]: i for i in json.loads(interp_json)}
+        revived_here = 0
         for f in schema:
             it = by_key.get(f.get("paragraphId"))
             if not it:
                 continue
             # 라벨은 스키마 것이 원본이다 — 캐시 항목에 없어도 규칙 검사가
             # 무력화되면 안 된다(라벨이 비면 규칙이 항상 통과시켜 버린다).
-            judged = {**it, "label": it.get("label") or f.get("label") or ""}
+            judged = {**it, "label": it.get("label") or f.get("label") or "",
+                      "ruleRole": it.get("ruleRole") or f.get("role") or ""}
             if f.get("role") == "applicant" and should_demote(judged):
                 f["role"] = "noise"
                 demoted += 1
+            # 역할 교정 — 통째로 죽은 문서(신청인칸 0)만 되살린다(§4.6).
+            elif f.get("role") == "office" and should_promote_to_user(
+                    judged, doc_type=doc_type, form_kind=form_kind,
+                    form_applicant_count=app_before):
+                f["role"] = "applicant"
+                revived_here += 1
             if not (f.get("semantic") or "").strip() and it["semantic"]:
                 f["semantic"] = it["semantic"]
                 tagged += 1
@@ -291,6 +307,9 @@ def promote() -> None:
         pending.append((json.dumps(schema, ensure_ascii=False), len(inputs),
                         app, len(inputs) - app, form_id))
         updated += 1
+        revived += revived_here
+        if revived_here:
+            revived_forms += 1
 
     for i in range(0, len(pending), 200):
         chunk = pending[i:i + 200]
@@ -300,7 +319,8 @@ def promote() -> None:
             " applicant_count=?, office_count=? WHERE form_id=?", chunk)
         con.execute("COMMIT")
     _log(f"PROMOTED: 서식 {updated} · 오염제거(noise 강등) {demoted}"
-         f" · semantic 신규부여 {tagged}")
+         f" · semantic 신규부여 {tagged}"
+         f" · 역할교정(죽은 서식 되살림) {revived}칸/{revived_forms}서식")
     con.close()
 
 

@@ -84,18 +84,33 @@ def context_for_input(inp: dict, idx: dict) -> dict[str, str]:
 
 def build_context_fields(
     schema_inputs: list[dict], doc_model: dict, *, title: str = "",
+    roles: tuple[str, ...] | None = ("applicant",),
 ) -> list[dict[str, Any]]:
-    """신청인 입력칸 목록 → AI 해석 입력(문맥 포함 필드 목록).
+    """입력칸 목록 → AI 해석 입력(문맥 포함 필드 목록).
 
     key 는 paragraphId — 라벨 중복(같은 라벨이 여러 칸)에도 칸을 정확히
     가리키게 한다. 현행 ai_form_fill 의 라벨 기준 재매핑은 중복 라벨을
     첫 칸에만 잇는 약점이 있었다.
+
+    roles
+    -----
+    `None` 이면 규칙이 매긴 역할과 무관하게 **전 입력칸**을 싣는다.
+    빌드타임 해석(ai_field_interpretation)은 반드시 `None` 을 쓴다 — §4.6.
+
+    규칙이 AI 앞에서 먼저 잘라내면 AI 는 그 문서를 아예 못 본다. 실측
+    (검측요청서 #5067): 파싱은 셀 338개·빈 칸 241개를 뽑았는데 규칙이
+    22칸을 전부 '관공서 칸'으로 판정해 **AI 가 보는 칸이 0** 이 됐다.
+    시공사가 쓰는 `검측부위`·`검측요구일시`·`공사량`이 통째로 죽은 것이다.
+
+    런타임 값 채움(ai_doc_interpret)은 기본값 `("applicant",)` 를 그대로
+    쓴다 — 거기서는 이미 확정된 역할대로 사용자 칸만 채워야 한다.
     """
     idx = cell_text_index(doc_model)
     doc_title = document_title(doc_model, fallback=title)
     out: list[dict[str, Any]] = []
     for inp in schema_inputs:
-        if inp.get("role") != "applicant":
+        role = inp.get("role")
+        if roles is not None and role not in roles:
             continue
         pid = inp.get("paragraphId") or ""
         if not pid:
@@ -108,6 +123,9 @@ def build_context_fields(
             "sensitive": bool(inp.get("sensitive")),
             "inputType": inp.get("inputType") or "text",
             "semantic": inp.get("semantic") or "",
+            # 규칙이 매긴 역할은 **힌트로만** 싣는다 — AI 판정을 가두지
+            # 않되, 판정이 규칙과 갈릴 때 게이트가 대조할 근거는 남긴다.
+            "ruleRole": role or "",
             "context": {"title": doc_title, **ctx},
         })
     return out

@@ -150,7 +150,7 @@ def _temp_catalog(tmp_path: Path, staged_status="OK") -> Path:
     con = sqlite3.connect(db)
     con.execute("CREATE TABLE forms(form_id INTEGER PRIMARY KEY,"
                 " input_schema TEXT, input_count INT, applicant_count INT,"
-                " office_count INT)")
+                " office_count INT, doc_type TEXT, form_kind TEXT)")
     schema = [
         {"label": "성명", "role": "applicant", "semantic": "",
          "paragraphId": "p1"},
@@ -159,7 +159,7 @@ def _temp_catalog(tmp_path: Path, staged_status="OK") -> Path:
         {"label": "210mm×297mm(백상지 80g/m2)", "role": "applicant",
          "semantic": "", "paragraphId": "p3"},
     ]
-    con.execute("INSERT INTO forms VALUES(1,?,3,3,0)",
+    con.execute("INSERT INTO forms VALUES(1,?,3,3,0,'신청신고','민원신청')",
                 (json.dumps(schema, ensure_ascii=False),))
     con.execute(B.DDL)
     interp = [
@@ -200,11 +200,78 @@ def test_promote_demotes_pollution_and_fills_blank_semantic(
     assert "PROMOTED" in capsys.readouterr().out
 
 
+def _dead_form_catalog(tmp_path: Path, doc_type="기타",
+                       form_kind="행정내부") -> Path:
+    """검측요청서 형상 — 전 칸 office(신청인칸 0)."""
+    db = tmp_path / "catalog.sqlite"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE forms(form_id INTEGER PRIMARY KEY,"
+                " input_schema TEXT, input_count INT, applicant_count INT,"
+                " office_count INT, doc_type TEXT, form_kind TEXT)")
+    schema = [
+        {"label": "검측부위", "role": "office", "semantic": "",
+         "paragraphId": "p1"},
+        {"label": "검측결과", "role": "office", "semantic": "",
+         "paragraphId": "p2"},
+    ]
+    con.execute("INSERT INTO forms VALUES(1,?,2,0,2,?,?)",
+                (json.dumps(schema, ensure_ascii=False), doc_type, form_kind))
+    con.execute(B.DDL)
+    interp = [
+        # 시공사가 적는 칸 → 되살린다
+        {"key": "p1", "isInput": True, "filledBy": "작성자", "semantic": "",
+         "ruleRole": "office", "label": "검측부위", "meaning": "검측 부위",
+         "question": "검측부위를 알려주세요", "confidence": 0.9},
+        # 감리자가 적는 칸 → 그대로 관계자
+        {"key": "p2", "isInput": True, "filledBy": "상대방", "semantic": "",
+         "ruleRole": "office", "label": "검측결과", "meaning": "검측 결과",
+         "question": "", "confidence": 0.9},
+    ]
+    con.execute(
+        f"INSERT INTO {B.STAGING}(form_id, status, interpretations)"
+        f" VALUES(1,'OK',?)",
+        (json.dumps(interp, ensure_ascii=False),))
+    con.commit()
+    con.close()
+    return db
+
+
+def _roles_after_promote(tmp_path: Path) -> dict:
+    con = sqlite3.connect(tmp_path / "catalog.sqlite")
+    raw, app = con.execute(
+        "SELECT input_schema, applicant_count FROM forms"
+        " WHERE form_id=1").fetchone()
+    con.close()
+    return {"roles": {f["paragraphId"]: f["role"] for f in json.loads(raw)},
+            "applicantCount": app}
+
+
+def test_promote_revives_dead_business_document(tmp_path, monkeypatch, capsys):
+    # 검측요청서: 시공사 칸만 되살아나고 감리자 칸은 그대로 관계자
+    monkeypatch.setattr(B, "CATALOG", _dead_form_catalog(tmp_path))
+    B.promote()
+    after = _roles_after_promote(tmp_path)
+    assert after["roles"]["p1"] == "applicant"
+    assert after["roles"]["p2"] == "office"
+    assert after["applicantCount"] == 1
+    assert "역할교정" in capsys.readouterr().out
+
+
+def test_promote_never_revives_protected_ledger(tmp_path, monkeypatch):
+    # 대장기록은 안전규칙상 전 칸 관계자가 정답 — AI 가 뭐라 하든 불변
+    monkeypatch.setattr(B, "CATALOG",
+                        _dead_form_catalog(tmp_path, doc_type="대장기록"))
+    B.promote()
+    after = _roles_after_promote(tmp_path)
+    assert after["roles"] == {"p1": "office", "p2": "office"}
+    assert after["applicantCount"] == 0
+
+
 def test_promote_refuses_when_ok_ratio_below_gate(
         tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(B, "CATALOG",
                         _temp_catalog(tmp_path, staged_status="AI_FAILED"))
-    B.promote()
+    B.promote()  # noqa: F841 — 아래에서 카탈로그 무변경을 확인한다
     out = capsys.readouterr().out
     assert "REJECTED" in out
     con = sqlite3.connect(tmp_path / "catalog.sqlite")

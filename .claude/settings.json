@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:\\work\\02. hwpx-web-office\\scripts\\ops\\hooks\\post_edit_ai_pipeline_gate.py\"",
+            "timeout": 120,
+            "statusMessage": "AI 해석 공정 게이트(§4.6) 검사"
+          }
+        ]
+      }
+    ]
+  }
+}

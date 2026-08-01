@@ -114,23 +114,30 @@ def build_interpretation_prompt(fields: list[dict]) -> str:
                       "left": ctx.get("left") or "",
                       "up": ctx.get("up") or ""})
     return (
-        "당신은 한국 관공서 HWPX 서식 분석가입니다. 각 칸이 **무엇을 적는 "
-        "칸인지** 판정하세요. 값을 지어내지 마세요 — 값은 묻지 않습니다.\n"
+        "당신은 한국 문서 서식 분석가입니다. 각 칸이 **무엇을 적는 칸이고 "
+        "누가 적는 칸인지** 판정하세요. 값을 지어내지 마세요 — 값은 묻지 "
+        "않습니다.\n"
         "규칙:\n"
         "- 반드시 JSON 배열만 출력. 다른 설명·코드펜스 금지.\n"
         '- 각 항목: {"key":"칸 key 그대로","isInput":true/false,'
+        '"filledBy":"작성자|상대방|",'
         '"meaning":"무엇을 적는 칸인지 한 줄","semantic":"태그 또는 빈문자열",'
         '"profileKey":"표준 프로필 키 또는 빈문자열",'
         '"question":"사용자에게 물을 문구","confidence":0.0~1.0}\n'
         "- isInput=false 로 판정할 것: 용지 규격(210mm×297mm 등), 법령·서식 "
         "번호 표시(■ …시행규칙 [별지제…호서식]), 안내문(※ …합니다), 구역 "
         "제목, 첨부서류 목록, 자르는선 — 사람이 값을 적는 칸이 아닙니다.\n"
+        "- filledBy: 이 문서를 **제출·작성하는 쪽**이 적으면 '작성자', 받는 "
+        "쪽(관공서 담당자·감리자·검토자·승인자)이 적으면 '상대방'. 예: "
+        "검측요청서에서 검측부위·검측요구일시·공사량은 시공사가 적으므로 "
+        "'작성자', 검측결과·검측자·검측일시는 감리자가 적으므로 '상대방'. "
+        "관공서 서식의 접수번호·처리기간·담당자확인란도 '상대방'.\n"
         f"- semantic 은 다음 중 하나이거나 빈 문자열: "
         f"{sorted(ALLOWED_SEMANTIC)}\n"
-        "- profileKey 는 신청인의 표준 신상정보에서 오는 값일 때만 채우고"
-        "(성명·주소·연락처 등), 서식 고유 항목이면 빈 문자열로 두고 "
-        "question 을 잘 적으세요.\n"
-        f"서식 제목: {title}\n"
+        "- profileKey 는 작성자의 표준 신상·사업자 정보에서 오는 값일 때만 "
+        "채우고(성명·주소·연락처·상호 등), 문서 고유 항목이면 빈 문자열로 "
+        "두고 question 을 잘 적으세요.\n"
+        f"문서 제목: {title}\n"
         f"칸 목록: {json.dumps(lines, ensure_ascii=False)}"
     )
 
@@ -162,10 +169,16 @@ def validate_interpretation(
             conf = float(r.get("confidence") or 0.0)
         except (TypeError, ValueError):
             conf = 0.0
+        filled_by = str(r.get("filledBy", "") or "").strip()
+        if filled_by not in ("작성자", "상대방"):
+            filled_by = ""
         ok.append({
             "key": key,
             "label": known[key].get("label") or "",
             "isInput": bool(r.get("isInput", True)),
+            "filledBy": filled_by,
+            # 규칙이 매긴 역할 — 게이트가 AI 판정과 대조한다
+            "ruleRole": known[key].get("ruleRole") or "",
             "meaning": str(r.get("meaning", "") or "").strip()[:120],
             "semantic": sem,
             "profileKey": str(r.get("profileKey", "") or "").strip()[:40],
@@ -173,6 +186,50 @@ def validate_interpretation(
             "confidence": max(0.0, min(1.0, conf)),
         })
     return ok, bad
+
+
+# 역할 교정을 절대 적용하지 않는 보호 구역 — 이 분류들은 '전 칸 관계자'가
+# 정답이다. 대장(ledger)은 안전규칙으로 고정돼 있고
+# (test_ledger_keeps_fields_but_marks_office), 증명발급은 관공서가 발급하는
+# 문서라 신청인이 쓸 칸이 없는 게 맞다.
+ROLE_PROTECTED_DOCTYPES = frozenset({"대장기록", "증명발급"})
+ROLE_PROTECTED_KINDS = frozenset({"발급증서"})
+
+PROMOTE_MIN_CONFIDENCE = 0.7
+
+
+def should_promote_to_user(
+    interp: dict, *, doc_type: str, form_kind: str,
+    form_applicant_count: int,
+    min_confidence: float = PROMOTE_MIN_CONFIDENCE,
+) -> bool:
+    """이 칸을 관계자 → 작성자(사용자) 칸으로 되살려도 되는가.
+
+    강등에서 배운 원칙과 같다 — AI 단독 판정은 못 믿는다(파일럿에서 정상
+    칸의 15.8% 를 죽였다). 여기서는 **범위를 좁히는 것**이 둘째 신호다:
+
+      · 문서 전체가 죽어 있을 때만(`form_applicant_count == 0`) 되살린다.
+        이미 입력칸이 하나라도 살아있는 서식의 역할은 건드리지 않는다 —
+        지금 잘 도는 서식을 재배치해 망가뜨릴 위험이 0 이 된다.
+      · 보호 구역(대장기록·증명발급·발급증서)은 어떤 경우에도 제외.
+      · 규칙이 이미 작성자로 본 칸은 교정 대상이 아니다(할 일이 없다).
+
+    실측 근거(2026-08-01): 검측요청서 38건이 전 칸 관계자로 죽어 있다.
+    시공사가 쓰는 `검측부위`·`검측요구일시`·`공사량`이 사용자에게 안 보인다.
+    원인은 역할 축이 `민원인 ↔ 관공서` 2축뿐이라 `시공사 → 감리단` 문서를
+    담을 자리가 없기 때문이다.
+    """
+    if form_applicant_count > 0:
+        return False
+    if doc_type in ROLE_PROTECTED_DOCTYPES or form_kind in ROLE_PROTECTED_KINDS:
+        return False
+    if interp.get("ruleRole") == "applicant":
+        return False
+    if not interp.get("isInput", True):
+        return False
+    if interp.get("filledBy") != "작성자":
+        return False
+    return float(interp.get("confidence") or 0.0) >= min_confidence
 
 
 def interpret_fields(
@@ -202,4 +259,6 @@ def interpret_fields(
         "inputCount": sum(1 for r in ok if r["isInput"]),
         "notInputCount": sum(1 for r in ok if not r["isInput"]),
         "semanticCount": sum(1 for r in ok if r["semantic"]),
+        "authorCount": sum(1 for r in ok if r["filledBy"] == "작성자"),
+        "counterpartyCount": sum(1 for r in ok if r["filledBy"] == "상대방"),
     }

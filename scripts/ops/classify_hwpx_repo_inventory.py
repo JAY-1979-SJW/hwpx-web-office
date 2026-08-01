@@ -120,6 +120,9 @@ def classify_path(path: str) -> tuple[str, str, str]:
 
     if lower.startswith(".githooks/"):
         return "CONFIG_BUILD", "unassigned", "keep_git_hooks"
+    # .claude/ 는 프로젝트 도구 설정(훅 등록 등)이다 — .githooks 와 같은 성격.
+    if lower.startswith(".claude/"):
+        return "CONFIG_BUILD", "unassigned", "keep_claude_config"
     if path in {".gitignore", "CLAUDE.md"} or name in {"package.json", "package-lock.json", "pyproject.toml"}:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
@@ -135,7 +138,10 @@ def classify_path(path: str) -> tuple[str, str, str]:
             return "ACTIVE_AUTOFILL", "batch_api_browser", "keep_active_autofill_frontend"
         return "FRONTEND_VIEWER", "browser_ui", "keep_frontend_viewer"
     if lower.startswith("scripts/ops/"):
-        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates")):
+        # scripts/ops/hooks/ 는 게이트를 자동 집행하는 감리 기반시설이다
+        # (편집 시점에 게이트를 돌려 규칙 위반을 즉시 잡는다) — 이름이
+        # `gate_` 로 시작하지 않아도 성격은 AUDIT_GATE 다.
+        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates", "/hooks/")):
             return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
         if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
             return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"
