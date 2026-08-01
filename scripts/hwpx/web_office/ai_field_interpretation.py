@@ -28,6 +28,7 @@ paragraphId 인지, semantic 이 아는 어휘인지 기계 대조하고 아니�
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from typing import Any, Callable
@@ -36,8 +37,12 @@ from .ai_doc_interpret import RunnerError
 from .ai_form_fill import _parse_json_array
 from .form_fill_planner import _PROMPT
 
-CLAUDE_MODEL = "haiku"          # §9 — 최하위 모델만
-DEFAULT_TIMEOUT_SEC = 180
+# §4.7 — 빌드타임 해석은 상위 모델을 쓴다(대표님 지시, 2026-08-01).
+# 해석은 한 번 굳으면 카탈로그에 영구히 남아 이후 모든 채움의 근거가
+# 되므로 일회성 런타임 호출보다 품질 가치가 크다. 런타임 값 채움
+# (ai_form_fill·ai_doc_interpret)은 §9 그대로 Haiku 고정.
+CLAUDE_MODEL = os.environ.get("HWPX_AI_INTERPRET_MODEL", "sonnet")
+DEFAULT_TIMEOUT_SEC = 300       # 상위 모델은 응답이 느리다
 
 Runner = Callable[[str], str]
 

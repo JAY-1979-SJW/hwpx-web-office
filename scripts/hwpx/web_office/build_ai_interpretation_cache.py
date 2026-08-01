@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 import time
@@ -55,6 +56,13 @@ from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
+
+# 건설·현장 서류 — 대표님 사업 축이라 우선 공사 대상(2026-08-01 지시).
+# 카탈로그 실측: 이름에 이 신호가 있는 서식 1,774건(5.6%), 신청인칸
+# 10,857개. 그중 검측요청서 38건은 전 칸이 관계자로 죽어 있었다.
+CONSTRUCTION_DOC_RE = re.compile(
+    r"(검측|시공|감리|공사|착공|준공|기성|공정|안전관리|품질관리"
+    r"|자재승인|하도급|설계변경|현장대리인|건설기술|시방)")
 FLUSH_EVERY = 10        # AI 호출이 느려 소량씩 — 중단돼도 잃는 게 적다
 
 # promote 게이트 — 해석 성공률이 이 아래면 반영을 거부한다.
@@ -123,22 +131,36 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
 
 
 def _targets(con: sqlite3.Connection, limit: int, shard: int,
-             shards: int) -> list[tuple]:
+             shards: int, scope: str = "all") -> list[tuple]:
+    """공사 대상. scope='construction' 이면 건설·현장 서류만.
+
+    죽은 서식(신청인칸 0)을 먼저 돌린다 — 사용자가 지금 아예 못 쓰는
+    문서라 효과가 가장 크고, 역할 교정 게이트가 '죽은 문서만' 적용되므로
+    위험도 가장 낮다.
+    """
     done = {r[0] for r in con.execute(f"SELECT form_id FROM {STAGING}")}
     rows = con.execute(
-        "SELECT form_id, source_path, input_schema, clean_name FROM forms"
+        "SELECT form_id, source_path, input_schema, clean_name,"
+        " COALESCE(name,''), COALESCE(applicant_count,0) FROM forms"
         " WHERE input_schema IS NOT NULL AND input_schema != ''"
         " ORDER BY form_id").fetchall()
     out = []
     for r in rows:
-        if r[0] in done:
+        form_id, _, _, clean_name, name, _ = r
+        if form_id in done:
             continue
-        if shards > 1 and r[0] % shards != shard:
+        if shards > 1 and form_id % shards != shard:
             continue
+        if scope == "construction":
+            label = f"{clean_name or ''} {name or ''}"
+            if not CONSTRUCTION_DOC_RE.search(label):
+                continue
         out.append(r)
-        if limit and len(out) >= limit:
-            break
-    return out
+    # 죽은 서식 우선(applicant_count 오름차순), 그 안에서는 form_id 순
+    out.sort(key=lambda r: (r[5], r[0]))
+    if limit:
+        out = out[:limit]
+    return [r[:4] for r in out]
 
 
 def interpret_one(source_rel: str, schema_json: str, clean_name: str,
@@ -179,11 +201,13 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
     }
 
 
-def run(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
+def run(limit: int = 0, shard: int = 0, shards: int = 1,
+        scope: str = "all", promote_on_pass: bool = False) -> None:
     con = _connect()
     con.execute(DDL)
-    targets = _targets(con, limit, shard, shards)
-    _log(f"대상 {len(targets)}건 (shard {shard}/{shards})")
+    targets = _targets(con, limit, shard, shards, scope)
+    _log(f"대상 {len(targets)}건 (shard {shard}/{shards}, scope={scope},"
+         f" model={CLAUDE_MODEL})")
     pending: list[dict] = []
     t0 = time.time()
     for n, (form_id, source_path, schema_json, clean_name) in enumerate(
@@ -206,6 +230,12 @@ def run(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
     _flush(con, pending)
     _log(f"완료 {len(targets)}건 / {time.time() - t0:.0f}s")
     con.close()
+    if promote_on_pass:
+        # 대표님 지시(2026-08-01): 게이트 통과 시 자동 반영.
+        # promote() 안의 성공률 게이트가 미달이면 스스로 거부하므로
+        # '무조건 반영'이 아니다 — 통과했을 때만 넘어간다.
+        _log("--- 게이트 통과 시 자동 반영 ---")
+        promote()
 
 
 def status() -> None:
@@ -331,13 +361,18 @@ def main() -> None:
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--promote", action="store_true")
+    ap.add_argument("--scope", choices=("all", "construction"), default="all",
+                    help="construction = 건설·현장 서류만")
+    ap.add_argument("--promote-on-pass", action="store_true",
+                    help="공사 후 게이트 통과 시 자동 반영")
     a = ap.parse_args()
     if a.status:
         status()
     elif a.promote:
         promote()
     else:
-        run(limit=a.limit, shard=a.shard, shards=a.shards)
+        run(limit=a.limit, shard=a.shard, shards=a.shards, scope=a.scope,
+            promote_on_pass=a.promote_on_pass)
 
 
 if __name__ == "__main__":
