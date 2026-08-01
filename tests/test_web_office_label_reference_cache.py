@@ -33,6 +33,24 @@ def test_cache_key_does_not_merge_different_labels():
     assert L.cache_key("성명", "신청신고") != L.cache_key("성명(대표자)", "신청신고")
 
 
+def test_normalize_strips_trailing_list_number():
+    # 실사례(2026-08-02 메타 검토): '불합격량 1'~'불합격량 20' 이 같은
+    # 필드인데 순번 때문에 20개로 쪼개져 있었다.
+    assert L.normalize_label("불합격량 1") == L.normalize_label("불합격량 20")
+    assert L.normalize_label("불합격량 1") == "불합격량"
+
+
+def test_normalize_keeps_pure_or_near_pure_numeric_labels():
+    # 남는 글자가 너무 짧으면(코드값 등) 지우지 않는다 — 과병합 방지
+    assert L.normalize_label("20") == "20"
+    assert L.normalize_label("1234") == "1234"
+
+
+def test_normalize_does_not_merge_unrelated_labels_with_digits():
+    # 숫자를 지워도 서로 다른 라벨끼리는 여전히 달라야 한다
+    assert L.normalize_label("고급감리원") != L.normalize_label("불합격량1")
+
+
 # ── 백필(새 AI 호출 없음) ────────────────────────────────────────
 
 def _make_catalog(tmp_path: Path) -> Path:

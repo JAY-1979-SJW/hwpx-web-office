@@ -57,11 +57,28 @@ CREATE TABLE IF NOT EXISTS {TABLE}(
 """
 
 _WS_RE = re.compile(r"\s+")
+_TRAILING_NUM_RE = re.compile(r"\d+$")
+
+# 최소 이 길이 이상 남아야 순번 제거를 적용한다 — 라벨 전체가 숫자거나
+# 거의 숫자뿐이면(예: 순수 코드값) 지우지 않는다. 우연한 과병합 방지.
+_MIN_STEM_LEN = 2
 
 
 def normalize_label(label: str) -> str:
-    """라벨 표기 흔들림(공백)만 지운다 — 의미까지 바꾸지 않는다."""
-    return _WS_RE.sub("", (label or "").strip())
+    """라벨 표기 흔들림(공백)만 지운다 — 의미까지 바꾸지 않는다.
+
+    끝에 붙은 순번은 예외적으로 지운다(2026-08-02 메타 검토 실측):
+    `불합격량 1`~`불합격량 20` 이 같은 필드인데 번호 때문에 20개 별도
+    항목으로 쪼개져 있었다. 목록 번호는 라벨의 **의미**가 아니라
+    **위치** 표시라 지워도 안전하다 — 반대로 라벨 자체가 온통 숫자면
+    (남는 글자가 `_MIN_STEM_LEN` 미만) 지우지 않는다(코드값 등 오병합
+    방지).
+    """
+    text = _WS_RE.sub("", (label or "").strip())
+    stripped = _TRAILING_NUM_RE.sub("", text)
+    if len(stripped) >= _MIN_STEM_LEN:
+        return stripped
+    return text
 
 
 def cache_key(label: str, doc_type: str) -> str:
