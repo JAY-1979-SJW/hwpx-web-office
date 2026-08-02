@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공사 감리자 지정 신청서 - 웹 입력</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; padding: 20px; min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+            padding: 30px; text-align: center; }
+        header h1 { font-size: 1.6em; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9em; }
+        .form-container { padding: 30px; display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+        .form-field { display: flex; flex-direction: column; }
+        .field-label { font-weight: 600; margin-bottom: 8px; font-size: 0.95em; }
+        .field-label .cell-ref { color: #667eea; font-size: 0.8em; font-weight: normal; margin-left: 5px; }
+        .field-input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; font-family: inherit; }
+        .field-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .field-input[readonly] { background: #f0f0f0; color: #888; }
+        .form-field.info-only { opacity: 0.75; }
+        .badge-info { background: #eee; color: #666; font-size: 0.7em; padding: 2px 6px;
+            border-radius: 10px; margin-left: 6px; font-weight: normal; }
+        .guidance-box { background: #f8f9fa; border-left: 3px solid #667eea; padding: 10px; border-radius: 5px;
+            font-size: 0.85em; color: #555; margin-top: 6px; }
+        .button-group { display: flex; gap: 10px; padding: 0 30px 30px; justify-content: center; grid-column: 1 / -1; }
+        button { padding: 12px 28px; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+        .btn-save { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-reset, .btn-back { background: #f0f0f0; color: #333; }
+        .status-message { margin: 0 30px 20px; padding: 12px; border-radius: 5px; display: none;
+            text-align: center; font-weight: 500; grid-column: 1 / -1; }
+        .status-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        @media (max-width: 700px) { .form-container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 공사 감리자 지정 신청서</h1>
+            <p>기준서 기반 자동 생성 웹 입력 (39개 필드) · 필수 강제 없음</p>
+        </header>
+        <form id="formMain" class="form-container">
+
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수번호
+                            <span class="cell-ref">[C4]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 신청서를 접수한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수일자
+                            <span class="cell-ref">[F4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="F4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 접수 처리한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            처리일자
+                            <span class="cell-ref">[M4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="M4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 처리를 완료한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            주소
+                            <span class="cell-ref">[B7]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B7" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축주의 주소를 입력하고, 이어지는 "(전화번호: )" 칸에 연락처를 함께 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            지역지구
+                            <span class="cell-ref">[E18]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E18" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 대지가 속한 용도지역ㆍ지구를 입력하세요 (예: 제2종일반주거지역).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            건축연면적
+                            <span class="cell-ref">[E20]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E20" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축연면적을 입력하세요 (단위: ㎡, 각 층 바닥면적의 합).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            구    조
+                            <span class="cell-ref">[P20]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="P20" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축물의 주요 구조를 입력하세요 (예: 철근콘크리트조).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            용    도
+                            <span class="cell-ref">[E21]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E21" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축물의 용도를 입력하세요 (예: 단독주택, 제1종근린생활시설).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            건축허가일 /허가번호
+                            <span class="cell-ref">[P21]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="P21" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축허가(신고) 일자와 허가번호를 함께 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            처리기간
+                            <span class="cell-ref">[R4]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 법정 처리기간을 안내하는 라벨입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            7일
+                            <span class="cell-ref">[T4]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 법정 처리기간은 7일로 고정되어 있습니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            성명(법인명)
+                            <span class="cell-ref">[B6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축주의 성명(법인인 경우 법인명)을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            생년월일(사업자 또는 법인등록번호)
+                            <span class="cell-ref">[I6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="I6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축주의 생년월일(개인, YYMMDD) 또는 사업자ㆍ법인등록번호를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            「행정절차법」 제14조에 따라 정보통신망을 이용한 각종 부담금 부과 사전통지 등의 문서 송달에 동의합니다.
+                            <span class="cell-ref">[E8]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 전자우편 송달 동의에 대한 법적 근거를 설명하는 안내 문구입니다. 아래 [동의함]/[동의하지 않음] 중 하나를 선택하면 됩니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            [  ] 동의함
+                            <span class="cell-ref">[E9]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E9" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 전자우편으로 통지받는 데 동의하면 이 [ ]에 √ 표시하세요. (E9/N9 중 하나만 선택)</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            [  ] 동의하지 않음
+                            <span class="cell-ref">[N9]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="N9" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 전자우편 통지에 동의하지 않으면 이 [ ]에 √ 표시하세요. (E9/N9 중 하나만 선택)</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            건축주                  (서명 또는 인)
+                            <span class="cell-ref">[E10]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E10" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✍️ ✍️ 건축주 본인이 서명하거나 인감을 날인하는 칸입니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            전자우편 주소
+                            <span class="cell-ref">[E11]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E11" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 연락 가능한 전자우편 주소를 입력하세요 ("@" 앞부분).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            @
+                            <span class="cell-ref">[G11]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 이메일 주소 형식의 "@" 기호입니다. 별도 입력이 필요한 칸이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            성명
+                            <span class="cell-ref">[B13]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B13" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ ② 설계자의 성명을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            (서명 또는 인)
+                            <span class="cell-ref">[E13]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="E13" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✍️ ✍️ 설계자 본인이 서명하거나 인감을 날인하는 칸입니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            자격번호
+                            <span class="cell-ref">[J13]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J13" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 설계자의 건축사 자격번호를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            사무소명
+                            <span class="cell-ref">[B14]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B14" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 설계자가 소속된 건축사사무소의 명칭을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            신고번호
+                            <span class="cell-ref">[J14]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J14" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 건축사사무소의 등록(신고)번호를 입력하세요 — 이미 발급받은 번호를 기재하는 것으로, 접수번호처럼 기관이 새로 부여하는 값이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            사무소주소
+                            <span class="cell-ref">[B15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축사사무소의 소재지를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            (전화번호:                      )
+                            <span class="cell-ref">[Q15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="Q15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축사사무소의 전화번호를 "(전화번호: )" 칸에 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            대지위치
+                            <span class="cell-ref">[B17]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B17" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ ③ 공사개요 - 대지의 위치(지번 주소)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            층    수
+                            <span class="cell-ref">[K18]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="K18" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축물의 층수를 입력하세요 (지하/지상 층수는 P18에 함께 기재).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            지하 지상
+                            <span class="cell-ref">[P18]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="P18" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 지하ㆍ지상 층수를 각각 입력하세요 (예: 지하 2층, 지상 15층).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            대지면적
+                            <span class="cell-ref">[B19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 대지면적을 입력하세요 (단위: ㎡, 옆 칸 E19에 이미 ㎡ 표시됨).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            ㎡
+                            <span class="cell-ref">[E19]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 면적 단위 기호 "㎡"입니다. 별도 입력 칸이 아니라 B19에 입력한 숫자의 단위 표시입니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            건축면적
+                            <span class="cell-ref">[K19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="K19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축면적을 입력하세요 (단위: ㎡).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            ㎡
+                            <span class="cell-ref">[P19]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 면적 단위 기호 "㎡"입니다. K19에 입력한 숫자의 단위 표시로, 별도 입력 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            「건축법」 제25조제2항, 같은 법 시행령 제19조의2제3항 및 같은 법 시행규칙 제19조의3제1항에 따라 위와 같이 공사 감리자 지정을 신청합니다.
+                            <span class="cell-ref">[A22]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 건축법령에 근거해 신청 취지를 밝히는 정형 문구입니다. 수정하지 않습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            년          월          일
+                            <span class="cell-ref">[A23]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="A23" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청 연월일을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            건축주                          (서명 또는 인)
+                            <span class="cell-ref">[A24]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="A24" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✍️ ✍️ 건축주 본인이 서명하거나 인감을 날인하는 칸입니다 (하단 제출용 서명란).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            특별시장·광역시장·특별자치시장·특별자치도지사, 시장·군수·구청장
+                            <span class="cell-ref">[A25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출받을 관할 관청의 직함이 나열되어 있습니다. 해당하는 곳을 그대로 두고 관할 기관에 제출하면 되며, 별도로 편집할 필요는 없습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            귀하
+                            <span class="cell-ref">[O25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 수신처 표시 "귀하"입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            210㎜×297㎜[백상지(80g/㎡) 또는 중질지(80g/㎡)]
+                            <span class="cell-ref">[A26]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출용 용지 규격 안내입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+            <div class="button-group">
+                <button type="button" class="btn-back" onclick="location.href='index.html'">🏠 돌아가기</button>
+                <button type="reset" class="btn-reset">🔄 초기화</button>
+                <button type="submit" class="btn-save">💾 저장</button>
+            </div>
+            <div class="status-message" id="statusMessage"></div>
+        </form>
+    </div>
+    <script>
+        const STORAGE_KEY = 'form_supervisor-designation-application_data';
+        const form = document.getElementById('formMain');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = {};
+            document.querySelectorAll('[data-cell]').forEach(input => {
+                if (input.value) data[input.dataset.cell] = input.value;
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            const msg = document.getElementById('statusMessage');
+            msg.textContent = `✅ 저장되었습니다! (${Object.keys(data).length}개 필드)`;
+            msg.className = 'status-message success';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        });
+        window.addEventListener('load', function() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                Object.keys(data).forEach(cell => {
+                    const input = document.querySelector(`[data-cell="${cell}"]`);
+                    if (input) input.value = data[cell];
+                });
+            }
+        });
+    </script>
+</body>
+</html>

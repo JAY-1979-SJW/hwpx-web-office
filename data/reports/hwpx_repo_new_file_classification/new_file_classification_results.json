@@ -1,27 +1,108 @@
 [
   {
-    "safePath": ".claude/settings.json",
-    "category": "CONFIG_BUILD",
-    "zone": "unassigned",
-    "separationPlan": "keep_claude_config",
+    "safePath": "docs/specifications/construction_clean_spec.json",
+    "category": "REPORT_DOC",
+    "zone": "docs_reports",
+    "separationPlan": "keep_documentation",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
   },
   {
-    "safePath": "scripts/ops/gate_hwpx_ai_interpretation_pipeline.py",
-    "category": "AUDIT_GATE",
-    "zone": "closeout_security",
-    "separationPlan": "keep_gate_audit",
+    "safePath": "docs/specifications/supervision_forms_final.json",
+    "category": "REPORT_DOC",
+    "zone": "docs_reports",
+    "separationPlan": "keep_documentation",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
   },
   {
-    "safePath": "scripts/ops/hooks/post_edit_ai_pipeline_gate.py",
-    "category": "AUDIT_GATE",
-    "zone": "closeout_security",
-    "separationPlan": "keep_gate_audit",
+    "safePath": "frontend/web_office_viewer/forms/fire-facility-completion-inspection-application.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "frontend/web_office_viewer/forms/index.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "frontend/web_office_viewer/forms/outdoor-tank-safety-inspection-extension-application.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "frontend/web_office_viewer/forms/supervisor-designation-application.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/apply_ai_guidance_supervision.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/build_catalog_pilot.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/generate_forms_specification.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/generate_html_forms.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/parse_supervision_forms.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/verify_catalog_spec.py",
+    "category": "ACTIVE_HWPX_CORE",
+    "zone": "hwpx_core",
+    "separationPlan": "keep_hwpx_core",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>소방시설공사 완공검사신청서 - 웹 입력</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; padding: 20px; min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+            padding: 30px; text-align: center; }
+        header h1 { font-size: 1.6em; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9em; }
+        .form-container { padding: 30px; display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+        .form-field { display: flex; flex-direction: column; }
+        .field-label { font-weight: 600; margin-bottom: 8px; font-size: 0.95em; }
+        .field-label .cell-ref { color: #667eea; font-size: 0.8em; font-weight: normal; margin-left: 5px; }
+        .field-input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; font-family: inherit; }
+        .field-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .field-input[readonly] { background: #f0f0f0; color: #888; }
+        .form-field.info-only { opacity: 0.75; }
+        .badge-info { background: #eee; color: #666; font-size: 0.7em; padding: 2px 6px;
+            border-radius: 10px; margin-left: 6px; font-weight: normal; }
+        .guidance-box { background: #f8f9fa; border-left: 3px solid #667eea; padding: 10px; border-radius: 5px;
+            font-size: 0.85em; color: #555; margin-top: 6px; }
+        .button-group { display: flex; gap: 10px; padding: 0 30px 30px; justify-content: center; grid-column: 1 / -1; }
+        button { padding: 12px 28px; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+        .btn-save { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-reset, .btn-back { background: #f0f0f0; color: #333; }
+        .status-message { margin: 0 30px 20px; padding: 12px; border-radius: 5px; display: none;
+            text-align: center; font-weight: 500; grid-column: 1 / -1; }
+        .status-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        @media (max-width: 700px) { .form-container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 소방시설공사 완공검사신청서</h1>
+            <p>기준서 기반 자동 생성 웹 입력 (32개 필드) · 필수 강제 없음</p>
+        </header>
+        <form id="formMain" class="form-container">
+
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수번호
+                            <span class="cell-ref">[B4]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 부여하는 접수번호입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수일자
+                            <span class="cell-ref">[E4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="E4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 접수 처리한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수일자
+                            <span class="cell-ref">[I4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="I4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관 처리 영역입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            처리기간
+                            <span class="cell-ref">[K4]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="K4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 기재하는 처리기간 관련 칸입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            소재지
+                            <span class="cell-ref">[D7]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D7" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청인(업체)의 소재지를 입력하고, 이어지는 "(전화번호: )" 칸에 연락처를 함께 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            소재지
+                            <span class="cell-ref">[D10]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D10" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 시공장소(공사 현장)의 소재지를 입력하고, 이어지는 "(전화번호: )" 칸에 연락처를 함께 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            구 조
+                            <span class="cell-ref">[D11]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D11" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축물의 구조와 지하ㆍ지상 층수를 입력하세요 (예: 철근콘크리트조, 지하2층/지상10층).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            소방시설의 종     류
+                            <span class="cell-ref">[D14]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D14" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 설치된 소방시설의 종류를 입력하세요 (예: 자동화재탐지설비, 스프링클러설비 등).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            착공신고일
+                            <span class="cell-ref">[D19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 착공신고를 한 날짜를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            3일
+                            <span class="cell-ref">[O4]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 법정 처리기간은 3일로 고정되어 있습니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            신 청 인
+                            <span class="cell-ref">[A6]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "신 청 인" 구획 제목입니다. 아래 상호명칭/등록번호/대표자 칸에 실제 정보를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            상호(명칭)
+                            <span class="cell-ref">[D6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청인(시공업체)의 상호(명칭)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            등록번호    (제     호)
+                            <span class="cell-ref">[H6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="H6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 소방시설공사업 등록번호를 입력하세요 (등록증에 기재된 "제○○-○○○○○○호" 형식).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            대표자
+                            <span class="cell-ref">[L6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="L6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청인(업체)의 대표자 성명을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            상호(명칭)
+                            <span class="cell-ref">[D9]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D9" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 공사 현장(시공장소)의 건축물 상호(명칭)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            주요 용도
+                            <span class="cell-ref">[L9]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="L9" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 건축물의 주요 용도를 입력하세요 (예: 업무시설, 판매시설).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            대지면적                        연면적                     건축면적
+                            <span class="cell-ref">[D12]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D12" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 대지면적ㆍ연면적ㆍ건축면적을 각각 ㎡ 단위로 입력하세요 (한 칸에 세 값을 함께 기재).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            책임시공 및 기술관리 소방기술자
+                            <span class="cell-ref">[A15]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "책임시공 및 기술관리 소방기술자" 구획 제목입니다. 아래 성명/분야ㆍ등급 칸에 실제 정보를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            성명
+                            <span class="cell-ref">[D15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 현장 배치 소방기술자의 성명을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            분야/등급
+                            <span class="cell-ref">[L15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="L15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 소방기술자의 자격분야와 등급을 입력하세요 (예: 소방설비기사(기계분야)).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            공사 종류
+                            <span class="cell-ref">[A17]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "공사 종류" 구획 제목입니다. 아래 [ ] 목록에서 해당 항목에 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            [ ] 신설   [ ] 증설   [ ] 개설   [ ] 이전   [ ] 정비   [ ] 그 밖의 공사
+                            <span class="cell-ref">[D17]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D17" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 해당하는 공사 종류의 [ ]에 √ 표시하세요 (신설/증설/개설/이전/정비/그 밖의 공사 중 선택).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            완공일
+                            <span class="cell-ref">[L19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="L19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 공사가 완공된 날짜를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            「소방시설공사업법」 제14조제1항 및 같은 법 시행규칙 제13조제1항에 따라 소방시설공사 완공검사를 신청합니다.
+                            <span class="cell-ref">[A20]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 소방시설공사업법령에 근거해 완공검사를 신청하는 취지를 밝히는 정형 문구입니다. 수정하지 않습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            년          월          일
+                            <span class="cell-ref">[A21]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="A21" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청 연월일을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            신청인
+                            <span class="cell-ref">[A22]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "신청인" 서명란 라벨입니다. 실제 서명은 옆 칸(J22)에 합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            (서명 또는 인)
+                            <span class="cell-ref">[J22]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J22" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✍️ ✍️ 신청인이 서명하거나 인감을 날인하는 칸입니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            소방본부장/소방서장
+                            <span class="cell-ref">[A23]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출받을 소방본부장 또는 소방서장 중 관할 기관에 해당하는 쪽에 제출하면 되며, 별도로 편집할 필요는 없습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            귀하
+                            <span class="cell-ref">[F23]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 수신처 표시 "귀하"입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            첨부서류
+                            <span class="cell-ref">[A25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "첨부서류" 항목 라벨입니다. 실제 안내는 옆 칸(C25)에 있습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            설계도서 1부(「소방시설공사업법」 제13조제1항에 따른 착공신고 또는 같은 조 제2항에 따른 변경신고 이후 설계도서가 변경되지 않거나, 법 제20조에 따라 공사감리 결과를 통보하는 경우에는 제외합니다)
+                            <span class="cell-ref">[C25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출해야 할 첨부서류(설계도서 1부)를 안내하는 문구입니다. 해당 서류를 함께 제출하면 되며, 이 텍스트 자체를 편집하지 않습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            수수료 없  음
+                            <span class="cell-ref">[P25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 이 신청서는 수수료가 없다는 안내입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+            <div class="button-group">
+                <button type="button" class="btn-back" onclick="location.href='index.html'">🏠 돌아가기</button>
+                <button type="reset" class="btn-reset">🔄 초기화</button>
+                <button type="submit" class="btn-save">💾 저장</button>
+            </div>
+            <div class="status-message" id="statusMessage"></div>
+        </form>
+    </div>
+    <script>
+        const STORAGE_KEY = 'form_fire-facility-completion-inspection-application_data';
+        const form = document.getElementById('formMain');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = {};
+            document.querySelectorAll('[data-cell]').forEach(input => {
+                if (input.value) data[input.dataset.cell] = input.value;
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            const msg = document.getElementById('statusMessage');
+            msg.textContent = `✅ 저장되었습니다! (${Object.keys(data).length}개 필드)`;
+            msg.className = 'status-message success';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        });
+        window.addEventListener('load', function() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                Object.keys(data).forEach(cell => {
+                    const input = document.querySelector(`[data-cell="${cell}"]`);
+                    if (input) input.value = data[cell];
+                });
+            }
+        });
+    </script>
+</body>
+</html>

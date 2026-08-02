@@ -50,3 +50,9 @@ docs/SUPERVISION_READINESS.md
 validate_field_addresses.py
 reparse_form_331_fields.py
 scripts/ops/gate_api_key_detection.py
+
+# 대량 생성 웹폼 산출물 (재생성 가능 - 스크립트+기준서로 언제든 복원)
+forms_construction_clean/
+forms_construction_full/
+forms_construction10/
+forms_catalog/

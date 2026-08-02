@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서 - 웹 입력</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; padding: 20px; min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+            padding: 30px; text-align: center; }
+        header h1 { font-size: 1.6em; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9em; }
+        .form-container { padding: 30px; display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+        .form-field { display: flex; flex-direction: column; }
+        .field-label { font-weight: 600; margin-bottom: 8px; font-size: 0.95em; }
+        .field-label .cell-ref { color: #667eea; font-size: 0.8em; font-weight: normal; margin-left: 5px; }
+        .field-input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; font-family: inherit; }
+        .field-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .field-input[readonly] { background: #f0f0f0; color: #888; }
+        .form-field.info-only { opacity: 0.75; }
+        .badge-info { background: #eee; color: #666; font-size: 0.7em; padding: 2px 6px;
+            border-radius: 10px; margin-left: 6px; font-weight: normal; }
+        .guidance-box { background: #f8f9fa; border-left: 3px solid #667eea; padding: 10px; border-radius: 5px;
+            font-size: 0.85em; color: #555; margin-top: 6px; }
+        .button-group { display: flex; gap: 10px; padding: 0 30px 30px; justify-content: center; grid-column: 1 / -1; }
+        button { padding: 12px 28px; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+        .btn-save { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-reset, .btn-back { background: #f0f0f0; color: #333; }
+        .status-message { margin: 0 30px 20px; padding: 12px; border-radius: 5px; display: none;
+            text-align: center; font-weight: 500; grid-column: 1 / -1; }
+        .status-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        @media (max-width: 700px) { .form-container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏭 특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서</h1>
+            <p>기준서 기반 자동 생성 웹 입력 (63개 필드) · 필수 강제 없음</p>
+        </header>
+        <form id="formMain" class="form-container">
+
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수번호
+                            <span class="cell-ref">[B4]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="B4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 부여하는 접수번호입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            접수일자
+                            <span class="cell-ref">[E4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="E4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 접수 처리한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            처리일자
+                            <span class="cell-ref">[G4]</span>
+                        </label>
+                        <input type="date" class="field-input" data-cell="G4" readonly>
+                        <div class="guidance-box">
+                            <div class="guidance-text">🏛️ 🏛️ 기관이 처리를 완료한 날짜입니다. 신청 시에는 비워두세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            설치장소
+                            <span class="cell-ref">[C8]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C8" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크저장소가 설치된 소재지(도로명 주소)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            저장위험물의 유별, 품명, 화학명
+                            <span class="cell-ref">[C11]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C11" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 저장 중인 위험물의 유별(예: 제4류)ㆍ품명(예: 휘발유)ㆍ화학명을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            외면방식조치
+                            <span class="cell-ref">[C21]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C21" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크 저부 외면의 부식방지조치 방법에 해당하는 항목에 표시하세요 (아스팔트샌드 등).</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            보수의적정성여부
+                            <span class="cell-ref">[C24]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C24" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 기존 보수 이력이 있다면 그 적정성 여부를 기재하세요 (없으면 "해당없음").</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            처리기간
+                            <span class="cell-ref">[K4]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 법정 처리기간 계산식을 안내하는 라벨입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            검사기간 +15일
+                            <span class="cell-ref">[L4]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 처리기간은 "검사기간 + 15일"로 고정되어 있습니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            설치자
+                            <span class="cell-ref">[A6]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "설치자" 구획 제목입니다. 아래 성명/주소/전화번호 칸에 실제 정보를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            성명
+                            <span class="cell-ref">[C6]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C6" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크 설치자의 성명(법인인 경우 법인명)을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            주소
+                            <span class="cell-ref">[C7]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C7" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 설치자의 주소를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            전화번호
+                            <span class="cell-ref">[I7]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="I7" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 설치자의 전화번호를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            탱크번호
+                            <span class="cell-ref">[I8]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="I8" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크의 고유 관리번호를 입력하세요 (설치허가증에 기재된 탱크 번호).</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            완공연월일
+                            <span class="cell-ref">[A9]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "완공연월일" 라벨입니다. 실제 날짜는 옆 칸(C9)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            년        월        일
+                            <span class="cell-ref">[C9]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C9" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크 설치공사가 완공된 연월일을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            설치허가 연월일 및 가번호
+                            <span class="cell-ref">[A10]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "설치허가 연월일 및 허가번호" 라벨입니다. 실제 값은 옆 칸(C10)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            년        월        일 /  제        호
+                            <span class="cell-ref">[C10]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C10" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크 설치허가를 받은 연월일과 허가번호를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            저장최대수량
+                            <span class="cell-ref">[A12]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "저장최대수량" 라벨입니다. 실제 값은 옆 칸(C12)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            ℓ
+                            <span class="cell-ref">[C12]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C12" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크의 저장 최대수량을 리터(ℓ) 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            수분등의 관리
+                            <span class="cell-ref">[A13]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "수분등의 관리" 라벨입니다. 실제 값은 옆 칸(C13)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            지붕형식(고정식[ ] ㆍ 고정식 이외의 것[ ]) / *수분등의 관리(유[ ]ㆍ무[ ])
+                            <span class="cell-ref">[C13]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C13" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크의 지붕형식([ ]에 표시)과 수분 관리 상태(유/무 표시)를 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            저장위험물의 부식성
+                            <span class="cell-ref">[A14]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "저장위험물의 부식성" 라벨입니다. 실제 값은 옆 칸(C14)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[C14]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C14" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 저장 위험물의 부식성 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            저장조건
+                            <span class="cell-ref">[A15]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "저장조건" 라벨입니다. 실제 값은 옆 칸(C15/M15)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유종, 저장온도, 불활성기체봉입 등 부식의 발생에 현저한 영향을 미치는 저장조건의 변경예정
+                            <span class="cell-ref">[C15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 유종ㆍ저장온도ㆍ불활성기체봉입 등 부식에 영향을 줄 수 있는 저장조건의 변경예정 내용을 기재하세요 (없으면 "해당없음").</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M15]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M15" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 저장조건 변경예정 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            설계판두께 mm
+                            <span class="cell-ref">[D17]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D17" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 애뉼러판의 설계 판두께를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            설계판두께 mm
+                            <span class="cell-ref">[J17]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J17" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 밑판의 설계 판두께를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            최소판두께 mm
+                            <span class="cell-ref">[D18]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D18" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 애뉼러판의 최소 판두께를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            최소측정판두께의 평균치 mm
+                            <span class="cell-ref">[J18]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J18" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 밑판의 최소 측정판두께 평균치를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            부식률이 최대인 판의 경과연수 년
+                            <span class="cell-ref">[D19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 애뉼러판에서 부식률이 최대인 판의 경과연수(년)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            부식률이 최대인 판의 경과연수               년
+                            <span class="cell-ref">[J19]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J19" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 밑판에서 부식률이 최대인 판의 경과연수(년)를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            부식률 mm/년
+                            <span class="cell-ref">[D20]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="D20" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 애뉼러판의 부식률(mm/년)을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            부식률 mm/년
+                            <span class="cell-ref">[J20]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="J20" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 밑판의 부식률(mm/년)을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            *탱크저부외면 부식방지조치
+                            <span class="cell-ref">[A21]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "탱크저부외면 부식방지조치" 라벨입니다. 실제 값은 옆 칸(C21/H21)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            빗물침투방지조치 적합[ ] 부적합[ ]
+                            <span class="cell-ref">[H21]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="H21" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 빗물침투방지조치의 적합 여부에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            차기개방시기판 두께추정치
+                            <span class="cell-ref">[A22]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "차기개방시기판 두께추정치" 라벨입니다. 실제 값은 옆 칸(C22)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            차기개방예정시기
+                            <span class="cell-ref">[C22]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C22" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 다음 번 탱크 개방 예정 시기를 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            애뉼러판의 판두께 추정치 mm
+                            <span class="cell-ref">[C23]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C23" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 애뉼러판의 판두께 추정치를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            밑판의 판두께 추정치 mm
+                            <span class="cell-ref">[H23]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="H23" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 밑판의 판두께 추정치를 mm 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            *보 수 ㆍ 변형
+                            <span class="cell-ref">[A24]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "보수ㆍ변형" 라벨입니다. 실제 값은 옆 칸(C24/H24)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유해한 변형의 유무 유[ ]  무[ ]
+                            <span class="cell-ref">[H24]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="H24" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 유해한 변형의 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            *부 등 침 하
+                            <span class="cell-ref">[A25]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "부등침하" 라벨입니다. 실제 값은 옆 칸(C25)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            최대치의 탱크지름에 대한 비율
+                            <span class="cell-ref">[C25]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C25" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 탱크 최대 침하치의 탱크 지름에 대한 비율을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            *지지력ㆍ침하
+                            <span class="cell-ref">[A26]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "지지력ㆍ침하" 라벨입니다. 실제 값은 옆 칸(C26)에 입력합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            평균침하량 ㎜/년
+                            <span class="cell-ref">[C26]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C26" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 평균 침하량을 ㎜/년 단위로 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            과거 3년간의 특정ㆍ준특정옥외탱크의 유지관리에 기인한 사고발생
+                            <span class="cell-ref">[C27]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C27" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 과거 3년간 특정ㆍ준특정옥외탱크의 유지관리에 기인한 사고발생 이력을 기재하세요 (없으면 "없음").</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M27]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M27" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 사고발생 이력 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            과거 3년간의 「위험물안전관리법」 제14조제2항에 따른 조치 명령
+                            <span class="cell-ref">[C28]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C28" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 과거 3년간 「위험물안전관리법」 제14조제2항에 따른 조치명령을 받은 이력을 기재하세요 (없으면 "없음").</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M28]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M28" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 조치명령 이력 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            「위험물안전관리법」 제17조 또는 제18조 위반
+                            <span class="cell-ref">[C29]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C29" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 「위험물안전관리법」 제17조 또는 제18조 위반 이력을 기재하세요 (없으면 "없음").</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M29]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M29" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 위반 이력 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            *안전관리종사자에 대한 교육훈련의 적합성
+                            <span class="cell-ref">[C30]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C30" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 안전관리종사자에 대한 교육훈련의 적합성 여부를 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M30]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M30" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 교육훈련 적합성 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            *안전관리를 위한 순찰ㆍ점검
+                            <span class="cell-ref">[C31]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="C31" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 안전관리를 위한 순찰ㆍ점검 실시 현황을 기재하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            유[ ]  무[ ]
+                            <span class="cell-ref">[M31]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="M31" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 순찰ㆍ점검 적합성 유무에 해당하는 [ ]에 √ 표시하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            「위험물안전관리법 시행규칙」 제65조제3항에 따라 특정ㆍ준특정옥외탱크저장소의 구조안전점검시기의 연장을 신청합니다.
+                            <span class="cell-ref">[A32]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 위험물안전관리법 시행규칙에 근거해 연장을 신청하는 취지를 밝히는 정형 문구입니다. 수정하지 않습니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            년            월            일
+                            <span class="cell-ref">[A33]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="A33" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✏️ 신청 연월일을 입력하세요.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            신청인
+                            <span class="cell-ref">[A34]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ "신청인" 서명란 라벨입니다. 실제 서명은 옆 칸(F34)에 합니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">
+                            (서명 또는 인)
+                            <span class="cell-ref">[F34]</span>
+                        </label>
+                        <input type="text" class="field-input" data-cell="F34" >
+                        <div class="guidance-box">
+                            <div class="guidance-text">✍️ ✍️ 신청인이 서명하거나 인감을 날인하는 칸입니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            한국소방산업기술원장 귀하
+                            <span class="cell-ref">[A35]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출처(한국소방산업기술원장) 표시입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+                    <div class="form-field info-only">
+                        <label class="field-label">
+                            210mm×297mm[백상지(80g/㎡) 또는 중질지(80g/㎡)]
+                            <span class="cell-ref">[A36]</span>
+                            <span class="badge-info">입력 불필요</span>
+                        </label>
+                        <div class="guidance-box">
+                            <div class="guidance-text">ℹ️ 제출용 용지 규격 안내입니다. 편집 대상이 아닙니다.</div>
+                        </div>
+                    </div>
+            <div class="button-group">
+                <button type="button" class="btn-back" onclick="location.href='index.html'">🏠 돌아가기</button>
+                <button type="reset" class="btn-reset">🔄 초기화</button>
+                <button type="submit" class="btn-save">💾 저장</button>
+            </div>
+            <div class="status-message" id="statusMessage"></div>
+        </form>
+    </div>
+    <script>
+        const STORAGE_KEY = 'form_outdoor-tank-safety-inspection-extension-application_data';
+        const form = document.getElementById('formMain');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = {};
+            document.querySelectorAll('[data-cell]').forEach(input => {
+                if (input.value) data[input.dataset.cell] = input.value;
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            const msg = document.getElementById('statusMessage');
+            msg.textContent = `✅ 저장되었습니다! (${Object.keys(data).length}개 필드)`;
+            msg.className = 'status-message success';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        });
+        window.addEventListener('load', function() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                Object.keys(data).forEach(cell => {
+                    const input = document.querySelector(`[data-cell="${cell}"]`);
+                    if (input) input.value = data[cell];
+                });
+            }
+        });
+    </script>
+</body>
+</html>
