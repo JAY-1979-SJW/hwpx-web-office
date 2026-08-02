@@ -8,5 +8,45 @@ node_modules/
 .tmp/
 tmp/
 *.hwpx
+
+# 데이터 디렉토리 (data/reports/와 data/cache/는 제외)
 data/
+!data/reports/
+!data/cache/
 reports/
+
+# 분석/테스트 스크립트 (일회성)
+ai_validate_field_mapping.py
+analyze_form_structure.py
+auto_map_fields.py
+extract_form_331_details.py
+export_test_data.py
+generate_test_report.py
+inspect_detailed_hwpx.py
+inspect_saved_hwpx.py
+reparse_supervision_forms.py
+test_*.py
+test-results/
+playwright-report/
+
+# 프론트엔드 프로토타입 (UI 검증용)
+frontend/web_office_viewer/*.html
+package.json
+package-lock.json
+
+# 스크립트 임시 산출물
+scripts/hwpx/analyze_supervision_fields_ai.py
+scripts/hwpx/apply_form_data_to_cells.py
+scripts/hwpx/build_supervision_cache.py
+scripts/hwpx/create_sample_guides.py
+scripts/hwpx/generate_field_mappings.py
+docs/supervision_form_*.md
+smart_field_mapping.py
+tests/supervision_form_ui.spec.js
+update_supervision_cache.py
+
+# 감리 서류 검증 스크립트 (임시)
+docs/SUPERVISION_READINESS.md
+validate_field_addresses.py
+reparse_form_331_fields.py
+scripts/ops/gate_api_key_detection.py

@@ -193,7 +193,7 @@
       ],
       "returncode": 0,
       "ok": true,
-      "summary": "15 passed in 0.05s"
+      "summary": "15 passed in 0.04s"
     },
     "zoneGateRunner": {
       "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
@@ -227,11 +227,7 @@
       "devlog_untracked",
       "reports_untracked"
     ],
-    "unexpectedOutsideScope": [
-      "M scripts/hwpx/web_office/coordinate_layout.py",
-      "M scripts/hwpx/web_office/hancom_layout_refresh.py",
-      "?? tmp/"
-    ]
+    "unexpectedOutsideScope": []
   },
   "warnings": [
     "WARN_SANDBOX_ONLY",

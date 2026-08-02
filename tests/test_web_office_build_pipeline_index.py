@@ -45,6 +45,7 @@ def _make_catalog(tmp_path: Path) -> Path:
         (4, "좌표검증FAIL", "onedrive_hwpx/d.hwpx", "[]", "FAIL", None, None),
         (5, "AI1차까지", "onedrive_hwpx/e.hwpx", "[]", "PASS", "OK", None),
         (6, "AI2차까지", "onedrive_hwpx/f.hwpx", "[]", "PASS", "OK", "OK"),
+        (7, "AI1차실패", "onedrive_hwpx/g.hwpx", "[]", "PASS", "AI_FAILED", None),
     ]
     for fid, nm, sp, schema, addr, ai1, ai2 in rows:
         con.execute(
@@ -80,18 +81,19 @@ def test_stage_classification_follows_furthest_completed_stage(
     assert rows[4]["stage"] == P.STAGE_ADDR_FAIL
     assert rows[5]["stage"] == P.STAGE_AI1
     assert rows[6]["stage"] == P.STAGE_AI2
+    assert rows[7]["stage"] == P.STAGE_AI1_FAILED   # 실패가 미착수에 숨지 않는다
 
 
 def test_scope_filters_by_source_path_substring(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "CATALOG", _make_catalog(tmp_path))
     rows = P.query_index(scope="onedrive_hwpx")
-    assert {r["form_id"] for r in rows} == {3, 4, 5, 6}
+    assert {r["form_id"] for r in rows} == {3, 4, 5, 6, 7}
 
 
 def test_no_scope_returns_everything(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "CATALOG", _make_catalog(tmp_path))
     rows = P.query_index()
-    assert len(rows) == 6
+    assert len(rows) == 7
 
 
 def test_write_index_covers_all_rows_and_is_valid_jsonl(tmp_path, monkeypatch):
@@ -99,10 +101,10 @@ def test_write_index_covers_all_rows_and_is_valid_jsonl(tmp_path, monkeypatch):
     rows = P.query_index()
     jsonl_path, md_path = P.write_index(rows, out_dir=tmp_path / "out")
     lines = jsonl_path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 6
+    assert len(lines) == 7
     parsed = [json.loads(l) for l in lines]
-    assert {p["form_id"] for p in parsed} == {1, 2, 3, 4, 5, 6}
+    assert {p["form_id"] for p in parsed} == {1, 2, 3, 4, 5, 6, 7}
     md = md_path.read_text(encoding="utf-8")
-    assert "전체 6건" in md
-    for fid in range(1, 7):
+    assert "전체 7건" in md
+    for fid in range(1, 8):
         assert f"#{fid}" in md

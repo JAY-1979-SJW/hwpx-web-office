@@ -201,9 +201,37 @@ AI 해석·자동채움은 **드라이 런(무기입 실행)을 선행하지 않
 - 안전선 불변: AI 는 여전히 값을 만들지 않고(§4.5 비창조), 두 신호 합의
   없이는 칸의 운명을 바꾸지 못한다(§4.6). 모델을 올려도 게이트는 그대로다.
 
+### 4.8 API 호출은 Claude Code에서만 (2026-08-02 신설)
+
+저장소 스크립트는 API를 호출하지 않는다. Claude Code(나의 세션)에서만 API 호출.
+이렇게 하면 스크립트에 API 키가 필요 없고 보안 위험이 없다.
+
+**역할 분담:**
+- **스크립트** (data processing): 파싱, 필터링, 검증, 캐시 생성 등
+- **Claude Code** (AI work): 필드 해석, 검증, 맥락 분석 등 (API 자동 포함)
+
+**규칙:**
+- 금지: 스크립트에서 `os.getenv()`, `os.environ`, 설정 파일로 API 키 접근
+- 허용: Claude Code 세션에서 직접 작업 (`from anthropic import Anthropic` 등)
+- 훅: `scripts/ops/gate_api_key_detection.py` — API 접근 코드 탐지
+  · `os.getenv('ANTHROPIC_API_KEY')` 등 탐지 → commit 거부
+  · 커밋 게이트: API 키 접근 코드 0건 통과 필수
+
+**예:**
+```python
+# ❌ 금지 (스크립트)
+from anthropic import Anthropic
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+# ✅ 허용 (Claude Code 세션에서만)
+from anthropic import Anthropic
+client = Anthropic()  # 세션 인증 자동 사용
+```
+
 ### 보안/개인정보 금지
 - `secret / token / password / env` 값 출력 금지
 - 결제 / 송금 / 전자서명 / 제출 자동 실행 금지
+- **API 키 보호** (§4.8 참조): 스크립트에 기입 금지, Claude Code 세션만 사용
 
 ---
 

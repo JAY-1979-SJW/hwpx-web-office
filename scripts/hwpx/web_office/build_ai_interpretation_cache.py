@@ -153,12 +153,24 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
 
 
 def _targets(con: sqlite3.Connection, limit: int, shard: int,
-             shards: int, scope: str = "all") -> list[tuple]:
-    """공사 대상. scope='construction' 이면 건설·현장 서류만.
+             shards: int, scope: str = "all",
+             source_scope: str | None = None) -> list[tuple]:
+    """공사 대상.
 
-    죽은 서식(신청인칸 0)을 먼저 돌린다 — 사용자가 지금 아예 못 쓰는
-    문서라 효과가 가장 크고, 역할 교정 게이트가 '죽은 문서만' 적용되므로
-    위험도 가장 낮다.
+    scope='construction' — **이름** 키워드 필터(문서명에 '검측'·'공사' 등).
+      카탈로그 전체가 대상이라 특정 이관·경로 범위를 안 가린다 — 다른
+      배치(예: OneDrive 이관분 전용 실행)와 착각하기 쉽다(2026-08-02
+      실사례: --scope construction 을 쓰다 의도와 다른 문서 집합을
+      건드릴 뻔했다).
+    source_scope — **경로** 필터(source_path 부분일치, 예: "onedrive_hwpx").
+      "이 이관 범위만" 처럼 물리적 출처로 한정할 때 쓴다. scope 와 동시
+      지정 가능(둘 다 만족해야 대상).
+
+    우선순위는 **문서 내용**(파싱된 실제 applicant_count) 기준으로 죽은
+    서식(신청인칸 0)을 먼저 돌린다 — 사용자가 지금 아예 못 쓰는 문서라
+    효과가 가장 크고, 역할 교정 게이트가 '죽은 문서만' 적용되므로 위험도
+    가장 낮다. 이름 키워드가 아니라 스키마 생성 단계가 이미 확정한 실제
+    칸 구성을 근거로 삼는다.
     """
     done = {r[0] for r in con.execute(f"SELECT form_id FROM {STAGING}")}
     rows = con.execute(
@@ -168,7 +180,7 @@ def _targets(con: sqlite3.Connection, limit: int, shard: int,
         " ORDER BY form_id").fetchall()
     out = []
     for r in rows:
-        form_id, _, _, clean_name, name, _ = r
+        form_id, source_path, _, clean_name, name, _ = r
         if form_id in done:
             continue
         if shards > 1 and form_id % shards != shard:
@@ -177,6 +189,8 @@ def _targets(con: sqlite3.Connection, limit: int, shard: int,
             label = f"{clean_name or ''} {name or ''}"
             if not CONSTRUCTION_DOC_RE.search(label):
                 continue
+        if source_scope and source_scope not in (source_path or ""):
+            continue
         out.append(r)
     # 죽은 서식 우선(applicant_count 오름차순), 그 안에서는 form_id 순
     out.sort(key=lambda r: (r[5], r[0]))
@@ -224,12 +238,13 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
 
 
 def run(limit: int = 0, shard: int = 0, shards: int = 1,
-        scope: str = "all", promote_on_pass: bool = False) -> None:
+        scope: str = "all", source_scope: str | None = None,
+        promote_on_pass: bool = False) -> None:
     con = _connect()
     con.execute(DDL)
-    targets = _targets(con, limit, shard, shards, scope)
+    targets = _targets(con, limit, shard, shards, scope, source_scope)
     _log(f"대상 {len(targets)}건 (shard {shard}/{shards}, scope={scope},"
-         f" model={CLAUDE_MODEL})")
+         f" sourceScope={source_scope or '-'}, model={CLAUDE_MODEL})")
     pending: list[dict] = []
     t0 = time.time()
     for n, (form_id, source_path, schema_json, clean_name) in enumerate(
@@ -492,7 +507,10 @@ def main() -> None:
     ap.add_argument("--verify", action="store_true",
                     help="2차 독립 검증(확신도 문턱 대체)")
     ap.add_argument("--scope", choices=("all", "construction"), default="all",
-                    help="construction = 건설·현장 서류만")
+                    help="construction = 문서명 키워드 필터(건설·현장)")
+    ap.add_argument("--source-scope", default=None,
+                    help="source_path 부분일치 필터(예: onedrive_hwpx)"
+                        " — 특정 이관·경로 범위로 한정할 때. --scope 와 별개")
     ap.add_argument("--promote-on-pass", action="store_true",
                     help="공사 후 게이트 통과 시 자동 반영")
     a = ap.parse_args()
@@ -504,7 +522,7 @@ def main() -> None:
         promote()
     else:
         run(limit=a.limit, shard=a.shard, shards=a.shards, scope=a.scope,
-            promote_on_pass=a.promote_on_pass)
+            source_scope=a.source_scope, promote_on_pass=a.promote_on_pass)
 
 
 if __name__ == "__main__":

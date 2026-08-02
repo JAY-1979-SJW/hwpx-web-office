@@ -1,6 +1,15 @@
 [
   {
-    "safePath": "scripts/ops/gate_hwpx_session_claim.py",
+    "safePath": ".claude/settings.json",
+    "category": "CONFIG_BUILD",
+    "zone": "unassigned",
+    "separationPlan": "keep_claude_config",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/ops/gate_hwpx_ai_interpretation_pipeline.py",
     "category": "AUDIT_GATE",
     "zone": "closeout_security",
     "separationPlan": "keep_gate_audit",
@@ -9,10 +18,10 @@
     "failures": []
   },
   {
-    "safePath": "tests/test_ops_gate_hwpx_session_claim.py",
-    "category": "TEST_ONLY",
+    "safePath": "scripts/ops/hooks/post_edit_ai_pipeline_gate.py",
+    "category": "AUDIT_GATE",
     "zone": "closeout_security",
-    "separationPlan": "keep_test",
+    "separationPlan": "keep_gate_audit",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
