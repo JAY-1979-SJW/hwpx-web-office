@@ -29,6 +29,14 @@ class WebOfficeParagraph:
 class WebOfficeCell:
     cellId: str
     tableId: str
+    # EDU-OFFICE-CONTRACT-01: 외부 소비자(edu 플랫폼 office_contract.py)가
+    # documentModel.cells[].tableIndex 를 계약으로 명시하고 EditCommand의
+    # forward/inverse set_cells[].table 값으로 그대로 쓴다. tableId(문자열)만
+    # 있으면 소비자가 별도로 tables 리스트를 순회해 인덱스를 derive해야
+    # 하는데, 이 매핑 없이 tableIndex를 직접 읽으면 undefined가 되어
+    # 저장이 깨진다(실측: 37번 폴더 통합 실패 원인 확인) — 셀 생성 시점에
+    # 인덱스를 함께 채워 계약을 실제로 만족시킨다.
+    tableIndex: int
     row: int
     col: int
     rowSpan: int = 1

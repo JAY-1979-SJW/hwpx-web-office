@@ -54,16 +54,16 @@
   {
     "id": "hwpx_core_library",
     "title": "HWPX core parser and document utilities",
-    "fileCount": 246,
+    "fileCount": 248,
     "categories": [
       "ACTIVE_HWPX_CORE"
     ],
     "zones": {
-      "hwpx_core": 246
+      "hwpx_core": 248
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 76,
-      "LOW_REVIEW": 110,
+      "HIGH_REVIEW": 77,
+      "LOW_REVIEW": 111,
       "STANDARD_REVIEW": 60
     },
     "riskTags": {
@@ -72,15 +72,16 @@
       "OCR_REVIEW": 15,
       "PII_PATTERN_REVIEW": 25,
       "PRODUCTION_WRITE_REVIEW": 4,
-      "RAW_FILENAME_PATTERN_REVIEW": 69,
+      "RAW_FILENAME_PATTERN_REVIEW": 70,
       "RAW_PATH_PATTERN_REVIEW": 7,
-      "SOURCE_MUTATION_REVIEW": 56
+      "SOURCE_MUTATION_REVIEW": 57
     },
-    "reviewRequiredFiles": 76,
+    "reviewRequiredFiles": 77,
     "action": "keep_as_shared_core_with_import_review",
     "gatePolicy": "source_dependency_review_required",
     "movePolicy": "no_move_until_import_impact_review",
     "sampleSafePaths": [
+      "scripts/hwpx/__init__.py",
       "scripts/hwpx/ai_proposal/__init__.py",
       "scripts/hwpx/ai_proposal/ai_proposal_contract.py",
       "scripts/hwpx/ai_proposal/confidence_policy.py",
@@ -99,22 +100,21 @@
       "scripts/hwpx/diagnostics/02_fidelity_gate.py",
       "scripts/hwpx/diagnostics/03_convert_smoke.py",
       "scripts/hwpx/diagnostics/04_audit_log_probe.py",
-      "scripts/hwpx/diagnostics/05_batch_plan_probe.py",
-      "scripts/hwpx/diagnostics/06_roundtrip_text_probe.py"
+      "scripts/hwpx/diagnostics/05_batch_plan_probe.py"
     ]
   },
   {
     "id": "frontend_viewer_shell",
     "title": "Browser viewer and UI shell",
-    "fileCount": 60,
+    "fileCount": 63,
     "categories": [
       "FRONTEND_VIEWER"
     ],
     "zones": {
-      "browser_ui": 60
+      "browser_ui": 63
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 6,
+      "HIGH_REVIEW": 9,
       "LOW_REVIEW": 45,
       "STANDARD_REVIEW": 9
     },
@@ -122,11 +122,11 @@
       "HANCOM_DEPENDENCY_REVIEW": 1,
       "OCR_REVIEW": 3,
       "PII_PATTERN_REVIEW": 6,
-      "RAW_FILENAME_PATTERN_REVIEW": 11,
+      "RAW_FILENAME_PATTERN_REVIEW": 14,
       "RAW_PATH_PATTERN_REVIEW": 2,
-      "SOURCE_MUTATION_REVIEW": 1
+      "SOURCE_MUTATION_REVIEW": 4
     },
-    "reviewRequiredFiles": 6,
+    "reviewRequiredFiles": 9,
     "action": "protect_browser_contracts",
     "gatePolicy": "browser_regression_required",
     "movePolicy": "no_move_until_route_contract_review",
@@ -156,16 +156,16 @@
   {
     "id": "audit_gate_layer",
     "title": "Audits, gates, installers, dashboards",
-    "fileCount": 151,
+    "fileCount": 153,
     "categories": [
       "AUDIT_GATE"
     ],
     "zones": {
-      "closeout_security": 151
+      "closeout_security": 153
     },
     "safetyClasses": {
       "HIGH_REVIEW": 57,
-      "LOW_REVIEW": 46,
+      "LOW_REVIEW": 48,
       "STANDARD_REVIEW": 48
     },
     "riskTags": {
@@ -270,22 +270,22 @@
   {
     "id": "docs_reports_layer",
     "title": "PII-safe reports and closeout docs",
-    "fileCount": 359,
+    "fileCount": 358,
     "categories": [
       "REPORT_DOC"
     ],
     "zones": {
-      "docs_reports": 359
+      "docs_reports": 358
     },
     "safetyClasses": {
       "HIGH_REVIEW": 195,
       "LOW_REVIEW": 70,
-      "STANDARD_REVIEW": 94
+      "STANDARD_REVIEW": 93
     },
     "riskTags": {
       "AI_API_REVIEW": 3,
       "HANCOM_DEPENDENCY_REVIEW": 130,
-      "OCR_REVIEW": 59,
+      "OCR_REVIEW": 58,
       "PII_PATTERN_REVIEW": 160,
       "PRODUCTION_WRITE_REVIEW": 33,
       "RAW_FILENAME_PATTERN_REVIEW": 79,

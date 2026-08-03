@@ -1,9 +1,9 @@
 # HWPX Repo Detailed Separation Plan
 
 - verdict: PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN
-- baseline: b0c299d
+- baseline: 7f25476
 - scope: tracked_files_only_classification_no_move
-- total files: 1228
+- total files: 1234
 - modules linked: 10
 - release zones gated: 6
 - hold zones: 5
@@ -11,22 +11,22 @@
 
 ## Areas
 - runtime_autofill_line: files=18 action=protect_with_module_audit_and_zone_gate move=no_move_until_gate_green
-- hwpx_core_library: files=246 action=keep_as_shared_core_with_import_review move=no_move_until_import_impact_review
-- frontend_viewer_shell: files=60 action=protect_browser_contracts move=no_move_until_route_contract_review
-- audit_gate_layer: files=151 action=keep_as_release_gate_layer move=no_move_until_gate_bootstrap_review
+- hwpx_core_library: files=248 action=keep_as_shared_core_with_import_review move=no_move_until_import_impact_review
+- frontend_viewer_shell: files=63 action=protect_browser_contracts move=no_move_until_route_contract_review
+- audit_gate_layer: files=153 action=keep_as_release_gate_layer move=no_move_until_gate_bootstrap_review
 - test_support_layer: files=225 action=keep_with_target_module_mapping move=no_move_until_test_owner_review
-- docs_reports_layer: files=359 action=keep_pii_safe_artifacts move=no_move_until_report_retention_review
+- docs_reports_layer: files=358 action=keep_pii_safe_artifacts move=no_move_until_report_retention_review
 - legacy_experiment_quarantine: files=163 action=quarantine_before_any_archive_or_split move=no_move_no_delete_without_owner_approval
 - config_root_layer: files=5 action=keep_as_root_configuration move=no_move_without_build_review
 - manual_review_hold: files=1 action=hold_until_classified move=no_move_no_delete_without_owner_approval
 
 ## Zone Gates
 - batch_api_browser: files=18 gate=True readiness=GATED
-- browser_ui: files=60 gate=False readiness=HOLD_FOR_REVIEW
-- closeout_security: files=180 gate=True readiness=GATED
-- docs_reports: files=359 gate=False readiness=HOLD_FOR_REVIEW
+- browser_ui: files=63 gate=False readiness=HOLD_FOR_REVIEW
+- closeout_security: files=182 gate=True readiness=GATED
+- docs_reports: files=358 gate=False readiness=HOLD_FOR_REVIEW
 - download_export: files=4 gate=True readiness=GATED
-- hwpx_core: files=275 gate=False readiness=HOLD_FOR_REVIEW
+- hwpx_core: files=277 gate=False readiness=HOLD_FOR_REVIEW
 - input_parse: files=15 gate=True readiness=GATED
 - review_approval: files=4 gate=True readiness=GATED
 - test_support: files=118 gate=False readiness=HOLD_FOR_REVIEW

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx_form_auto_fill_fail_fast_gate_v1",
-  "runId": "ff_20260803T021229Z",
+  "runId": "ff_20260803T072559Z",
   "verdict": "PASS_HWPX_FORM_AUTO_FILL_FAIL_FAST_GATE",
   "summary": {
     "stepsTotal": 19,
@@ -143,7 +143,7 @@
   },
   "historySummary": {
     "schemaVersion": "hwpx_form_auto_fill_module_audit_history_summary_v1",
-    "runId": "ff_20260803T021229Z",
+    "runId": "ff_20260803T072559Z",
     "entriesWritten": 10,
     "modulesPassed": 10,
     "modulesFailed": 0,
@@ -161,7 +161,7 @@
   },
   "moduleLogContractVerdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_LOG_CONTRACT",
   "repoClassificationContractSummary": {
-    "trackedFiles": 1228,
+    "trackedFiles": 1234,
     "governedExistingFiles": 92,
     "newFiles": 0,
     "existingFailures": 0,
@@ -171,7 +171,7 @@
   },
   "repoClassificationContractVerdict": "PASS_HWPX_REPO_CLASSIFICATION_CONTRACT_GATE",
   "repoManifestPromotionSummary": {
-    "trackedFiles": 1228,
+    "trackedFiles": 1234,
     "stablePathMappedFiles": 0,
     "manifestPromotionCandidates": 0,
     "modulesAffected": 0,
@@ -191,21 +191,21 @@
   },
   "repoManifestDriftZeroVerdict": "PASS_HWPX_REPO_MANIFEST_DRIFT_ZERO_GATE",
   "existingFileClassificationSummary": {
-    "trackedFiles": 1228,
+    "trackedFiles": 1234,
     "governedFiles": 92,
     "passedFiles": 92,
     "failedFiles": 0
   },
   "existingFileClassificationVerdict": "PASS_HWPX_REPO_EXISTING_FILE_CLASSIFICATION_GATE",
   "newFileClassificationSummary": {
-    "newFiles": 1,
+    "newFiles": 0,
     "ignoredFiles": 0,
-    "passedFiles": 1,
+    "passedFiles": 0,
     "failedFiles": 0
   },
   "newFileClassificationVerdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
   "separationSummary": {
-    "totalFiles": 1228,
+    "totalFiles": 1234,
     "areas": 9,
     "zones": 11,
     "modules": 10,
@@ -220,7 +220,7 @@
     "dryRunPackages": 9,
     "executionAllowedPackages": 0,
     "holdPackages": 2,
-    "totalFiles": 1228,
+    "totalFiles": 1234,
     "releaseZonesGated": 6,
     "holdZones": 5
   },
@@ -231,7 +231,7 @@
     "approvedPackets": 0,
     "executionAllowedPackets": 0,
     "holdPackets": 2,
-    "totalFiles": 1228
+    "totalFiles": 1234
   },
   "separationOwnerReviewVerdict": "PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS",
   "separationApprovalDecisionSummary": {

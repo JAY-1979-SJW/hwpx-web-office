@@ -8,21 +8,21 @@
   },
   {
     "zone": "browser_ui",
-    "fileCount": 60,
+    "fileCount": 63,
     "releaseGate": false,
     "gateMode": "inventory_review_only",
     "splitReadiness": "HOLD_FOR_REVIEW"
   },
   {
     "zone": "closeout_security",
-    "fileCount": 180,
+    "fileCount": 182,
     "releaseGate": true,
     "gateMode": "module_audit_and_zone_gate",
     "splitReadiness": "GATED"
   },
   {
     "zone": "docs_reports",
-    "fileCount": 359,
+    "fileCount": 358,
     "releaseGate": false,
     "gateMode": "inventory_review_only",
     "splitReadiness": "HOLD_FOR_REVIEW"
@@ -36,7 +36,7 @@
   },
   {
     "zone": "hwpx_core",
-    "fileCount": 275,
+    "fileCount": 277,
     "releaseGate": false,
     "gateMode": "inventory_review_only",
     "splitReadiness": "HOLD_FOR_REVIEW"

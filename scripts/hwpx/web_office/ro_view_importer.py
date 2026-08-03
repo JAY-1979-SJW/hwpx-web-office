@@ -1232,7 +1232,7 @@ def import_hwpx_as_ro_view(
                     paragraphs.append(par)
 
             cells.append(WebOfficeCell(
-                cellId=cell_id, tableId=tid,
+                cellId=cell_id, tableId=tid, tableIndex=ti,
                 row=c.row, col=c.col,
                 rowSpan=c.rowSpan or 1, colSpan=c.colSpan or 1,
                 isCoveredByMerge=bool(c.isCoveredByMerge),
