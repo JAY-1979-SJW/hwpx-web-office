@@ -57,5 +57,10 @@ forms_construction_full/
 forms_construction10/
 forms_catalog/
 
-# 대용량 재생성 가능 기준서 (57MB+) - parse/generate 스크립트로 언제든 재생성
-docs/specifications/construction_clean_spec.json
+# 문서 파일 캐시(기계생성 기준서) - parse/generate 스크립트로 언제든
+# 재생성 가능하므로 커밋하지 않는다. 손수 검증/AI 해설 반영한
+# supervision_forms_final.json만 예외로 계속 추적한다.
+docs/specifications/*_spec.json
+docs/specifications/*_parsed.json
+docs/specifications/*_cache.json
+!docs/specifications/supervision_forms_final.json
