@@ -56,3 +56,6 @@ forms_construction_clean/
 forms_construction_full/
 forms_construction10/
 forms_catalog/
+
+# 대용량 재생성 가능 기준서 (57MB+) - parse/generate 스크립트로 언제든 재생성
+docs/specifications/construction_clean_spec.json
