@@ -193,17 +193,22 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
 
   #sidebar { width: 260px; flex: none; background: var(--side-bg); color: var(--side-text);
-             overflow-y: auto; padding: 18px 0 24px; }
+             display: flex; flex-direction: column; padding: 18px 0 0; }
   #sidebar .brand { padding: 0 18px 16px; font-weight: 700; font-size: 0.95em; color: #fff;
                      display: flex; align-items: center; gap: 8px; }
   #sidebar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
-  #sidebar h2 { font-size: 0.72em; text-transform: uppercase; letter-spacing: .08em; color: var(--side-text-dim);
-                font-weight: 600; padding: 16px 18px 6px; margin: 0; }
-  #sidebar .item { padding: 6px 18px; cursor: pointer; font-size: 0.87em; line-height: 1.5;
+  #axis-tabs { display: flex; gap: 2px; padding: 0 12px 10px; }
+  #axis-tabs button { flex: 1; font: inherit; font-size: 0.78em; font-weight: 600; padding: 7px 4px;
+                       border: none; border-radius: 6px; background: transparent; color: var(--side-text-dim); cursor: pointer; }
+  #axis-tabs button:hover { background: var(--side-hover); color: var(--side-text); }
+  #axis-tabs button.on { background: var(--accent); color: #fff; }
+  #axis-list { flex: 1; overflow-y: auto; padding-bottom: 18px; border-top: 1px solid #232833; }
+  #sidebar .item { padding: 7px 18px; cursor: pointer; font-size: 0.87em; line-height: 1.5;
                     display: flex; justify-content: space-between; gap: 10px; border-left: 2px solid transparent; }
   #sidebar .item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #sidebar .item:hover { background: var(--side-hover); }
   #sidebar .item.active { background: var(--side-hover); border-left-color: var(--accent); color: #fff; }
+  #sidebar .item.all { color: var(--side-text-dim); font-style: italic; }
   #sidebar .cnt { color: var(--side-text-dim); font-variant-numeric: tabular-nums; flex: none; }
   #sidebar .item.active .cnt { color: var(--accent-text); }
 
@@ -211,25 +216,34 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   h1 { margin: 0 0 4px; font-size: 1.4em; font-weight: 700; letter-spacing: -.01em; }
   .sub { margin: 0 0 20px; color: var(--text-dim); font-size: 0.88em; }
 
-  #toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  #toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
   input#q, input#base { font: inherit; padding: 8px 12px; border: 1px solid var(--border-strong);
                           border-radius: var(--radius); background: var(--panel); color: var(--text); }
-  input#q { flex: 1; min-width: 220px; max-width: 380px; }
+  input#q { flex: 1; max-width: 380px; }
   input#q:focus, input#base:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  input#base { width: 200px; font-size: 0.85em; color: var(--text-dim); font-family: var(--font-mono); }
-  #toolbar .hint { font-size: 0.78em; color: var(--text-faint); }
+  #settings-toggle { font: inherit; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
+                      background: var(--panel); color: var(--text-dim); cursor: pointer; line-height: 1; }
+  #settings-toggle:hover { color: var(--text); border-color: var(--text-faint); }
+  #settings-panel { display: none; align-items: center; gap: 8px; margin: -2px 0 14px; padding: 10px 12px;
+                     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+  #settings-panel.open { display: flex; }
+  #settings-panel label { font-size: 0.8em; color: var(--text-dim); white-space: nowrap; }
+  input#base { width: 220px; font-size: 0.85em; color: var(--text-dim); font-family: var(--font-mono); }
+  #settings-panel .hint { font-size: 0.78em; color: var(--text-faint); }
 
   #stats { color: var(--text-dim); margin-bottom: 12px; font-size: 0.86em; font-variant-numeric: tabular-nums; }
   #stats b { color: var(--text); font-weight: 600; }
 
   .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-                overflow: auto; max-height: calc(100vh - 190px); }
+                overflow: auto; max-height: calc(100vh - 152px); }
   table { border-collapse: collapse; width: 100%; font-size: 0.88em; }
   th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   td:nth-child(2) { white-space: normal; min-width: 260px; }
   th { position: sticky; top: 0; background: var(--panel); color: var(--text-dim); font-weight: 600;
        font-size: 0.82em; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border-strong); z-index: 1; }
-  td:first-child, td:last-child, td:nth-last-child(2) { font-variant-numeric: tabular-nums; }
+  th.id-col, td.id-col { font-variant-numeric: tabular-nums; }
+  td:last-child, td:nth-last-child(2) { font-variant-numeric: tabular-nums; }
+  .id-col { color: var(--text-faint); font-family: var(--font-mono); font-size: 0.92em; width: 1%; }
   tbody tr[data-open] { cursor: pointer; }
   tbody tr[data-open]:hover { background: var(--accent-soft); }
   tbody tr:last-child td { border-bottom: none; }
@@ -237,22 +251,38 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   .pill-y { background: var(--ok-soft); color: var(--ok); }
   .pill-n { background: transparent; color: var(--no); }
   .tag { color: var(--text-dim); }
-  .name-cell { color: var(--text); }
+  .tag.muted { color: var(--text-faint); }
+  .name-cell { color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .open-hint { opacity: 0; color: var(--accent); font-size: 0.85em; transition: opacity .1s; flex: none; }
+  tr[data-open]:hover .open-hint { opacity: 1; }
   .more-row td { color: var(--text-faint); padding: 12px 14px; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent-text);
+                 padding: 3px 6px 3px 10px; border-radius: 999px; font-weight: 600; font-size: 0.9em; }
+  .filter-chip button { font: inherit; border: none; background: transparent; color: inherit; cursor: pointer;
+                         width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  .filter-chip button:hover { background: rgba(0,0,0,.12); }
 </style></head>
 <body>
-<div id="sidebar"></div>
+<div id="sidebar">
+  <div class="brand"><span class="dot"></span>HWPX 카탈로그</div>
+  <div id="axis-tabs"></div>
+  <div id="axis-list"></div>
+</div>
 <div id="main">
   <h1>HWPX 서식 카탈로그 목차</h1>
   <p class="sub">발행기관 · 문서유형 · 서식종류로 걸러보고, 행을 클릭하면 원본을 좌표 그대로 새 탭에서 연다.</p>
   <div id="toolbar">
     <input id="q" placeholder="서식명 검색…">
-    <input id="base" value="http://localhost:8000" title="원본 뷰어(coord_view.html) 서버 주소 - editor_api_route 기동 주소">
-    <span class="hint">↑ 원본 뷰어 서버 주소 (/web-office/coord_view.html)</span>
+    <button id="settings-toggle" title="원본 뷰어 서버 주소 설정">⚙ 서버 설정</button>
+  </div>
+  <div id="settings-panel">
+    <label for="base">원본 뷰어(coord_view.html) 서버 주소</label>
+    <input id="base" value="http://localhost:8000">
+    <span class="hint">행 클릭 시 이 주소의 /web-office/coord_view.html 로 연다</span>
   </div>
   <div id="stats"></div>
   <div class="table-wrap">
-    <table><thead><tr><th>form_id</th><th>서식명</th><th>발행기관</th><th>문서유형</th><th>서식종류</th>
+    <table><thead><tr><th class="id-col">ID</th><th>서식명</th><th>발행기관</th><th>문서유형</th><th>서식종류</th>
     <th>입력가능</th><th>입력칸수</th></tr></thead><tbody id="rows"></tbody></table>
   </div>
 </div>
@@ -260,27 +290,49 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
 const ITEMS = __DATA_JSON__;
 const GROUPS = __GROUPS_JSON__;
 const TOTAL = __TOTAL__, FILLABLE = __FILLABLE__;
+const AXES = Object.keys(GROUPS);
+const AXIS_FIELD = {'발행기관': 'inst', '문서유형': 'doc', '서식종류': 'kind'};
+
+let curAxis = AXES[0];
 let active = null; // {axis, key}
 
-function render() {
-  const sb = document.getElementById('sidebar');
-  sb.innerHTML = '<div class="brand"><span class="dot"></span>HWPX 카탈로그</div>';
-  for (const axis of Object.keys(GROUPS)) {
-    const h = document.createElement('h2'); h.textContent = axis; sb.appendChild(h);
-    for (const [key, n] of GROUPS[axis]) {
-      const el = document.createElement('div');
-      el.className = 'item' + (active && active.axis === axis && active.key === key ? ' active' : '');
-      el.innerHTML = '<span>' + key + '</span><span class="cnt">' + n + '</span>';
-      el.onclick = () => {
-        active = (active && active.axis === axis && active.key === key) ? null : {axis, key};
-        renderTable(); render();
-      };
-      sb.appendChild(el);
-    }
+function renderSidebar() {
+  const tabs = document.getElementById('axis-tabs');
+  tabs.innerHTML = '';
+  for (const axis of AXES) {
+    const b = document.createElement('button');
+    b.textContent = axis;
+    b.className = axis === curAxis ? 'on' : '';
+    b.onclick = () => { curAxis = axis; renderSidebar(); };
+    tabs.appendChild(b);
+  }
+
+  const list = document.getElementById('axis-list');
+  list.innerHTML = '';
+  const allItem = document.createElement('div');
+  allItem.className = 'item all' + (!active || active.axis !== curAxis ? ' active' : '');
+  allItem.innerHTML = '<span>전체</span><span class="cnt">' +
+    GROUPS[curAxis].reduce((s, [, n]) => s + n, 0).toLocaleString() + '</span>';
+  allItem.onclick = () => { if (active && active.axis === curAxis) active = null; renderTable(); renderSidebar(); };
+  list.appendChild(allItem);
+
+  for (const [key, n] of GROUPS[curAxis]) {
+    const el = document.createElement('div');
+    el.className = 'item' + (active && active.axis === curAxis && active.key === key ? ' active' : '');
+    el.innerHTML = '<span>' + key + '</span><span class="cnt">' + n.toLocaleString() + '</span>';
+    el.onclick = () => {
+      active = (active && active.axis === curAxis && active.key === key) ? null : {axis: curAxis, key};
+      renderTable(); renderSidebar();
+    };
+    list.appendChild(el);
   }
 }
 
-const AXIS_FIELD = {'발행기관': 'inst', '문서유형': 'doc', '서식종류': 'kind'};
+function cell(axis, value) {
+  // 현재 필터 축과 같은 열이면(=이미 필터로 확정된 값) 반복 출력 대신 옅게 처리
+  const muted = active && active.axis === axis;
+  return '<td class="tag' + (muted ? ' muted' : '') + '">' + value + '</td>';
+}
 
 function renderTable() {
   const q = document.getElementById('q').value.trim().toLowerCase();
@@ -290,16 +342,28 @@ function renderTable() {
     rows = rows.filter(r => r[f] === active.key);
   }
   if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
-  document.getElementById('stats').innerHTML =
-    (active ? '<b>' + active.axis + ' = ' + active.key + '</b> · ' : '') +
+
+  const statsEl = document.getElementById('stats');
+  statsEl.innerHTML = '';
+  if (active) {
+    const chip = document.createElement('span');
+    chip.className = 'filter-chip';
+    chip.innerHTML = '<span>' + active.axis + ' = ' + active.key + '</span><button title="필터 해제">×</button>';
+    chip.querySelector('button').onclick = () => { active = null; renderTable(); renderSidebar(); };
+    statsEl.appendChild(chip);
+    statsEl.appendChild(document.createTextNode(' · '));
+  }
+  statsEl.appendChild(document.createRange().createContextualFragment(
     '<b>' + rows.length.toLocaleString() + '</b>건 표시 · 전체 ' + TOTAL.toLocaleString() +
-    '건 · 입력가능 ' + FILLABLE.toLocaleString() + '건';
+    '건 · 입력가능 ' + FILLABLE.toLocaleString() + '건'));
+
   const tb = document.getElementById('rows');
   const frag = document.createDocumentFragment();
   for (const r of rows.slice(0, 2000)) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td class="tag">' + r.id + '</td><td class="name-cell">' + r.name + '</td>' +
-      '<td class="tag">' + r.inst + '</td><td class="tag">' + r.doc + '</td><td class="tag">' + r.kind + '</td>' +
+    tr.innerHTML = '<td class="id-col">' + r.id + '</td>' +
+      '<td class="name-cell">' + r.name + '<span class="open-hint">↗ 원본 열기</span></td>' +
+      cell('발행기관', r.inst) + cell('문서유형', r.doc) + cell('서식종류', r.kind) +
       '<td><span class="pill ' + (r.fillable ? 'pill-y' : 'pill-n') + '">' + (r.fillable ? 'Y' : 'N') + '</span></td>' +
       '<td class="tag">' + r.inputCount + '</td>';
     if (r.sourcePath) {
@@ -324,7 +388,10 @@ function renderTable() {
 }
 
 document.getElementById('q').addEventListener('input', renderTable);
-render();
+document.getElementById('settings-toggle').addEventListener('click', () => {
+  document.getElementById('settings-panel').classList.toggle('open');
+});
+renderSidebar();
 renderTable();
 </script>
 </body></html>
