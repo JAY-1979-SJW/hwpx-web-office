@@ -188,15 +188,30 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
     --ok: #1b7f4d; --ok-soft: #e7f6ee; --no: #9aa1ad;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: var(--font-ui); display: flex; height: 100vh; background: var(--bg); color: var(--text); }
+  body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: var(--text);
+         display: flex; flex-direction: column; height: 100vh; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
 
+  /* ── 상단 통검색 바: 도서관 OPAC 표준 배치 - 검색은 항상 전체폭 상단 ── */
+  #topbar { flex: none; background: var(--side-bg); color: #fff; display: flex; align-items: center;
+            gap: 18px; padding: 0 24px; height: 60px; }
+  #topbar .brand { font-weight: 700; font-size: 1.05em; display: flex; align-items: center; gap: 8px; flex: none; }
+  #topbar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  #topbar .brand .sub { font-weight: 400; font-size: 0.72em; color: var(--side-text-dim); margin-left: 2px; }
+  #topbar-search { flex: 1; max-width: 640px; position: relative; }
+  #topbar-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); opacity: 0.5; pointer-events: none; }
+  input#q { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid #333a46; border-radius: var(--radius);
+            background: #1c212b; color: #fff; }
+  input#q::placeholder { color: var(--side-text-dim); }
+  input#q:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: #20262f; }
+  #topbar-total { flex: none; font-size: 0.8em; color: var(--side-text-dim); font-variant-numeric: tabular-nums; }
+  #topbar-total b { color: #fff; font-weight: 700; }
+
+  #body { flex: 1; display: flex; min-height: 0; }
+
   #sidebar { width: 280px; flex: none; background: var(--side-bg); color: var(--side-text);
-             display: flex; flex-direction: column; padding: 18px 0 0; }
-  #sidebar .brand { padding: 0 18px 16px; font-weight: 700; font-size: 0.95em; color: #fff;
-                     display: flex; align-items: center; gap: 8px; }
-  #sidebar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+             display: flex; flex-direction: column; padding: 14px 0 0; border-top: 1px solid #232833; }
   #axis-tabs { display: flex; gap: 2px; padding: 0 12px 10px; }
   #axis-tabs button { flex: 1; font: inherit; font-size: 0.78em; font-weight: 600; padding: 7px 4px;
                        border: none; border-radius: 6px; background: transparent; color: var(--side-text-dim); cursor: pointer;
@@ -221,15 +236,14 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
                         border: none; cursor: pointer; padding: 0; }
   #axis-clear button:hover { text-decoration: underline; }
 
-  #main { flex: 1; overflow-y: auto; padding: 28px 32px 40px; min-width: 0; }
-  h1 { margin: 0 0 4px; font-size: 1.4em; font-weight: 700; letter-spacing: -.01em; }
-  .sub { margin: 0 0 20px; color: var(--text-dim); font-size: 0.88em; }
+  #main { flex: 1; overflow-y: auto; padding: 20px 32px 40px; min-width: 0; }
 
-  #toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
-  input#q, input#base, select#sort { font: inherit; padding: 8px 12px; border: 1px solid var(--border-strong);
+  #toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  #toolbar .sub { margin: 0; color: var(--text-dim); font-size: 0.88em; }
+  #toolbar .toolbar-right { display: flex; gap: 10px; align-items: center; flex: none; }
+  input#base, select#sort { font: inherit; padding: 8px 12px; border: 1px solid var(--border-strong);
                           border-radius: var(--radius); background: var(--panel); color: var(--text); }
-  input#q { flex: 1; max-width: 380px; }
-  input#q:focus, input#base:focus, select#sort:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input#base:focus, select#sort:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   select#sort { color: var(--text-dim); cursor: pointer; }
   #settings-toggle { font: inherit; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
                       background: var(--panel); color: var(--text-dim); cursor: pointer; line-height: 1; }
@@ -245,7 +259,7 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   #stats b { color: var(--text); font-weight: 600; }
 
   .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-                overflow: auto; max-height: calc(100vh - 152px); }
+                overflow: auto; max-height: calc(100vh - 218px); }
   table { border-collapse: collapse; width: 100%; font-size: 0.88em; }
   th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   td:nth-child(2) { white-space: normal; min-width: 260px; }
@@ -286,23 +300,33 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   #pager .pg-num { font-variant-numeric: tabular-nums; padding: 0 6px; }
 </style></head>
 <body>
+<div id="topbar">
+  <div class="brand"><span class="dot"></span>HWPX 카탈로그<span class="sub">서식 목차</span></div>
+  <div id="topbar-search">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input id="q" placeholder="서식명으로 검색…">
+  </div>
+  <div id="topbar-total">전체 <b>__TOTAL_FMT__</b>건 · 입력가능 <b>__FILLABLE_FMT__</b>건</div>
+</div>
+<div id="body">
 <div id="sidebar">
-  <div class="brand"><span class="dot"></span>HWPX 카탈로그</div>
   <div id="axis-tabs"></div>
   <div id="axis-clear"></div>
   <div id="axis-list"></div>
 </div>
 <div id="main">
-  <h1>HWPX 서식 카탈로그 목차</h1>
-  <p class="sub">발행기관 · 문서유형 · 서식종류로 걸러보고, 행을 클릭하면 원본을 좌표 그대로 새 탭에서 연다.</p>
   <div id="toolbar">
-    <input id="q" placeholder="서식명 검색…">
-    <select id="sort">
-      <option value="id">ID순</option>
-      <option value="name">서식명 가나다순</option>
-      <option value="inputDesc">입력칸 많은순</option>
-    </select>
-    <button id="settings-toggle" title="원본 뷰어 서버 주소 설정">⚙ 서버 설정</button>
+    <p class="sub">발행기관 · 문서유형 · 서식종류로 걸러보고, 행을 클릭하면 원본을 좌표 그대로 새 탭에서 연다.</p>
+    <div class="toolbar-right">
+      <select id="sort">
+        <option value="id">ID순</option>
+        <option value="name">서식명 가나다순</option>
+        <option value="inputDesc">입력칸 많은순</option>
+      </select>
+      <button id="settings-toggle" title="원본 뷰어 서버 주소 설정">⚙ 서버 설정</button>
+    </div>
   </div>
   <div id="settings-panel">
     <label for="base">원본 뷰어(coord_view.html) 서버 주소</label>
@@ -316,6 +340,7 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
     <th>입력가능</th><th>입력칸수</th></tr></thead><tbody id="rows"></tbody></table>
   </div>
   <div id="pager"></div>
+</div>
 </div>
 <script>
 const ITEMS = __DATA_JSON__;
@@ -523,7 +548,8 @@ renderTable();
 </script>
 </body></html>
 """.replace("__DATA_JSON__", data_json).replace("__GROUPS_JSON__", groups_json) \
-   .replace("__TOTAL__", str(total)).replace("__FILLABLE__", str(fillable_n))
+   .replace("__TOTAL__", str(total)).replace("__FILLABLE__", str(fillable_n)) \
+   .replace("__TOTAL_FMT__", f"{total:,}").replace("__FILLABLE_FMT__", f"{fillable_n:,}")
 
 
 if __name__ == "__main__":
