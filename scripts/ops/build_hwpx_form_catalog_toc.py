@@ -192,35 +192,45 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
 
-  #sidebar { width: 260px; flex: none; background: var(--side-bg); color: var(--side-text);
+  #sidebar { width: 280px; flex: none; background: var(--side-bg); color: var(--side-text);
              display: flex; flex-direction: column; padding: 18px 0 0; }
   #sidebar .brand { padding: 0 18px 16px; font-weight: 700; font-size: 0.95em; color: #fff;
                      display: flex; align-items: center; gap: 8px; }
   #sidebar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
   #axis-tabs { display: flex; gap: 2px; padding: 0 12px 10px; }
   #axis-tabs button { flex: 1; font: inherit; font-size: 0.78em; font-weight: 600; padding: 7px 4px;
-                       border: none; border-radius: 6px; background: transparent; color: var(--side-text-dim); cursor: pointer; }
+                       border: none; border-radius: 6px; background: transparent; color: var(--side-text-dim); cursor: pointer;
+                       position: relative; }
   #axis-tabs button:hover { background: var(--side-hover); color: var(--side-text); }
   #axis-tabs button.on { background: var(--accent); color: #fff; }
+  #axis-tabs button .n { position: absolute; top: -4px; right: -2px; background: var(--ok); color: #fff;
+                          font-size: 0.7em; min-width: 14px; height: 14px; border-radius: 7px; line-height: 14px;
+                          padding: 0 3px; }
   #axis-list { flex: 1; overflow-y: auto; padding-bottom: 18px; border-top: 1px solid #232833; }
   #sidebar .item { padding: 7px 18px; cursor: pointer; font-size: 0.87em; line-height: 1.5;
-                    display: flex; justify-content: space-between; gap: 10px; border-left: 2px solid transparent; }
-  #sidebar .item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                    display: flex; align-items: center; gap: 9px; }
   #sidebar .item:hover { background: var(--side-hover); }
-  #sidebar .item.active { background: var(--side-hover); border-left-color: var(--accent); color: #fff; }
-  #sidebar .item.all { color: var(--side-text-dim); font-style: italic; }
-  #sidebar .cnt { color: var(--side-text-dim); font-variant-numeric: tabular-nums; flex: none; }
-  #sidebar .item.active .cnt { color: var(--accent-text); }
+  #sidebar .item input[type="checkbox"] { accent-color: var(--accent); flex: none; width: 14px; height: 14px; }
+  #sidebar .item .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sidebar .item.checked .lbl { color: #fff; font-weight: 600; }
+  #sidebar .item.zero { opacity: 0.4; }
+  #sidebar .cnt { color: var(--side-text-dim); font-variant-numeric: tabular-nums; flex: none; font-size: 0.92em; }
+  #sidebar .item.checked .cnt { color: var(--accent-text); }
+  #axis-clear { padding: 6px 18px 10px; }
+  #axis-clear button { font: inherit; font-size: 0.78em; color: var(--accent-text); background: none;
+                        border: none; cursor: pointer; padding: 0; }
+  #axis-clear button:hover { text-decoration: underline; }
 
   #main { flex: 1; overflow-y: auto; padding: 28px 32px 40px; min-width: 0; }
   h1 { margin: 0 0 4px; font-size: 1.4em; font-weight: 700; letter-spacing: -.01em; }
   .sub { margin: 0 0 20px; color: var(--text-dim); font-size: 0.88em; }
 
   #toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
-  input#q, input#base { font: inherit; padding: 8px 12px; border: 1px solid var(--border-strong);
+  input#q, input#base, select#sort { font: inherit; padding: 8px 12px; border: 1px solid var(--border-strong);
                           border-radius: var(--radius); background: var(--panel); color: var(--text); }
   input#q { flex: 1; max-width: 380px; }
-  input#q:focus, input#base:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input#q:focus, input#base:focus, select#sort:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  select#sort { color: var(--text-dim); cursor: pointer; }
   #settings-toggle { font: inherit; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
                       background: var(--panel); color: var(--text-dim); cursor: pointer; line-height: 1; }
   #settings-toggle:hover { color: var(--text); border-color: var(--text-faint); }
@@ -256,16 +266,30 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   .open-hint { opacity: 0; color: var(--accent); font-size: 0.85em; transition: opacity .1s; flex: none; }
   tr[data-open]:hover .open-hint { opacity: 1; }
   .more-row td { color: var(--text-faint); padding: 12px 14px; }
+  #applied-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .filter-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent-text);
-                 padding: 3px 6px 3px 10px; border-radius: 999px; font-weight: 600; font-size: 0.9em; }
+                 padding: 3px 6px 3px 10px; border-radius: 999px; font-weight: 600; font-size: 0.86em; }
+  .filter-chip .axis { opacity: 0.65; font-weight: 500; }
   .filter-chip button { font: inherit; border: none; background: transparent; color: inherit; cursor: pointer;
                          width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
   .filter-chip button:hover { background: rgba(0,0,0,.12); }
+  .filter-chip.clear-all { background: transparent; color: var(--text-dim); font-weight: 500; cursor: pointer; }
+  .filter-chip.clear-all:hover { color: var(--text); text-decoration: underline; }
+
+  #pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;
+           font-size: 0.86em; color: var(--text-dim); }
+  #pager .pages { display: flex; align-items: center; gap: 4px; }
+  #pager button { font: inherit; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px;
+                  background: var(--panel); color: var(--text); cursor: pointer; }
+  #pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
+  #pager button:disabled { opacity: 0.4; cursor: default; }
+  #pager .pg-num { font-variant-numeric: tabular-nums; padding: 0 6px; }
 </style></head>
 <body>
 <div id="sidebar">
   <div class="brand"><span class="dot"></span>HWPX 카탈로그</div>
   <div id="axis-tabs"></div>
+  <div id="axis-clear"></div>
   <div id="axis-list"></div>
 </div>
 <div id="main">
@@ -273,6 +297,11 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   <p class="sub">발행기관 · 문서유형 · 서식종류로 걸러보고, 행을 클릭하면 원본을 좌표 그대로 새 탭에서 연다.</p>
   <div id="toolbar">
     <input id="q" placeholder="서식명 검색…">
+    <select id="sort">
+      <option value="id">ID순</option>
+      <option value="name">서식명 가나다순</option>
+      <option value="inputDesc">입력칸 많은순</option>
+    </select>
     <button id="settings-toggle" title="원본 뷰어 서버 주소 설정">⚙ 서버 설정</button>
   </div>
   <div id="settings-panel">
@@ -280,11 +309,13 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
     <input id="base" value="http://localhost:8000">
     <span class="hint">행 클릭 시 이 주소의 /web-office/coord_view.html 로 연다</span>
   </div>
+  <div id="applied-filters"></div>
   <div id="stats"></div>
   <div class="table-wrap">
     <table><thead><tr><th class="id-col">ID</th><th>서식명</th><th>발행기관</th><th>문서유형</th><th>서식종류</th>
     <th>입력가능</th><th>입력칸수</th></tr></thead><tbody id="rows"></tbody></table>
   </div>
+  <div id="pager"></div>
 </div>
 <script>
 const ITEMS = __DATA_JSON__;
@@ -292,9 +323,35 @@ const GROUPS = __GROUPS_JSON__;
 const TOTAL = __TOTAL__, FILLABLE = __FILLABLE__;
 const AXES = Object.keys(GROUPS);
 const AXIS_FIELD = {'발행기관': 'inst', '문서유형': 'doc', '서식종류': 'kind'};
+const PAGE_SIZE = 50;
 
+// 도서관 OPAC 식 패싯 검색: 축 안에서는 다중 선택 = OR, 축 사이는 AND.
 let curAxis = AXES[0];
-let active = null; // {axis, key}
+const filters = {}; // axis -> Set(선택된 값)
+for (const axis of AXES) filters[axis] = new Set();
+let page = 1;
+let sortMode = 'id';
+
+function matches(item, excludeAxis) {
+  for (const axis of AXES) {
+    if (axis === excludeAxis) continue;
+    const sel = filters[axis];
+    if (sel.size && !sel.has(item[AXIS_FIELD[axis]])) return false;
+  }
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  if (q && !item.name.toLowerCase().includes(q)) return false;
+  return true;
+}
+
+function facetCounts(axis) {
+  const counts = new Map();
+  for (const item of ITEMS) {
+    if (!matches(item, axis)) continue;
+    const v = item[AXIS_FIELD[axis]];
+    counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  return counts;
+}
 
 function renderSidebar() {
   const tabs = document.getElementById('axis-tabs');
@@ -303,63 +360,130 @@ function renderSidebar() {
     const b = document.createElement('button');
     b.textContent = axis;
     b.className = axis === curAxis ? 'on' : '';
+    if (filters[axis].size) {
+      const n = document.createElement('span');
+      n.className = 'n'; n.textContent = filters[axis].size;
+      b.appendChild(n);
+    }
     b.onclick = () => { curAxis = axis; renderSidebar(); };
     tabs.appendChild(b);
   }
 
+  const clearWrap = document.getElementById('axis-clear');
+  clearWrap.innerHTML = '';
+  if (filters[curAxis].size) {
+    const btn = document.createElement('button');
+    btn.textContent = '이 축 선택 해제 (' + filters[curAxis].size + ')';
+    btn.onclick = () => { filters[curAxis].clear(); page = 1; renderTable(); renderSidebar(); };
+    clearWrap.appendChild(btn);
+  }
+
+  const counts = facetCounts(curAxis);
   const list = document.getElementById('axis-list');
   list.innerHTML = '';
-  const allItem = document.createElement('div');
-  allItem.className = 'item all' + (!active || active.axis !== curAxis ? ' active' : '');
-  allItem.innerHTML = '<span>전체</span><span class="cnt">' +
-    GROUPS[curAxis].reduce((s, [, n]) => s + n, 0).toLocaleString() + '</span>';
-  allItem.onclick = () => { if (active && active.axis === curAxis) active = null; renderTable(); renderSidebar(); };
-  list.appendChild(allItem);
-
-  for (const [key, n] of GROUPS[curAxis]) {
-    const el = document.createElement('div');
-    el.className = 'item' + (active && active.axis === curAxis && active.key === key ? ' active' : '');
-    el.innerHTML = '<span>' + key + '</span><span class="cnt">' + n.toLocaleString() + '</span>';
-    el.onclick = () => {
-      active = (active && active.axis === curAxis && active.key === key) ? null : {axis: curAxis, key};
-      renderTable(); renderSidebar();
+  // 원래 카탈로그 전체 순서(빈도순)를 유지하되, 다른 필터로 0건이 된 값도
+  // 목록에서 사라지지 않고 흐리게 남긴다(도서관 카탈로그 UX — 선택지 자체가
+  // 사라지면 "왜 안 보이지"가 되므로).
+  for (const [key] of GROUPS[curAxis]) {
+    const n = counts.get(key) || 0;
+    const checked = filters[curAxis].has(key);
+    const el = document.createElement('label');
+    el.className = 'item' + (checked ? ' checked' : '') + (n === 0 && !checked ? ' zero' : '');
+    el.innerHTML = '<input type="checkbox"' + (checked ? ' checked' : '') + '><span class="lbl">' + key +
+      '</span><span class="cnt">' + n.toLocaleString() + '</span>';
+    el.querySelector('input').onchange = () => {
+      if (filters[curAxis].has(key)) filters[curAxis].delete(key); else filters[curAxis].add(key);
+      page = 1; renderTable(); renderSidebar();
     };
     list.appendChild(el);
   }
 }
 
 function cell(axis, value) {
-  // 현재 필터 축과 같은 열이면(=이미 필터로 확정된 값) 반복 출력 대신 옅게 처리
-  const muted = active && active.axis === axis;
+  const muted = filters[axis].size > 0;
   return '<td class="tag' + (muted ? ' muted' : '') + '">' + value + '</td>';
 }
 
-function renderTable() {
-  const q = document.getElementById('q').value.trim().toLowerCase();
-  let rows = ITEMS;
-  if (active) {
-    const f = AXIS_FIELD[active.axis];
-    rows = rows.filter(r => r[f] === active.key);
-  }
-  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+function sortRows(rows) {
+  const out = rows.slice();
+  if (sortMode === 'name') out.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  else if (sortMode === 'inputDesc') out.sort((a, b) => b.inputCount - a.inputCount);
+  else out.sort((a, b) => a.id - b.id);
+  return out;
+}
 
-  const statsEl = document.getElementById('stats');
-  statsEl.innerHTML = '';
-  if (active) {
-    const chip = document.createElement('span');
-    chip.className = 'filter-chip';
-    chip.innerHTML = '<span>' + active.axis + ' = ' + active.key + '</span><button title="필터 해제">×</button>';
-    chip.querySelector('button').onclick = () => { active = null; renderTable(); renderSidebar(); };
-    statsEl.appendChild(chip);
-    statsEl.appendChild(document.createTextNode(' · '));
+function renderAppliedFilters() {
+  const wrap = document.getElementById('applied-filters');
+  wrap.innerHTML = '';
+  let any = false;
+  for (const axis of AXES) {
+    for (const key of filters[axis]) {
+      any = true;
+      const chip = document.createElement('span');
+      chip.className = 'filter-chip';
+      chip.innerHTML = '<span class="axis">' + axis + '</span><span>' + key + '</span><button title="해제">×</button>';
+      chip.querySelector('button').onclick = () => {
+        filters[axis].delete(key); page = 1; renderTable(); renderSidebar();
+      };
+      wrap.appendChild(chip);
+    }
   }
-  statsEl.appendChild(document.createRange().createContextualFragment(
+  if (any) {
+    const clearAll = document.createElement('span');
+    clearAll.className = 'filter-chip clear-all';
+    clearAll.textContent = '전체 해제';
+    clearAll.onclick = () => {
+      for (const axis of AXES) filters[axis].clear();
+      page = 1; renderTable(); renderSidebar();
+    };
+    wrap.appendChild(clearAll);
+  }
+}
+
+function renderPager(totalRows) {
+  const pager = document.getElementById('pager');
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  if (page > totalPages) page = totalPages;
+  pager.innerHTML = '';
+  if (totalRows <= PAGE_SIZE) return;
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(totalRows, page * PAGE_SIZE);
+  const info = document.createElement('span');
+  info.textContent = from.toLocaleString() + '–' + to.toLocaleString() + ' / ' + totalRows.toLocaleString() + '건';
+  pager.appendChild(info);
+  const pages = document.createElement('span');
+  pages.className = 'pages';
+  const mk = (label, delta, disabled) => {
+    const b = document.createElement('button');
+    b.textContent = label; b.disabled = disabled;
+    b.onclick = () => { page += delta; renderTable(); };
+    return b;
+  };
+  pages.appendChild(mk('← 이전', -1, page <= 1));
+  const num = document.createElement('span');
+  num.className = 'pg-num';
+  num.textContent = page + ' / ' + totalPages + '쪽';
+  pages.appendChild(num);
+  pages.appendChild(mk('다음 →', 1, page >= totalPages));
+  pager.appendChild(pages);
+}
+
+function renderTable() {
+  let rows = ITEMS.filter(r => matches(r, null));
+  rows = sortRows(rows);
+
+  renderAppliedFilters();
+
+  document.getElementById('stats').innerHTML =
     '<b>' + rows.length.toLocaleString() + '</b>건 표시 · 전체 ' + TOTAL.toLocaleString() +
-    '건 · 입력가능 ' + FILLABLE.toLocaleString() + '건'));
+    '건 · 입력가능 ' + FILLABLE.toLocaleString() + '건';
+
+  const start = (page - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(start, start + PAGE_SIZE);
 
   const tb = document.getElementById('rows');
   const frag = document.createDocumentFragment();
-  for (const r of rows.slice(0, 2000)) {
+  for (const r of pageRows) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td class="id-col">' + r.id + '</td>' +
       '<td class="name-cell">' + r.name + '<span class="open-hint">↗ 원본 열기</span></td>' +
@@ -379,15 +503,18 @@ function renderTable() {
   }
   tb.innerHTML = '';
   tb.appendChild(frag);
-  if (rows.length > 2000) {
+  if (!pageRows.length) {
     const tr = document.createElement('tr');
     tr.className = 'more-row';
-    tr.innerHTML = '<td colspan="7">… 상위 2,000건만 표시 · 검색/분류로 좁혀 주세요</td>';
+    tr.innerHTML = '<td colspan="7">조건에 맞는 서식이 없습니다.</td>';
     tb.appendChild(tr);
   }
+
+  renderPager(rows.length);
 }
 
-document.getElementById('q').addEventListener('input', renderTable);
+document.getElementById('q').addEventListener('input', () => { page = 1; renderTable(); renderSidebar(); });
+document.getElementById('sort').addEventListener('change', (e) => { sortMode = e.target.value; renderTable(); });
 document.getElementById('settings-toggle').addEventListener('click', () => {
   document.getElementById('settings-panel').classList.toggle('open');
 });
