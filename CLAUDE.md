@@ -49,6 +49,24 @@ Excel·기타 비HWPX 도메인은 이 저장소 범위 밖이다.
 
 모든 작업 보고에 건축공사 비유를 반드시 포함한다.
 
+### 3-A. 토큰 절감 원칙 (2026-08-03 신설)
+
+Claude Code 세션은 다음을 지킨다:
+
+- **원시 데이터 통째 출력 금지** — JSON/셀 구조/좌표맵 등을 확인할 때
+  필요한 필드만 뽑아 출력한다. `borderFill`/`cellMargin` 같은 미사용
+  필드까지 pretty-print 하지 않는다.
+- **재확인 최소화** — 이미 검증된 내용을 같은 세션에서 다시 덤프하지 않는다.
+- **진단 결과는 verdict/핵심 수치만** — 게이트·훅 JSON 응답 전체 대신
+  `scripts/ops/gate_concise.py <대상 스크립트>` 로 실행해 verdict/실패
+  목록만 본다. 전체 출력은 `data/reports/gate_concise_logs/`에 자동 보관된다.
+- **큰 산출물은 파일로 저장, 대화창엔 요약만** — 대량 목록/리포트는
+  파일에 쓰고 대화에는 건수·핵심 사례만 보고한다.
+- 새로 짠 진단 스크립트는 커밋 전
+  `python scripts/ops/audit_verbose_output_lint.py <파일...>` 로 장황한 통째
+  출력 패턴(`json.dumps(..., indent=..)`/`pprint.pprint()`)이 있는지
+  점검한다(정보성 — 빌드를 막지 않음).
+
 ---
 
 ## 4. 안전 금지선 (ABSOLUTE PROHIBITIONS)
