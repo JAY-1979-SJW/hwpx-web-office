@@ -241,9 +241,9 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
   td:nth-child(2) { white-space: normal; min-width: 260px; }
   th { position: sticky; top: 0; background: var(--panel); color: var(--text-dim); font-weight: 600;
        font-size: 0.82em; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border-strong); z-index: 1; }
-  th.id-col, td.id-col { font-variant-numeric: tabular-nums; }
-  td:last-child, td:nth-last-child(2) { font-variant-numeric: tabular-nums; }
-  .id-col { color: var(--text-faint); font-family: var(--font-mono); font-size: 0.92em; width: 1%; }
+  td:last-child { font-variant-numeric: tabular-nums; }
+  .id-col { color: var(--text-faint); font-family: var(--font-mono); font-size: 0.92em; width: 1%;
+             font-variant-numeric: tabular-nums; }
   tbody tr[data-open] { cursor: pointer; }
   tbody tr[data-open]:hover { background: var(--accent-soft); }
   tbody tr:last-child td { border-bottom: none; }
