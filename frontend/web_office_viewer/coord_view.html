@@ -57,6 +57,9 @@
   $("file").onchange=(e)=>upload(e.target.files[0]);
   $("sample").onclick=()=>loadLayout("tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx");
   window.__coordReady=true;
+  // 목차 뷰어 등에서 ?src=<sourcePath> 로 넘어오면 바로 로드
+  const qsSrc = new URLSearchParams(location.search).get("src");
+  if (qsSrc) loadLayout(qsSrc);
 </script>
 </body>
 </html>

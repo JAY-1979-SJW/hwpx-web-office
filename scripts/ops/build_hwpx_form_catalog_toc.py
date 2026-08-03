@@ -4,11 +4,14 @@
 목차만 새로 뽑는다. 산출: data/reports/hwpx_form_catalog_toc/
   - toc_summary.md          : 발행기관·문서유형·서식종류별 건수 요약(사람이 읽는 것)
   - hwpx_form_catalog_toc.xlsx : 요약 시트 + 전체 38,165건 상세 시트
+  - catalog_toc_viewer.html : 발행기관/문서유형/서식종류 사이드 메뉴로
+    거르는 자체완결형(서버 불필요, JSON 인라인) 뷰어
 
 사용: python scripts/ops/build_hwpx_form_catalog_toc.py
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -28,7 +31,7 @@ def _conn() -> sqlite3.Connection:
 
 def _fetch_rows(c: sqlite3.Connection) -> list[sqlite3.Row]:
     return c.execute(
-        """SELECT f.form_id, f.name, f.institution, f.legal_basis,
+        """SELECT f.form_id, f.name, f.institution, f.legal_basis, f.source_path,
                   d.clean_name, d.doc_type, d.form_kind, d.fillable, d.input_count
            FROM forms f LEFT JOIN derivations_rebuild d ON f.form_id = d.form_id
            ORDER BY f.institution, d.doc_type, f.form_id"""
@@ -123,8 +126,140 @@ def build() -> dict:
         md_lines.append(f"- {k}: {n}건")
     (OUT_DIR / "toc_summary.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
 
+    # ── 사이드 메뉴 뷰어(html, JSON 인라인 - 서버 없이 바로 열림) ─────────
+    items = [
+        {
+            "id": r["form_id"], "name": r["clean_name"] or r["name"],
+            "inst": (r["institution"] or "(미분류)").strip() or "(미분류)",
+            "doc": (r["doc_type"] or "(미분류)").strip() or "(미분류)",
+            "kind": (r["form_kind"] or "(미분류)").strip() or "(미분류)",
+            "fillable": bool(r["fillable"]), "inputCount": r["input_count"] or 0,
+            "sourcePath": r["source_path"] or "",
+        }
+        for r in rows
+    ]
+    viewer_html = _render_viewer_html(items, by_inst, by_doc, by_kind, len(rows), fillable_n)
+    viewer_path = OUT_DIR / "catalog_toc_viewer.html"
+    viewer_path.write_text(viewer_html, encoding="utf-8")
+
     return {"total": len(rows), "fillable": fillable_n, "xlsx": str(xlsx_path),
-            "by_inst_top5": by_inst[:5], "by_doc": by_doc}
+            "viewer": str(viewer_path), "by_inst_top5": by_inst[:5], "by_doc": by_doc}
+
+
+def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> str:
+    data_json = json.dumps(items, ensure_ascii=False)
+    groups_json = json.dumps({"발행기관": by_inst, "문서유형": by_doc, "서식종류": by_kind}, ensure_ascii=False)
+    return """<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>HWPX 서식 카탈로그 목차</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; display: flex; height: 100vh; }
+  #sidebar { width: 280px; flex: none; background: #1f2937; color: #e5e7eb; overflow-y: auto; padding: 16px 0; }
+  #sidebar h2 { font-size: 0.8em; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af;
+                padding: 12px 16px 4px; margin: 0; }
+  #sidebar .item { padding: 6px 16px; cursor: pointer; font-size: 0.92em; display: flex; justify-content: space-between; }
+  #sidebar .item:hover { background: #374151; }
+  #sidebar .item.active { background: #2563eb; color: #fff; }
+  #sidebar .cnt { color: #9ca3af; }
+  #sidebar .item.active .cnt { color: #dbeafe; }
+  #main { flex: 1; overflow-y: auto; padding: 20px 28px; }
+  #stats { color: #555; margin-bottom: 12px; }
+  #toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  input#q { flex: 1; min-width: 200px; max-width: 420px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; }
+  input#base { width: 220px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; color: #555; font-size: 0.85em; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9em; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
+  th { position: sticky; top: 0; background: #fff; border-bottom: 2px solid #333; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #eff6ff; }
+  .fill-y { color: #15803d; font-weight: 600; }
+  .fill-n { color: #999; }
+</style></head>
+<body>
+<div id="sidebar"></div>
+<div id="main">
+  <h1 style="margin-top:0">HWPX 서식 카탈로그 목차</h1>
+  <div id="stats"></div>
+  <div id="toolbar">
+    <input id="q" placeholder="서식명 검색...">
+    <input id="base" value="http://localhost:8000" title="원본 뷰어(coord_view.html) 서버 주소 - editor_api_route 기동 주소">
+    <span style="font-size:0.8em;color:#999">↑ 행 클릭 시 이 주소의 /web-office/coord_view.html 로 원본을 연다</span>
+  </div>
+  <table><thead><tr><th>form_id</th><th>서식명</th><th>발행기관</th><th>문서유형</th><th>서식종류</th>
+  <th>입력가능</th><th>입력칸수</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+<script>
+const ITEMS = __DATA_JSON__;
+const GROUPS = __GROUPS_JSON__;
+const TOTAL = __TOTAL__, FILLABLE = __FILLABLE__;
+let active = null; // {axis, key}
+
+function render() {
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '';
+  for (const axis of Object.keys(GROUPS)) {
+    const h = document.createElement('h2'); h.textContent = axis; sb.appendChild(h);
+    for (const [key, n] of GROUPS[axis]) {
+      const el = document.createElement('div');
+      el.className = 'item' + (active && active.axis === axis && active.key === key ? ' active' : '');
+      el.innerHTML = '<span>' + key + '</span><span class="cnt">' + n + '</span>';
+      el.onclick = () => {
+        active = (active && active.axis === axis && active.key === key) ? null : {axis, key};
+        renderTable(); render();
+      };
+      sb.appendChild(el);
+    }
+  }
+}
+
+const AXIS_FIELD = {'발행기관': 'inst', '문서유형': 'doc', '서식종류': 'kind'};
+
+function renderTable() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let rows = ITEMS;
+  if (active) {
+    const f = AXIS_FIELD[active.axis];
+    rows = rows.filter(r => r[f] === active.key);
+  }
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  document.getElementById('stats').textContent =
+    (active ? active.axis + ' = ' + active.key + ' · ' : '') +
+    rows.length + '건 표시 (전체 ' + TOTAL + '건, 입력가능 ' + FILLABLE + '건)';
+  const tb = document.getElementById('rows');
+  const frag = document.createDocumentFragment();
+  for (const r of rows.slice(0, 2000)) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + r.id + '</td><td>' + r.name + '</td><td>' + r.inst + '</td>' +
+      '<td>' + r.doc + '</td><td>' + r.kind + '</td>' +
+      '<td class="' + (r.fillable ? 'fill-y' : 'fill-n') + '">' + (r.fillable ? 'Y' : 'N') + '</td>' +
+      '<td>' + r.inputCount + '</td>';
+    if (r.sourcePath) {
+      tr.title = '클릭하면 원본을 뷰어(coord_view.html)로 연다';
+      tr.onclick = () => {
+        let base = document.getElementById('base').value;
+        while (base.endsWith('/')) base = base.slice(0, -1);
+        window.open(base + '/web-office/coord_view.html?src=' + encodeURIComponent(r.sourcePath), '_blank');
+      };
+    }
+    frag.appendChild(tr);
+  }
+  tb.innerHTML = '';
+  tb.appendChild(frag);
+  if (rows.length > 2000) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="7" style="color:#999;padding:10px">... 상위 2000건만 표시 (검색/분류로 좁혀 주세요)</td>';
+    tb.appendChild(tr);
+  }
+}
+
+document.getElementById('q').addEventListener('input', renderTable);
+render();
+renderTable();
+</script>
+</body></html>
+""".replace("__DATA_JSON__", data_json).replace("__GROUPS_JSON__", groups_json) \
+   .replace("__TOTAL__", str(total)).replace("__FILLABLE__", str(fillable_n))
 
 
 if __name__ == "__main__":
@@ -133,3 +268,4 @@ if __name__ == "__main__":
     print("발행기관 상위5:", result["by_inst_top5"])
     print("문서유형:", result["by_doc"])
     print("산출:", result["xlsx"])
+    print("뷰어:", result["viewer"])
