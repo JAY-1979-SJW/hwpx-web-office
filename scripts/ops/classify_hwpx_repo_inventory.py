@@ -141,7 +141,11 @@ def classify_path(path: str) -> tuple[str, str, str]:
         # scripts/ops/hooks/ 는 게이트를 자동 집행하는 감리 기반시설이다
         # (편집 시점에 게이트를 돌려 규칙 위반을 즉시 잡는다) — 이름이
         # `gate_` 로 시작하지 않아도 성격은 AUDIT_GATE 다.
-        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates", "/hooks/")):
+        # `build_` 도 같은 성격이다 - 기존 build_hwpx_repo_separation_owner_review.py·
+        # build_hwpx_repo_separation_execution_plan_draft.py·
+        # build_hwpx_repo_manifest_promotion_candidates.py 전부 이 규칙으로 새 파일이었다면
+        # 똑같이 막혔을 선례(감사 산출물을 read-only로 만드는 스크립트) - 토큰 목록 공백이었다.
+        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "build_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates", "/hooks/")):
             return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
         if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
             return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"
