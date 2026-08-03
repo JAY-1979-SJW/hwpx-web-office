@@ -1,74 +1,15 @@
 {
   "schemaVersion": "hwpx_repo_new_file_classification_gate_v1",
-  "verdict": "FAIL_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
+  "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
   "summary": {
-    "newFiles": 6,
+    "newFiles": 0,
     "ignoredFiles": 0,
-    "passedFiles": 5,
-    "failedFiles": 1
+    "passedFiles": 0,
+    "failedFiles": 0
   },
-  "newFileResults": [
-    {
-      "safePath": "frontend/web_office_viewer/forms/fire-facility-completion-inspection-application-live.html",
-      "category": "FRONTEND_VIEWER",
-      "zone": "browser_ui",
-      "separationPlan": "keep_frontend_viewer",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "frontend/web_office_viewer/forms/outdoor-tank-safety-inspection-extension-application-live.html",
-      "category": "FRONTEND_VIEWER",
-      "zone": "browser_ui",
-      "separationPlan": "keep_frontend_viewer",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "frontend/web_office_viewer/forms/supervisor-designation-application-live.html",
-      "category": "FRONTEND_VIEWER",
-      "zone": "browser_ui",
-      "separationPlan": "keep_frontend_viewer",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "scripts/hwpx/web_office/generate_wired_forms.py",
-      "category": "ACTIVE_HWPX_CORE",
-      "zone": "hwpx_core",
-      "separationPlan": "keep_hwpx_core",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "scripts/ops/gate_concise.py",
-      "category": "AUDIT_GATE",
-      "zone": "closeout_security",
-      "separationPlan": "keep_gate_audit",
-      "moduleDeclared": false,
-      "status": "PASS",
-      "failures": []
-    },
-    {
-      "safePath": "scripts/ops/lint_verbose_output.py",
-      "category": "LEGACY_EXPERIMENT",
-      "zone": "unassigned",
-      "separationPlan": "review_legacy_ops",
-      "moduleDeclared": false,
-      "status": "FAIL",
-      "failures": [
-        "FAIL_NEW_FILE_UNASSIGNED_ZONE"
-      ]
-    }
-  ],
+  "newFileResults": [],
   "ignoredSafePaths": [],
-  "failures": [
-    "FAIL_NEW_FILE_UNASSIGNED_ZONE"
-  ],
+  "failures": [],
   "security": {
     "piiLeak": 0,
     "rawPathLeak": 0,

@@ -228,8 +228,8 @@
       "reports_untracked"
     ],
     "unexpectedOutsideScope": [
-      "M scripts/hwpx/web_office/document_model.py",
-      "M scripts/hwpx/web_office/ro_view_importer.py"
+      "M  scripts/hwpx/web_office/document_model.py",
+      "M  scripts/hwpx/web_office/ro_view_importer.py"
     ]
   },
   "warnings": [

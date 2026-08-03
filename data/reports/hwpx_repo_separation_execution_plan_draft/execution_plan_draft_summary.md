@@ -1,7 +1,7 @@
 # HWPX Repo Separation Execution Plan Draft
 
 - verdict: PASS_HWPX_REPO_SEPARATION_EXECUTION_PLAN_DRAFT
-- baseline: b0c299d
+- baseline: 7f25476
 - mode: DRY_RUN_EXECUTION_PLAN_DRAFT
 - reviewApproved: 0
 - executionPlanCandidates: 0

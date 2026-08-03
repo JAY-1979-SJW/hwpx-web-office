@@ -1,7 +1,7 @@
 # HWPX Repo Separation Final Execution Approval Gate
 
 - verdict: PASS_HWPX_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL_GATE
-- baseline: b0c299d
+- baseline: 7f25476
 - mode: FINAL_EXECUTION_APPROVAL_GATE_NO_COMMANDS
 - executionPlanCandidates: 0
 - finalExecutionApproved: 0

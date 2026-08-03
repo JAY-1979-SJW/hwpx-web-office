@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_separation_approval_decision_gate_v1",
   "verdict": "PASS_HWPX_REPO_SEPARATION_APPROVAL_DECISION_GATE",
-  "baselineHead": "b0c299d",
+  "baselineHead": "7f25476",
   "mode": "REVIEW_DECISION_ONLY",
   "summary": {
     "packets": 9,
