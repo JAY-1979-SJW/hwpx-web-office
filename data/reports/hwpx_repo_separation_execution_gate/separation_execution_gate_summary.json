@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_separation_execution_gate_v1",
   "verdict": "PASS_HWPX_REPO_SEPARATION_EXECUTION_GATE",
-  "baselineHead": "7f25476",
+  "baselineHead": "97d5159",
   "mode": "DRY_RUN_ONLY",
   "requestExecution": false,
   "ownerApproved": false,

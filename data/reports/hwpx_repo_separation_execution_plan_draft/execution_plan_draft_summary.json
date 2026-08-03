@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_separation_execution_plan_draft_v1",
   "verdict": "PASS_HWPX_REPO_SEPARATION_EXECUTION_PLAN_DRAFT",
-  "baselineHead": "7f25476",
+  "baselineHead": "97d5159",
   "mode": "DRY_RUN_EXECUTION_PLAN_DRAFT",
   "summary": {
     "decisions": 9,

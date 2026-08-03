@@ -193,7 +193,7 @@
       ],
       "returncode": 0,
       "ok": true,
-      "summary": "15 passed in 0.05s"
+      "summary": "15 passed in 0.04s"
     },
     "zoneGateRunner": {
       "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
@@ -228,8 +228,7 @@
       "reports_untracked"
     ],
     "unexpectedOutsideScope": [
-      "M  scripts/hwpx/web_office/document_model.py",
-      "M  scripts/hwpx/web_office/ro_view_importer.py"
+      "?? scripts/ops/build_hwpx_form_catalog_toc.py"
     ]
   },
   "warnings": [

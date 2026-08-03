@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "safePath": "scripts/ops/build_hwpx_form_catalog_toc.py",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_ops",
+    "moduleDeclared": false,
+    "status": "FAIL",
+    "failures": [
+      "FAIL_NEW_FILE_UNASSIGNED_ZONE"
+    ]
+  }
+]

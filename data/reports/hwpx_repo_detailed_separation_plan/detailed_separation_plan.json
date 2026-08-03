@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_detailed_separation_plan_v1",
   "verdict": "PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN",
-  "baselineHead": "7f25476",
+  "baselineHead": "97d5159",
   "scope": "tracked_files_only_classification_no_move",
   "summary": {
     "totalFiles": 1234,

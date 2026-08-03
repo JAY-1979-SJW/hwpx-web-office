@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_repo_separation_final_execution_approval_gate_v1",
   "verdict": "PASS_HWPX_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL_GATE",
-  "baselineHead": "7f25476",
+  "baselineHead": "97d5159",
   "mode": "FINAL_EXECUTION_APPROVAL_GATE_NO_COMMANDS",
   "summary": {
     "decisions": 9,
