@@ -1,8 +1,8 @@
 # HWPX Form Auto Fill Fail Fast Gate
 
 - verdict: PASS_HWPX_FORM_AUTO_FILL_FAIL_FAST_GATE
-- runId: ff_20260523T041309Z
-- steps: 7/7 passed
+- runId: ff_20260803T021229Z
+- steps: 19/19 passed
 - modules: 10
 - zones: 6
 - security: pii=0 rawPath=0 rawFilename=0
@@ -11,7 +11,19 @@
 - PASS persistent_gate_installation PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED
 - PASS module_audits PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS
 - PASS module_audit_history PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDIT_HISTORY
+- PASS module_log_contract PASS_HWPX_FORM_AUTO_FILL_MODULE_LOG_CONTRACT
+- PASS repo_classification_contract PASS_HWPX_REPO_CLASSIFICATION_CONTRACT_GATE
+- PASS repo_manifest_promotion_candidates PASS_HWPX_REPO_MANIFEST_PROMOTION_CANDIDATES
+- PASS repo_manifest_drift_zero PASS_HWPX_REPO_MANIFEST_DRIFT_ZERO_GATE
+- PASS repo_existing_file_classification PASS_HWPX_REPO_EXISTING_FILE_CLASSIFICATION_GATE
+- PASS repo_new_file_classification PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE
 - PASS zone_gates_from_module_audit PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES
 - PASS upload_gate PASS_HWPX_FORM_AUTO_FILL_UPLOAD_GATE
 - PASS construction_design_audit PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN
+- PASS repo_detailed_separation_plan PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN
+- PASS repo_separation_execution_gate PASS_HWPX_REPO_SEPARATION_EXECUTION_GATE
+- PASS repo_separation_owner_review PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS
+- PASS repo_separation_approval_decision PASS_HWPX_REPO_SEPARATION_APPROVAL_DECISION_GATE
+- PASS repo_separation_execution_plan_draft PASS_HWPX_REPO_SEPARATION_EXECUTION_PLAN_DRAFT
+- PASS repo_separation_final_execution_approval PASS_HWPX_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL_GATE
 - PASS gate_dashboard PASS_HWPX_FORM_AUTO_FILL_GATE_DASHBOARD

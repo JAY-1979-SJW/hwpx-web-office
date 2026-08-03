@@ -18,6 +18,42 @@
     "failCode": null
   },
   {
+    "name": "module_log_contract",
+    "verdict": "PASS_HWPX_FORM_AUTO_FILL_MODULE_LOG_CONTRACT",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_classification_contract",
+    "verdict": "PASS_HWPX_REPO_CLASSIFICATION_CONTRACT_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_manifest_promotion_candidates",
+    "verdict": "PASS_HWPX_REPO_MANIFEST_PROMOTION_CANDIDATES",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_manifest_drift_zero",
+    "verdict": "PASS_HWPX_REPO_MANIFEST_DRIFT_ZERO_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_existing_file_classification",
+    "verdict": "PASS_HWPX_REPO_EXISTING_FILE_CLASSIFICATION_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_new_file_classification",
+    "verdict": "PASS_HWPX_REPO_NEW_FILE_CLASSIFICATION_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
     "name": "zone_gates_from_module_audit",
     "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
     "status": "PASS",
@@ -32,6 +68,42 @@
   {
     "name": "construction_design_audit",
     "verdict": "PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_detailed_separation_plan",
+    "verdict": "PASS_HWPX_REPO_DETAILED_SEPARATION_PLAN",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_separation_execution_gate",
+    "verdict": "PASS_HWPX_REPO_SEPARATION_EXECUTION_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_separation_owner_review",
+    "verdict": "PASS_HWPX_REPO_SEPARATION_OWNER_REVIEW_PACKETS",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_separation_approval_decision",
+    "verdict": "PASS_HWPX_REPO_SEPARATION_APPROVAL_DECISION_GATE",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_separation_execution_plan_draft",
+    "verdict": "PASS_HWPX_REPO_SEPARATION_EXECUTION_PLAN_DRAFT",
+    "status": "PASS",
+    "failCode": null
+  },
+  {
+    "name": "repo_separation_final_execution_approval",
+    "verdict": "PASS_HWPX_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL_GATE",
     "status": "PASS",
     "failCode": null
   },

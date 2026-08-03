@@ -1,7 +1,7 @@
 {
   "schemaVersion": "hwpx_form_auto_fill_persistent_gate_installation_v1",
   "installationMode": "REPO_PERSISTENT_MANIFEST",
-  "verdict": "FAIL_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
+  "verdict": "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED",
   "mode": "SANDBOX_ONLY",
   "sourceMutationAllowed": false,
   "moduleAuditManifest": "scripts/ops/audit_hwpx_form_auto_fill_module_manifest.json",

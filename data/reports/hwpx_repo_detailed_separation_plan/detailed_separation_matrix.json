@@ -7,11 +7,10 @@
       "ACTIVE_AUTOFILL"
     ],
     "zones": {
-      "batch_api_browser": 5,
+      "batch_api_browser": 9,
       "download_export": 2,
       "input_parse": 3,
       "review_approval": 2,
-      "unassigned": 4,
       "writer_readback": 2
     },
     "safetyClasses": {
@@ -55,29 +54,29 @@
   {
     "id": "hwpx_core_library",
     "title": "HWPX core parser and document utilities",
-    "fileCount": 184,
+    "fileCount": 246,
     "categories": [
       "ACTIVE_HWPX_CORE"
     ],
     "zones": {
-      "hwpx_core": 184
+      "hwpx_core": 246
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 42,
-      "LOW_REVIEW": 91,
-      "STANDARD_REVIEW": 51
+      "HIGH_REVIEW": 76,
+      "LOW_REVIEW": 110,
+      "STANDARD_REVIEW": 60
     },
     "riskTags": {
       "AI_API_REVIEW": 1,
-      "HANCOM_DEPENDENCY_REVIEW": 38,
-      "OCR_REVIEW": 13,
-      "PII_PATTERN_REVIEW": 8,
+      "HANCOM_DEPENDENCY_REVIEW": 45,
+      "OCR_REVIEW": 15,
+      "PII_PATTERN_REVIEW": 25,
       "PRODUCTION_WRITE_REVIEW": 4,
-      "RAW_FILENAME_PATTERN_REVIEW": 37,
-      "RAW_PATH_PATTERN_REVIEW": 6,
-      "SOURCE_MUTATION_REVIEW": 32
+      "RAW_FILENAME_PATTERN_REVIEW": 69,
+      "RAW_PATH_PATTERN_REVIEW": 7,
+      "SOURCE_MUTATION_REVIEW": 56
     },
-    "reviewRequiredFiles": 42,
+    "reviewRequiredFiles": 76,
     "action": "keep_as_shared_core_with_import_review",
     "gatePolicy": "source_dependency_review_required",
     "movePolicy": "no_move_until_import_impact_review",
@@ -93,6 +92,7 @@
       "scripts/hwpx/audit_hwpx_samples.py",
       "scripts/hwpx/build_page_capped_review_index.py",
       "scripts/hwpx/client_parse_hwpx_smoke.py",
+      "scripts/hwpx/convert_law_forms_batch.py",
       "scripts/hwpx/convert_local_hwp_inventory_to_hwpx.py",
       "scripts/hwpx/diagnostics/00_input_signature.py",
       "scripts/hwpx/diagnostics/01_extract_inventory.py",
@@ -100,30 +100,33 @@
       "scripts/hwpx/diagnostics/03_convert_smoke.py",
       "scripts/hwpx/diagnostics/04_audit_log_probe.py",
       "scripts/hwpx/diagnostics/05_batch_plan_probe.py",
-      "scripts/hwpx/diagnostics/06_roundtrip_text_probe.py",
-      "scripts/hwpx/diagnostics/hwp_diag_common.py"
+      "scripts/hwpx/diagnostics/06_roundtrip_text_probe.py"
     ]
   },
   {
     "id": "frontend_viewer_shell",
     "title": "Browser viewer and UI shell",
-    "fileCount": 28,
+    "fileCount": 60,
     "categories": [
       "FRONTEND_VIEWER"
     ],
     "zones": {
-      "browser_ui": 28
+      "browser_ui": 60
     },
     "safetyClasses": {
-      "LOW_REVIEW": 26,
-      "STANDARD_REVIEW": 2
+      "HIGH_REVIEW": 6,
+      "LOW_REVIEW": 45,
+      "STANDARD_REVIEW": 9
     },
     "riskTags": {
-      "OCR_REVIEW": 1,
-      "RAW_FILENAME_PATTERN_REVIEW": 1,
-      "RAW_PATH_PATTERN_REVIEW": 1
+      "HANCOM_DEPENDENCY_REVIEW": 1,
+      "OCR_REVIEW": 3,
+      "PII_PATTERN_REVIEW": 6,
+      "RAW_FILENAME_PATTERN_REVIEW": 11,
+      "RAW_PATH_PATTERN_REVIEW": 2,
+      "SOURCE_MUTATION_REVIEW": 1
     },
-    "reviewRequiredFiles": 0,
+    "reviewRequiredFiles": 6,
     "action": "protect_browser_contracts",
     "gatePolicy": "browser_regression_required",
     "movePolicy": "no_move_until_route_contract_review",
@@ -139,44 +142,44 @@
       "frontend/web_office_viewer/components/WebOfficePayloadSummary.tsx",
       "frontend/web_office_viewer/components/WebOfficeTableBlock.tsx",
       "frontend/web_office_viewer/components/WebOfficeViewer.tsx",
+      "frontend/web_office_viewer/coord_view.html",
       "frontend/web_office_viewer/edit_command.mjs",
-      "frontend/web_office_viewer/format_charpr_matcher.mjs",
-      "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs",
-      "frontend/web_office_viewer/index.html",
-      "frontend/web_office_viewer/para_edit_apply_format_smoke.mjs",
-      "frontend/web_office_viewer/para_edit_browser_self_test.mjs",
-      "frontend/web_office_viewer/para_edit_command.mjs",
-      "frontend/web_office_viewer/para_edit_ime_live_smoke.mjs",
-      "frontend/web_office_viewer/para_edit_normalizer.mjs"
+      "frontend/web_office_viewer/editor_clean.html",
+      "frontend/web_office_viewer/editor_demo.html",
+      "frontend/web_office_viewer/editor_ui_bridge.mjs",
+      "frontend/web_office_viewer/form_question_panel.html",
+      "frontend/web_office_viewer/form_question_panel.mjs",
+      "frontend/web_office_viewer/form_question_panel_self_test.mjs",
+      "frontend/web_office_viewer/format_charpr_matcher.mjs"
     ]
   },
   {
     "id": "audit_gate_layer",
     "title": "Audits, gates, installers, dashboards",
-    "fileCount": 124,
+    "fileCount": 151,
     "categories": [
       "AUDIT_GATE"
     ],
     "zones": {
-      "closeout_security": 124
+      "closeout_security": 151
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 50,
-      "LOW_REVIEW": 40,
-      "STANDARD_REVIEW": 34
+      "HIGH_REVIEW": 57,
+      "LOW_REVIEW": 46,
+      "STANDARD_REVIEW": 48
     },
     "riskTags": {
       "AI_API_REVIEW": 29,
-      "HANCOM_DEPENDENCY_REVIEW": 29,
-      "OCR_REVIEW": 38,
-      "PII_PATTERN_REVIEW": 17,
-      "PRODUCTION_WRITE_REVIEW": 7,
-      "RAW_FILENAME_PATTERN_REVIEW": 59,
-      "RAW_PATH_PATTERN_REVIEW": 10,
+      "HANCOM_DEPENDENCY_REVIEW": 32,
+      "OCR_REVIEW": 39,
+      "PII_PATTERN_REVIEW": 20,
+      "PRODUCTION_WRITE_REVIEW": 8,
+      "RAW_FILENAME_PATTERN_REVIEW": 74,
+      "RAW_PATH_PATTERN_REVIEW": 15,
       "REAL_USER_FILE_REVIEW": 18,
-      "SOURCE_MUTATION_REVIEW": 39
+      "SOURCE_MUTATION_REVIEW": 43
     },
-    "reviewRequiredFiles": 50,
+    "reviewRequiredFiles": 57,
     "action": "keep_as_release_gate_layer",
     "gatePolicy": "self_audit_required",
     "movePolicy": "no_move_until_gate_bootstrap_review",
@@ -206,42 +209,44 @@
   {
     "id": "test_support_layer",
     "title": "Tests and fixtures",
-    "fileCount": 174,
+    "fileCount": 225,
     "categories": [
       "TEST_FIXTURE",
       "TEST_ONLY"
     ],
     "zones": {
-      "batch_api_browser": 4,
-      "closeout_security": 35,
+      "batch_api_browser": 9,
+      "closeout_security": 29,
       "download_export": 2,
-      "input_parse": 9,
+      "input_parse": 12,
       "review_approval": 2,
-      "test_support": 30,
-      "unassigned": 90,
-      "writer_readback": 2
+      "test_support": 118,
+      "unassigned": 50,
+      "writer_readback": 3
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 88,
-      "LOW_REVIEW": 33,
-      "STANDARD_REVIEW": 53
+      "HIGH_REVIEW": 103,
+      "LOW_REVIEW": 50,
+      "STANDARD_REVIEW": 72
     },
     "riskTags": {
-      "AI_API_REVIEW": 31,
-      "HANCOM_DEPENDENCY_REVIEW": 55,
-      "OCR_REVIEW": 33,
-      "PII_PATTERN_REVIEW": 47,
+      "AI_API_REVIEW": 32,
+      "HANCOM_DEPENDENCY_REVIEW": 63,
+      "OCR_REVIEW": 34,
+      "PII_PATTERN_REVIEW": 56,
       "PRODUCTION_WRITE_REVIEW": 7,
-      "RAW_FILENAME_PATTERN_REVIEW": 118,
-      "RAW_PATH_PATTERN_REVIEW": 21,
+      "RAW_FILENAME_PATTERN_REVIEW": 149,
+      "RAW_PATH_PATTERN_REVIEW": 22,
       "REAL_USER_FILE_REVIEW": 4,
-      "SOURCE_MUTATION_REVIEW": 53
+      "SOURCE_MUTATION_REVIEW": 59
     },
-    "reviewRequiredFiles": 88,
+    "reviewRequiredFiles": 103,
     "action": "keep_with_target_module_mapping",
     "gatePolicy": "pytest_required",
     "movePolicy": "no_move_until_test_owner_review",
     "sampleSafePaths": [
+      "scripts/hwpx/test_ai_field_labeler.py",
+      "scripts/hwpx/test_form_template_store.py",
       "scripts/hwpx/test_hancom_hwp_converter_providers.py",
       "scripts/hwpx/test_hancom_hwp_converter_router.py",
       "scripts/hwpx/test_hancom_hwpx_delivery_quality_gate.py",
@@ -259,38 +264,36 @@
       "scripts/hwpx/test_hwp_realtime_audit_watch.py",
       "scripts/hwpx/test_hwp_to_hwpx_sdk.py",
       "scripts/hwpx/test_hwp_to_hwpx_standalone.py",
-      "scripts/hwpx/test_hwpx_delivery_auto_verify.py",
-      "scripts/hwpx/test_hwpx_edit_tool.py",
-      "scripts/hwpx/test_hwpx_header_field_detector.py"
+      "scripts/hwpx/test_hwpx_delivery_auto_verify.py"
     ]
   },
   {
     "id": "docs_reports_layer",
     "title": "PII-safe reports and closeout docs",
-    "fileCount": 296,
+    "fileCount": 359,
     "categories": [
       "REPORT_DOC"
     ],
     "zones": {
-      "docs_reports": 296
+      "docs_reports": 359
     },
     "safetyClasses": {
-      "HIGH_REVIEW": 142,
-      "LOW_REVIEW": 62,
-      "STANDARD_REVIEW": 92
+      "HIGH_REVIEW": 195,
+      "LOW_REVIEW": 70,
+      "STANDARD_REVIEW": 94
     },
     "riskTags": {
       "AI_API_REVIEW": 3,
-      "HANCOM_DEPENDENCY_REVIEW": 114,
-      "OCR_REVIEW": 50,
-      "PII_PATTERN_REVIEW": 109,
-      "PRODUCTION_WRITE_REVIEW": 21,
-      "RAW_FILENAME_PATTERN_REVIEW": 74,
-      "RAW_PATH_PATTERN_REVIEW": 16,
-      "REAL_USER_FILE_REVIEW": 44,
-      "SOURCE_MUTATION_REVIEW": 34
+      "HANCOM_DEPENDENCY_REVIEW": 130,
+      "OCR_REVIEW": 59,
+      "PII_PATTERN_REVIEW": 160,
+      "PRODUCTION_WRITE_REVIEW": 33,
+      "RAW_FILENAME_PATTERN_REVIEW": 79,
+      "RAW_PATH_PATTERN_REVIEW": 29,
+      "REAL_USER_FILE_REVIEW": 46,
+      "SOURCE_MUTATION_REVIEW": 40
     },
-    "reviewRequiredFiles": 142,
+    "reviewRequiredFiles": 195,
     "action": "keep_pii_safe_artifacts",
     "gatePolicy": "leak_scan_required",
     "movePolicy": "no_move_until_report_retention_review",
@@ -320,27 +323,27 @@
   {
     "id": "legacy_experiment_quarantine",
     "title": "Legacy and experimental scripts",
-    "fileCount": 150,
+    "fileCount": 163,
     "categories": [
       "LEGACY_EXPERIMENT"
     ],
     "zones": {
-      "hwpx_core": 23,
-      "unassigned": 127
+      "hwpx_core": 29,
+      "unassigned": 134
     },
     "safetyClasses": {
-      "REVIEW_REQUIRED": 150
+      "REVIEW_REQUIRED": 163
     },
     "riskTags": {
       "AI_API_REVIEW": 1,
-      "HANCOM_DEPENDENCY_REVIEW": 37,
+      "HANCOM_DEPENDENCY_REVIEW": 38,
       "OCR_REVIEW": 4,
       "PII_PATTERN_REVIEW": 15,
       "RAW_FILENAME_PATTERN_REVIEW": 16,
       "RAW_PATH_PATTERN_REVIEW": 16,
       "SOURCE_MUTATION_REVIEW": 28
     },
-    "reviewRequiredFiles": 150,
+    "reviewRequiredFiles": 163,
     "action": "quarantine_before_any_archive_or_split",
     "gatePolicy": "manual_review_required",
     "movePolicy": "no_move_no_delete_without_owner_approval",
@@ -370,25 +373,31 @@
   {
     "id": "config_root_layer",
     "title": "Root configuration and build metadata",
-    "fileCount": 2,
+    "fileCount": 5,
     "categories": [
       "CONFIG_BUILD"
     ],
     "zones": {
-      "unassigned": 2
+      "unassigned": 5
     },
     "safetyClasses": {
       "HIGH_REVIEW": 1,
-      "LOW_REVIEW": 1
+      "LOW_REVIEW": 3,
+      "STANDARD_REVIEW": 1
     },
     "riskTags": {
-      "PII_PATTERN_REVIEW": 1
+      "AI_API_REVIEW": 1,
+      "PII_PATTERN_REVIEW": 1,
+      "RAW_PATH_PATTERN_REVIEW": 1
     },
     "reviewRequiredFiles": 1,
     "action": "keep_as_root_configuration",
     "gatePolicy": "config_change_review_required",
     "movePolicy": "no_move_without_build_review",
     "sampleSafePaths": [
+      ".claude/settings.json",
+      ".githooks/pre-commit",
+      ".githooks/pre-push",
       ".gitignore",
       "CLAUDE.md"
     ]
