@@ -57,6 +57,15 @@ REQUIRED_ENDPOINTS = [
     # 저장, 사용자 경로 미접근). 통제된 업로드 — 확장자/zip/크기 검증 후 로드.
     "POST /api/web-office/hwpx-upload",
     "POST /api/web-office/cell-save-apply",
+    # WEB-OFFICE-PARA-EDIT-SAVE-01: 문단 편집 저장(§4.2 header/footer 텍스트,
+    # §4.3 editInPlace 포함) - cell-save-apply 와 동일 계약의 문단판.
+    "POST /api/web-office/para-save-apply",
+    # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-01: 서식 속성 변경(§4.1 조건부 허용,
+    # 기존 charPr 매칭 또는 append-only 신규 charPr).
+    "POST /api/web-office/apply-format",
+    # WEB-OFFICE-AI-FILL-PLAN-01: AI 자동채움 계획 수립(§4.5 드라이 런) - 기입 전
+    # 단계, ai-fill 과 별개 엔드포인트.
+    "POST /api/web-office/fill-plan",
     # WEB-OFFICE-COORD-LAYOUT-01: lineseg 좌표 레이아웃(한컴 없이) 엔드포인트.
     "POST /api/web-office/hwpx-layout",
     # WEB-OFFICE-TRUTH-01: 한컴 실렌더 페이지 배경('원본 그대로' 하이브리드

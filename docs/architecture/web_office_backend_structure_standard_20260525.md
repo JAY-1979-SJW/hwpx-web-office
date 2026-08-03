@@ -52,6 +52,9 @@ The backend API surface is limited to:
 - `POST /api/web-office/hwpx-load`
 - `POST /api/web-office/hwpx-upload` — 브라우저 파일선택/드래그 업로드(WEB-OFFICE-UPLOAD-01). 사용자가 고른 파일 바이트만 수신 → sandbox(`tmp/web_office_uploads/`)에 내용해시 파일명으로 기록 → hwpx-load 동일 파이프. 서버는 사용자 PC 경로 미접근, 확장자·zip컨테이너·크기(기본 30MB) 검증, 원본 무수정
 - `POST /api/web-office/cell-save-apply`
+- `POST /api/web-office/para-save-apply` — 문단 편집 저장(WEB-OFFICE-PARA-EDIT-SAVE-01). §4.2 header/footer 텍스트, §4.3 editInPlace 포함. cell-save-apply 와 동일 계약의 문단판
+- `POST /api/web-office/apply-format` — 서식 속성 변경(WEB-OFFICE-PARA-EDIT-APPLYFORMAT-01). §4.1 조건부 허용, 기존 charPr 매칭 또는 append-only 신규 charPr
+- `POST /api/web-office/fill-plan` — AI 자동채움 계획 수립(WEB-OFFICE-AI-FILL-PLAN-01). §4.5 드라이 런, 기입 전 단계
 - `POST /api/web-office/hwpx-layout` — lineseg 좌표 레이아웃(한컴 미사용, read-only)
 - `GET /api/web-office/truth-page` — 한컴 실렌더 페이지 PNG('원본 그대로' 표시 배경). 내용해시 캐시, 프로젝트-상대 경로만, 한컴 미설치 환경 404 → 좌표 렌더 폴백
 - `POST /api/web-office/ai-fill` — AI 자동채움 값 제안(§9 Claude Code CLI Haiku only; AI inject 없이 자동 실행 금지)
