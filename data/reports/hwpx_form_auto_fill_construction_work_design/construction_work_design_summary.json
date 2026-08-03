@@ -193,7 +193,7 @@
       ],
       "returncode": 0,
       "ok": true,
-      "summary": "15 passed in 0.05s"
+      "summary": "15 passed in 0.04s"
     },
     "zoneGateRunner": {
       "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES",
@@ -227,7 +227,12 @@
       "devlog_untracked",
       "reports_untracked"
     ],
-    "unexpectedOutsideScope": []
+    "unexpectedOutsideScope": [
+      "?? frontend/web_office_viewer/forms/fire-facility-completion-inspection-application-live.html",
+      "?? frontend/web_office_viewer/forms/outdoor-tank-safety-inspection-extension-application-live.html",
+      "?? frontend/web_office_viewer/forms/supervisor-designation-application-live.html",
+      "?? scripts/hwpx/web_office/generate_wired_forms.py"
+    ]
   },
   "warnings": [
     "WARN_SANDBOX_ONLY",

@@ -1,11 +1,58 @@
 [
   {
-    "safePath": "scripts/hwpx/__init__.py",
+    "safePath": "frontend/web_office_viewer/forms/fire-facility-completion-inspection-application-live.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "frontend/web_office_viewer/forms/outdoor-tank-safety-inspection-extension-application-live.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "frontend/web_office_viewer/forms/supervisor-designation-application-live.html",
+    "category": "FRONTEND_VIEWER",
+    "zone": "browser_ui",
+    "separationPlan": "keep_frontend_viewer",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/hwpx/web_office/generate_wired_forms.py",
     "category": "ACTIVE_HWPX_CORE",
     "zone": "hwpx_core",
     "separationPlan": "keep_hwpx_core",
     "moduleDeclared": false,
     "status": "PASS",
     "failures": []
+  },
+  {
+    "safePath": "scripts/ops/gate_concise.py",
+    "category": "AUDIT_GATE",
+    "zone": "closeout_security",
+    "separationPlan": "keep_gate_audit",
+    "moduleDeclared": false,
+    "status": "PASS",
+    "failures": []
+  },
+  {
+    "safePath": "scripts/ops/lint_verbose_output.py",
+    "category": "LEGACY_EXPERIMENT",
+    "zone": "unassigned",
+    "separationPlan": "review_legacy_ops",
+    "moduleDeclared": false,
+    "status": "FAIL",
+    "failures": [
+      "FAIL_NEW_FILE_UNASSIGNED_ZONE"
+    ]
   }
 ]
