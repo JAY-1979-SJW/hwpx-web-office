@@ -166,7 +166,7 @@ def _apply_subject(fields: list[dict]) -> int:
     return third
 
 
-def run(limit: int = 0, size_cap_mb: float = 1.5,
+def run(limit: int = 0, size_cap_mb: float = 3.0,
         shard: int = 0, shards: int = 1) -> None:
     """shards>1 이면 form_id % shards == shard 인 것만 처리한다.
 
@@ -376,7 +376,7 @@ def promote(force: bool = False) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--size-cap-mb", type=float, default=1.5)
+    ap.add_argument("--size-cap-mb", type=float, default=3.0)
     ap.add_argument("--status", action="store_true", help="진행 상황만 출력")
     ap.add_argument("--promote", action="store_true",
                     help="스테이징을 forms/fields 에 반영")

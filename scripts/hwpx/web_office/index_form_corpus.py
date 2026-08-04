@@ -32,7 +32,7 @@ from scripts.hwpx.web_office.build_form_catalog import (  # noqa: E402
 LIB = PROJECT_ROOT / "data" / "drafts" / "form_library"
 LIB_REL = "data/drafts/form_library"
 CATALOG = LIB / "catalog.sqlite"
-SIZE_CAP = 1.5 * 1024 * 1024
+SIZE_CAP = 3 * 1024 * 1024   # 1.5MB→3MB, 2026-08-04: build_form_catalog.py 와 동일 조정
 
 CORPORA = [
     # 공공기관 먼저(소규모·고가치 → 즉시 검색 가능), 법제처 대량은 마지막

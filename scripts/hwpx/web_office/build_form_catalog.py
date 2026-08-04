@@ -27,7 +27,8 @@ LIB = PROJECT_ROOT / "data" / "drafts" / "form_library"
 LIB_REL = "data/drafts/form_library"   # 브릿지는 project-relative sourcePath 요구
 MANIFEST = LIB / "manifest.json"
 CATALOG = LIB / "catalog.sqlite"
-SIZE_CAP = 1.5 * 1024 * 1024   # 1.5MB 초과 = 거대 문서 사전 제외
+SIZE_CAP = 3 * 1024 * 1024   # 3MB 초과 = 거대 문서 사전 제외 (1.5MB→3MB, 2026-08-04: 실측상
+                              # 116건 스킵 중 49건이 1.5~3MB 경계선이라 무근거 예방컷을 완화)
 
 
 def _log(m): print(m, flush=True)
