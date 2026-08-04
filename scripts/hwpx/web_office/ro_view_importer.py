@@ -94,6 +94,14 @@ def _inline_text_content(elem: ET.Element) -> str:
         # 문단 단위로 걸러도(_iter_paragraphs_in_cell_elem) 이 경로로 다시
         # 딸려 들어왔다. tail 은 run 의 것이므로 호출자가 따로 잇는다.
         return ""
+    if local == "ctrl":
+        # hp:ctrl(양식필드·누름틀 등 컨트롤 객체)의 hp:fieldBegin/hp:parameters/
+        # hp:stringParam 은 눈에 보이는 문서 글자가 아니라 필드 내부 명령
+        # 문자열이다(예: "Clickhere:set:42:Direction:wstring:0: ...").
+        # 여기서도 재귀하면 그 명령 문자열이 본문 텍스트에 그대로 새어나온다
+        # (실측: 자재검수요청서.hwpx 문서번호/수신 칸에 노출됨). tbl과 같은
+        # 이유로 통째로 건너뛴다 — tail은 호출자가 별도로 잇는다.
+        return ""
     if local == "linebreak":
         parts = ["\n"]
     elif local == "fwspace":
