@@ -1,6 +1,21 @@
-#!/usr/bin/env sh
-# 저장소 분류 가드 (기존)
-python scripts/ops/run_hwpx_repo_commit_guard.py --temp-only || exit 1
-# 세션 점유 게이트 — 다른 세션이 점유한 파일이 staged 에 섞이면 중단.
-# 점유가 없거나 만료됐으면 통과한다(게이트 고장이 작업을 막지 않는다).
-python scripts/ops/gate_hwpx_session_claim.py --check || exit 1
+#!/bin/sh
+# commit-checklist-wrapper v1
+# 커밋 전 체크리스트(공통) → 통과 시 기존 훅(pre-commit.orig) 실행. 설치기: .githooks/install_commit_checklist.py
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+TOP="$(git rev-parse --show-toplevel)"
+CHK="$TOP/.githooks/commit_checklist.py"
+[ -f "$CHK" ] || CHK="$TOP/scripts/ops/commit_checklist/commit_checklist.py"
+# 워크트리·다른 브랜치엔 사본이 없을 수 있어 설치 시점 원본 절대경로로 대체(없는 브랜치 커밋 전면차단 방지)
+[ -f "$CHK" ] || CHK="C:/work/02. hwpx-web-office/.githooks/commit_checklist.py"
+PY=python
+command -v python >/dev/null 2>&1 || PY=py
+if [ -f "$CHK" ]; then
+  "$PY" "$CHK" || exit 1
+else
+  echo "[커밋 전 체크리스트] 검사기 없음: $CHK — 커밋 차단(설치 확인)"; exit 1
+fi
+if [ -f "$HOOK_DIR/pre-commit.orig" ]; then
+  "$HOOK_DIR/pre-commit.orig" "$@"
+  exit $?
+fi
+exit 0
