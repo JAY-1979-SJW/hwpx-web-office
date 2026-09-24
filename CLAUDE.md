@@ -285,3 +285,4 @@ AI fill(자동 입력) 로직은 `scripts/hwpx/pipeline/`, `scripts/hwpx/ai_prop
 
 *분리 일: 2026-05-22*
 *원본 저장소: office-analysis-engine (33. office-analysis-engine)*
+*2026-09-24: 33의 분리 후 HWPX 변경(fb3ebf5·9938d70) 흡수 — RO-VIEW 렌더 서비스 이관, 셀 공백 교정은 service 표시층에만(importer 봉인 유지), 표 순서 교정은 02 방식 유지. 02가 정본, 33 scripts/hwpx 는 구본(2단계에서 처리). 기준서: docs/specs/2026-09-24_hwpx_33to02_merge_phase1_spec.md*
