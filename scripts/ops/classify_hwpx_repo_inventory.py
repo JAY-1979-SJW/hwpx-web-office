@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -120,7 +120,15 @@ def classify_path(path: str) -> tuple[str, str, str]:
 
     if lower.startswith(".githooks/"):
         return "CONFIG_BUILD", "unassigned", "keep_git_hooks"
-    if path in {".gitignore", "CLAUDE.md"} or name in {"package.json", "package-lock.json", "pyproject.toml"}:
+    # .claude/ 는 프로젝트 도구 설정(훅 등록 등)이다 — .githooks 와 같은 성격.
+    if lower.startswith(".claude/"):
+        return "CONFIG_BUILD", "unassigned", "keep_claude_config"
+    if path in {".gitignore", "CLAUDE.md"} or name in {
+        "package.json",
+        "package-lock.json",
+        "pyproject.toml",
+        "requirements.txt",
+    }:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
         return "REPORT_DOC", "docs_reports", "keep_pii_safe_report"
@@ -135,7 +143,21 @@ def classify_path(path: str) -> tuple[str, str, str]:
             return "ACTIVE_AUTOFILL", "batch_api_browser", "keep_active_autofill_frontend"
         return "FRONTEND_VIEWER", "browser_ui", "keep_frontend_viewer"
     if lower.startswith("scripts/ops/"):
-        if any(token in lower for token in ("audit_", "gate_", "verify_", "install_", "classify_", "dashboard", "history", "candidate_scan", "candidate_upload", "upload_hwpx_candidates")):
+        if any(
+            token in lower
+            for token in (
+                "audit_",
+                "gate_",
+                "verify_",
+                "install_",
+                "classify_",
+                "dashboard",
+                "history",
+                "candidate_scan",
+                "candidate_upload",
+                "upload_hwpx_candidates",
+            )
+        ):
             return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
         if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
             return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"
@@ -159,7 +181,10 @@ def classify_path(path: str) -> tuple[str, str, str]:
     if lower.startswith("scripts/hwpx/"):
         if "/test_" in lower or name.startswith("test_"):
             return "TEST_ONLY", "test_support", "keep_script_test"
-        if any(part in lower for part in ("/parser/", "/recognition_corpus/", "/source_extractor/", "/web_office/")):
+        if any(
+            part in lower
+            for part in ("/parser/", "/recognition_corpus/", "/source_extractor/", "/web_office/")
+        ):
             return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_core"
         if any(token in lower for token in ("hancom", "hwp_to_hwpx", "converter", "native_com")):
             return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
@@ -175,27 +200,86 @@ def _infer_zone(path: str) -> str:
     lower = path.lower()
     if "web_office" in lower:
         return "test_support"
-    if any(token in lower for token in ("repo_separation", "repo_inventory", "detailed_separation", "new_file_classification", "app_structure_drift", "monitor_structure_drift")):
+    if any(
+        token in lower
+        for token in (
+            "repo_separation",
+            "repo_inventory",
+            "detailed_separation",
+            "new_file_classification",
+            "app_structure_drift",
+            "monitor_structure_drift",
+        )
+    ):
         return "closeout_security"
-    if any(token in lower for token in ("existing_file_classification", "module_log_contract", "module_audits", "persistent_gates", "fail_fast", "zone_gates")):
+    if any(
+        token in lower
+        for token in (
+            "existing_file_classification",
+            "module_log_contract",
+            "module_audits",
+            "persistent_gates",
+            "fail_fast",
+            "zone_gates",
+        )
+    ):
         return "closeout_security"
-    if any(token in lower for token in ("api_route", "frontend_contract", "browser_smoke", "browser_batch", "ui_connect", "module_communication")):
+    if any(
+        token in lower
+        for token in (
+            "api_route",
+            "frontend_contract",
+            "browser_smoke",
+            "browser_batch",
+            "ui_connect",
+            "module_communication",
+        )
+    ):
         return "batch_api_browser"
-    if any(token in lower for token in ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")):
+    if any(
+        token in lower
+        for token in ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")
+    ):
         return "batch_api_browser"
-    if any(token in lower for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")):
+    if any(
+        token in lower
+        for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")
+    ):
         return "input_parse"
-    if any(token in lower for token in ("field_catalog", "index_and_recommend", "type_classification", "construction_work_design")):
+    if any(
+        token in lower
+        for token in (
+            "field_catalog",
+            "index_and_recommend",
+            "type_classification",
+            "construction_work_design",
+        )
+    ):
         return "input_parse"
     if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):
         return "review_approval"
-    if any(token in lower for token in ("writer_sandbox", "readback", "write_sandbox", "rwedit", "backend_rwedit")):
+    if any(
+        token in lower
+        for token in ("writer_sandbox", "readback", "write_sandbox", "rwedit", "backend_rwedit")
+    ):
         return "writer_readback"
     if any(token in lower for token in ("download_review", "final_export")):
         return "download_export"
     if any(token in lower for token in ("api_batch", "browser_batch", "api_browser", "real_like")):
         return "batch_api_browser"
-    if any(token in lower for token in ("closeout", "security", "audit", "gate", "dashboard", "history", "deploy_verifier", "server_deploy")):
+    if any(
+        token in lower
+        for token in (
+            "closeout",
+            "security",
+            "audit",
+            "gate",
+            "dashboard",
+            "history",
+            "deploy_verifier",
+            "server_deploy",
+        )
+    ):
         return "closeout_security"
     return "unassigned"
 
@@ -205,9 +289,15 @@ def _risk_tags(path: str, text: str) -> list[str]:
     lower_text = text.lower()
     combined = f"{lower_path}\n{lower_text}"
     risks = []
-    if any(token in combined for token in ("production write", "write-production", "production_adapters")):
+    if any(
+        token in combined
+        for token in ("production write", "write-production", "production_adapters")
+    ):
         risks.append("PRODUCTION_WRITE_REVIEW")
-    if any(token in combined for token in ("overwrite-source", "source overwrite", "source_path", "output_path")):
+    if any(
+        token in combined
+        for token in ("overwrite-source", "source overwrite", "source_path", "output_path")
+    ):
         risks.append("SOURCE_MUTATION_REVIEW")
     if any(token in combined for token in ("openai", "anthropic", "chatcompletion", "gemini")):
         risks.append("AI_API_REVIEW")
@@ -229,7 +319,10 @@ def _risk_tags(path: str, text: str) -> list[str]:
 def _safety_class(category: str, risk_tags: list[str]) -> str:
     if category in {"LEGACY_EXPERIMENT", "UNKNOWN_REVIEW_REQUIRED"}:
         return "REVIEW_REQUIRED"
-    if any(tag in risk_tags for tag in ("PRODUCTION_WRITE_REVIEW", "SOURCE_MUTATION_REVIEW", "PII_PATTERN_REVIEW")):
+    if any(
+        tag in risk_tags
+        for tag in ("PRODUCTION_WRITE_REVIEW", "SOURCE_MUTATION_REVIEW", "PII_PATTERN_REVIEW")
+    ):
         return "HIGH_REVIEW"
     if risk_tags:
         return "STANDARD_REVIEW"
