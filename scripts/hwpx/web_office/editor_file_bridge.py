@@ -3,6 +3,7 @@
 The load side returns a render payload plus the editor document model needed by
 cell_edit_state.mjs. The save side reuses save_apply_bridge.
 """
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -12,7 +13,6 @@ from typing import Any
 from .render_payload import build_render_payload
 from .ro_view_importer import import_hwpx_as_ro_view
 from .save_apply_bridge import apply_cell_save_request
-
 
 _PR = Path(__file__).resolve().parents[3]
 
@@ -48,8 +48,107 @@ def _sanitize_render_payload(payload: dict[str, Any], source_rel: str) -> dict[s
     return clean
 
 
+def _build_table_address_maps(
+    source_path: Path,
+) -> tuple[list[str], list[dict[tuple[int, int], tuple[int, int]]]]:
+    """표 전역 등장순 → tableId, 표별 cellAddr → 등장순 (r,c) 매핑."""
+    import re as _re
+    import sys as _sys
+    import xml.etree.ElementTree as _ET
+    import zipfile
+
+    def _ln(t):
+        return t.rsplit("}", 1)[-1] if "}" in t else t
+
+    z = zipfile.ZipFile(source_path)
+    secs = sorted(
+        [n for n in z.namelist() if _re.search(r"section\d+\.xml$", n.lower())],
+        key=lambda n: int(_re.search(r"section(\d+)", n.lower()).group(1)),
+    )
+    table_ids: list[str] = []
+    addr_maps: list[dict[tuple[int, int], tuple[int, int]]] = []
+    for sec in secs:
+        si = int(_re.search(r"section(\d+)", sec.lower()).group(1))
+        root = _ET.fromstring(z.read(sec))
+        for ti, tbl in enumerate(e for e in root.iter() if _ln(e.tag) == "tbl"):
+            table_ids.append(f"t_s{si}_{ti:03d}")
+            amap: dict[tuple[int, int], tuple[int, int]] = {}
+            trs = [e for e in tbl if _ln(e.tag) == "tr"]
+            for r, tr in enumerate(trs):
+                tcs = [e for e in tr if _ln(e.tag) == "tc"]
+                for c, tc in enumerate(tcs):
+                    addr = next((x for x in tc.iter() if _ln(x.tag) == "cellAddr"), None)
+                    if addr is None:
+                        continue
+                    key = (int(addr.attrib.get("rowAddr", 0)), int(addr.attrib.get("colAddr", 0)))
+                    # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
+                    # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
+                    # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
+                    # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
+                    # 발동 로그 필수(대표님 지적) — 무음이면 가드가
+                    # 정당한 규칙인지 임시방편인지 판별 불가.
+                    if key in amap:
+                        print(
+                            f"[COORD_WARN] ADDR_COLLISION_FIRST_WINS: "
+                            f"{source_path} table=t_s{si}_{ti:03d} "
+                            f"cellAddr={key} 첫 occ={amap[key]} "
+                            f"무시된 occ=({r},{c})",
+                            file=_sys.stderr,
+                        )
+                    else:
+                        amap[key] = (r, c)
+            addr_maps.append(amap)
+    return table_ids, addr_maps
+
+
+def _build_field_entry(
+    f: dict[str, Any],
+    table_ids: list[str],
+    addr_maps: list[dict[tuple[int, int], tuple[int, int]]],
+    cells_by_id: dict[Any, dict[str, Any]],
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "label": f.get("label"),
+        "key": f.get("key"),
+        "fieldType": f.get("type"),
+        "expectedFormat": f.get("expected_format"),
+        "prompt": f.get("prompt"),
+        "reason": f.get("reason"),
+        "confidence": f.get("confidence"),
+    }
+    t = f.get("target") or {}
+    ti = f.get("table")
+    if ti is not None and 0 <= int(ti) < len(table_ids):
+        occ = addr_maps[int(ti)].get((int(t.get("row", -1)), int(t.get("col", -1))))
+        if occ is not None:
+            cid = f"cell_{table_ids[int(ti)]}_r{occ[0]}_c{occ[1]}"
+            entry["cellId"] = cid
+            cell = cells_by_id.get(cid)
+            # 인식기는 새 입력창을 만들 권한이 없다 — 셀에 이미 실제
+            # 텍스트(라벨 원문)가 있으면 잠금 해제하지 않는다
+            # (INLINE_LABEL_CELL 이 인접 빈칸을 못 찾고 라벨 셀
+            # 자신을 타깃으로 오인하는 실사례 결함 방지). 원본
+            # 서식상 빈 칸(파서 분류)일 때만 라벨을 달아 연결한다.
+            if (
+                cell is not None
+                and not cell.get("isCoveredByMerge")
+                and not (cell.get("text") or "").strip()
+            ):
+                cell["isInputCell"] = True
+                if not cell.get("inputLabel"):
+                    cell["inputLabel"] = f.get("label")
+    elif t.get("kind") == "paragraph":
+        entry["paragraph"] = {
+            "section": t.get("section"),
+            "order": t.get("paragraph_order"),
+            "text": t.get("current_text"),
+        }
+    return entry
+
+
 def _recognize_input_fields(
-    source_path: Path, document_model: dict[str, Any],
+    source_path: Path,
+    document_model: dict[str, Any],
 ) -> list[dict[str, Any]] | None:
     """AI 필드 인식(hwpx_header_field_detector)을 로드에 연결.
 
@@ -59,103 +158,28 @@ def _recognize_input_fields(
     실패해도 로드는 계속(None 반환 — 뷰어는 파서 분류만 사용).
     """
     try:
-        import re as _re
         import sys as _sys
-        import zipfile
-        import xml.etree.ElementTree as _ET
-        _hx = str(Path(__file__).resolve().parents[1])   # scripts/hwpx
+
+        _hx = str(Path(__file__).resolve().parents[1])  # scripts/hwpx
         if _hx not in _sys.path:
             _sys.path.insert(0, _hx)
-        from hwpx_package import HwpxPackage
         from hwpx_header_field_detector import detect_input_fields
+        from hwpx_package import HwpxPackage
 
-        pkg = (HwpxPackage.open(source_path)
-               if hasattr(HwpxPackage, "open") else HwpxPackage(source_path))
+        pkg = (
+            HwpxPackage.open(source_path)
+            if hasattr(HwpxPackage, "open")
+            else HwpxPackage(source_path)
+        )
         rep = detect_input_fields(pkg)
         fields = rep.get("fields") or []
         if not fields:
             return []
 
-        # 표 전역 등장순 → tableId, 표별 cellAddr → 등장순 (r,c) 매핑
-        def _ln(t):
-            return t.rsplit("}", 1)[-1] if "}" in t else t
-        z = zipfile.ZipFile(source_path)
-        secs = sorted(
-            [n for n in z.namelist()
-             if _re.search(r"section\d+\.xml$", n.lower())],
-            key=lambda n: int(_re.search(r"section(\d+)", n.lower()).group(1)))
-        table_ids: list[str] = []
-        addr_maps: list[dict[tuple[int, int], tuple[int, int]]] = []
-        for sec in secs:
-            si = int(_re.search(r"section(\d+)", sec.lower()).group(1))
-            root = _ET.fromstring(z.read(sec))
-            for ti, tbl in enumerate(
-                    e for e in root.iter() if _ln(e.tag) == "tbl"):
-                table_ids.append(f"t_s{si}_{ti:03d}")
-                amap: dict[tuple[int, int], tuple[int, int]] = {}
-                trs = [e for e in tbl if _ln(e.tag) == "tr"]
-                for r, tr in enumerate(trs):
-                    tcs = [e for e in tr if _ln(e.tag) == "tc"]
-                    for c, tc in enumerate(tcs):
-                        addr = next((x for x in tc.iter()
-                                     if _ln(x.tag) == "cellAddr"), None)
-                        if addr is not None:
-                            key = (int(addr.attrib.get("rowAddr", 0)),
-                                   int(addr.attrib.get("colAddr", 0)))
-                            # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
-                            # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
-                            # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
-                            # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
-                            # 발동 로그 필수(대표님 지적) — 무음이면 가드가
-                            # 정당한 규칙인지 임시방편인지 판별 불가.
-                            if key in amap:
-                                print(f"[COORD_WARN] ADDR_COLLISION_FIRST_WINS: "
-                                      f"{source_path} table=t_s{si}_{ti:03d} "
-                                      f"cellAddr={key} 첫 occ={amap[key]} "
-                                      f"무시된 occ=({r},{c})", file=_sys.stderr)
-                            else:
-                                amap[key] = (r, c)
-                addr_maps.append(amap)
-
-        cells_by_id = {c.get("cellId"): c
-                       for c in (document_model.get("cells") or [])}
-        out: list[dict[str, Any]] = []
-        for f in fields:
-            entry: dict[str, Any] = {
-                "label": f.get("label"), "key": f.get("key"),
-                "fieldType": f.get("type"),
-                "expectedFormat": f.get("expected_format"),
-                "prompt": f.get("prompt"), "reason": f.get("reason"),
-                "confidence": f.get("confidence"),
-            }
-            t = f.get("target") or {}
-            ti = f.get("table")
-            if ti is not None and 0 <= int(ti) < len(table_ids):
-                occ = addr_maps[int(ti)].get(
-                    (int(t.get("row", -1)), int(t.get("col", -1))))
-                if occ is not None:
-                    cid = f"cell_{table_ids[int(ti)]}_r{occ[0]}_c{occ[1]}"
-                    entry["cellId"] = cid
-                    cell = cells_by_id.get(cid)
-                    # 인식기는 새 입력창을 만들 권한이 없다 — 셀에 이미 실제
-                    # 텍스트(라벨 원문)가 있으면 잠금 해제하지 않는다
-                    # (INLINE_LABEL_CELL 이 인접 빈칸을 못 찾고 라벨 셀
-                    # 자신을 타깃으로 오인하는 실사례 결함 방지). 원본
-                    # 서식상 빈 칸(파서 분류)일 때만 라벨을 달아 연결한다.
-                    if (cell is not None and not cell.get("isCoveredByMerge")
-                            and not (cell.get("text") or "").strip()):
-                        cell["isInputCell"] = True
-                        if not cell.get("inputLabel"):
-                            cell["inputLabel"] = f.get("label")
-            elif t.get("kind") == "paragraph":
-                entry["paragraph"] = {
-                    "section": t.get("section"),
-                    "order": t.get("paragraph_order"),
-                    "text": t.get("current_text"),
-                }
-            out.append(entry)
-        return out
-    except Exception:
+        table_ids, addr_maps = _build_table_address_maps(source_path)
+        cells_by_id = {c.get("cellId"): c for c in (document_model.get("cells") or [])}
+        return [_build_field_entry(f, table_ids, addr_maps, cells_by_id) for f in fields]
+    except Exception:  # ruff: ignore[blind-except]
         return None
 
 
@@ -170,11 +194,9 @@ def load_hwpx_for_editor(
     if request.get("operation") != "HWPX_EDITOR_LOAD":
         return {"verdict": "REJECTED", "reason": "UNSUPPORTED_OPERATION"}
     try:
-        source_path, source_rel = _resolve_project_hwpx(
-            project_root, request.get("sourcePath"))
+        source_path, source_rel = _resolve_project_hwpx(project_root, request.get("sourcePath"))
     except ValueError as exc:
-        return {"verdict": "REJECTED", "reason": "INVALID_REQUEST",
-                "detail": str(exc)}
+        return {"verdict": "REJECTED", "reason": "INVALID_REQUEST", "detail": str(exc)}
 
     # 파싱 캐시 — 같은 파일을 두 번 파싱하지 않는다. '서식 불러오기' 한 번에
     # /hwpx-load 와 /fill-plan 이 같은 파일을 각각 로드해 이중 파싱하던 것을,
@@ -184,11 +206,12 @@ def load_hwpx_for_editor(
     _digest = None
     try:
         from . import parse_cache as _pc
+
         _digest = _pc.source_digest(source_path)
         _hit = _pc.read_entry(_digest)
         if _hit is not None:
             return _pc._refresh_volatile(_hit)
-    except Exception:      # noqa: BLE001 — 캐시 고장이 로드를 막지 않는다
+    except Exception:  # ruff: ignore[blind-except] — 캐시 고장이 로드를 막지 않는다
         _pc = None
         _digest = None
 
@@ -222,7 +245,7 @@ def load_hwpx_for_editor(
     if _pc is not None and _digest is not None:
         try:
             _pc.write_entry(_digest, result)
-        except Exception:      # noqa: BLE001 — 캐시 저장 실패는 로드를 막지 않는다
+        except Exception:  # ruff: ignore[blind-except] — 캐시 저장 실패는 로드를 막지 않는다
             pass
     return result
 
@@ -239,7 +262,8 @@ def load_and_apply_cell_save(
     if load_response.get("verdict") != "PASS":
         return {"verdict": "REJECTED", "load": load_response, "save": None}
     save_response = apply_cell_save_request(
-        save_request, project_root=project_root, output_dir=output_dir)
+        save_request, project_root=project_root, output_dir=output_dir
+    )
     return {
         "operation": "HWPX_EDITOR_LOAD_SAVE",
         "verdict": "PASS" if save_response.get("verdict") == "PASS" else "FAIL",

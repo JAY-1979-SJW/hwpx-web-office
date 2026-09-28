@@ -9,6 +9,7 @@ corpus 문서를 parser_engine + B동 v2(xml_deep_structure_analyzer)로
 - AI 미호출 (진단만 — §10 자동 입력 정책과 무관)
 - 운영 corpus DB 직접 쓰기 금지 (R2)
 """
+
 from __future__ import annotations
 
 import json
@@ -34,9 +35,9 @@ def _read_section_xmls(hwpx_path: Path) -> list[str]:
                 if low.startswith("contents/section") and low.endswith(".xml"):
                     try:
                         out.append(z.read(name).decode("utf-8", "ignore"))
-                    except Exception:
+                    except Exception:  # ruff: ignore[blind-except]
                         pass
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except]
         pass
     return out
 
@@ -44,6 +45,7 @@ def _read_section_xmls(hwpx_path: Path) -> list[str]:
 def _paragraph_xml_chunks(section_xml: str) -> list[str]:
     """간단 paragraph 분할 — <hp:p ...> ~ </hp:p> 또는 <p ...> ~ </p>."""
     import re
+
     chunks: list[str] = []
     for pat in (r"<hp:p[\s>][\s\S]*?</hp:p>", r"<p[\s>][\s\S]*?</p>"):
         chunks.extend(re.findall(pat, section_xml))
@@ -52,7 +54,63 @@ def _paragraph_xml_chunks(section_xml: str) -> list[str]:
 
 def _cell_xml_chunks(section_xml: str) -> list[str]:
     import re
+
     return re.findall(r"<hp:tc[\s>][\s\S]*?</hp:tc>", section_xml)[:200]
+
+
+def _build_parser_stats(result) -> dict[str, int]:
+    return {
+        "sectionCount": len(result.sections or []),
+        "tableCount": len(result.tables or []),
+        "blockCount": len(result.blocks or []),
+        "objectCount": len(result.objects or []),
+        "scheduleCount": len(result.schedules or []),
+        "slotCount": len(result.inputSlotCandidates or []),
+        "binDataCount": len(result.binData or []),
+        "warningCount": len(result.warnings or []),
+        "errorCount": len(result.errors or []),
+    }
+
+
+def _record_flag(flag_counts: Counter, severity_counts: Counter, f: dict | None) -> int:
+    if not f:
+        return 0
+    flag_counts[f["reason_code"]] += 1
+    severity_counts[f["severity"]] += 1
+    return 1
+
+
+def _scan_section_diagnostics(section_xmls: list[str], an) -> tuple[Counter, Counter, int]:
+    flag_counts: Counter = Counter()
+    severity_counts: Counter = Counter()
+    diag_total = 0
+    for sec_xml in section_xmls:
+        # paragraph 단위 — run boundary + style resolution
+        for p_xml in _paragraph_xml_chunks(sec_xml):
+            for fn in (an.analyze_run_boundary, an.analyze_style_resolution):
+                diag_total += _record_flag(flag_counts, severity_counts, fn(p_xml))
+        # cell 단위
+        for c_xml in _cell_xml_chunks(sec_xml):
+            for fn in (an.analyze_cell_internal_paragraph, an.analyze_merged_cell_geometry):
+                diag_total += _record_flag(flag_counts, severity_counts, fn(c_xml))
+        # element 단위 — section 전체
+        for fn in (an.analyze_checkbox_or_shape, an.analyze_object_anchor):
+            diag_total += _record_flag(flag_counts, severity_counts, fn(sec_xml))
+    return flag_counts, severity_counts, diag_total
+
+
+def _classify_recognition(parser_stats: dict[str, int]) -> str:
+    if parser_stats["slotCount"] != 0:
+        return "HAS_LABELS"
+    if parser_stats["tableCount"] == 0:
+        return "NO_TABLE"
+    if parser_stats["objectCount"] > 0:
+        return "OBJECT_HEAVY"
+    if parser_stats["scheduleCount"] > 0:
+        return "SCHEDULE_ONLY"
+    if parser_stats["blockCount"] == 0:
+        return "EMPTY_OR_BROKEN"
+    return "TABLE_BUT_NO_SLOT"
 
 
 def diagnose_one(file_path: Path) -> dict:
@@ -65,75 +123,21 @@ def diagnose_one(file_path: Path) -> dict:
     rec_start = time.time()
     try:
         result = parse_hwpx_v2(file_path)
-    except Exception as e:
+    except Exception as e:  # ruff: ignore[blind-except]
         return {"status": "PARSE_ERROR", "error": str(e)[:200]}
     rec_ms = int((time.time() - rec_start) * 1000)
 
     # parser-level 통계
-    parser_stats = {
-        "sectionCount": len(result.sections or []),
-        "tableCount": len(result.tables or []),
-        "blockCount": len(result.blocks or []),
-        "objectCount": len(result.objects or []),
-        "scheduleCount": len(result.schedules or []),
-        "slotCount": len(result.inputSlotCandidates or []),
-        "binDataCount": len(result.binData or []),
-        "warningCount": len(result.warnings or []),
-        "errorCount": len(result.errors or []),
-    }
+    parser_stats = _build_parser_stats(result)
 
     # B동 진단 — section XML 단위
     diag_start = time.time()
     section_xmls = _read_section_xmls(file_path)
-    flag_counts: Counter = Counter()
-    severity_counts: Counter = Counter()
-    diag_total = 0
-
-    for sec_xml in section_xmls:
-        # paragraph 단위 — run boundary + style resolution
-        for p_xml in _paragraph_xml_chunks(sec_xml):
-            for fn_name, fn in (
-                ("run_boundary", an.analyze_run_boundary),
-                ("style_resolution", an.analyze_style_resolution),
-            ):
-                f = fn(p_xml)
-                if f:
-                    flag_counts[f["reason_code"]] += 1
-                    severity_counts[f["severity"]] += 1
-                    diag_total += 1
-        # cell 단위
-        for c_xml in _cell_xml_chunks(sec_xml):
-            for fn in (an.analyze_cell_internal_paragraph,
-                          an.analyze_merged_cell_geometry):
-                f = fn(c_xml)
-                if f:
-                    flag_counts[f["reason_code"]] += 1
-                    severity_counts[f["severity"]] += 1
-                    diag_total += 1
-        # element 단위 — section 전체
-        for fn in (an.analyze_checkbox_or_shape, an.analyze_object_anchor):
-            f = fn(sec_xml)
-            if f:
-                flag_counts[f["reason_code"]] += 1
-                severity_counts[f["severity"]] += 1
-                diag_total += 1
+    flag_counts, severity_counts, diag_total = _scan_section_diagnostics(section_xmls, an)
     diag_ms = int((time.time() - diag_start) * 1000)
 
     # 라벨 미인지 분류
-    label_count = parser_stats["slotCount"]
-    if label_count == 0:
-        if parser_stats["tableCount"] == 0:
-            recognition_class = "NO_TABLE"
-        elif parser_stats["objectCount"] > 0:
-            recognition_class = "OBJECT_HEAVY"
-        elif parser_stats["scheduleCount"] > 0:
-            recognition_class = "SCHEDULE_ONLY"
-        elif parser_stats["blockCount"] == 0:
-            recognition_class = "EMPTY_OR_BROKEN"
-        else:
-            recognition_class = "TABLE_BUT_NO_SLOT"
-    else:
-        recognition_class = "HAS_LABELS"
+    recognition_class = _classify_recognition(parser_stats)
 
     return {
         "status": "OK",
@@ -148,8 +152,7 @@ def diagnose_one(file_path: Path) -> dict:
     }
 
 
-def run_batch(limit: int, only_form: bool, only_no_label: bool,
-                  report_jsonl: Path) -> dict:
+def run_batch(limit: int, only_form: bool, only_no_label: bool, report_jsonl: Path) -> dict:
     corpus_path = PROJECT_ROOT / "data/recognition_corpus/corpus.sqlite3"
     conn = sqlite3.connect(str(corpus_path))
     if only_form:
@@ -160,12 +163,16 @@ def run_batch(limit: int, only_form: bool, only_no_label: bool,
             "  ON c.document_id = d.document_id "
             "WHERE d.inventory_status='FOUND' "
             "  AND c.document_type='fillable_form' "
-            "ORDER BY d.first_seen_at LIMIT ?", (limit,)).fetchall()
+            "ORDER BY d.first_seen_at LIMIT ?",
+            (limit,),
+        ).fetchall()
     else:
         rows = conn.execute(
             "SELECT document_id, source_path FROM hwpx_documents "
             "WHERE inventory_status='FOUND' "
-            "ORDER BY first_seen_at LIMIT ?", (limit,)).fetchall()
+            "ORDER BY first_seen_at LIMIT ?",
+            (limit,),
+        ).fetchall()
     conn.close()
 
     report_jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -218,7 +225,8 @@ def main():
     only_no_label = "--no-label-only" in sys.argv
     for a in sys.argv[1:]:
         if a.isdigit():
-            limit = int(a); break
+            limit = int(a)
+            break
 
     suffix = "_form" if only_form else ""
     out = PROJECT_ROOT / f"data/drafts/hwpx_diagnose_report{suffix}.jsonl"
