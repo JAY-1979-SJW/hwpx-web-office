@@ -514,6 +514,61 @@ def analyze_label_context_sufficiency(
 # ── 통합 진단 ────────────────────────────────────────────────────────────────
 
 
+def _run_xml_analyzers(items: list[dict], analyzers: tuple) -> list[dict]:
+    flags: list[dict] = []
+    for item in items:
+        for fn in analyzers:
+            f = fn(
+                item["xml"],
+                target_key=item.get("target_key"),
+                normalized_label=item.get("normalized_label"),
+            )
+            if f:
+                flags.append(f)
+    return flags
+
+
+def _run_readback_checks(items: list[dict]) -> list[dict]:
+    flags: list[dict] = []
+    for item in items:
+        f = analyze_readback_mismatch(
+            expected_hash=item.get("expected_hash"),
+            actual_hash=item.get("actual_hash"),
+            divergence_code=item.get("divergence_code"),
+            target_key=item.get("target_key"),
+            normalized_label=item.get("normalized_label"),
+        )
+        if f:
+            flags.append(f)
+    return flags
+
+
+def _run_ambiguity_checks(items: list[dict]) -> list[dict]:
+    flags: list[dict] = []
+    for item in items:
+        f = analyze_target_ambiguous(
+            candidate_targets=item.get("candidate_targets") or [],
+            normalized_label=item.get("normalized_label"),
+        )
+        if f:
+            flags.append(f)
+    return flags
+
+
+def _run_label_checks(items: list[dict]) -> list[dict]:
+    flags: list[dict] = []
+    for item in items:
+        f = analyze_label_context_sufficiency(
+            normalized_label=item.get("normalized_label"),
+            neighbor_text=item.get("neighbor_text"),
+            occurrence_count=int(item.get("occurrence_count") or 0),
+            document_count=int(item.get("document_count") or 0),
+        )
+        if f:
+            flags.append(f)
+    return flags
+
+
 def diagnose_session(
     *,
     paragraph_xml_list: list[dict] | None = None,
@@ -530,59 +585,24 @@ def diagnose_session(
     return: flag dict 리스트.
     """
     flags: list[dict] = []
-    for item in paragraph_xml_list or []:
-        for fn in (analyze_run_boundary, analyze_style_resolution):
-            f = fn(
-                item["xml"],
-                target_key=item.get("target_key"),
-                normalized_label=item.get("normalized_label"),
-            )
-            if f:
-                flags.append(f)
-    for item in cell_xml_list or []:
-        for fn in (analyze_cell_internal_paragraph, analyze_merged_cell_geometry):
-            f = fn(
-                item["xml"],
-                target_key=item.get("target_key"),
-                normalized_label=item.get("normalized_label"),
-            )
-            if f:
-                flags.append(f)
-    for item in element_xml_list or []:
-        for fn in (analyze_checkbox_or_shape, analyze_object_anchor):
-            f = fn(
-                item["xml"],
-                target_key=item.get("target_key"),
-                normalized_label=item.get("normalized_label"),
-            )
-            if f:
-                flags.append(f)
-    for item in readback_checks or []:
-        f = analyze_readback_mismatch(
-            expected_hash=item.get("expected_hash"),
-            actual_hash=item.get("actual_hash"),
-            divergence_code=item.get("divergence_code"),
-            target_key=item.get("target_key"),
-            normalized_label=item.get("normalized_label"),
+    flags.extend(
+        _run_xml_analyzers(
+            paragraph_xml_list or [], (analyze_run_boundary, analyze_style_resolution)
         )
-        if f:
-            flags.append(f)
-    for item in ambiguity_checks or []:
-        f = analyze_target_ambiguous(
-            candidate_targets=item.get("candidate_targets") or [],
-            normalized_label=item.get("normalized_label"),
+    )
+    flags.extend(
+        _run_xml_analyzers(
+            cell_xml_list or [], (analyze_cell_internal_paragraph, analyze_merged_cell_geometry)
         )
-        if f:
-            flags.append(f)
-    for item in label_checks or []:
-        f = analyze_label_context_sufficiency(
-            normalized_label=item.get("normalized_label"),
-            neighbor_text=item.get("neighbor_text"),
-            occurrence_count=int(item.get("occurrence_count") or 0),
-            document_count=int(item.get("document_count") or 0),
+    )
+    flags.extend(
+        _run_xml_analyzers(
+            element_xml_list or [], (analyze_checkbox_or_shape, analyze_object_anchor)
         )
-        if f:
-            flags.append(f)
+    )
+    flags.extend(_run_readback_checks(readback_checks or []))
+    flags.extend(_run_ambiguity_checks(ambiguity_checks or []))
+    flags.extend(_run_label_checks(label_checks or []))
     return flags
 
 

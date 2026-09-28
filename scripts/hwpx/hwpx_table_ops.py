@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import math
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from typing import Any
 
 from hwpx_element_factory import append_generated_table as append_generated_table_to_package
@@ -737,6 +738,31 @@ def _set_fill_color_on_border_fill(bf: ET.Element, color: str) -> None:
     win_brush.attrib.setdefault("alpha", "0")
 
 
+def _find_border_fills_container(root: ET.Element) -> ET.Element | None:
+    """header.xml 트리에서 borderFills 컨테이너 요소를 찾는다."""
+    for elem in root.iter():
+        if local_name(elem.tag) == "borderFills":
+            return elem
+    return None
+
+
+def _find_reused_border_fill(all_bf: list[ET.Element], norm_color: str) -> ET.Element | None:
+    """동일 색상의 borderFill이 이미 있으면 반환한다 (재사용 검사)."""
+    for bf in all_bf:
+        if _get_fill_color_from_border_fill(bf) == norm_color:
+            return bf
+    return None
+
+
+def _select_clone_source(all_bf: list[ET.Element], source_border_fill_id: str | None) -> ET.Element:
+    """복제 소스 선택: source_border_fill_id 우선, 없으면 첫 번째."""
+    if source_border_fill_id:
+        for bf in all_bf:
+            if bf.attrib.get("id") == str(source_border_fill_id):
+                return bf
+    return all_bf[0]
+
+
 def ensure_solid_border_fill(
     package: HwpxPackage,
     color: str,
@@ -759,12 +785,7 @@ def ensure_solid_border_fill(
         return {"status": "HEADER_NOT_FOUND"}
     entry, root = header
 
-    # borderFills 컨테이너 탐색
-    container = None
-    for elem in root.iter():
-        if local_name(elem.tag) == "borderFills":
-            container = elem
-            break
+    container = _find_border_fills_container(root)
     if container is None:
         return {"status": "BORDER_FILLS_NOT_FOUND"}
 
@@ -772,24 +793,15 @@ def ensure_solid_border_fill(
     if not all_bf:
         return {"status": "NO_BORDER_FILL_TEMPLATE"}
 
-    # 동일 색상 재사용 검사
-    for bf in all_bf:
-        if _get_fill_color_from_border_fill(bf) == norm_color:
-            return {
-                "status": "REUSED_EXISTING",
-                "borderFillIDRef": bf.attrib.get("id", ""),
-                "color": norm_color,
-            }
+    reused = _find_reused_border_fill(all_bf, norm_color)
+    if reused is not None:
+        return {
+            "status": "REUSED_EXISTING",
+            "borderFillIDRef": reused.attrib.get("id", ""),
+            "color": norm_color,
+        }
 
-    # 복제 소스 선택: source_border_fill_id 우선, 없으면 첫 번째
-    source = None
-    if source_border_fill_id:
-        for bf in all_bf:
-            if bf.attrib.get("id") == str(source_border_fill_id):
-                source = bf
-                break
-    if source is None:
-        source = all_bf[0]
+    source = _select_clone_source(all_bf, source_border_fill_id)
 
     new_id = str(max(int(bf.attrib.get("id", "0")) for bf in all_bf) + 1)
     cloned = _copy.deepcopy(source)
@@ -1229,6 +1241,98 @@ def table_values_from_ops(operations: list[dict[str, Any]]) -> list[str]:
     return unique
 
 
+def _table_operation_dispatch(
+    editor: Any, operation: dict[str, Any], table_index: int
+) -> dict[str, Callable[[], dict[str, Any]]]:
+    return {
+        "inspect": lambda: editor.get_table_cells(table_index),
+        "inspect_matrix": lambda: editor.get_table_cell_matrix(table_index),
+        "update_cells": lambda: editor.update_table_cells(
+            table_index,
+            [str(value) for value in operation.get("values", [])],
+            bool(operation.get("clear_remaining_cells")),
+        ),
+        "set_cell_text": lambda: editor.set_table_cell_text(
+            table_index,
+            int(operation.get("row_index", -1)),
+            int(operation.get("col_index", -1)),
+            str(operation.get("value", "")),
+            bool(operation.get("clear_remaining_cells", True)),
+        ),
+        "set_visual_cell_text": lambda: editor.set_table_visual_cell_text(
+            table_index,
+            int(operation.get("visual_row", -1)),
+            int(operation.get("visual_col", -1)),
+            str(operation.get("value", "")),
+            bool(operation.get("clear_remaining_cells", True)),
+        ),
+        "update_cell_matrix": lambda: editor.update_table_cell_matrix(
+            table_index, operation.get("updates", [])
+        ),
+        "append_row": lambda: editor.append_table_row(
+            table_index,
+            [str(value) for value in operation.get("values", [])],
+            bool(operation.get("clear_remaining_cells", True)),
+        ),
+        "delete_row": lambda: editor.delete_table_row(
+            table_index,
+            int(operation.get("row_index", -1)),
+            bool(operation.get("protect_header", True)),
+        ),
+        "clone_table": lambda: editor.clone_table(table_index),
+        "merge_cells": lambda: editor.merge_table_cells(
+            table_index,
+            int(operation.get("row_index", -1)),
+            int(operation.get("col_index", -1)),
+            int(operation.get("row_span", 1)),
+            int(operation.get("col_span", 1)),
+        ),
+        "unmerge_cell": lambda: editor.unmerge_table_cell(
+            table_index,
+            int(operation.get("row_index", -1)),
+            int(operation.get("col_index", -1)),
+            bool(operation.get("clear_generated_cells", True)),
+        ),
+        "set_cell_layout": lambda: editor.set_cell_layout(
+            table_index,
+            int(operation.get("row_index", -1)),
+            int(operation.get("col_index", -1)),
+            operation.get("layout", {}),
+        ),
+    }
+
+
+def _execute_table_operation(
+    editor: Any, op: str | None, operation: dict[str, Any], table_index: int
+) -> dict[str, Any]:
+    handler = _table_operation_dispatch(editor, operation, table_index).get(op)
+    if handler is None:
+        return {"status": "UNSUPPORTED_TABLE_OPERATION", "op": op}
+    return handler()
+
+
+def _next_table_operations_status(current_status: str, result_status: str | None) -> str:
+    if result_status in {
+        "TABLE_NOT_FOUND",
+        "ROW_NOT_FOUND",
+        "CELL_NOT_FOUND",
+        "UNSUPPORTED_TABLE_OPERATION",
+    }:
+        return "FAIL"
+    if (
+        result_status
+        in {
+            "HEADER_ROW_DELETE_BLOCKED",
+            "MERGE_SPAN_NOOP",
+            "UNMERGE_NOOP",
+            "SET_CELL_LAYOUT_NOOP",
+        }
+        and current_status != "FAIL"
+    ):
+        return "WARN"
+    return current_status
+
+
 def apply_table_operations(editor: Any, operations: list[dict[str, Any]]) -> dict[str, Any]:
     report = {
         "initial_tables": editor.find_tables(),
@@ -1239,96 +1343,13 @@ def apply_table_operations(editor: Any, operations: list[dict[str, Any]]) -> dic
     for index, operation in enumerate(operations, start=1):
         op = operation.get("op")
         table_index = int(operation.get("table_index", 0))
-        if op == "inspect":
-            result = editor.get_table_cells(table_index)
-        elif op == "inspect_matrix":
-            result = editor.get_table_cell_matrix(table_index)
-        elif op == "update_cells":
-            result = editor.update_table_cells(
-                table_index,
-                [str(value) for value in operation.get("values", [])],
-                bool(operation.get("clear_remaining_cells", False)),
-            )
-        elif op == "set_cell_text":
-            result = editor.set_table_cell_text(
-                table_index,
-                int(operation.get("row_index", -1)),
-                int(operation.get("col_index", -1)),
-                str(operation.get("value", "")),
-                bool(operation.get("clear_remaining_cells", True)),
-            )
-        elif op == "set_visual_cell_text":
-            result = editor.set_table_visual_cell_text(
-                table_index,
-                int(operation.get("visual_row", -1)),
-                int(operation.get("visual_col", -1)),
-                str(operation.get("value", "")),
-                bool(operation.get("clear_remaining_cells", True)),
-            )
-        elif op == "update_cell_matrix":
-            result = editor.update_table_cell_matrix(table_index, operation.get("updates", []))
-        elif op == "append_row":
-            result = editor.append_table_row(
-                table_index,
-                [str(value) for value in operation.get("values", [])],
-                bool(operation.get("clear_remaining_cells", True)),
-            )
-        elif op == "delete_row":
-            result = editor.delete_table_row(
-                table_index,
-                int(operation.get("row_index", -1)),
-                bool(operation.get("protect_header", True)),
-            )
-        elif op == "clone_table":
-            result = editor.clone_table(table_index)
-        elif op == "merge_cells":
-            result = editor.merge_table_cells(
-                table_index,
-                int(operation.get("row_index", -1)),
-                int(operation.get("col_index", -1)),
-                int(operation.get("row_span", 1)),
-                int(operation.get("col_span", 1)),
-            )
-        elif op == "unmerge_cell":
-            result = editor.unmerge_table_cell(
-                table_index,
-                int(operation.get("row_index", -1)),
-                int(operation.get("col_index", -1)),
-                bool(operation.get("clear_generated_cells", True)),
-            )
-        elif op == "set_cell_layout":
-            result = editor.set_cell_layout(
-                table_index,
-                int(operation.get("row_index", -1)),
-                int(operation.get("col_index", -1)),
-                operation.get("layout", {}),
-            )
-        else:
-            result = {"status": "UNSUPPORTED_TABLE_OPERATION", "op": op}
+        result = _execute_table_operation(editor, op, operation, table_index)
         result["operation_index"] = index
         result["op"] = op
         report["operations"].append(result)
         if result.get("warnings"):
             report["warnings"].extend(result["warnings"])
-        status = result.get("status")
-        if status in {
-            "TABLE_NOT_FOUND",
-            "ROW_NOT_FOUND",
-            "CELL_NOT_FOUND",
-            "UNSUPPORTED_TABLE_OPERATION",
-        }:
-            report["status"] = "FAIL"
-        elif (
-            status
-            in {
-                "HEADER_ROW_DELETE_BLOCKED",
-                "MERGE_SPAN_NOOP",
-                "UNMERGE_NOOP",
-                "SET_CELL_LAYOUT_NOOP",
-            }
-            and report["status"] != "FAIL"
-        ):
-            report["status"] = "WARN"
+        report["status"] = _next_table_operations_status(report["status"], result.get("status"))
     report["final_tables"] = editor.find_tables()
     return report
 

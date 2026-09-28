@@ -13,6 +13,7 @@ plan dict가 계약을 만족하는지 검증한다.
 - BLOCKED_INVALID_PLAN    : schema 결함 (구조/필드 누락)
 - BLOCKED_UNSAFE          : 금지 operationType / 위험 등급으로 차단
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -111,6 +112,7 @@ REQUIRED_SAFETY_FIELDS: tuple[str, ...] = (
 # Dataclass 표현 (직렬화는 dict로, 정식 IO는 dict 단위)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Target:
     tableId: str | None = None
@@ -150,7 +152,7 @@ class Safety:
 
 @dataclass
 class AuditTrailEntry:
-    actor: str = "system"   # manual/ai/system
+    actor: str = "system"  # manual/ai/system
     action: str = ""
     at: str = ""
     note: str = ""
@@ -174,8 +176,10 @@ class ValidationResult:
     def to_dict(self) -> dict:
         return {
             "verdict": self.verdict,
-            "issues": [{"code": i.code, "detail": i.detail,
-                          "operationId": i.operationId} for i in self.issues],
+            "issues": [
+                {"code": i.code, "detail": i.detail, "operationId": i.operationId}
+                for i in self.issues
+            ],
             "autoAllowedOps": self.autoAllowedOps,
             "reviewRequiredOps": self.reviewRequiredOps,
             "blockedOps": self.blockedOps,
@@ -185,6 +189,7 @@ class ValidationResult:
 # ──────────────────────────────────────────────────────────────────────────────
 # 검증 로직
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _missing_fields(d: dict, required: tuple[str, ...]) -> list[str]:
     return [k for k in required if k not in d]
@@ -199,11 +204,12 @@ def _validate_target(op_type: str, target: dict) -> list[str]:
         for k in ("tableId", "row", "col"):
             if k not in target or target[k] is None:
                 missing.append(f"target.{k}")
-    elif op_type in _PARAGRAPH_OPS:
-        if (target.get("paragraphIndex") is None
-                and target.get("paragraphKey") is None
-                and target.get("tableId") is None):
-            missing.append("target.paragraphIndex_or_paragraphKey_or_tableId")
+    elif op_type in _PARAGRAPH_OPS and (
+        target.get("paragraphIndex") is None
+        and target.get("paragraphKey") is None
+        and target.get("tableId") is None
+    ):
+        missing.append("target.paragraphIndex_or_paragraphKey_or_tableId")
     return missing
 
 
@@ -221,19 +227,23 @@ def _validate_operation(op: dict, idx: int) -> tuple[list[ValidationIssue], str]
 
     op_type = op.get("operationType", "")
     if op_type in BLOCKED_OPERATION_TYPES:
-        issues.append(ValidationIssue(
-            "OP_BLOCKED_TYPE",
-            f"operationType={op_type!r} is explicitly blocked in this contract phase",
-            op_id,
-        ))
+        issues.append(
+            ValidationIssue(
+                "OP_BLOCKED_TYPE",
+                f"operationType={op_type!r} is explicitly blocked in this contract phase",
+                op_id,
+            )
+        )
         return issues, "blocked"
 
     if op_type not in ALLOWED_OPERATION_TYPES:
-        issues.append(ValidationIssue(
-            "OP_UNKNOWN_TYPE",
-            f"operationType={op_type!r} is not in ALLOWED_OPERATION_TYPES",
-            op_id,
-        ))
+        issues.append(
+            ValidationIssue(
+                "OP_UNKNOWN_TYPE",
+                f"operationType={op_type!r} is not in ALLOWED_OPERATION_TYPES",
+                op_id,
+            )
+        )
         return issues, "blocked"
 
     # target 검증
@@ -244,33 +254,134 @@ def _validate_operation(op: dict, idx: int) -> tuple[list[ValidationIssue], str]
     # riskLevel
     risk = op.get("riskLevel", "")
     if risk not in ALLOWED_RISK_LEVELS:
-        issues.append(ValidationIssue(
-            "OP_RISK_LEVEL_INVALID", f"riskLevel={risk!r}", op_id,
-        ))
+        issues.append(
+            ValidationIssue(
+                "OP_RISK_LEVEL_INVALID",
+                f"riskLevel={risk!r}",
+                op_id,
+            )
+        )
 
     # expectedBefore 강제: overwrite 성격 ops는 expectedBefore 필수
     overwrite_ops = {
-        "setCellText", "setParagraphText", "setCellFillColor",
-        "setCellHorizontalAlign", "setCellVerticalAlign",
-        "setCellTextStyle", "replaceTextRun",
+        "setCellText",
+        "setParagraphText",
+        "setCellFillColor",
+        "setCellHorizontalAlign",
+        "setCellVerticalAlign",
+        "setCellTextStyle",
+        "replaceTextRun",
     }
     if op_type in overwrite_ops and "expectedBefore" not in op:
-        issues.append(ValidationIssue(
-            "OP_EXPECTED_BEFORE_MISSING",
-            f"expectedBefore is required for operationType={op_type!r}",
-            op_id,
-        ))
+        issues.append(
+            ValidationIssue(
+                "OP_EXPECTED_BEFORE_MISSING",
+                f"expectedBefore is required for operationType={op_type!r}",
+                op_id,
+            )
+        )
 
     # 버킷 분류
     if issues:
         return issues, "blocked"
 
-    bucket = "review" if (
-        op_type in REVIEW_REQUIRED_OPERATION_TYPES
-        or op.get("requiresReview") is True
-        or risk == "high"
-    ) else "auto"
+    bucket = (
+        "review"
+        if (
+            op_type in REVIEW_REQUIRED_OPERATION_TYPES
+            or op.get("requiresReview") is True
+            or risk == "high"
+        )
+        else "auto"
+    )
     return [], bucket
+
+
+def _validate_top_level_fields(plan: dict) -> list[ValidationIssue]:
+    issues = [
+        ValidationIssue("PLAN_MISSING_FIELD", k)
+        for k in _missing_fields(plan, REQUIRED_PLAN_FIELDS)
+    ]
+    if plan.get("schemaVersion") != SCHEMA_VERSION:
+        issues.append(
+            ValidationIssue(
+                "SCHEMA_VERSION_MISMATCH",
+                f"expected={SCHEMA_VERSION!r}, got={plan.get('schemaVersion')!r}",
+            )
+        )
+    cb = plan.get("createdBy", "")
+    if cb not in ALLOWED_CREATED_BY:
+        issues.append(
+            ValidationIssue(
+                "PLAN_CREATED_BY_INVALID",
+                f"createdBy={cb!r} not in {sorted(ALLOWED_CREATED_BY)}",
+            )
+        )
+    return issues
+
+
+def _validate_safety_field(plan: dict) -> list[ValidationIssue]:
+    safety = plan.get("safety", {})
+    if not isinstance(safety, dict):
+        return [ValidationIssue("SAFETY_NOT_OBJECT", "safety must be a dict")]
+    issues = [
+        ValidationIssue("SAFETY_MISSING_FIELD", k)
+        for k in _missing_fields(safety, REQUIRED_SAFETY_FIELDS)
+    ]
+    if safety.get("originalHashRequired") is True and not plan.get("sourceDocumentHash"):
+        issues.append(
+            ValidationIssue(
+                "SOURCE_DOC_HASH_REQUIRED",
+                "safety.originalHashRequired=true but sourceDocumentHash empty",
+            )
+        )
+    return issues
+
+
+def _classify_operations(
+    ops: list,
+) -> tuple[list[ValidationIssue], list[str], list[str], list[str]]:
+    issues: list[ValidationIssue] = []
+    blocked_op_ids: list[str] = []
+    review_op_ids: list[str] = []
+    auto_op_ids: list[str] = []
+    for i, op in enumerate(ops):
+        op_issues, bucket = _validate_operation(op, i)
+        op_id = op.get("operationId", f"op[{i}]") if isinstance(op, dict) else f"op[{i}]"
+        issues.extend(op_issues)
+        if bucket == "blocked":
+            blocked_op_ids.append(op_id)
+        elif bucket == "review":
+            review_op_ids.append(op_id)
+        else:
+            auto_op_ids.append(op_id)
+    return issues, blocked_op_ids, review_op_ids, auto_op_ids
+
+
+_PLAN_LEVEL_INVALID_CODES = {
+    "PLAN_MISSING_FIELD",
+    "SCHEMA_VERSION_MISMATCH",
+    "PLAN_CREATED_BY_INVALID",
+    "SAFETY_NOT_OBJECT",
+    "SAFETY_MISSING_FIELD",
+    "SOURCE_DOC_HASH_REQUIRED",
+    "OPS_NOT_LIST",
+    "OPS_EMPTY",
+    "PLAN_NOT_OBJECT",
+}
+
+
+def _determine_plan_verdict(
+    issues: list[ValidationIssue], blocked_op_ids: list[str], review_op_ids: list[str]
+) -> str:
+    plan_level_invalid = any(i.code in _PLAN_LEVEL_INVALID_CODES for i in issues)
+    if plan_level_invalid:
+        return "BLOCKED_INVALID_PLAN"
+    if blocked_op_ids:
+        return "BLOCKED_UNSAFE"
+    if review_op_ids:
+        return "REVIEW_REQUIRED"
+    return "PASS_AUTO_ALLOWED"
 
 
 def validate_edit_plan(plan: dict) -> ValidationResult:
@@ -282,39 +393,9 @@ def validate_edit_plan(plan: dict) -> ValidationResult:
         result.verdict = "BLOCKED_INVALID_PLAN"
         return result
 
-    # 1) 최상위 필수 필드
-    for k in _missing_fields(plan, REQUIRED_PLAN_FIELDS):
-        result.issues.append(ValidationIssue("PLAN_MISSING_FIELD", k))
+    result.issues.extend(_validate_top_level_fields(plan))
+    result.issues.extend(_validate_safety_field(plan))
 
-    # schemaVersion 고정
-    if plan.get("schemaVersion") != SCHEMA_VERSION:
-        result.issues.append(ValidationIssue(
-            "SCHEMA_VERSION_MISMATCH",
-            f"expected={SCHEMA_VERSION!r}, got={plan.get('schemaVersion')!r}",
-        ))
-
-    # createdBy
-    cb = plan.get("createdBy", "")
-    if cb not in ALLOWED_CREATED_BY:
-        result.issues.append(ValidationIssue(
-            "PLAN_CREATED_BY_INVALID",
-            f"createdBy={cb!r} not in {sorted(ALLOWED_CREATED_BY)}",
-        ))
-
-    # safety
-    safety = plan.get("safety", {})
-    if not isinstance(safety, dict):
-        result.issues.append(ValidationIssue("SAFETY_NOT_OBJECT", "safety must be a dict"))
-    else:
-        for k in _missing_fields(safety, REQUIRED_SAFETY_FIELDS):
-            result.issues.append(ValidationIssue("SAFETY_MISSING_FIELD", k))
-        if safety.get("originalHashRequired") is True and not plan.get("sourceDocumentHash"):
-            result.issues.append(ValidationIssue(
-                "SOURCE_DOC_HASH_REQUIRED",
-                "safety.originalHashRequired=true but sourceDocumentHash empty",
-            ))
-
-    # operations
     ops = plan.get("operations", [])
     if not isinstance(ops, list):
         result.issues.append(ValidationIssue("OPS_NOT_LIST", "operations must be a list"))
@@ -323,42 +404,13 @@ def validate_edit_plan(plan: dict) -> ValidationResult:
     if len(ops) == 0:
         result.issues.append(ValidationIssue("OPS_EMPTY", "operations must not be empty"))
 
-    blocked_op_ids: list[str] = []
-    review_op_ids: list[str] = []
-    auto_op_ids: list[str] = []
-    for i, op in enumerate(ops):
-        op_issues, bucket = _validate_operation(op, i)
-        op_id = op.get("operationId", f"op[{i}]") if isinstance(op, dict) else f"op[{i}]"
-        result.issues.extend(op_issues)
-        if bucket == "blocked":
-            blocked_op_ids.append(op_id)
-        elif bucket == "review":
-            review_op_ids.append(op_id)
-        else:
-            auto_op_ids.append(op_id)
-
+    op_issues, blocked_op_ids, review_op_ids, auto_op_ids = _classify_operations(ops)
+    result.issues.extend(op_issues)
     result.autoAllowedOps = auto_op_ids
     result.reviewRequiredOps = review_op_ids
     result.blockedOps = blocked_op_ids
 
-    # 최종 verdict
-    plan_level_invalid = any(
-        i.code in {
-            "PLAN_MISSING_FIELD", "SCHEMA_VERSION_MISMATCH",
-            "PLAN_CREATED_BY_INVALID", "SAFETY_NOT_OBJECT",
-            "SAFETY_MISSING_FIELD", "SOURCE_DOC_HASH_REQUIRED",
-            "OPS_NOT_LIST", "OPS_EMPTY", "PLAN_NOT_OBJECT",
-        }
-        for i in result.issues
-    )
-    if plan_level_invalid:
-        result.verdict = "BLOCKED_INVALID_PLAN"
-    elif blocked_op_ids:
-        result.verdict = "BLOCKED_UNSAFE"
-    elif review_op_ids:
-        result.verdict = "REVIEW_REQUIRED"
-    else:
-        result.verdict = "PASS_AUTO_ALLOWED"
+    result.verdict = _determine_plan_verdict(result.issues, blocked_op_ids, review_op_ids)
     return result
 
 
@@ -375,8 +427,9 @@ def default_safety() -> dict:
     }
 
 
-def empty_plan_skeleton(plan_id: str, source_doc_hash: str,
-                         created_by: str, created_at: str) -> dict:
+def empty_plan_skeleton(
+    plan_id: str, source_doc_hash: str, created_by: str, created_at: str
+) -> dict:
     """빈 EditPlan skeleton dict 생성 (manual UI / AI 모두 동일 출발점)."""
     return {
         "planId": plan_id,

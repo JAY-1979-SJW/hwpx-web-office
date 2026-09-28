@@ -14,11 +14,10 @@ import csv
 import json
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
-
-from dataclasses import replace
 
 from hancom_hwp_converter_providers import (
     PROVIDER_ORDER,
@@ -33,9 +32,14 @@ from hancom_hwp_to_hwpx_batch import (
     convert_one_with_strategy,
     convert_user_present_one,
 )
-from hwp_to_hwpx_standalone import configure_logging, convert_batch, convert_hwp_to_hwpx, default_log_path, log_result
 from hancom_provider_promotion_gate import read_promotion_evidence, validate_promotion_evidence
-
+from hwp_to_hwpx_standalone import (
+    configure_logging,
+    convert_batch,
+    convert_hwp_to_hwpx,
+    default_log_path,
+    log_result,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TMP_DEFAULT = REPO_ROOT / "tmp" / "hancom_hwp_converter_router"
@@ -54,14 +58,22 @@ PROVIDER_TO_EXECUTOR = {
     "user_present": HWP_USER_PRESENT_PROVIDER,
 }
 EXECUTABLE_BOOTSTRAP_PROVIDERS = ["standalone", "hwpxjs", "com", "local_gui", "user_present"]
-PROMOTION_EVIDENCE_REQUIRED_PROVIDERS = {"official_converter", "sdk", "com", "local_gui", "user_present"}
+PROMOTION_EVIDENCE_REQUIRED_PROVIDERS = {
+    "official_converter",
+    "sdk",
+    "com",
+    "local_gui",
+    "user_present",
+}
 
 
 def is_hwpx_zip(path: Path) -> bool:
     try:
         with ZipFile(path) as zf:
             names = zf.namelist()
-        return bool(names) and (any(name.lower().endswith(".xml") for name in names) or "mimetype" in names)
+        return bool(names) and (
+            any(name.lower().endswith(".xml") for name in names) or "mimetype" in names
+        )
     except (BadZipFile, OSError):
         return False
 
@@ -114,17 +126,19 @@ def promote_providers_with_evidence(
     return promoted
 
 
-def _provider_status_dict_for_plan(provider: ProviderStatus, status: str, blocker: str) -> dict[str, object]:
+def _provider_status_dict_for_plan(
+    provider: ProviderStatus, status: str, blocker: str
+) -> dict[str, object]:
     planned = replace(provider, status=status, blocker=blocker)
     return status_to_dict(planned)
 
 
-def choose_bootstrap_provider(providers: list[ProviderStatus], requested_provider: str) -> ProviderStatus | None:
+def choose_bootstrap_provider(
+    providers: list[ProviderStatus], requested_provider: str
+) -> ProviderStatus | None:
     by_name = {provider.provider: provider for provider in providers}
     candidates = (
-        [requested_provider]
-        if requested_provider != "auto"
-        else EXECUTABLE_BOOTSTRAP_PROVIDERS
+        [requested_provider] if requested_provider != "auto" else EXECUTABLE_BOOTSTRAP_PROVIDERS
     )
     for name in candidates:
         provider = by_name.get(name)
@@ -140,7 +154,9 @@ def provider_requires_promotion_evidence(plan: dict[str, object]) -> bool:
     return str(selected.get("provider") or "") in PROMOTION_EVIDENCE_REQUIRED_PROVIDERS
 
 
-def build_user_present_manual_plan(input_path: Path | None, output_path: Path, output_dir: Path) -> dict[str, object]:
+def build_user_present_manual_plan(
+    input_path: Path | None, output_path: Path, output_dir: Path
+) -> dict[str, object]:
     result_json = output_dir / "user_present_result.json"
     evidence_json = output_dir / "user_present_promotion_evidence_template.json"
     if not input_path:
@@ -201,7 +217,9 @@ def build_user_present_manual_plan(input_path: Path | None, output_path: Path, o
         "available": USER_PRESENT_SCRIPT.exists(),
         "script": str(USER_PRESENT_SCRIPT),
         "evidence_builder": str(USER_PRESENT_EVIDENCE_SCRIPT),
-        "status": "READY_FOR_USER_PRESENT_MANUAL_RUN" if USER_PRESENT_SCRIPT.exists() else "SCRIPT_NOT_FOUND",
+        "status": "READY_FOR_USER_PRESENT_MANUAL_RUN"
+        if USER_PRESENT_SCRIPT.exists()
+        else "SCRIPT_NOT_FOUND",
         "reason": "Requires a visible Hancom window and user confirmation; not eligible for unattended execution",
         "command": command,
         "result_json": str(result_json),
@@ -210,7 +228,9 @@ def build_user_present_manual_plan(input_path: Path | None, output_path: Path, o
     }
 
 
-def build_promotion_evidence_template(provider: str, input_path: Path | None, output_path: Path) -> dict[str, object]:
+def build_promotion_evidence_template(
+    provider: str, input_path: Path | None, output_path: Path
+) -> dict[str, object]:
     return {
         "provider": provider,
         "input_path": str(input_path) if input_path else "",
@@ -228,73 +248,109 @@ def build_promotion_evidence_template(provider: str, input_path: Path | None, ou
     }
 
 
+def _provider_meets_execution_bar(provider: object | None) -> bool:
+    return bool(
+        provider
+        and getattr(provider, "available", False)
+        and getattr(provider, "verified", False)
+        and getattr(provider, "execution_allowed", False)
+    )
+
+
+def _select_provider_for_request(
+    requested_provider: str, input_is_batch_dir: bool, promoted_providers: list[object]
+) -> object | None:
+    if requested_provider == "auto" and input_is_batch_dir:
+        standalone = _provider_by_name(promoted_providers, "standalone")
+        return (
+            standalone
+            if _provider_meets_execution_bar(standalone)
+            else choose_provider(promoted_providers)
+        )
+    if requested_provider == "auto":
+        return choose_provider(promoted_providers)
+    requested_selected = _provider_by_name(promoted_providers, requested_provider)
+    return requested_selected if _provider_meets_execution_bar(requested_selected) else None
+
+
+def _resolve_bootstrap_provider(
+    selected: object | None,
+    providers: list[object],
+    requested_provider: str,
+    args: argparse.Namespace,
+) -> tuple[object | None, str | None]:
+    if not (
+        selected is None
+        and getattr(args, "mode", "preflight") == "convert"
+        and getattr(args, "allow_execute", False)
+    ):
+        return None, None
+    bootstrap_provider = choose_bootstrap_provider(providers, requested_provider)
+    reason = (
+        "Explicit one-file bootstrap execution; provider is available but not promoted by evidence yet"
+        if bootstrap_provider
+        else None
+    )
+    return bootstrap_provider, reason
+
+
+def _validate_plan_input_path(
+    input_path: Path | None, effective_provider: object | None
+) -> str | None:
+    if not input_path:
+        return None
+    if not input_path.exists():
+        return "INPUT_NOT_FOUND"
+    if input_path.is_dir() and not (
+        effective_provider and effective_provider.provider == "standalone"
+    ):
+        return "INPUT_DIRECTORY_REQUIRES_STANDALONE_PROVIDER"
+    if not input_path.is_dir() and input_path.suffix.lower() != ".hwp":
+        return "INPUT_NOT_HWP"
+    if not input_path.is_dir() and not has_hwp_binary_signature(input_path):
+        return "INPUT_NOT_HWP_BINARY"
+    return None
+
+
+def _determine_plan_status(
+    selected: object | None, bootstrap_provider: object | None, input_error: str | None
+) -> tuple[str, str]:
+    if selected is None and bootstrap_provider is None:
+        return "NO_EXECUTABLE_PROVIDER", "No provider is both verified and execution_allowed"
+    if input_error:
+        return "INPUT_INVALID", input_error
+    if bootstrap_provider is not None:
+        return "READY_FOR_BOOTSTRAP_ONE_FILE_EXECUTION", ""
+    return "READY_FOR_ONE_FILE_EXECUTION", ""
+
+
 def build_plan(args: argparse.Namespace, providers: list[object]) -> dict[str, object]:
     input_path = Path(args.input).expanduser().resolve() if args.input else None
     output_dir = Path(args.output_dir).expanduser().resolve()
     input_is_batch_dir = bool(input_path and input_path.is_dir())
-    output_name = input_path.with_suffix(".hwpx").name if input_path and not input_is_batch_dir else "output.hwpx"
+    output_name = (
+        input_path.with_suffix(".hwpx").name
+        if input_path and not input_is_batch_dir
+        else "output.hwpx"
+    )
     output_path = output_dir if input_is_batch_dir else output_dir / output_name
     raw_promotion_evidence = read_promotion_evidence(getattr(args, "promotion_evidence_json", None))
     promotion_gate_for_selection = validate_promotion_evidence(raw_promotion_evidence)
     promoted_providers = promote_providers_with_evidence(providers, promotion_gate_for_selection)
     requested_provider = str(getattr(args, "provider", "auto") or "auto")
-    if requested_provider == "auto" and input_is_batch_dir:
-        standalone = _provider_by_name(promoted_providers, "standalone")
-        selected = (
-            standalone
-            if standalone
-            and getattr(standalone, "available", False)
-            and getattr(standalone, "verified", False)
-            and getattr(standalone, "execution_allowed", False)
-            else choose_provider(promoted_providers)
-        )
-    elif requested_provider == "auto":
-        selected = choose_provider(promoted_providers)
-    else:
-        requested_selected = _provider_by_name(promoted_providers, requested_provider)
-        selected = (
-            requested_selected
-            if requested_selected
-            and getattr(requested_selected, "available", False)
-            and getattr(requested_selected, "verified", False)
-            and getattr(requested_selected, "execution_allowed", False)
-            else None
-        )
-    bootstrap_provider = None
-    bootstrap_reason = None
-    if selected is None and getattr(args, "mode", "preflight") == "convert" and getattr(args, "allow_execute", False):
-        bootstrap_provider = choose_bootstrap_provider(providers, requested_provider)
-        if bootstrap_provider:
-            bootstrap_reason = (
-                "Explicit one-file bootstrap execution; provider is available but not promoted by evidence yet"
-            )
+    selected = _select_provider_for_request(
+        requested_provider, input_is_batch_dir, promoted_providers
+    )
+    bootstrap_provider, bootstrap_reason = _resolve_bootstrap_provider(
+        selected, providers, requested_provider, args
+    )
     user_present_status = _provider_by_name(providers, "user_present")
     selected_provider_name = selected.provider if selected else None
     promotion_gate = validate_promotion_evidence(raw_promotion_evidence, selected_provider_name)
-    input_error = None
     effective_provider = selected or bootstrap_provider
-    if input_path:
-        if not input_path.exists():
-            input_error = "INPUT_NOT_FOUND"
-        elif input_path.is_dir() and not (effective_provider and effective_provider.provider == "standalone"):
-            input_error = "INPUT_DIRECTORY_REQUIRES_STANDALONE_PROVIDER"
-        elif not input_path.is_dir() and input_path.suffix.lower() != ".hwp":
-            input_error = "INPUT_NOT_HWP"
-        elif not input_path.is_dir() and not has_hwp_binary_signature(input_path):
-            input_error = "INPUT_NOT_HWP_BINARY"
+    input_error = _validate_plan_input_path(input_path, effective_provider)
 
-    if selected is None and bootstrap_provider is None:
-        status = "NO_EXECUTABLE_PROVIDER"
-        blocker = "No provider is both verified and execution_allowed"
-    elif input_error:
-        status = "INPUT_INVALID"
-        blocker = input_error
-    elif bootstrap_provider is not None:
-        status = "READY_FOR_BOOTSTRAP_ONE_FILE_EXECUTION"
-        blocker = ""
-    else:
-        status = "READY_FOR_ONE_FILE_EXECUTION"
-        blocker = ""
+    status, blocker = _determine_plan_status(selected, bootstrap_provider, input_error)
 
     manual_fallback = None
     if getattr(args, "manual_fallback", False):
@@ -340,11 +396,17 @@ def build_plan(args: argparse.Namespace, providers: list[object]) -> dict[str, o
         "provider_order": PROVIDER_ORDER,
         "execution_policy": {
             "default_mode": "preflight",
-            "batch_allowed": bool(effective_provider and effective_provider.provider == "standalone"),
-            "one_file_only": not bool(input_is_batch_dir and effective_provider and effective_provider.provider == "standalone"),
+            "batch_allowed": bool(
+                effective_provider and effective_provider.provider == "standalone"
+            ),
+            "one_file_only": not bool(
+                input_is_batch_dir
+                and effective_provider
+                and effective_provider.provider == "standalone"
+            ),
             "requires_allow_execute": True,
         },
-}
+    }
 
 
 def build_conversion_promotion_evidence(
@@ -356,14 +418,16 @@ def build_conversion_promotion_evidence(
 ) -> dict[str, object]:
     zip_ok = output_path.exists() and is_hwpx_zip(output_path)
     xml_ok = zip_ok
-    one_file_success = bool(conversion.get("ok")) and has_hwp_binary_signature(input_path) and zip_ok and xml_ok
+    one_file_success = (
+        bool(conversion.get("ok")) and has_hwp_binary_signature(input_path) and zip_ok and xml_ok
+    )
     return {
         "provider": provider,
         "input_path": str(input_path),
         "output_path": str(output_path),
         "one_file_success": one_file_success,
         "execution_approved": execution_approved,
-        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "verified_at": datetime.now(UTC).isoformat(),
         "output_validation": {
             "status": "PASS" if zip_ok and xml_ok else "FAIL",
             "zip_ok": zip_ok,
@@ -386,7 +450,9 @@ def write_promotion_evidence_if_requested(
 ) -> str | None:
     if conversion.get("mode") == "batch_text_only_rebuild":
         return None
-    output_path_text = conversion.get("output") or plan.get("actual_output") or plan.get("planned_output")
+    output_path_text = (
+        conversion.get("output") or plan.get("actual_output") or plan.get("planned_output")
+    )
     if not output_path_text:
         return None
     evidence_arg = getattr(args, "promotion_evidence_out", None)
@@ -410,7 +476,9 @@ def write_promotion_evidence_if_requested(
     return str(evidence_path)
 
 
-def execute_one_file_conversion(args: argparse.Namespace, plan: dict[str, object]) -> dict[str, object]:
+def execute_one_file_conversion(
+    args: argparse.Namespace, plan: dict[str, object]
+) -> dict[str, object]:
     selected = plan.get("selected_provider")
     if not isinstance(selected, dict):
         return {
@@ -460,7 +528,9 @@ def execute_one_file_conversion(args: argparse.Namespace, plan: dict[str, object
     }
 
 
-def execute_standalone_one(input_path: Path, output_dir: Path, args: argparse.Namespace) -> dict[str, object]:
+def execute_standalone_one(
+    input_path: Path, output_dir: Path, args: argparse.Namespace
+) -> dict[str, object]:
     expected_texts = list(getattr(args, "expected_text", []) or [])
     strict_quality = bool(getattr(args, "strict_quality", False))
     existing_policy = str(getattr(args, "existing_policy", "fail") or "fail")
@@ -509,18 +579,24 @@ def execute_standalone_one(input_path: Path, output_dir: Path, args: argparse.Na
     )
     log_result("router_file_complete", report)
     report_output = Path(str(report.get("output") or output_path)).expanduser().resolve()
-    ok = bool(report.get("status") == "PASS" and report_output.exists() and is_hwpx_zip(report_output))
+    ok = bool(
+        report.get("status") == "PASS" and report_output.exists() and is_hwpx_zip(report_output)
+    )
     return {
         "input": str(input_path),
         "output": str(report_output),
         "provider": "STANDALONE_TEXT_ONLY",
         "ok": ok,
-        "error_code": "STANDALONE_OUTPUT_VALID" if ok else str(report.get("error") or "STANDALONE_CONVERSION_FAILED"),
+        "error_code": "STANDALONE_OUTPUT_VALID"
+        if ok
+        else str(report.get("error") or "STANDALONE_CONVERSION_FAILED"),
         "converter_json": report,
     }
 
 
-def execute_hwpxjs_one(input_path: Path, output_dir: Path, args: argparse.Namespace) -> dict[str, object]:
+def execute_hwpxjs_one(
+    input_path: Path, output_dir: Path, args: argparse.Namespace
+) -> dict[str, object]:
     output_path = output_dir / f"{input_path.stem}.hwpx"
     if output_path.exists():
         output_path = output_dir / f"{input_path.stem}_{input_path.stat().st_size}.hwpx"
@@ -567,7 +643,12 @@ def execute_hwpxjs_one(input_path: Path, output_dir: Path, args: argparse.Namesp
             parsed = json.loads(result_json.read_text(encoding="utf-8-sig"))
         except json.JSONDecodeError:
             parsed = None
-    ok = bool(parsed and parsed.get("status") == "PASS" and output_path.exists() and is_hwpx_zip(output_path))
+    ok = bool(
+        parsed
+        and parsed.get("status") == "PASS"
+        and output_path.exists()
+        and is_hwpx_zip(output_path)
+    )
     return {
         "input": str(input_path),
         "output": str(output_path),
@@ -575,7 +656,9 @@ def execute_hwpxjs_one(input_path: Path, output_dir: Path, args: argparse.Namesp
         "ok": ok,
         "returncode": proc.returncode,
         "converter_json": parsed,
-        "error_code": "HWPXJS_OUTPUT_VALID" if ok else str((parsed or {}).get("error") or "HWPXJS_FAILED"),
+        "error_code": "HWPXJS_OUTPUT_VALID"
+        if ok
+        else str((parsed or {}).get("error") or "HWPXJS_FAILED"),
         "result_json": str(result_json),
         "stdout_tail": (proc.stdout or "")[-1000:],
         "stderr_tail": (proc.stderr or "")[-1000:],
@@ -647,7 +730,12 @@ def execute_local_gui_one(
             parsed = json.loads(result_json.read_text(encoding="utf-8-sig"))
         except json.JSONDecodeError:
             parsed = None
-    ok = bool(parsed and parsed.get("status") == "OUTPUT_VALID" and output_path.exists() and is_hwpx_zip(output_path))
+    ok = bool(
+        parsed
+        and parsed.get("status") == "OUTPUT_VALID"
+        and output_path.exists()
+        and is_hwpx_zip(output_path)
+    )
     return {
         "input": str(input_path),
         "output": str(output_path),
@@ -656,7 +744,9 @@ def execute_local_gui_one(
         "returncode": proc.returncode,
         "ok": ok,
         "converter_json": parsed,
-        "error_code": "LOCAL_GUI_OUTPUT_VALID" if ok else str((parsed or {}).get("status") or "LOCAL_GUI_FAILED"),
+        "error_code": "LOCAL_GUI_OUTPUT_VALID"
+        if ok
+        else str((parsed or {}).get("status") or "LOCAL_GUI_FAILED"),
         "result_json": str(result_json),
         "stdout_log": str(stdout_log),
         "stderr_log": str(stderr_log),
@@ -671,14 +761,12 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         return
     normalized_rows = []
     for row in rows:
-        normalized_rows.append(
-            {
-                key: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-                if isinstance(value, (dict, list))
-                else value
-                for key, value in row.items()
-            }
-        )
+        normalized_rows.append({
+            key: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+            if isinstance(value, (dict, list))
+            else value
+            for key, value in row.items()
+        })
     with path.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(normalized_rows[0]))
         writer.writeheader()
@@ -691,7 +779,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     providers = detect_providers()
     plan = build_plan(args, providers)
     result: dict[str, object] = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tool": "hancom_hwp_converter_router",
         "schema_version": 2,
         "providers": [status_to_dict(provider) for provider in providers],
@@ -703,13 +791,18 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         plan["blocker"] = "convert mode requires --allow-execute and a verified provider"
     elif args.mode == "convert":
         promotion_gate = plan.get("promotion_gate")
-        if plan.get("status") not in {"READY_FOR_ONE_FILE_EXECUTION", "READY_FOR_BOOTSTRAP_ONE_FILE_EXECUTION"}:
+        if plan.get("status") not in {
+            "READY_FOR_ONE_FILE_EXECUTION",
+            "READY_FOR_BOOTSTRAP_ONE_FILE_EXECUTION",
+        }:
             plan["status"] = "EXECUTION_REFUSED"
             plan["blocker"] = plan.get("blocker") or "provider or input is not execution-ready"
         elif (
             plan.get("status") == "READY_FOR_ONE_FILE_EXECUTION"
             and provider_requires_promotion_evidence(plan)
-            and (not isinstance(promotion_gate, dict) or promotion_gate.get("promotable") is not True)
+            and (
+                not isinstance(promotion_gate, dict) or promotion_gate.get("promotable") is not True
+            )
         ):
             plan["status"] = "EXECUTION_REFUSED_PROMOTION_GATE"
             plan["blocker"] = "convert mode requires promotable one-file provider evidence"
@@ -725,9 +818,15 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                     plan["promotion_evidence_out"] = evidence_path
             else:
                 plan["status"] = "CONVERSION_FAILED"
-                plan["blocker"] = str(conversion.get("error_code") or conversion.get("status") or "CONVERSION_FAILED")
+                plan["blocker"] = str(
+                    conversion.get("error_code") or conversion.get("status") or "CONVERSION_FAILED"
+                )
 
-    report_json = Path(args.report_json).expanduser().resolve() if args.report_json else output_dir / "router_report.json"
+    report_json = (
+        Path(args.report_json).expanduser().resolve()
+        if args.report_json
+        else output_dir / "router_report.json"
+    )
     report_csv = output_dir / "provider_status.csv"
     report_json.parent.mkdir(parents=True, exist_ok=True)
     report_json.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -741,7 +840,9 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         )
         evidence_path = Path(str(manual_fallback["promotion_evidence_template"]))
         evidence_path.parent.mkdir(parents=True, exist_ok=True)
-        evidence_path.write_text(json.dumps(evidence_template, ensure_ascii=False, indent=2), encoding="utf-8")
+        evidence_path.write_text(
+            json.dumps(evidence_template, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     result["report_json"] = str(report_json)
     result["provider_csv"] = str(report_csv)
     return result
@@ -750,34 +851,84 @@ def run(args: argparse.Namespace) -> dict[str, object]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Hancom HWP converter router")
     parser.add_argument("--input", help="One HWP file path. Optional for provider preflight.")
-    parser.add_argument("--output-dir", default=str(TMP_DEFAULT), help="tmp output/report directory")
+    parser.add_argument(
+        "--output-dir", default=str(TMP_DEFAULT), help="tmp output/report directory"
+    )
     parser.add_argument("--report-json", help="Router report JSON path")
-    parser.add_argument("--promotion-evidence-json", help="Future provider promotion evidence JSON path")
-    parser.add_argument("--promotion-evidence-out", help="Path to write promotion evidence after a successful conversion")
-    parser.add_argument("--manual-fallback", action="store_true", help="Include user-present manual fallback command and evidence template")
+    parser.add_argument(
+        "--promotion-evidence-json", help="Future provider promotion evidence JSON path"
+    )
+    parser.add_argument(
+        "--promotion-evidence-out",
+        help="Path to write promotion evidence after a successful conversion",
+    )
+    parser.add_argument(
+        "--manual-fallback",
+        action="store_true",
+        help="Include user-present manual fallback command and evidence template",
+    )
     parser.add_argument("--mode", choices=["preflight", "convert"], default="preflight")
-    parser.add_argument("--provider", choices=["auto", "hwpxjs", "standalone", "com", "local_gui", "user_present"], default="auto")
-    parser.add_argument("--allow-execute", action="store_true", help="Required for future one-file conversion execution")
-    parser.add_argument("--timeout-sec", type=int, default=90, help="One-file conversion timeout in seconds")
-    parser.add_argument("--wait-user-sec", type=int, default=60, help="User-present confirmation wait in seconds")
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "hwpxjs", "standalone", "com", "local_gui", "user_present"],
+        default="auto",
+    )
+    parser.add_argument(
+        "--allow-execute",
+        action="store_true",
+        help="Required for future one-file conversion execution",
+    )
+    parser.add_argument(
+        "--timeout-sec", type=int, default=90, help="One-file conversion timeout in seconds"
+    )
+    parser.add_argument(
+        "--wait-user-sec", type=int, default=60, help="User-present confirmation wait in seconds"
+    )
     parser.add_argument("--save-strategy", choices=["direct", "haction", "auto"], default="auto")
     parser.add_argument("--diag-dir", help="Directory for converter diagnostic logs")
-    parser.add_argument("--expected-text", action="append", help="Text that must appear in standalone output")
-    parser.add_argument("--strict-quality", action="store_true", help="Fail standalone conversion on quality warnings")
-    parser.add_argument("--embed-original", action="store_true", help="Embed the original HWP in standalone output")
-    parser.add_argument("--decoded-style-bridge", action="store_true", help="Apply decoded style bridge in standalone output")
-    parser.add_argument("--fidelity-policy", choices=["text", "audit", "strict"], default="text", help="Standalone fidelity handling for unsupported HWP records")
-    parser.add_argument("--pattern", default="*.hwp", help="Standalone batch file pattern. Default: *.hwp")
+    parser.add_argument(
+        "--expected-text", action="append", help="Text that must appear in standalone output"
+    )
+    parser.add_argument(
+        "--strict-quality",
+        action="store_true",
+        help="Fail standalone conversion on quality warnings",
+    )
+    parser.add_argument(
+        "--embed-original", action="store_true", help="Embed the original HWP in standalone output"
+    )
+    parser.add_argument(
+        "--decoded-style-bridge",
+        action="store_true",
+        help="Apply decoded style bridge in standalone output",
+    )
+    parser.add_argument(
+        "--fidelity-policy",
+        choices=["text", "audit", "strict"],
+        default="text",
+        help="Standalone fidelity handling for unsupported HWP records",
+    )
+    parser.add_argument(
+        "--pattern", default="*.hwp", help="Standalone batch file pattern. Default: *.hwp"
+    )
     parser.add_argument(
         "--existing-policy",
         choices=["fail", "skip", "rename", "overwrite"],
         default="fail",
         help="Standalone output collision policy. Default: fail.",
     )
-    parser.add_argument("--fail-fast", action="store_true", help="Standalone batch stops after the first failed file")
-    parser.add_argument("--workers", type=int, default=1, help="Standalone batch parallel workers. Default: 1")
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Standalone batch stops after the first failed file",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Standalone batch parallel workers. Default: 1"
+    )
     parser.add_argument("--log-file", help="Standalone converter log file path")
-    parser.add_argument("--log-level", default="INFO", help="Standalone converter log level. Default: INFO")
+    parser.add_argument(
+        "--log-level", default="INFO", help="Standalone converter log level. Default: INFO"
+    )
     parser.add_argument("--job-id", help="Standalone converter job id")
     args = parser.parse_args()
     result = run(args)

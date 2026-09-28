@@ -471,6 +471,28 @@ def _compute_table_scores(
             "total_cells": 0,
         }
 
+    scan = _scan_table_cells(grid)
+    lvp_score = _label_value_pair_score(grid, col_count, row_count)
+
+    return {
+        "text_cell_ratio": scan["text_cells"] / total_cells,
+        "merge_ratio": scan["merged_cells"] / total_cells,
+        "page_marker_score": scan["page_marker_hits"] / total_cells,
+        "stamp_score": scan["stamp_hits"] / total_cells,
+        "label_value_pair_score": lvp_score,
+        "metadata_score": scan["metadata_hits"] / total_cells,
+        "legal_form_score": scan["legal_form_hits"] / total_cells,
+        "approval_stamp_score": scan["stamp_hits"] / total_cells,
+        "nested_table_count": scan["nested_table_count"],
+        "max_col_span": scan["max_col_span"],
+        "max_row_span": scan["max_row_span"],
+        "row_count": row_count,
+        "col_count": col_count,
+        "total_cells": total_cells,
+    }
+
+
+def _scan_table_cells(grid: list[list[ET.Element]]) -> dict[str, int]:
     text_cells = 0
     merged_cells = 0
     nested_table_count = 0
@@ -505,33 +527,30 @@ def _compute_table_scores(
             if raw_t and any(kw in raw_t for kw in LEGAL_FORM_KEYWORDS):
                 legal_form_hits += 1
 
-    # label-value-pair score: 2-col 표에서 왼쪽 셀이 짧은 라벨인 비율
-    lvp_score = 0.0
-    if col_count == 2 and row_count >= 2:
-        label_rows = 0
-        for row in grid:
-            if len(row) >= 1:
-                lt = normalize_header(cell_text(row[0]))
-                if lt and len(lt) <= 12:
-                    label_rows += 1
-        lvp_score = label_rows / row_count if row_count else 0.0
-
     return {
-        "text_cell_ratio": text_cells / total_cells,
-        "merge_ratio": merged_cells / total_cells,
-        "page_marker_score": page_marker_hits / total_cells,
-        "stamp_score": stamp_hits / total_cells,
-        "label_value_pair_score": lvp_score,
-        "metadata_score": metadata_hits / total_cells,
-        "legal_form_score": legal_form_hits / total_cells,
-        "approval_stamp_score": stamp_hits / total_cells,
+        "text_cells": text_cells,
+        "merged_cells": merged_cells,
         "nested_table_count": nested_table_count,
         "max_col_span": max_col_span,
         "max_row_span": max_row_span,
-        "row_count": row_count,
-        "col_count": col_count,
-        "total_cells": total_cells,
+        "page_marker_hits": page_marker_hits,
+        "stamp_hits": stamp_hits,
+        "metadata_hits": metadata_hits,
+        "legal_form_hits": legal_form_hits,
     }
+
+
+def _label_value_pair_score(grid: list[list[ET.Element]], col_count: int, row_count: int) -> float:
+    """label-value-pair score: 2-col 표에서 왼쪽 셀이 짧은 라벨인 비율."""
+    if not (col_count == 2 and row_count >= 2):
+        return 0.0
+    label_rows = 0
+    for row in grid:
+        if len(row) >= 1:
+            lt = normalize_header(cell_text(row[0]))
+            if lt and len(lt) <= 12:
+                label_rows += 1
+    return label_rows / row_count if row_count else 0.0
 
 
 def classify_table_layout(

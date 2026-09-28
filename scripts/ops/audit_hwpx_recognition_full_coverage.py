@@ -77,7 +77,7 @@ def _scan_hwpx_inventory() -> list[dict]:
             try:
                 stat = p.stat()
                 sha = hashlib.sha256(p.read_bytes()).hexdigest()
-            except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+            except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
                 items.append({
                     "relativePath": rel,
                     "fileName": p.name,
@@ -108,7 +108,7 @@ def _audit_required_xml_parts(path: Path) -> tuple[bool, list[str]]:
     try:
         with zipfile.ZipFile(path) as zf:
             names = set(zf.namelist())
-    except Exception:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         return False, sorted(required) + ["Contents/section*.xml"]
     missing = sorted(required - names)
     if not any(n.startswith("Contents/section") and n.endswith(".xml") for n in names):
@@ -142,7 +142,7 @@ def _audit_one_file(item: dict) -> dict:
         from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
 
         r = parse_hwpx_v2(path)
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["verdict"] = "FAIL_PARSE_ERROR"
         rec_out["errors"].append({"stage": "parse", "detail": str(exc)})
         rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -187,7 +187,7 @@ def _audit_one_file(item: dict) -> dict:
             "ambiguousCandidateCount": ocm.ambiguousCandidateCount,
             "noGeometryObjectCount": ocm.noGeometryObjectCount,
         }
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "object_mapping", "detail": str(exc)})
         rec_out["objectMapping"] = None
 
@@ -219,7 +219,7 @@ def _audit_one_file(item: dict) -> dict:
                 rec_out["ambiguousAutoPromotionBlocked"] = None
         else:
             rec_out["ambiguousAutoPromotionBlocked"] = None
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({
             "stage": "confirmation_gate",
             "detail": str(exc),
@@ -256,7 +256,7 @@ def _audit_one_file(item: dict) -> dict:
             rec_out["fillRequirementSemanticBreakdown"][sem] = (
                 rec_out["fillRequirementSemanticBreakdown"].get(sem, 0) + 1
             )
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({
             "stage": "fill_requirement",
             "detail": str(exc),
@@ -273,7 +273,7 @@ def _audit_one_file(item: dict) -> dict:
         items = fr.build_review_items(reqs, matches, missing)
         rec_out["missingMaterialCount"] = len(missing)
         rec_out["reviewItemCount"] = len(items)
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "evidence", "detail": str(exc)})
 
     # 7) UI payload smoke
@@ -285,7 +285,7 @@ def _audit_one_file(item: dict) -> dict:
             payload.get("reviewSections") is not None and "summary" in payload
         )
         rec_out["uiPayloadSummary"] = payload.get("summary")
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "ui_payload", "detail": str(exc)})
         rec_out["uiPayloadReady"] = False
 
@@ -308,7 +308,7 @@ def _audit_one_file(item: dict) -> dict:
                 "accepted": val.acceptedDecisionCount,
                 "errors": [e.get("code") for e in val.errors],
             }
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "decision_validation", "detail": str(exc)})
 
     # 9) sha/mtime after (writer 미호출 — 변경 없어야 함)
@@ -427,7 +427,7 @@ def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
             "outputCreated": res["outputCreated"],
             "originalUnmodified": res["originalUnmodified"],
         })
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         results.append({
             "scenario": "setParagraphText",
             "verdict": "FAIL",
@@ -468,7 +468,7 @@ def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
             "outputCreated": res2.outputCreated,
             "originalUnmodified": res2.originalUnmodified,
         })
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         results.append({
             "scenario": "replaceTextRun",
             "verdict": "FAIL",
@@ -517,13 +517,8 @@ def _classify_document_type(relative_path: str) -> str:
 # ── overall aggregation ─────────────────────────────────────────────────────
 
 
-def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: list[dict]) -> dict:
-    counts: dict[str, int] = {}
-    for r in file_results:
-        v = r["verdict"]
-        counts[v] = counts.get(v, 0) + 1
-
-    # documentType 분류 + form-type별 verdict 집계
+def _classify_and_count_doctypes(file_results: list[dict]) -> dict:
+    """documentType 분류 + form-type별 verdict 집계 (file_results 를 in-place 로 documentType 추가)."""
     doctype_counts: dict[str, int] = {}
     fillable_full = 0
     fillable_core = 0
@@ -544,6 +539,53 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: l
             reference_count += 1
         elif dt == "empty_template":
             empty_template_count += 1
+    return {
+        "doctypeCounts": doctype_counts,
+        "fillableFull": fillable_full,
+        "fillableCore": fillable_core,
+        "fillableTotal": fillable_total,
+        "referenceCount": reference_count,
+        "emptyTemplateCount": empty_template_count,
+    }
+
+
+def _determine_overall_verdict(stats: dict[str, int]) -> str:
+    """`_aggregate` 가 계산한 집계 카운트(dict)로 최종 verdict 를 판정한다."""
+    if stats["total"] == 0:
+        return "WARN_NO_HWPX_FIXTURES"
+    if stats["unsafe_mut"] > 0:
+        return "FAIL_UNSAFE_MUTATION"
+    if stats["parse_failed"] > 0 or stats["struct_fail"] > 0:
+        return "FAIL_PARSE_ERROR" if stats["parse_failed"] > 0 else "FAIL_STRUCTURE_MISMATCH"
+    if stats["fill_fail"] > 0:
+        return "WARN_PARTIAL_COVERAGE"
+    if stats["smoke_blocked"] > 0:
+        return "WARN_WRITER_SMOKE_FAILED"
+    if (
+        stats["full"] + stats["core"] + stats["template_empty"] == stats["total"]
+        and stats["smoke_pass"] >= 2
+    ):
+        return (
+            "PASS_CORE_COVERAGE_WITH_KNOWN_TEMPLATE_GAPS"
+            if stats["template_empty"] > 0
+            else "PASS_FULL_COVERAGE"
+        )
+    return "WARN_PARTIAL_COVERAGE"
+
+
+def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: list[dict]) -> dict:
+    counts: dict[str, int] = {}
+    for r in file_results:
+        v = r["verdict"]
+        counts[v] = counts.get(v, 0) + 1
+
+    doctype_stats = _classify_and_count_doctypes(file_results)
+    doctype_counts = doctype_stats["doctypeCounts"]
+    fillable_full = doctype_stats["fillableFull"]
+    fillable_core = doctype_stats["fillableCore"]
+    fillable_total = doctype_stats["fillableTotal"]
+    reference_count = doctype_stats["referenceCount"]
+    empty_template_count = doctype_stats["emptyTemplateCount"]
 
     total = len(inventory)
     included = sum(1 for i in inventory if i["include"])
@@ -565,25 +607,18 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: l
     smoke_pass = sum(1 for s in smoke_results if s.get("verdict") == "PASS")
     smoke_blocked = sum(1 for s in smoke_results if s.get("verdict") == "FAIL")
 
-    # overall verdict
-    if total == 0:
-        overall = "WARN_NO_HWPX_FIXTURES"
-    elif unsafe_mut > 0:
-        overall = "FAIL_UNSAFE_MUTATION"
-    elif parse_failed > 0 or struct_fail > 0:
-        overall = "FAIL_PARSE_ERROR" if parse_failed > 0 else "FAIL_STRUCTURE_MISMATCH"
-    elif fill_fail > 0:
-        overall = "WARN_PARTIAL_COVERAGE"
-    elif smoke_blocked > 0:
-        overall = "WARN_WRITER_SMOKE_FAILED"
-    elif full + core + template_empty == total and smoke_pass >= 2:
-        overall = (
-            "PASS_CORE_COVERAGE_WITH_KNOWN_TEMPLATE_GAPS"
-            if template_empty > 0
-            else "PASS_FULL_COVERAGE"
-        )
-    else:
-        overall = "WARN_PARTIAL_COVERAGE"
+    overall = _determine_overall_verdict({
+        "total": total,
+        "unsafe_mut": unsafe_mut,
+        "parse_failed": parse_failed,
+        "struct_fail": struct_fail,
+        "fill_fail": fill_fail,
+        "smoke_blocked": smoke_blocked,
+        "full": full,
+        "core": core,
+        "template_empty": template_empty,
+        "smoke_pass": smoke_pass,
+    })
 
     fillable_form_coverage_rate = (
         round(fillable_full / fillable_total, 4) if fillable_total else None
@@ -766,7 +801,7 @@ def run_audit() -> dict:
             continue
         try:
             file_results.append(_audit_one_file(item))
-        except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+        except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
             file_results.append({
                 "relativePath": item["relativePath"],
                 "fileName": item["fileName"],

@@ -86,39 +86,51 @@ FORBIDDEN_WRITER_SYMBOLS = [
 ]
 
 
+def _missing_pattern_findings(src: str, patterns: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": pat}
+        for pat in patterns
+        if not re.search(pat, src)
+    ]
+
+
+def _forbidden_pattern_findings(src: str, patterns: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": pat} for pat in patterns if re.search(pat, src)
+    ]
+
+
 def _check_static() -> list[dict]:
     findings: list[dict] = []
     if not ADAPTER.is_file():
         findings.append({"code": "ADAPTER_MISSING", "level": "FAIL", "detail": str(ADAPTER)})
         return findings
     ad_src = ADAPTER.read_text(encoding="utf-8")
-    for pat in REQUIRED_ADAPTER_PATTERNS:
-        if not re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_ADAPTER_PATTERNS:
-        if re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_FORBIDDEN_FEATURE", "level": "FAIL", "detail": pat})
-    for frag in FORBIDDEN_ADAPTER_FRAGMENTS:
-        if re.search(frag, ad_src):
-            findings.append({"code": "ADAPTER_FORBIDDEN_FRAGMENT", "level": "FAIL", "detail": frag})
+    findings.extend(
+        _missing_pattern_findings(ad_src, REQUIRED_ADAPTER_PATTERNS, "ADAPTER_PATTERN_MISSING")
+    )
+    findings.extend(
+        _forbidden_pattern_findings(ad_src, FORBIDDEN_ADAPTER_PATTERNS, "ADAPTER_FORBIDDEN_FEATURE")
+    )
+    findings.extend(
+        _forbidden_pattern_findings(
+            ad_src, FORBIDDEN_ADAPTER_FRAGMENTS, "ADAPTER_FORBIDDEN_FRAGMENT"
+        )
+    )
     if OPS.is_file():
         ops_src = OPS.read_text(encoding="utf-8")
-        for pat in FORBIDDEN_OPS_PATTERNS_AFTER_BASELINE:
-            if re.search(pat, ops_src):
-                findings.append({
-                    "code": "OPS_FORBIDDEN_NEW_PRIMITIVE",
-                    "level": "FAIL",
-                    "detail": pat,
-                })
+        findings.extend(
+            _forbidden_pattern_findings(
+                ops_src, FORBIDDEN_OPS_PATTERNS_AFTER_BASELINE, "OPS_FORBIDDEN_NEW_PRIMITIVE"
+            )
+        )
     if SAVE_PIPELINE.is_file():
         sp_src = SAVE_PIPELINE.read_text(encoding="utf-8")
-        for pat in REQUIRED_PIPELINE_PATTERNS:
-            if not re.search(pat, sp_src):
-                findings.append({
-                    "code": "PIPELINE_PATTERN_MISSING",
-                    "level": "FAIL",
-                    "detail": pat,
-                })
+        findings.extend(
+            _missing_pattern_findings(
+                sp_src, REQUIRED_PIPELINE_PATTERNS, "PIPELINE_PATTERN_MISSING"
+            )
+        )
     return findings
 
 
@@ -250,52 +262,50 @@ def _run_dynamic() -> dict[str, Any]:
     return out
 
 
+def _required_key_findings(mapping: dict, keys: list[str], code: str, name: str) -> list[dict]:
+    return [
+        {
+            "code": code,
+            "level": "FAIL",
+            "detail": f"{name}: {k}={mapping.get(k)}",
+        }
+        for k in keys
+        if mapping.get(k) != "PASS"
+    ]
+
+
+def _check_one_scope(scope_kind: str, sec: dict) -> list[dict]:
+    findings: list[dict] = []
+    if not sec.get("ok"):
+        findings.append({"code": "SCOPE_FIXTURE_MISSING", "level": "WARN", "detail": scope_kind})
+        return findings
+    r = sec["result"]
+    name = f"{scope_kind}.TYPE_TEXT.inside_r1"
+    if not r["outputCreated"]:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
+        return findings
+    if not r["outputInSandbox"]:
+        findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
+    if r["rejectedCount"]:
+        findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
+    if not r["typeMultiRun"]:
+        findings.append({"code": "TYPE_MULTI_RUN_FLAG_MISSING", "level": "FAIL", "detail": name})
+    findings.extend(_required_key_findings(r["verify7"], REQUIRED_V7, "V7_NOT_PASS", name))
+    findings.extend(_required_key_findings(r["readback"], REQUIRED_RB, "READBACK_NOT_PASS", name))
+    if sec.get("shaPreserved") is False:
+        findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
+    if sec.get("mtimePreserved") is False:
+        findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+    return findings
+
+
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
         findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN", "detail": "no fixture"})
         return findings
     for scope_kind, sec in dyn["byScope"].items():
-        if not sec.get("ok"):
-            findings.append({
-                "code": "SCOPE_FIXTURE_MISSING",
-                "level": "WARN",
-                "detail": scope_kind,
-            })
-            continue
-        r = sec["result"]
-        name = f"{scope_kind}.TYPE_TEXT.inside_r1"
-        if not r["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
-            continue
-        if not r["outputInSandbox"]:
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
-        if r["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
-        if not r["typeMultiRun"]:
-            findings.append({
-                "code": "TYPE_MULTI_RUN_FLAG_MISSING",
-                "level": "FAIL",
-                "detail": name,
-            })
-        for k in REQUIRED_V7:
-            if r["verify7"].get(k) != "PASS":
-                findings.append({
-                    "code": "V7_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={r['verify7'].get(k)}",
-                })
-        for k in REQUIRED_RB:
-            if r["readback"].get(k) != "PASS":
-                findings.append({
-                    "code": "READBACK_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={r['readback'].get(k)}",
-                })
-        if sec.get("shaPreserved") is False:
-            findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
-        if sec.get("mtimePreserved") is False:
-            findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+        findings.extend(_check_one_scope(scope_kind, sec))
     return findings
 
 

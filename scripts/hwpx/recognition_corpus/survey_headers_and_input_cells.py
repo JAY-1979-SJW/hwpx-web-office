@@ -312,6 +312,111 @@ class InputCell:
         }
 
 
+def _detect_label_adjacent_type(cols: int, ci: int, row: list[ET.Element]) -> str | None:
+    """타입 1: label_adjacent (2-col 표, 왼쪽 라벨 + 오른쪽 빈 셀)."""
+    if not (cols == 2 and ci == 1):
+        return None
+    left_norm = normalize(_cell_text(row[0])) if row else ""
+    return left_norm if left_norm and len(left_norm) <= 20 else None
+
+
+def _detect_form_field_type(layout: str, row: list[ET.Element], ci: int) -> str | None:
+    """타입 2: form_field (form_table 내 빈 값 셀, 같은 행 라벨 후보)."""
+    if layout != "form_table":
+        return None
+    row_labels = [
+        normalize(_cell_text(c)) for j, c in enumerate(row) if j != ci and normalize(_cell_text(c))
+    ]
+    if not row_labels:
+        return None
+    candidate_label = min(row_labels, key=len)
+    return candidate_label if len(candidate_label) <= 20 else None
+
+
+def _detect_header_column_type(
+    header_row_idxs: list[int], ri: int, grid: list[list[ET.Element]], ci: int
+) -> str | None:
+    """타입 3: header_column (헤더 아래 데이터행 빈 셀)."""
+    if not (header_row_idxs and ri > max(header_row_idxs)):
+        return None
+    header_row = grid[header_row_idxs[-1]]
+    if ci >= len(header_row):
+        return None
+    hdr_norm = normalize(_cell_text(header_row[ci]))
+    return hdr_norm if hdr_norm and len(hdr_norm) <= 20 else None
+
+
+@dataclass(frozen=True)
+class _InputCellTableContext:
+    """`_find_input_cells` 한 번 호출(표 1개) 동안 셀마다 공통인 컨텍스트."""
+
+    grid: list[list[ET.Element]]
+    header_row_idxs: list[int]
+    header_zone: set[int]
+    layout: str
+    cols: int
+    fid: str
+    sec_idx: int
+    tbl_idx: int
+
+
+def _detect_input_cell_type(
+    row: list[ET.Element], ri: int, ci: int, ctx: _InputCellTableContext
+) -> tuple[str, str] | None:
+    """빈 셀 하나에 대해 (itype, label) 을 판정하거나, 후보가 아니면 None."""
+    detected = _detect_label_adjacent_type(ctx.cols, ci, row)
+    if detected is not None:
+        return ITYPE_LABEL_ADJACENT, detected
+
+    detected = _detect_form_field_type(ctx.layout, row, ci)
+    if detected is not None:
+        return ITYPE_FORM_FIELD, detected
+
+    detected = _detect_header_column_type(ctx.header_row_idxs, ri, ctx.grid, ci)
+    if detected is not None:
+        return ITYPE_HEADER_COLUMN, detected
+
+    return None
+
+
+def _build_input_cell_candidate(
+    cell: ET.Element, ri: int, ci: int, row: list[ET.Element], ctx: _InputCellTableContext
+) -> InputCell | None:
+    raw = _cell_text(cell).strip()
+    norm_val = normalize(raw)
+
+    # 빈 셀 판정: 텍스트 없거나 공백/줄바꿈만
+    if len(norm_val) != 0:
+        return None
+
+    # 헤더행 자체는 입력셀 후보에서 제외
+    if ri in ctx.header_zone:
+        return None
+
+    detected_type = _detect_input_cell_type(row, ri, ci, ctx)
+    if detected_type is None:
+        return None
+    itype, label = detected_type
+    gfield, gconf = guess_field(label)
+    cs, rs = _cell_span(cell)
+
+    return InputCell(
+        maskedFileId=ctx.fid,
+        sectionIndex=ctx.sec_idx,
+        tableIndex=ctx.tbl_idx,
+        tableLayout=ctx.layout,
+        rowIndex=ri,
+        colIndex=ci,
+        inputCellType=itype,
+        adjacentLabel=label,
+        guessedField=gfield,
+        fieldConfidence=gconf,
+        colSpan=cs,
+        rowSpan=rs,
+        isInHeaderZone=(ri in ctx.header_zone),
+    )
+
+
 def _find_input_cells(
     fid: str,
     sec_idx: int,
@@ -320,84 +425,23 @@ def _find_input_cells(
     header_row_idxs: list[int],
     layout: str,
 ) -> list[InputCell]:
-    results: list[InputCell] = []
-    header_zone = set(header_row_idxs)
-    cols = max((len(r) for r in grid), default=0)
+    ctx = _InputCellTableContext(
+        grid=grid,
+        header_row_idxs=header_row_idxs,
+        header_zone=set(header_row_idxs),
+        layout=layout,
+        cols=max((len(r) for r in grid), default=0),
+        fid=fid,
+        sec_idx=sec_idx,
+        tbl_idx=tbl_idx,
+    )
 
+    results: list[InputCell] = []
     for ri, row in enumerate(grid):
         for ci, cell in enumerate(row):
-            raw = _cell_text(cell).strip()
-            norm_val = normalize(raw)
-            cs, rs = _cell_span(cell)
-
-            # 빈 셀 판정: 텍스트 없거나 공백/줄바꿈만
-            is_empty = len(norm_val) == 0
-
-            if not is_empty:
-                continue
-
-            # 헤더행 자체는 입력셀 후보에서 제외
-            if ri in header_zone:
-                continue
-
-            itype: str | None = None
-            label: str = ""
-            gfield = "unknown"
-            gconf = 0.0
-
-            # ── 타입 1: label_adjacent (2-col 표, 왼쪽 라벨 + 오른쪽 빈 셀) ──
-            if cols == 2 and ci == 1:
-                left_norm = normalize(_cell_text(row[0])) if row else ""
-                if left_norm and len(left_norm) <= 20:
-                    itype = ITYPE_LABEL_ADJACENT
-                    label = left_norm
-                    gfield, gconf = guess_field(label)
-
-            # ── 타입 2: form_field (form_table 내 빈 값 셀) ──
-            if itype is None and layout == "form_table":
-                # 같은 행에 라벨 후보가 있으면 form_field
-                row_labels = [
-                    normalize(_cell_text(c))
-                    for j, c in enumerate(row)
-                    if j != ci and normalize(_cell_text(c))
-                ]
-                if row_labels:
-                    candidate_label = min(row_labels, key=len)
-                    if len(candidate_label) <= 20:
-                        itype = ITYPE_FORM_FIELD
-                        label = candidate_label
-                        gfield, gconf = guess_field(label)
-
-            # ── 타입 3: header_column (헤더 아래 데이터행 빈 셀) ──
-            if itype is None and header_row_idxs and ri > max(header_row_idxs):
-                header_row = grid[header_row_idxs[-1]]
-                if ci < len(header_row):
-                    hdr_norm = normalize(_cell_text(header_row[ci]))
-                    if hdr_norm and len(hdr_norm) <= 20:
-                        itype = ITYPE_HEADER_COLUMN
-                        label = hdr_norm
-                        gfield, gconf = guess_field(label)
-
-            if itype is None:
-                continue
-
-            results.append(
-                InputCell(
-                    maskedFileId=fid,
-                    sectionIndex=sec_idx,
-                    tableIndex=tbl_idx,
-                    tableLayout=layout,
-                    rowIndex=ri,
-                    colIndex=ci,
-                    inputCellType=itype,
-                    adjacentLabel=label,
-                    guessedField=gfield,
-                    fieldConfidence=gconf,
-                    colSpan=cs,
-                    rowSpan=rs,
-                    isInHeaderZone=(ri in header_zone),
-                )
-            )
+            candidate = _build_input_cell_candidate(cell, ri, ci, row, ctx)
+            if candidate is not None:
+                results.append(candidate)
 
     return results
 

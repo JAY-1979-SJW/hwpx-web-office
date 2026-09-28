@@ -329,7 +329,7 @@ class DocumentBuilder:
             mode="png_insert",
         )
 
-    def chart_png(
+    def chart_png(  # ruff: ignore[too-many-arguments] -- 공개 fluent-builder API, image_png과 동일 사유로 시그니처 유지
         self,
         chart: dict[str, Any],
         width: int | None = None,

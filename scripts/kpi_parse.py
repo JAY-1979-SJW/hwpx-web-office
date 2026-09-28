@@ -128,6 +128,44 @@ def group_rows(spans, tol=5):
 # ── 컬럼 맵 탐지 ─────────────────────────────────────────────────────────────
 
 
+def _find_stage_xs(y, sorted_rows) -> dict:
+    """헤더 아래 35px에서 ①②③ 행 탐색."""
+    stage_xs = {}
+    for y2, row2 in sorted_rows:
+        if not (y < y2 <= y + 40):
+            continue
+        for x2, t2 in row2:
+            if t2 in ("①", "②", "③"):
+                stage_xs[x2] = t2
+    return stage_xs
+
+
+def _assign_stage_to_region(stage_xs: dict, region_xs: dict) -> dict:
+    """stage_x → 가장 가까운 지역 (±40px)."""
+    sorted_rg = sorted(region_xs.items())
+    rg_count: dict = defaultdict(int)
+    col_map: dict = {}
+
+    for sx in sorted(stage_xs):
+        candidates = [(abs(rx - sx), rx, rn) for rx, rn in sorted_rg if abs(rx - sx) < 60]
+        if not candidates:
+            continue
+        _, _, rn = min(candidates)
+        cnt = rg_count[rn]
+        if cnt == 0:
+            label = rn
+        else:
+            # 이미 할당된 항목을 ①로 소급
+            label = f"{rn}②"
+            for old_sx in list(col_map):
+                if col_map[old_sx] == rn:
+                    col_map[old_sx] = f"{rn}①"
+        col_map[sx] = label
+        rg_count[rn] += 1
+
+    return col_map
+
+
 def detect_region_header(sorted_rows):
     """
     지역명 헤더 행 탐색.
@@ -142,43 +180,13 @@ def detect_region_header(sorted_rows):
         if len(region_xs) < 3:
             continue
 
-        # 헤더 아래 35px에서 ①② 행 탐색
-        stage_xs = {}
-        for y2, row2 in sorted_rows:
-            if not (y < y2 <= y + 40):
-                continue
-            for x2, t2 in row2:
-                if t2 in ("①", "②", "③"):
-                    stage_xs[x2] = t2
+        stage_xs = _find_stage_xs(y, sorted_rows)
 
         if not stage_xs:
             # stage 없으면 지역 X 직접 사용
-            col_map = dict(region_xs)
-            return y, col_map
+            return y, dict(region_xs)
 
-        # stage_x → 가장 가까운 지역  (±40px)
-        sorted_rg = sorted(region_xs.items())
-        rg_count: dict = defaultdict(int)
-        col_map: dict = {}
-
-        for sx in sorted(stage_xs):
-            candidates = [(abs(rx - sx), rx, rn) for rx, rn in sorted_rg if abs(rx - sx) < 60]
-            if not candidates:
-                continue
-            _, _, rn = min(candidates)
-            cnt = rg_count[rn]
-            if cnt == 0:
-                label = rn
-            else:
-                # 이미 할당된 항목을 ①로 소급
-                label = f"{rn}②"
-                for old_sx in list(col_map):
-                    if col_map[old_sx] == rn:
-                        col_map[old_sx] = f"{rn}①"
-            col_map[sx] = label
-            rg_count[rn] += 1
-
-        return y, col_map
+        return y, _assign_stage_to_region(stage_xs, region_xs)
 
     return None
 
@@ -290,43 +298,46 @@ def detect_ilwidaega_header(sorted_rows):
 # ── 품목명 추출 ───────────────────────────────────────────────────────────────
 
 
+def _detect_unit(tokens, prev_unit):
+    """단위 탐지: UNIT_SET 정확 매칭 우선, 〃/ditto는 prev_unit 유지 신호."""
+    for t in reversed(tokens):
+        tn = norm_region(t)  # 공백 제거
+        if tn in DITTO:
+            # 〃가 단위 위치에 있으면 prev_unit 상속
+            break
+        if tn in UNIT_SET:
+            return tn
+    return prev_unit
+
+
+def _is_item_name_candidate(t: str) -> bool:
+    if t in DITTO:
+        return False
+    if "," in t and any(c.isdigit() for c in t):
+        return False  # 가격 문자열
+    if is_number_only(t):
+        return False
+    if t.startswith("("):
+        return False  # 괄호형 주석/규격 상세
+    if not KOREAN_FIRST_RE.match(t):
+        return False  # 한글 시작이 아니면 제외 (숫자·영문·특수문자 시작)
+    if not has_korean(t):
+        return False
+    if len(norm_region(t)) < 2:
+        return False  # 한 글자 잔재
+    # 규격 전용 접두어로 시작하는 경우 품목명 아님
+    return not t.startswith(SPEC_PREFIXES)
+
+
 def extract_item(tokens, prev_item, prev_unit):
     """
     왼쪽 컬럼 토큰에서 (품목명, 단위) 추출.
     의미 있는 한글 토큰이 없으면 이전 값 유지.
     """
-    # 단위 탐지: UNIT_SET 정확 매칭 우선, 〃/ditto는 prev_unit 유지 신호
-    unit = prev_unit
-    for t in reversed(tokens):
-        tn = norm_region(t)  # 공백 제거
-        if tn in DITTO:
-            # 〃가 단위 위치에 있으면 prev_unit 상속 (이미 unit=prev_unit이므로 break)
-            break
-        if tn in UNIT_SET:
-            unit = tn
-            break
+    unit = _detect_unit(tokens, prev_unit)
 
     # 품목명 후보: 한글로 시작, 2자 이상, 가격/규격 토큰 제외
-    candidates = []
-    for t in tokens:
-        if t in DITTO:
-            continue
-        if "," in t and any(c.isdigit() for c in t):
-            continue  # 가격 문자열
-        if is_number_only(t):
-            continue
-        if t.startswith("("):
-            continue  # 괄호형 주석/규격 상세
-        if not KOREAN_FIRST_RE.match(t):
-            continue  # 한글 시작이 아니면 제외 (숫자·영문·특수문자 시작)
-        if not has_korean(t):
-            continue
-        if len(norm_region(t)) < 2:
-            continue  # 한 글자 잔재
-        # 규격 전용 접두어로 시작하는 경우 품목명 아님
-        if t.startswith(SPEC_PREFIXES):
-            continue
-        candidates.append(t)
+    candidates = [t for t in tokens if _is_item_name_candidate(t)]
 
     if not candidates:
         return prev_item, unit

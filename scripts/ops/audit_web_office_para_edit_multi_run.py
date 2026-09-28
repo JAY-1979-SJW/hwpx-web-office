@@ -258,6 +258,45 @@ def _run_dynamic() -> dict[str, Any]:
     return out
 
 
+def _required_key_findings(mapping: dict, keys, code: str, name: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": f"{name}: {k}={mapping.get(k)}"}
+        for k in keys
+        if mapping.get(k) != "PASS"
+    ]
+
+
+def _check_one_scenario(scope_kind: str, sc: dict) -> list[dict]:
+    findings: list[dict] = []
+    name = f"{scope_kind}.{sc['scenario']}"
+    if not sc["outputCreated"]:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
+        return findings
+    if not sc["outputInSandbox"]:
+        findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
+    if sc["rejectedCount"]:
+        findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
+    if not sc["multiRunFlag"]:
+        findings.append({"code": "MULTI_RUN_FLAG_MISSING", "level": "FAIL", "detail": name})
+    findings.extend(_required_key_findings(sc["verify7"], REQUIRED_V7, "V7_NOT_PASS", name))
+    findings.extend(_required_key_findings(sc["readback"], REQUIRED_RB, "READBACK_NOT_PASS", name))
+    return findings
+
+
+def _check_one_multi_run_scope(scope_kind: str, sec: dict) -> tuple[list[dict], bool]:
+    """반환: (findings, covered)."""
+    if not sec.get("ok"):
+        return [{"code": "SCOPE_FIXTURE_MISSING", "level": "WARN", "detail": scope_kind}], False
+    findings: list[dict] = []
+    for sc in sec["scenarios"]:
+        findings.extend(_check_one_scenario(scope_kind, sc))
+    if sec.get("shaPreserved") is False:
+        findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
+    if sec.get("mtimePreserved") is False:
+        findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+    return findings, True
+
+
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
@@ -269,45 +308,9 @@ def _check_dynamic(dyn: dict) -> list[dict]:
         return findings
     cov = {"cell": False, "block": False}
     for scope_kind, sec in dyn["byScope"].items():
-        if not sec.get("ok"):
-            findings.append({
-                "code": "SCOPE_FIXTURE_MISSING",
-                "level": "WARN",
-                "detail": scope_kind,
-            })
-            continue
-        cov[scope_kind] = True
-        for sc in sec["scenarios"]:
-            name = f"{scope_kind}.{sc['scenario']}"
-            if not sc["outputCreated"]:
-                findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
-                continue
-            if not sc["outputInSandbox"]:
-                findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
-            if sc["rejectedCount"]:
-                findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
-            if not sc["multiRunFlag"]:
-                findings.append({"code": "MULTI_RUN_FLAG_MISSING", "level": "FAIL", "detail": name})
-            v7 = sc["verify7"]
-            for k in REQUIRED_V7:
-                if v7.get(k) != "PASS":
-                    findings.append({
-                        "code": "V7_NOT_PASS",
-                        "level": "FAIL",
-                        "detail": f"{name}: {k}={v7.get(k)}",
-                    })
-            rb = sc["readback"]
-            for k in REQUIRED_RB:
-                if rb.get(k) != "PASS":
-                    findings.append({
-                        "code": "READBACK_NOT_PASS",
-                        "level": "FAIL",
-                        "detail": f"{name}: {k}={rb.get(k)}",
-                    })
-        if sec.get("shaPreserved") is False:
-            findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
-        if sec.get("mtimePreserved") is False:
-            findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+        scope_findings, covered = _check_one_multi_run_scope(scope_kind, sec)
+        findings.extend(scope_findings)
+        cov[scope_kind] = covered
     if not any(cov.values()):
         findings.append({
             "code": "NO_SCOPE_COVERED",

@@ -8,6 +8,7 @@ descendant인지 식별하고, 셀 외부 객체는 OUT_OF_CELL로 분류한다.
 
 이 모듈은 writer를 호출하지 않으며 원본 파일은 절대 수정되지 않는다.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -80,6 +81,7 @@ class ObjectCellMappingEntry:
 @dataclass
 class GeometricCandidateEntry:
     """OUT_OF_CELL 객체에 대한 좌표 기반 추론 후보. confidence < 1.0 보장."""
+
     objectKey: str
     objectType: str
     candidateCellKey: str | None
@@ -168,6 +170,7 @@ class ObjectCellMappingResult:
 
 # ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 
+
 def _parser_normalize(text: str) -> str:
     if not text:
         return ""
@@ -182,8 +185,10 @@ def _cell_span(tc: ET.Element) -> tuple[int, int]:
     for child in tc:
         if child.tag == _TAG_CELLSPAN:
             try:
-                return (int(child.attrib.get("colSpan", "1")),
-                        int(child.attrib.get("rowSpan", "1")))
+                return (
+                    int(child.attrib.get("colSpan", "1")),
+                    int(child.attrib.get("rowSpan", "1")),
+                )
             except ValueError:
                 return 1, 1
     return 1, 1
@@ -193,7 +198,7 @@ def _cell_normalized_text(tc: ET.Element) -> str:
     parts = []
     for el in tc.iter():
         if el.tag == _TAG_TBL:
-            continue   # nested table 내부 텍스트는 셀 자체 텍스트로 보지 않음
+            continue  # nested table 내부 텍스트는 셀 자체 텍스트로 보지 않음
         if el.tag == _TAG_T and el.text:
             parts.append(el.text)
     return _parser_normalize("".join(parts))
@@ -208,6 +213,7 @@ def _find_bin_data_ref(elem: ET.Element) -> str | None:
 
 
 # ── 메인 매핑 함수 ────────────────────────────────────────────────────────────
+
 
 def map_objects_to_cells(source_path: Path) -> ObjectCellMappingResult:
     """HWPX 파일에서 객체↔셀 매핑을 계산. read-only / 원본 무수정."""
@@ -228,9 +234,9 @@ def map_objects_to_cells(source_path: Path) -> ObjectCellMappingResult:
     )
 
 
-def _map_from_section_xmls(section_xmls: list[bytes],
-                              document_hash: str = "",
-                              source_path: str = "") -> ObjectCellMappingResult:
+def _map_from_section_xmls(
+    section_xmls: list[bytes], document_hash: str = "", source_path: str = ""
+) -> ObjectCellMappingResult:
     """section XML bytes 리스트를 직접 받아 매핑 산출 (테스트 보조 API)."""
     mappings: list[ObjectCellMappingEntry] = []
     seen_object_keys: set[str] = set()
@@ -249,7 +255,17 @@ def _map_from_section_xmls(section_xmls: list[bytes],
         cell_stack: list[dict] = []
         local_mappings: list[ObjectCellMappingEntry] = []
 
-        def walk(elem: ET.Element) -> None:
+        def walk(
+            elem: ET.Element,
+            *,
+            section_idx=section_idx,
+            cell_stack=cell_stack,
+            section_table_counter=section_table_counter,
+            section_obj_counter=section_obj_counter,
+            section_cell_counter=section_cell_counter,
+            table_count_global=table_count_global,
+            local_mappings=local_mappings,
+        ) -> None:
             tag = elem.tag.split("}")[-1]
 
             if tag == "tbl":
@@ -266,8 +282,9 @@ def _map_from_section_xmls(section_xmls: list[bytes],
                             continue
                         col_span, row_span = _cell_span(tc)
                         cell_text = _cell_normalized_text(tc)
-                        cell_key = (f"t_s{section_idx}_"
-                                      f"{table_idx_in_section:03d}:r{row_idx}:c{col_idx}")
+                        cell_key = (
+                            f"t_s{section_idx}_{table_idx_in_section:03d}:r{row_idx}:c{col_idx}"
+                        )
                         cell_info = {
                             "tableIndex": global_table_idx,
                             "rowIndex": row_idx,
@@ -304,23 +321,38 @@ def _map_from_section_xmls(section_xmls: list[bytes],
                 if cell_stack:
                     top = cell_stack[-1]
                     entry = ObjectCellMappingEntry(
-                        objectKey=object_key, objectType=obj_type, objectRawTag=tag,
+                        objectKey=object_key,
+                        objectType=obj_type,
+                        objectRawTag=tag,
                         sectionIndex=section_idx,
-                        tableIndex=top["tableIndex"], rowIndex=top["rowIndex"],
-                        cellIndex=top["cellIndex"], cellKey=top["cellKey"],
+                        tableIndex=top["tableIndex"],
+                        rowIndex=top["rowIndex"],
+                        cellIndex=top["cellIndex"],
+                        cellKey=top["cellKey"],
                         cellText=top["cellText"],
-                        rowSpan=top["rowSpan"], colSpan=top["colSpan"],
-                        binDataRef=bin_ref, confidence=1.0,
-                        reason="DESCENDANT_OF_TC", isImageLike=is_image_like,
+                        rowSpan=top["rowSpan"],
+                        colSpan=top["colSpan"],
+                        binDataRef=bin_ref,
+                        confidence=1.0,
+                        reason="DESCENDANT_OF_TC",
+                        isImageLike=is_image_like,
                     )
                 else:
                     entry = ObjectCellMappingEntry(
-                        objectKey=object_key, objectType=obj_type, objectRawTag=tag,
+                        objectKey=object_key,
+                        objectType=obj_type,
+                        objectRawTag=tag,
                         sectionIndex=section_idx,
-                        tableIndex=None, rowIndex=None, cellIndex=None,
-                        cellKey=None, cellText=None,
-                        rowSpan=None, colSpan=None, binDataRef=bin_ref,
-                        confidence=0.0, reason="OUT_OF_CELL",
+                        tableIndex=None,
+                        rowIndex=None,
+                        cellIndex=None,
+                        cellKey=None,
+                        cellText=None,
+                        rowSpan=None,
+                        colSpan=None,
+                        binDataRef=bin_ref,
+                        confidence=0.0,
+                        reason="OUT_OF_CELL",
                         isImageLike=is_image_like,
                     )
                 local_mappings.append(entry)
@@ -400,8 +432,7 @@ def _extract_bbox(elem: ET.Element) -> tuple[int, int, int, int] | None:
     return None
 
 
-def _bbox_overlap_area(a: tuple[int, int, int, int],
-                        b: tuple[int, int, int, int]) -> float:
+def _bbox_overlap_area(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
     ax1, ay1, aw, ah = a
     ax2, ay2 = ax1 + aw, ay1 + ah
     bx1, by1, bw, bh = b
@@ -420,13 +451,152 @@ def _bbox_center(a: tuple[int, int, int, int]) -> tuple[float, float]:
 
 
 def _center_inside(point: tuple[float, float], bbox: tuple[int, int, int, int]) -> bool:
-    return (bbox[0] <= point[0] <= bbox[0] + bbox[2]
-            and bbox[1] <= point[1] <= bbox[1] + bbox[3])
+    return bbox[0] <= point[0] <= bbox[0] + bbox[2] and bbox[1] <= point[1] <= bbox[1] + bbox[3]
 
 
 def _euclid(p1: tuple[float, float], p2: tuple[float, float]) -> float:
-    dx = p1[0] - p2[0]; dy = p1[1] - p2[1]
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
     return (dx * dx + dy * dy) ** 0.5
+
+
+def _next_unique_object_key(
+    seen_object_keys: set[str], section_idx: int, raw_id: str, seq: int
+) -> tuple[str, int]:
+    object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
+    while object_key in seen_object_keys:
+        seq += 1
+        object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
+    return object_key, seq
+
+
+def _record_object_geometry(
+    elem: ET.Element,
+    tag: str,
+    *,
+    section_idx: int,
+    section_obj_counter: list[int],
+    seen_object_keys: set[str],
+    cell_stack: list[dict],
+    object_geom: dict[str, dict],
+) -> bool:
+    """object 요소면 object_geom 에 기록하고 True, 아니면 False."""
+    obj_type = _OBJECT_TAG_TO_TYPE.get(tag)
+    if obj_type is None:
+        return False
+    raw_id = elem.get("id", "")
+    seq = section_obj_counter[0]
+    section_obj_counter[0] += 1
+    object_key, _ = _next_unique_object_key(seen_object_keys, section_idx, raw_id, seq)
+    seen_object_keys.add(object_key)
+    object_geom[object_key] = {
+        "objectType": obj_type,
+        "bbox": _extract_bbox(elem),
+        "inCellStack": bool(cell_stack),
+    }
+    return True
+
+
+def _record_table_cell_geometry(
+    tc: ET.Element,
+    *,
+    section_idx: int,
+    tbl_idx: int,
+    row_idx: int,
+    col_idx: int,
+    table_count_global: int,
+    cell_geom: dict[str, dict],
+) -> str:
+    col_span, row_span = _cell_span(tc)
+    cell_text = _cell_normalized_text(tc)
+    cell_key = f"t_s{section_idx}_{tbl_idx:03d}:r{row_idx}:c{col_idx}"
+    bbox = _extract_bbox(tc)
+    cell_geom[cell_key] = {
+        "tableIndex": table_count_global + tbl_idx,
+        "rowIndex": row_idx,
+        "cellIndex": col_idx,
+        "rowSpan": row_span,
+        "colSpan": col_span,
+        "cellText": cell_text,
+        "bbox": bbox,
+    }
+    return cell_key
+
+
+def _walk_geometry_element(
+    elem: ET.Element,
+    *,
+    section_idx: int,
+    cell_stack: list[dict],
+    section_table_counter: list[int],
+    section_obj_counter: list[int],
+    table_count_global: int,
+    cell_geom: dict[str, dict],
+    object_geom: dict[str, dict],
+    seen_object_keys: set[str],
+) -> None:
+    tag = elem.tag.split("}")[-1]
+    if tag == "tbl":
+        tbl_idx = section_table_counter[0]
+        section_table_counter[0] += 1
+        row_idx = 0
+        for tr in list(elem):
+            if tr.tag != _TAG_TR:
+                continue
+            col_idx = 0
+            for tc in list(tr):
+                if tc.tag != _TAG_TC:
+                    continue
+                cell_key = _record_table_cell_geometry(
+                    tc,
+                    section_idx=section_idx,
+                    tbl_idx=tbl_idx,
+                    row_idx=row_idx,
+                    col_idx=col_idx,
+                    table_count_global=table_count_global,
+                    cell_geom=cell_geom,
+                )
+                cell_stack.append({"cellKey": cell_key})
+                for child in list(tc):
+                    _walk_geometry_element(
+                        child,
+                        section_idx=section_idx,
+                        cell_stack=cell_stack,
+                        section_table_counter=section_table_counter,
+                        section_obj_counter=section_obj_counter,
+                        table_count_global=table_count_global,
+                        cell_geom=cell_geom,
+                        object_geom=object_geom,
+                        seen_object_keys=seen_object_keys,
+                    )
+                cell_stack.pop()
+                col_idx += 1
+            row_idx += 1
+        return
+
+    if _record_object_geometry(
+        elem,
+        tag,
+        section_idx=section_idx,
+        section_obj_counter=section_obj_counter,
+        seen_object_keys=seen_object_keys,
+        cell_stack=cell_stack,
+        object_geom=object_geom,
+    ):
+        return
+
+    for child in list(elem):
+        _walk_geometry_element(
+            child,
+            section_idx=section_idx,
+            cell_stack=cell_stack,
+            section_table_counter=section_table_counter,
+            section_obj_counter=section_obj_counter,
+            table_count_global=table_count_global,
+            cell_geom=cell_geom,
+            object_geom=object_geom,
+            seen_object_keys=seen_object_keys,
+        )
 
 
 def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
@@ -434,8 +604,10 @@ def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
 
     cellKey, objectKey는 _map_from_section_xmls와 동일 규칙으로 발급.
     """
-    cell_geom: dict[str, dict] = {}   # cellKey → {bbox, tableIndex, rowIndex, cellIndex, rowSpan, colSpan, cellText}
-    object_geom: dict[str, dict] = {} # objectKey → {bbox, objectType}
+    cell_geom: dict[
+        str, dict
+    ] = {}  # cellKey → {bbox, tableIndex, rowIndex, cellIndex, rowSpan, colSpan, cellText}
+    object_geom: dict[str, dict] = {}  # objectKey → {bbox, objectType}
     seen_object_keys: set[str] = set()
     table_count_global = 0
 
@@ -449,59 +621,18 @@ def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
         section_obj_counter = [0]
         cell_stack: list[dict] = []
 
-        def walk(elem: ET.Element) -> None:
-            tag = elem.tag.split("}")[-1]
-            if tag == "tbl":
-                tbl_idx = section_table_counter[0]
-                section_table_counter[0] += 1
-                row_idx = 0
-                for tr in list(elem):
-                    if tr.tag != _TAG_TR:
-                        continue
-                    col_idx = 0
-                    for tc in list(tr):
-                        if tc.tag != _TAG_TC:
-                            continue
-                        col_span, row_span = _cell_span(tc)
-                        cell_text = _cell_normalized_text(tc)
-                        cell_key = f"t_s{section_idx}_{tbl_idx:03d}:r{row_idx}:c{col_idx}"
-                        bbox = _extract_bbox(tc)
-                        cell_geom[cell_key] = {
-                            "tableIndex": table_count_global + tbl_idx,
-                            "rowIndex": row_idx, "cellIndex": col_idx,
-                            "rowSpan": row_span, "colSpan": col_span,
-                            "cellText": cell_text, "bbox": bbox,
-                        }
-                        cell_stack.append({"cellKey": cell_key})
-                        for child in list(tc):
-                            walk(child)
-                        cell_stack.pop()
-                        col_idx += 1
-                    row_idx += 1
-                return
-
-            obj_type = _OBJECT_TAG_TO_TYPE.get(tag)
-            if obj_type is not None:
-                raw_id = elem.get("id", "")
-                seq = section_obj_counter[0]
-                section_obj_counter[0] += 1
-                object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
-                while object_key in seen_object_keys:
-                    seq += 1
-                    object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
-                seen_object_keys.add(object_key)
-                object_geom[object_key] = {
-                    "objectType": obj_type,
-                    "bbox": _extract_bbox(elem),
-                    "inCellStack": bool(cell_stack),
-                }
-                return
-
-            for child in list(elem):
-                walk(child)
-
         for child in list(root):
-            walk(child)
+            _walk_geometry_element(
+                child,
+                section_idx=section_idx,
+                cell_stack=cell_stack,
+                section_table_counter=section_table_counter,
+                section_obj_counter=section_obj_counter,
+                table_count_global=table_count_global,
+                cell_geom=cell_geom,
+                object_geom=object_geom,
+                seen_object_keys=seen_object_keys,
+            )
         table_count_global += section_table_counter[0]
 
     return cell_geom, object_geom
@@ -524,24 +655,26 @@ def map_objects_to_cells_with_geometry(source_path: Path) -> ObjectCellMappingRe
             if "section" in n and n.endswith(".xml"):
                 section_xmls.append(zf.read(n))
     base = _map_from_section_xmls(
-        section_xmls, document_hash=doc_hash,
+        section_xmls,
+        document_hash=doc_hash,
         source_path=str(source_path).replace("\\", "/"),
     )
     return _augment_with_geometric_candidates(base, section_xmls)
 
 
 def map_objects_to_cells_with_geometry_from_section_xmls(
-        section_xmls: list[bytes], document_hash: str = "",
-        source_path: str = "") -> ObjectCellMappingResult:
+    section_xmls: list[bytes], document_hash: str = "", source_path: str = ""
+) -> ObjectCellMappingResult:
     """section XML 직접 입력용 테스트 보조 API."""
-    base = _map_from_section_xmls(section_xmls,
-                                       document_hash=document_hash,
-                                       source_path=source_path)
+    base = _map_from_section_xmls(
+        section_xmls, document_hash=document_hash, source_path=source_path
+    )
     return _augment_with_geometric_candidates(base, section_xmls)
 
 
-def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
-                                            section_xmls: list[bytes]) -> ObjectCellMappingResult:
+def _augment_with_geometric_candidates(
+    base: ObjectCellMappingResult, section_xmls: list[bytes]
+) -> ObjectCellMappingResult:
     cell_geom, object_geom = _collect_geometry_from_section_xmls(section_xmls)
 
     has_any_cell_bbox = any(g["bbox"] is not None for g in cell_geom.values())
@@ -556,19 +689,24 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
     no_geometry_count = 0
     ambiguous_object_keys: set[str] = set()
 
-    out_of_cell_objects = [m for m in base.mappings
-                              if m.reason == "OUT_OF_CELL"]
+    out_of_cell_objects = [m for m in base.mappings if m.reason == "OUT_OF_CELL"]
 
     for m in out_of_cell_objects:
         obj_info = object_geom.get(m.objectKey, {})
         obj_bbox = obj_info.get("bbox")
         if obj_bbox is None:
             entry = GeometricCandidateEntry(
-                objectKey=m.objectKey, objectType=m.objectType,
-                candidateCellKey=None, tableIndex=None, rowIndex=None,
-                cellIndex=None, cellText=None,
-                overlapRatio=None, centerDistance=None,
-                confidence=0.0, reason="NO_GEOMETRY",
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=None,
+                tableIndex=None,
+                rowIndex=None,
+                cellIndex=None,
+                cellText=None,
+                overlapRatio=None,
+                centerDistance=None,
+                confidence=0.0,
+                reason="NO_GEOMETRY",
             )
             pair = (entry.objectKey, entry.candidateCellKey)
             if pair not in seen_pair:
@@ -579,11 +717,17 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
 
         if not has_any_cell_bbox:
             entry = GeometricCandidateEntry(
-                objectKey=m.objectKey, objectType=m.objectType,
-                candidateCellKey=None, tableIndex=None, rowIndex=None,
-                cellIndex=None, cellText=None,
-                overlapRatio=None, centerDistance=None,
-                confidence=0.0, reason="NO_CELL_GEOMETRY",
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=None,
+                tableIndex=None,
+                rowIndex=None,
+                cellIndex=None,
+                cellText=None,
+                overlapRatio=None,
+                centerDistance=None,
+                confidence=0.0,
+                reason="NO_CELL_GEOMETRY",
             )
             pair = (entry.objectKey, entry.candidateCellKey)
             if pair not in seen_pair:
@@ -606,17 +750,21 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
             overlap_ratio = ov / obj_area
             center_distance = _euclid(obj_center, _bbox_center(cell_bbox))
             center_inside = _center_inside(obj_center, cell_bbox)
-            candidate_scores.append(
-                (cell_key, g, overlap_ratio, center_distance, center_inside)
-            )
+            candidate_scores.append((cell_key, g, overlap_ratio, center_distance, center_inside))
 
         if not candidate_scores:
             entry = GeometricCandidateEntry(
-                objectKey=m.objectKey, objectType=m.objectType,
-                candidateCellKey=None, tableIndex=None, rowIndex=None,
-                cellIndex=None, cellText=None,
-                overlapRatio=None, centerDistance=None,
-                confidence=0.0, reason="NO_CELL_GEOMETRY",
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=None,
+                tableIndex=None,
+                rowIndex=None,
+                cellIndex=None,
+                cellText=None,
+                overlapRatio=None,
+                centerDistance=None,
+                confidence=0.0,
+                reason="NO_CELL_GEOMETRY",
             )
             pair = (entry.objectKey, entry.candidateCellKey)
             if pair not in seen_pair:
@@ -633,20 +781,25 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
             top_overlap = max(c[2] for c in center_inside_hits)
             top_n = sorted(center_inside_hits, key=lambda c: -c[2])
             # ambiguous: 동일/유사 score 후보 2개 이상
-            is_ambiguous = (len(center_inside_hits) >= 2
-                              and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA)
+            is_ambiguous = (
+                len(center_inside_hits) >= 2
+                and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
+            )
             for ck, g, overlap_ratio, dist, _ in top_n:
-                conf = min(_CONF_CENTER_INSIDE_CELL_MAX,
-                            0.5 + 0.3 * min(1.0, overlap_ratio))
+                conf = min(_CONF_CENTER_INSIDE_CELL_MAX, 0.5 + 0.3 * min(1.0, overlap_ratio))
                 entry = GeometricCandidateEntry(
-                    objectKey=m.objectKey, objectType=m.objectType,
-                    candidateCellKey=ck, tableIndex=g["tableIndex"],
-                    rowIndex=g["rowIndex"], cellIndex=g["cellIndex"],
+                    objectKey=m.objectKey,
+                    objectType=m.objectType,
+                    candidateCellKey=ck,
+                    tableIndex=g["tableIndex"],
+                    rowIndex=g["rowIndex"],
+                    cellIndex=g["cellIndex"],
                     cellText=g["cellText"],
                     overlapRatio=round(overlap_ratio, 4),
                     centerDistance=round(dist, 2),
                     confidence=round(conf, 3),
-                    reason="CENTER_INSIDE_CELL", ambiguous=is_ambiguous,
+                    reason="CENTER_INSIDE_CELL",
+                    ambiguous=is_ambiguous,
                 )
                 pair = (entry.objectKey, entry.candidateCellKey)
                 if pair in seen_pair:
@@ -659,19 +812,24 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
             # bbox 일부 overlap → BBOX_OVERLAP
             top_overlap = max(c[2] for c in overlap_hits)
             top_n = sorted(overlap_hits, key=lambda c: -c[2])
-            is_ambiguous = (len(overlap_hits) >= 2
-                              and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA)
+            is_ambiguous = (
+                len(overlap_hits) >= 2 and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
+            )
             for ck, g, overlap_ratio, dist, _ in top_n:
                 conf = min(_CONF_BBOX_OVERLAP_MAX, 0.3 + 0.5 * min(1.0, overlap_ratio))
                 entry = GeometricCandidateEntry(
-                    objectKey=m.objectKey, objectType=m.objectType,
-                    candidateCellKey=ck, tableIndex=g["tableIndex"],
-                    rowIndex=g["rowIndex"], cellIndex=g["cellIndex"],
+                    objectKey=m.objectKey,
+                    objectType=m.objectType,
+                    candidateCellKey=ck,
+                    tableIndex=g["tableIndex"],
+                    rowIndex=g["rowIndex"],
+                    cellIndex=g["cellIndex"],
                     cellText=g["cellText"],
                     overlapRatio=round(overlap_ratio, 4),
                     centerDistance=round(dist, 2),
                     confidence=round(conf, 3),
-                    reason="BBOX_OVERLAP", ambiguous=is_ambiguous,
+                    reason="BBOX_OVERLAP",
+                    ambiguous=is_ambiguous,
                 )
                 pair = (entry.objectKey, entry.candidateCellKey)
                 if pair in seen_pair:
@@ -690,13 +848,18 @@ def _augment_with_geometric_candidates(base: ObjectCellMappingResult,
             normalized = max(0.0, 1.0 - dist / (obj_diag * 4.0))
             conf = min(_CONF_NEAREST_CELL_MAX, 0.2 + 0.4 * normalized)
             entry = GeometricCandidateEntry(
-                objectKey=m.objectKey, objectType=m.objectType,
-                candidateCellKey=ck, tableIndex=g["tableIndex"],
-                rowIndex=g["rowIndex"], cellIndex=g["cellIndex"],
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=ck,
+                tableIndex=g["tableIndex"],
+                rowIndex=g["rowIndex"],
+                cellIndex=g["cellIndex"],
                 cellText=g["cellText"],
-                overlapRatio=0.0, centerDistance=round(dist, 2),
+                overlapRatio=0.0,
+                centerDistance=round(dist, 2),
                 confidence=round(conf, 3),
-                reason="NEAREST_CELL", ambiguous=False,
+                reason="NEAREST_CELL",
+                ambiguous=False,
             )
             pair = (entry.objectKey, entry.candidateCellKey)
             if pair not in seen_pair:
