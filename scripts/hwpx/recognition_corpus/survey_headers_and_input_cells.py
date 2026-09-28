@@ -516,6 +516,108 @@ class FileResult:
         }
 
 
+@dataclass
+class _TableId:
+    """(파일, 섹션, 테이블) 식별자 묶음 — 헬퍼 함수 인자 수를 줄이기 위한 것."""
+
+    fid: str
+    sec_idx: int
+    tbl_idx: int
+
+
+def _count_cells(grid) -> tuple[int, int]:
+    total_cells = 0
+    empty_cells = 0
+    for row in grid:
+        for cell in row:
+            total_cells += 1
+            if not normalize(_cell_text(cell)):
+                empty_cells += 1
+    return total_cells, empty_cells
+
+
+def _collect_header_records(
+    tid: _TableId,
+    grid,
+    header_row_idxs,
+    headers: list[HeaderRecord],
+    field_ctr: Counter,
+) -> list[str]:
+    """header_row_idxs 의 셀들로 HeaderRecord 를 만들어 headers 에 append 한다(부수효과).
+
+    field_ctr 를 갱신하고, 레이아웃 분류에 쓸 정규화된 헤더 텍스트 목록을 반환한다.
+    """
+    hdr_texts: list[str] = []
+    for hri in header_row_idxs:
+        if hri >= len(grid):
+            continue
+        for ci, cell in enumerate(grid[hri]):
+            norm = normalize(_cell_text(cell))
+            if not norm:
+                continue
+            cs, _ = _cell_span(cell)
+            gf, gc = guess_field(norm)
+            hdr_texts.append(norm)
+            field_ctr[gf] += 1
+            headers.append(
+                HeaderRecord(
+                    maskedFileId=tid.fid,
+                    sectionIndex=tid.sec_idx,
+                    tableIndex=tid.tbl_idx,
+                    tableLayout="",  # fill after layout classify
+                    rowIndex=hri,
+                    colIndex=ci,
+                    normalizedText=norm,
+                    guessedField=gf,
+                    fieldConfidence=gc,
+                    isDateLike=is_date_like(norm),
+                    colSpan=cs,
+                )
+            )
+    return hdr_texts
+
+
+def _process_one_table(
+    fid: str,
+    sec_idx: int,
+    tbl_idx: int,
+    tbl,
+    headers: list[HeaderRecord],
+    field_ctr: Counter,
+) -> tuple[int, int, str, list[InputCell]]:
+    """단일 테이블을 처리해 (total_cells, empty_cells, layout, input_cells)를 반환한다.
+
+    headers 에 이번 테이블의 HeaderRecord 를 append 하고 field_ctr 를 갱신한다(부수효과).
+    """
+    tid = _TableId(fid, sec_idx, tbl_idx)
+    grid = _table_grid(tbl)
+
+    total_cells, empty_cells = _count_cells(grid)
+
+    header_row_idxs = _detect_header_rows(grid)
+    hdr_texts = _collect_header_records(tid, grid, header_row_idxs, headers, field_ctr)
+
+    layout = _classify_layout(grid, hdr_texts)
+
+    # layout을 header records에 역주입
+    for hr in headers:
+        if (
+            hr.maskedFileId == fid
+            and hr.sectionIndex == sec_idx
+            and hr.tableIndex == tbl_idx
+            and not hr.tableLayout
+        ):
+            hr.tableLayout = layout
+
+    # 입력셀 탐지
+    icells = _find_input_cells(fid, sec_idx, tbl_idx, grid, header_row_idxs, layout)
+    for ic in icells:
+        if ic.guessedField != "unknown":
+            field_ctr[f"input:{ic.guessedField}"] += 1
+
+    return total_cells, empty_cells, layout, icells
+
+
 def _survey_file(
     path: Path,
     fid: str,
@@ -589,65 +691,13 @@ def _survey_file(
             tables = list(root.iter(f"{{{NS_HP}}}tbl"))
             for tbl_idx, tbl in enumerate(tables):
                 table_count += 1
-                grid = _table_grid(tbl)
-
-                # 셀 집계
-                for row in grid:
-                    for cell in row:
-                        total_cells += 1
-                        if not normalize(_cell_text(cell)):
-                            empty_cells += 1
-
-                header_row_idxs = _detect_header_rows(grid)
-
-                # 헤더 텍스트 수집
-                hdr_texts: list[str] = []
-                for hri in header_row_idxs:
-                    if hri >= len(grid):
-                        continue
-                    for ci, cell in enumerate(grid[hri]):
-                        norm = normalize(_cell_text(cell))
-                        if not norm:
-                            continue
-                        cs, _ = _cell_span(cell)
-                        gf, gc = guess_field(norm)
-                        hdr_texts.append(norm)
-                        field_ctr[gf] += 1
-                        headers.append(
-                            HeaderRecord(
-                                maskedFileId=fid,
-                                sectionIndex=sec_idx,
-                                tableIndex=tbl_idx,
-                                tableLayout="",  # fill after layout classify
-                                rowIndex=hri,
-                                colIndex=ci,
-                                normalizedText=norm,
-                                guessedField=gf,
-                                fieldConfidence=gc,
-                                isDateLike=is_date_like(norm),
-                                colSpan=cs,
-                            )
-                        )
-
-                layout = _classify_layout(grid, hdr_texts)
+                tc_cells, tc_empty, layout, icells = _process_one_table(
+                    fid, sec_idx, tbl_idx, tbl, headers, field_ctr
+                )
+                total_cells += tc_cells
+                empty_cells += tc_empty
                 layout_ctr[layout] += 1
-
-                # layout을 header records에 역주입
-                for hr in headers:
-                    if (
-                        hr.maskedFileId == fid
-                        and hr.sectionIndex == sec_idx
-                        and hr.tableIndex == tbl_idx
-                        and not hr.tableLayout
-                    ):
-                        hr.tableLayout = layout
-
-                # 입력셀 탐지
-                icells = _find_input_cells(fid, sec_idx, tbl_idx, grid, header_row_idxs, layout)
                 inputs.extend(icells)
-                for ic in icells:
-                    if ic.guessedField != "unknown":
-                        field_ctr[f"input:{ic.guessedField}"] += 1
 
     result = FileResult(
         maskedFileId=fid,
