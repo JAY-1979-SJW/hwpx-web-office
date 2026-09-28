@@ -44,7 +44,11 @@ ZONES = {
 }
 
 ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
-RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
+# (?![-\w.]) — ".hwpx" 뒤에 하이픈/글자/점이 더 이어지면 실제 hwpx 문서
+# 확장자가 아니라 "Dockerfile.hwpx-ro-view" 같은 코드 파일명의 일부다.
+# \b 만으로는 하이픈도 단어 경계로 쳐서 이런 파일을 오탐(raw filename leak)
+# 처리했다 — classify_repo() 가 저장소 자체를 못 도는 실제 회귀였다(2026-09-28).
+RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx(?![-\w.])", re.IGNORECASE)
 DATE_SEGMENT_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 PII_RE = re.compile(
     r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
