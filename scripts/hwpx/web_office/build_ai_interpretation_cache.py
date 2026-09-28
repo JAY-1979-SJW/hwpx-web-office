@@ -35,6 +35,7 @@
     ... --status
     ... --promote                   (승인 후에만)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,10 +50,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.hwpx.web_office.ai_doc_context import (  # noqa: E402
-    build_context_fields)
-from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
-    CLAUDE_MODEL, interpret_fields, should_demote, should_promote_to_user)
+from scripts.hwpx.web_office.ai_doc_context import build_context_fields  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.ai_field_interpretation import (  # ruff: ignore[module-import-not-at-top-of-file]
+    CLAUDE_MODEL,
+    interpret_fields,
+    should_demote,
+    should_promote_to_user,
+)
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -62,8 +66,9 @@ STAGING = "ai_field_interpretation"
 # 10,857개. 그중 검측요청서 38건은 전 칸이 관계자로 죽어 있었다.
 CONSTRUCTION_DOC_RE = re.compile(
     r"(검측|시공|감리|공사|착공|준공|기성|공정|안전관리|품질관리"
-    r"|자재승인|하도급|설계변경|현장대리인|건설기술|시방)")
-FLUSH_EVERY = 10        # AI 호출이 느려 소량씩 — 중단돼도 잃는 게 적다
+    r"|자재승인|하도급|설계변경|현장대리인|건설기술|시방)"
+)
+FLUSH_EVERY = 10  # AI 호출이 느려 소량씩 — 중단돼도 잃는 게 적다
 
 # promote 게이트 — 해석 성공률이 이 아래면 반영을 거부한다.
 PROMOTE_MIN_OK_RATIO = 0.90
@@ -86,9 +91,21 @@ CREATE TABLE IF NOT EXISTS {STAGING}(
 );
 """
 
-COLS = ["form_id", "status", "model", "field_count", "interpreted_count",
-        "input_count", "not_input_count", "semantic_count", "author_count",
-        "coverage", "interpretations", "error", "elapsed_sec"]
+COLS = [
+    "form_id",
+    "status",
+    "model",
+    "field_count",
+    "interpreted_count",
+    "input_count",
+    "not_input_count",
+    "semantic_count",
+    "author_count",
+    "coverage",
+    "interpretations",
+    "error",
+    "elapsed_sec",
+]
 
 # 2차 독립 검증 결과(§4.6 두 신호) — 확신도 문턱을 대체한다.
 VERIFY_TABLE = "ai_field_verification"
@@ -106,9 +123,18 @@ CREATE TABLE IF NOT EXISTS {VERIFY_TABLE}(
     elapsed_sec REAL
 );
 """
-VERIFY_COLS = ["form_id", "status", "model", "verdicts", "author_agreed",
-               "disagreed_count", "unverified_count", "agreement_rate",
-               "error", "elapsed_sec"]
+VERIFY_COLS = [
+    "form_id",
+    "status",
+    "model",
+    "verdicts",
+    "author_agreed",
+    "disagreed_count",
+    "unverified_count",
+    "agreement_rate",
+    "error",
+    "elapsed_sec",
+]
 
 
 def _log(m: str) -> None:
@@ -125,14 +151,17 @@ def _connect() -> sqlite3.Connection:
     return con
 
 
-def _flush(con: sqlite3.Connection, pending: list[dict],
-           retries: int = 10, table: str = STAGING,
-           cols: list[str] | None = None) -> None:
+def _flush(
+    con: sqlite3.Connection,
+    pending: list[dict],
+    retries: int = 10,
+    table: str = STAGING,
+    cols: list[str] | None = None,
+) -> None:
     if not pending:
         return
     cols = cols or COLS
-    sql = (f"INSERT OR REPLACE INTO {table}({', '.join(cols)}) "
-           f"VALUES({', '.join('?' * len(cols))})")
+    sql = f"INSERT OR REPLACE INTO {table}({', '.join(cols)}) VALUES({', '.join('?' * len(cols))})"
     payload = [tuple(r.get(c) for c in cols) for r in pending]
     for attempt in range(retries):
         try:
@@ -152,9 +181,14 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
     raise sqlite3.OperationalError("스테이징 쓰기 실패 — 잠김")
 
 
-def _targets(con: sqlite3.Connection, limit: int, shard: int,
-             shards: int, scope: str = "all",
-             source_scope: str | None = None) -> list[tuple]:
+def _targets(
+    con: sqlite3.Connection,
+    limit: int,
+    shard: int,
+    shards: int,
+    scope: str = "all",
+    source_scope: str | None = None,
+) -> list[tuple]:
     """공사 대상.
 
     scope='construction' — **이름** 키워드 필터(문서명에 '검측'·'공사' 등).
@@ -177,7 +211,8 @@ def _targets(con: sqlite3.Connection, limit: int, shard: int,
         "SELECT form_id, source_path, input_schema, clean_name,"
         " COALESCE(name,''), COALESCE(applicant_count,0) FROM forms"
         " WHERE input_schema IS NOT NULL AND input_schema != ''"
-        " ORDER BY form_id").fetchall()
+        " ORDER BY form_id"
+    ).fetchall()
     out = []
     for r in rows:
         form_id, source_path, _, clean_name, name, _ = r
@@ -199,14 +234,13 @@ def _targets(con: sqlite3.Connection, limit: int, shard: int,
     return [r[:4] for r in out]
 
 
-def interpret_one(source_rel: str, schema_json: str, clean_name: str,
-                  *, runner=None) -> dict:
+def interpret_one(source_rel: str, schema_json: str, clean_name: str, *, runner=None) -> dict:
     """서식 1건 해석. 원본은 읽기만 한다."""
     from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor
 
     res = load_hwpx_for_editor(
-        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_rel},
-        project_root=PROJECT_ROOT)
+        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_rel}, project_root=PROJECT_ROOT
+    )
     if res.get("verdict") != "PASS":
         return {"status": "LOAD_FAILED", "error": res.get("reason", "")}
 
@@ -214,15 +248,13 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
     # roles=None — 규칙이 매긴 역할과 무관하게 **전 입력칸**을 싣는다(§4.6).
     # 규칙이 AI 앞에서 자르면 검측요청서처럼 전 칸이 관계자로 판정된 문서를
     # AI 가 아예 못 본다(실측: 보이는 칸 0).
-    fields = build_context_fields(schema, res["documentModel"],
-                                  title=clean_name or "", roles=None)
+    fields = build_context_fields(schema, res["documentModel"], title=clean_name or "", roles=None)
     if not fields:
         return {"status": "NO_FIELDS", "field_count": 0}
 
     out = interpret_fields(fields, runner=runner)
     if not out.get("ok"):
-        return {"status": "AI_FAILED", "error": out.get("error", ""),
-                "field_count": len(fields)}
+        return {"status": "AI_FAILED", "error": out.get("error", ""), "field_count": len(fields)}
     return {
         "status": "OK",
         "field_count": len(fields),
@@ -232,27 +264,32 @@ def interpret_one(source_rel: str, schema_json: str, clean_name: str,
         "semantic_count": out["semanticCount"],
         "author_count": out["authorCount"],
         "coverage": out["coverage"],
-        "interpretations": json.dumps(out["interpretations"],
-                                      ensure_ascii=False),
+        "interpretations": json.dumps(out["interpretations"], ensure_ascii=False),
     }
 
 
-def run(limit: int = 0, shard: int = 0, shards: int = 1,
-        scope: str = "all", source_scope: str | None = None,
-        promote_on_pass: bool = False) -> None:
+def run(
+    limit: int = 0,
+    shard: int = 0,
+    shards: int = 1,
+    scope: str = "all",
+    source_scope: str | None = None,
+    promote_on_pass: bool = False,
+) -> None:
     con = _connect()
     con.execute(DDL)
     targets = _targets(con, limit, shard, shards, scope, source_scope)
-    _log(f"대상 {len(targets)}건 (shard {shard}/{shards}, scope={scope},"
-         f" sourceScope={source_scope or '-'}, model={CLAUDE_MODEL})")
+    _log(
+        f"대상 {len(targets)}건 (shard {shard}/{shards}, scope={scope},"
+        f" sourceScope={source_scope or '-'}, model={CLAUDE_MODEL})"
+    )
     pending: list[dict] = []
     t0 = time.time()
-    for n, (form_id, source_path, schema_json, clean_name) in enumerate(
-            targets, 1):
+    for n, (form_id, source_path, schema_json, clean_name) in enumerate(targets, 1):
         t1 = time.time()
         try:
             r = interpret_one(source_path, schema_json, clean_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             r = {"status": "ERROR", "error": f"{type(exc).__name__}: {exc}"[:200]}
         r["form_id"] = form_id
         r["model"] = CLAUDE_MODEL
@@ -262,8 +299,10 @@ def run(limit: int = 0, shard: int = 0, shards: int = 1,
             _flush(con, pending)
             done = n
             rate = (time.time() - t0) / done
-            _log(f"[{done}/{len(targets)}] {rate:.1f}s/건 "
-                 f"· 남은 예상 {(len(targets) - done) * rate / 3600:.1f}시간")
+            _log(
+                f"[{done}/{len(targets)}] {rate:.1f}s/건 "
+                f"· 남은 예상 {(len(targets) - done) * rate / 3600:.1f}시간"
+            )
     _flush(con, pending)
     _log(f"완료 {len(targets)}건 / {time.time() - t0:.0f}s")
     con.close()
@@ -281,8 +320,8 @@ def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
     1차 판정을 검증자에게 보여주지 않는다(앵커링 차단). 일치 대조는
     프로그램이 한다 — `ai_field_verification.agreement`.
     """
-    from scripts.hwpx.web_office.ai_field_verification import (
-        CLAUDE_MODEL as V_MODEL, verify_fields)
+    from scripts.hwpx.web_office.ai_field_verification import CLAUDE_MODEL as V_MODEL
+    from scripts.hwpx.web_office.ai_field_verification import verify_fields
     from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor
 
     con = _connect()
@@ -293,21 +332,25 @@ def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
     # 서식이나 대장·발급증서는 어차피 역할이 안 바뀌므로 검증해도 반영에
     # 영향이 없다. 앞선 표본 12건이 전부 비후보라 되살림 0 으로 나왔다.
     from scripts.hwpx.web_office.ai_field_interpretation import (
-        ROLE_PROTECTED_DOCTYPES, ROLE_PROTECTED_KINDS)
+        ROLE_PROTECTED_DOCTYPES,
+        ROLE_PROTECTED_KINDS,
+    )
+
     rows = con.execute(
         f"SELECT s.form_id, s.interpretations, f.source_path, f.clean_name,"
         f" f.input_schema, COALESCE(f.applicant_count,0),"
         f" COALESCE(f.doc_type,''), COALESCE(f.form_kind,'')"
         f" FROM {STAGING} s JOIN forms f ON f.form_id=s.form_id"
         f" WHERE s.status='OK' AND s.interpretations IS NOT NULL"
-        f" ORDER BY s.form_id").fetchall()
+        f" ORDER BY s.form_id"
+    ).fetchall()
 
     def _is_candidate(r) -> bool:
-        return (r[5] == 0 and r[6] not in ROLE_PROTECTED_DOCTYPES
-                and r[7] not in ROLE_PROTECTED_KINDS)
+        return (
+            r[5] == 0 and r[6] not in ROLE_PROTECTED_DOCTYPES and r[7] not in ROLE_PROTECTED_KINDS
+        )
 
-    pool = [r for r in rows
-            if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
+    pool = [r for r in rows if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
     pool.sort(key=lambda r: (0 if _is_candidate(r) else 1, r[0]))
     cand = sum(1 for r in pool if _is_candidate(r))
     _log(f"  (되살림 후보 {cand} / 전체 {len(pool)} — 후보 우선)")
@@ -318,47 +361,48 @@ def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
 
     pending: list[dict] = []
     t0 = time.time()
-    for n, (form_id, interp_json, source_path, clean_name,
-            schema_json) in enumerate(targets, 1):
+    for n, (form_id, interp_json, source_path, clean_name, schema_json) in enumerate(targets, 1):
         t1 = time.time()
         rec: dict = {"form_id": form_id, "model": V_MODEL}
         try:
             res = load_hwpx_for_editor(
                 {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_path},
-                project_root=PROJECT_ROOT)
+                project_root=PROJECT_ROOT,
+            )
             if res.get("verdict") != "PASS":
                 rec.update({"status": "LOAD_FAILED"})
             else:
                 fields = build_context_fields(
-                    json.loads(schema_json), res["documentModel"],
-                    title=clean_name or "", roles=None)
+                    json.loads(schema_json),
+                    res["documentModel"],
+                    title=clean_name or "",
+                    roles=None,
+                )
                 interp = json.loads(interp_json)
                 out = verify_fields(fields, interp)
                 if not out.get("ok"):
-                    rec.update({"status": "AI_FAILED",
-                                "error": out.get("error", "")})
+                    rec.update({"status": "AI_FAILED", "error": out.get("error", "")})
                 else:
                     ag = out["agreement"]
                     rec.update({
                         "status": "OK",
-                        "verdicts": json.dumps(out["verdicts"],
-                                               ensure_ascii=False),
-                        "author_agreed": json.dumps(ag["authorAgreed"],
-                                                    ensure_ascii=False),
+                        "verdicts": json.dumps(out["verdicts"], ensure_ascii=False),
+                        "author_agreed": json.dumps(ag["authorAgreed"], ensure_ascii=False),
                         "disagreed_count": len(ag["disagreed"]),
                         "unverified_count": len(ag["unverified"]),
                         "agreement_rate": ag["agreementRate"],
                     })
-        except Exception as exc:  # noqa: BLE001
-            rec.update({"status": "ERROR",
-                        "error": f"{type(exc).__name__}: {exc}"[:200]})
+        except Exception as exc:  # ruff: ignore[blind-except]
+            rec.update({"status": "ERROR", "error": f"{type(exc).__name__}: {exc}"[:200]})
         rec["elapsed_sec"] = round(time.time() - t1, 1)
         pending.append(rec)
         if len(pending) >= FLUSH_EVERY:
             _flush(con, pending, table=VERIFY_TABLE, cols=VERIFY_COLS)
             rate = (time.time() - t0) / n
-            _log(f"[{n}/{len(targets)}] {rate:.1f}s/건 · 남은 예상 "
-                 f"{(len(targets) - n) * rate / 3600:.1f}시간")
+            _log(
+                f"[{n}/{len(targets)}] {rate:.1f}s/건 · 남은 예상 "
+                f"{(len(targets) - n) * rate / 3600:.1f}시간"
+            )
     _flush(con, pending, table=VERIFY_TABLE, cols=VERIFY_COLS)
     _log(f"완료 {len(targets)}건 / {time.time() - t0:.0f}s")
     con.close()
@@ -368,10 +412,9 @@ def status() -> None:
     con = _connect()
     con.execute(DDL)
     total = con.execute(
-        "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL"
-        " AND input_schema != ''").fetchone()[0]
-    rows = con.execute(
-        f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
+        "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL AND input_schema != ''"
+    ).fetchone()[0]
+    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
     staged = sum(n for _, n in rows)
     _log(f"대상 {total} · 스테이징 {staged} ({staged / total * 100:.1f}%)")
     for st, n in rows:
@@ -379,14 +422,106 @@ def status() -> None:
     agg = con.execute(
         f"SELECT SUM(field_count), SUM(interpreted_count), SUM(input_count),"
         f" SUM(not_input_count), SUM(semantic_count), AVG(elapsed_sec)"
-        f" FROM {STAGING} WHERE status='OK'").fetchone()
+        f" FROM {STAGING} WHERE status='OK'"
+    ).fetchone()
     if agg and agg[0]:
         fc, ic, inp, notinp, sem, el = agg
-        _log(f"  칸 {fc} · 해석 {ic} ({ic / fc * 100:.1f}%)"
-             f" · 입력칸 {inp} · 입력칸아님(오염제거) {notinp}"
-             f" · semantic {sem} ({sem / fc * 100:.1f}%)"
-             f" · 평균 {el:.1f}s/건")
+        _log(
+            f"  칸 {fc} · 해석 {ic} ({ic / fc * 100:.1f}%)"
+            f" · 입력칸 {inp} · 입력칸아님(오염제거) {notinp}"
+            f" · semantic {sem} ({sem / fc * 100:.1f}%)"
+            f" · 평균 {el:.1f}s/건"
+        )
     con.close()
+
+
+def _load_verified_by_form(con) -> dict[int, set[str]]:
+    """2차 검증 결과 — 있으면 확신도 문턱 대신 이걸 둘째 신호로 쓴다(§4.6)."""
+    con.execute(VERIFY_DDL)
+    verified_by_form: dict[int, set[str]] = {}
+    for fid, agreed in con.execute(
+        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
+        f" WHERE status='OK' AND author_agreed IS NOT NULL"
+    ):
+        try:
+            verified_by_form[fid] = set(json.loads(agreed))
+        except Exception:  # ruff: ignore[blind-except]
+            pass
+    return verified_by_form
+
+
+def _apply_field_interpretation(
+    f: dict, it: dict, *, doc_type: str, form_kind: str, app_before: int, agreed: set[str] | None
+) -> tuple[bool, bool, bool]:
+    """캐시 해석 하나를 스키마 필드 하나에 반영. 반환: (강등됨, semantic부여됨, 되살림됨)."""
+    # 라벨은 스키마 것이 원본이다 — 캐시 항목에 없어도 규칙 검사가
+    # 무력화되면 안 된다(라벨이 비면 규칙이 항상 통과시켜 버린다).
+    judged = {
+        **it,
+        "label": it.get("label") or f.get("label") or "",
+        "ruleRole": it.get("ruleRole") or f.get("role") or "",
+    }
+    demoted = tagged = revived = False
+    if f.get("role") == "applicant" and should_demote(judged):
+        f["role"] = "noise"
+        demoted = True
+    # 역할 교정 — 통째로 죽은 문서(신청인칸 0)만 되살린다(§4.6).
+    elif f.get("role") == "office" and should_promote_to_user(
+        judged,
+        doc_type=doc_type,
+        form_kind=form_kind,
+        form_applicant_count=app_before,
+        verified=(it.get("key") in agreed if agreed is not None else None),
+    ):
+        f["role"] = "applicant"
+        revived = True
+    if not (f.get("semantic") or "").strip() and it["semantic"]:
+        f["semantic"] = it["semantic"]
+        tagged = True
+    if it.get("meaning"):
+        f["aiMeaning"] = it["meaning"]
+    if it.get("question"):
+        f["aiQuestion"] = it["question"]
+    if it.get("profileKey"):
+        f["aiProfileKey"] = it["profileKey"]
+    return demoted, tagged, revived
+
+
+def _process_staged_form(con, form_id, interp_json: str, verified_by_form: dict[int, set[str]]):
+    """스테이징 해석 1건을 forms.input_schema 반영용 pending 튜플로 변환.
+    반환: (pending_tuple, demoted, tagged, revived_here) 또는 스키마 없으면 None."""
+    row = con.execute(
+        "SELECT input_schema, doc_type, form_kind, applicant_count FROM forms WHERE form_id=?",
+        (form_id,),
+    ).fetchone()
+    if not row or not row[0]:
+        return None
+    schema = json.loads(row[0])
+    doc_type, form_kind, app_before = row[1] or "", row[2] or "", row[3] or 0
+    by_key = {i["key"]: i for i in json.loads(interp_json)}
+    agreed = verified_by_form.get(form_id)
+
+    demoted = tagged = revived_here = 0
+    for f in schema:
+        it = by_key.get(f.get("paragraphId"))
+        if not it:
+            continue
+        d, t, r = _apply_field_interpretation(
+            f,
+            it,
+            doc_type=doc_type,
+            form_kind=form_kind,
+            app_before=app_before,
+            agreed=agreed,
+        )
+        demoted += d
+        tagged += t
+        revived_here += r
+
+    inputs = [f for f in schema if f.get("role") != "noise"]
+    app = sum(1 for f in inputs if f.get("role") == "applicant")
+    pending = (json.dumps(schema, ensure_ascii=False), len(inputs), app, len(inputs) - app, form_id)
+    return pending, demoted, tagged, revived_here
 
 
 def promote() -> None:
@@ -401,8 +536,7 @@ def promote() -> None:
     """
     con = _connect()
     con.execute(DDL)
-    rows = con.execute(
-        f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
+    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
     staged = sum(n for _, n in rows)
     ok = dict(rows).get("OK", 0)
     if not staged:
@@ -410,23 +544,15 @@ def promote() -> None:
         return
     ratio = ok / staged
     if ratio < PROMOTE_MIN_OK_RATIO:
-        _log(f"REJECTED: 해석 성공률 {ratio:.1%}"
-             f" < 게이트 {PROMOTE_MIN_OK_RATIO:.0%}")
+        _log(f"REJECTED: 해석 성공률 {ratio:.1%} < 게이트 {PROMOTE_MIN_OK_RATIO:.0%}")
         return
 
-    # 2차 검증 결과 — 있으면 확신도 문턱 대신 이걸 둘째 신호로 쓴다(§4.6).
-    con.execute(VERIFY_DDL)
-    verified_by_form: dict[int, set[str]] = {}
-    for fid, agreed in con.execute(
-            f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
-            f" WHERE status='OK' AND author_agreed IS NOT NULL"):
-        try:
-            verified_by_form[fid] = set(json.loads(agreed))
-        except Exception:      # noqa: BLE001
-            pass
+    verified_by_form = _load_verified_by_form(con)
     if verified_by_form:
-        _log(f"2차 검증 반영 — 검증된 서식 {len(verified_by_form)}건"
-             f" (확신도 문턱 대신 두 판정 일치를 씀)")
+        _log(
+            f"2차 검증 반영 — 검증된 서식 {len(verified_by_form)}건"
+            f" (확신도 문턱 대신 두 판정 일치를 씀)"
+        )
 
     updated = 0
     demoted = 0
@@ -435,65 +561,35 @@ def promote() -> None:
     revived_forms = 0
     pending: list[tuple] = []
     for form_id, interp_json in con.execute(
-            f"SELECT form_id, interpretations FROM {STAGING}"
-            f" WHERE status='OK' AND interpretations IS NOT NULL"):
-        row = con.execute(
-            "SELECT input_schema, doc_type, form_kind, applicant_count"
-            " FROM forms WHERE form_id=?", (form_id,)).fetchone()
-        if not row or not row[0]:
+        f"SELECT form_id, interpretations FROM {STAGING}"
+        f" WHERE status='OK' AND interpretations IS NOT NULL"
+    ):
+        outcome = _process_staged_form(con, form_id, interp_json, verified_by_form)
+        if outcome is None:
             continue
-        schema = json.loads(row[0])
-        doc_type, form_kind, app_before = row[1] or "", row[2] or "", row[3] or 0
-        by_key = {i["key"]: i for i in json.loads(interp_json)}
-        agreed = verified_by_form.get(form_id)
-        revived_here = 0
-        for f in schema:
-            it = by_key.get(f.get("paragraphId"))
-            if not it:
-                continue
-            # 라벨은 스키마 것이 원본이다 — 캐시 항목에 없어도 규칙 검사가
-            # 무력화되면 안 된다(라벨이 비면 규칙이 항상 통과시켜 버린다).
-            judged = {**it, "label": it.get("label") or f.get("label") or "",
-                      "ruleRole": it.get("ruleRole") or f.get("role") or ""}
-            if f.get("role") == "applicant" and should_demote(judged):
-                f["role"] = "noise"
-                demoted += 1
-            # 역할 교정 — 통째로 죽은 문서(신청인칸 0)만 되살린다(§4.6).
-            elif f.get("role") == "office" and should_promote_to_user(
-                    judged, doc_type=doc_type, form_kind=form_kind,
-                    form_applicant_count=app_before,
-                    verified=(it.get("key") in agreed
-                              if agreed is not None else None)):
-                f["role"] = "applicant"
-                revived_here += 1
-            if not (f.get("semantic") or "").strip() and it["semantic"]:
-                f["semantic"] = it["semantic"]
-                tagged += 1
-            if it.get("meaning"):
-                f["aiMeaning"] = it["meaning"]
-            if it.get("question"):
-                f["aiQuestion"] = it["question"]
-            if it.get("profileKey"):
-                f["aiProfileKey"] = it["profileKey"]
-        inputs = [f for f in schema if f.get("role") != "noise"]
-        app = sum(1 for f in inputs if f.get("role") == "applicant")
-        pending.append((json.dumps(schema, ensure_ascii=False), len(inputs),
-                        app, len(inputs) - app, form_id))
+        form_pending, form_demoted, form_tagged, revived_here = outcome
+        pending.append(form_pending)
         updated += 1
+        demoted += form_demoted
+        tagged += form_tagged
         revived += revived_here
         if revived_here:
             revived_forms += 1
 
     for i in range(0, len(pending), 200):
-        chunk = pending[i:i + 200]
+        chunk = pending[i : i + 200]
         con.execute("BEGIN IMMEDIATE")
         con.executemany(
             "UPDATE forms SET input_schema=?, input_count=?,"
-            " applicant_count=?, office_count=? WHERE form_id=?", chunk)
+            " applicant_count=?, office_count=? WHERE form_id=?",
+            chunk,
+        )
         con.execute("COMMIT")
-    _log(f"PROMOTED: 서식 {updated} · 오염제거(noise 강등) {demoted}"
-         f" · semantic 신규부여 {tagged}"
-         f" · 역할교정(죽은 서식 되살림) {revived}칸/{revived_forms}서식")
+    _log(
+        f"PROMOTED: 서식 {updated} · 오염제거(noise 강등) {demoted}"
+        f" · semantic 신규부여 {tagged}"
+        f" · 역할교정(죽은 서식 되살림) {revived}칸/{revived_forms}서식"
+    )
     con.close()
 
 
@@ -504,15 +600,22 @@ def main() -> None:
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--promote", action="store_true")
-    ap.add_argument("--verify", action="store_true",
-                    help="2차 독립 검증(확신도 문턱 대체)")
-    ap.add_argument("--scope", choices=("all", "construction"), default="all",
-                    help="construction = 문서명 키워드 필터(건설·현장)")
-    ap.add_argument("--source-scope", default=None,
-                    help="source_path 부분일치 필터(예: onedrive_hwpx)"
-                        " — 특정 이관·경로 범위로 한정할 때. --scope 와 별개")
-    ap.add_argument("--promote-on-pass", action="store_true",
-                    help="공사 후 게이트 통과 시 자동 반영")
+    ap.add_argument("--verify", action="store_true", help="2차 독립 검증(확신도 문턱 대체)")
+    ap.add_argument(
+        "--scope",
+        choices=("all", "construction"),
+        default="all",
+        help="construction = 문서명 키워드 필터(건설·현장)",
+    )
+    ap.add_argument(
+        "--source-scope",
+        default=None,
+        help="source_path 부분일치 필터(예: onedrive_hwpx)"
+        " — 특정 이관·경로 범위로 한정할 때. --scope 와 별개",
+    )
+    ap.add_argument(
+        "--promote-on-pass", action="store_true", help="공사 후 게이트 통과 시 자동 반영"
+    )
     a = ap.parse_args()
     if a.status:
         status()
@@ -521,8 +624,14 @@ def main() -> None:
     elif a.promote:
         promote()
     else:
-        run(limit=a.limit, shard=a.shard, shards=a.shards, scope=a.scope,
-            source_scope=a.source_scope, promote_on_pass=a.promote_on_pass)
+        run(
+            limit=a.limit,
+            shard=a.shard,
+            shards=a.shards,
+            scope=a.scope,
+            source_scope=a.source_scope,
+            promote_on_pass=a.promote_on_pass,
+        )
 
 
 if __name__ == "__main__":
