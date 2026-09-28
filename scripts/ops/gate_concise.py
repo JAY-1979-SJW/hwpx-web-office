@@ -10,6 +10,7 @@
 
 종료 코드: 대상 스크립트의 종료 코드를 그대로 반환한다(CI/훅에서 체이닝 가능).
 """
+
 from __future__ import annotations
 
 import json
@@ -42,6 +43,21 @@ def _find_failures(obj):
     return []
 
 
+def _parse_gate_output(stdout: str):
+    """게이트들이 보통 JSON 하나를 stdout에 찍는다. 여러 JSON 블록이 섞여 있을 수 있으니
+    실패하면 마지막 { ... } 블록만 다시 시도한다."""
+    try:
+        return json.loads(stdout)
+    except (json.JSONDecodeError, ValueError):
+        start = stdout.rfind("{")
+        if start >= 0:
+            try:
+                return json.loads(stdout[start:])
+            except (json.JSONDecodeError, ValueError):
+                return None
+        return None
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print("사용법: gate_concise.py <스크립트> [인자...]", file=sys.stderr)
@@ -59,24 +75,13 @@ def main(argv: list[str]) -> int:
     log_path = log_dir / f"{Path(argv[0]).stem}_full_output.log"
     log_path.write_text(stdout + (proc.stderr or ""), encoding="utf-8")
 
-    # JSON 파싱 시도 (게이트들이 보통 JSON 하나를 stdout에 찍는다)
-    parsed = None
-    try:
-        parsed = json.loads(stdout)
-    except (json.JSONDecodeError, ValueError):
-        # 여러 JSON 블록이 섞여 있을 수 있음 - 마지막 { ... } 블록만 시도
-        start = stdout.rfind("{")
-        if start >= 0:
-            try:
-                parsed = json.loads(stdout[start:])
-            except (json.JSONDecodeError, ValueError):
-                parsed = None
+    parsed = _parse_gate_output(stdout)
 
     print(f"[gate_concise] 실행: {' '.join(argv)}")
     print(f"[gate_concise] 전체 출력 저장: {log_path} ({len(stdout)} bytes)")
 
     if parsed is None:
-        print(f"[gate_concise] JSON 파싱 실패 - 마지막 5줄만 표시:")
+        print("[gate_concise] JSON 파싱 실패 - 마지막 5줄만 표시:")
         for line in stdout.strip().splitlines()[-5:]:
             print(f"  {line}")
         return proc.returncode
@@ -86,7 +91,9 @@ def main(argv: list[str]) -> int:
     fail_count = sum(1 for _, v in verdicts if v.startswith("FAIL"))
     pass_count = sum(1 for _, v in verdicts if v.startswith("PASS"))
 
-    print(f"[gate_concise] verdict={top_verdict} (하위 게이트 PASS {pass_count} / FAIL {fail_count})")
+    print(
+        f"[gate_concise] verdict={top_verdict} (하위 게이트 PASS {pass_count} / FAIL {fail_count})"
+    )
 
     failures = _find_failures(parsed)
     if failures:

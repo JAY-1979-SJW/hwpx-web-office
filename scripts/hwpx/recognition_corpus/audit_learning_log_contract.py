@@ -6,6 +6,7 @@ HWPX 작성 검수 세션의 감사 로그 + 학습 로그 contract.
 ui_adapter, evidence_ingestion_contract)에서 import되어서는 안 된다.
 로그 저장은 별도 orchestration 계층에서만 수행한다.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -33,41 +34,70 @@ REQUIRED_LOG_VIEWS: tuple[str, ...] = (
 )
 
 ALLOWED_SESSION_STATUS: frozenset[str] = frozenset({
-    "REVIEW_STARTED", "READY_FOR_DECISION", "DECISION_VALIDATED",
-    "WRITER_APPLIED", "WRITER_BLOCKED", "READBACK_FAILED",
-    "COMPLETED", "CANCELLED", "ERROR",
+    "REVIEW_STARTED",
+    "READY_FOR_DECISION",
+    "DECISION_VALIDATED",
+    "WRITER_APPLIED",
+    "WRITER_BLOCKED",
+    "READBACK_FAILED",
+    "COMPLETED",
+    "CANCELLED",
+    "ERROR",
 })
 ALLOWED_DECISION: frozenset[str] = frozenset({
-    "APPROVE", "REJECT", "HOLD", "EDIT_VALUE",
-    "REQUEST_MATERIAL", "SYSTEM_APPROVE", "SYSTEM_HOLD",
+    "APPROVE",
+    "REJECT",
+    "HOLD",
+    "EDIT_VALUE",
+    "REQUEST_MATERIAL",
+    "SYSTEM_APPROVE",
+    "SYSTEM_HOLD",
 })
 ALLOWED_DECISION_SOURCE: frozenset[str] = frozenset({
-    "USER", "SYSTEM_POLICY", "AI_ASSISTED", "TEST_FIXTURE",
+    "USER",
+    "SYSTEM_POLICY",
+    "AI_ASSISTED",
+    "TEST_FIXTURE",
 })
 ALLOWED_OPERATION_TYPE: frozenset[str] = frozenset({
-    "setCellText", "setParagraphText", "replaceTextRun",
-    "setCellHorizontalAlign", "setCellVerticalAlign",
+    "setCellText",
+    "setParagraphText",
+    "replaceTextRun",
+    "setCellHorizontalAlign",
+    "setCellVerticalAlign",
 })
 FORBIDDEN_OPERATION_TYPE: frozenset[str] = frozenset({
     "setCellParagraphText",
 })
 ALLOWED_OPERATION_STATUS: frozenset[str] = frozenset({
-    "CREATED", "BLOCKED", "APPLIED", "SKIPPED",
+    "CREATED",
+    "BLOCKED",
+    "APPLIED",
+    "SKIPPED",
 })
 ALLOWED_READBACK_STATUS: frozenset[str] = frozenset({
-    "MATCHED", "MISMATCH", "NOT_RUN", "BLOCKED",
+    "MATCHED",
+    "MISMATCH",
+    "NOT_RUN",
+    "BLOCKED",
 })
 ALLOWED_REASON_CODE: frozenset[str] = frozenset({
-    "RUN_BOUNDARY_UNSUPPORTED", "CHECKBOX_OR_SHAPE_NEEDED",
-    "OBJECT_ANCHOR_NEEDED", "STYLE_RESOLUTION_NEEDED",
-    "CELL_INTERNAL_PARAGRAPH_NEEDED", "MERGED_CELL_GEOMETRY_NEEDED",
-    "READBACK_MISMATCH", "TARGET_AMBIGUOUS",
+    "RUN_BOUNDARY_UNSUPPORTED",
+    "CHECKBOX_OR_SHAPE_NEEDED",
+    "OBJECT_ANCHOR_NEEDED",
+    "STYLE_RESOLUTION_NEEDED",
+    "CELL_INTERNAL_PARAGRAPH_NEEDED",
+    "MERGED_CELL_GEOMETRY_NEEDED",
+    "READBACK_MISMATCH",
+    "TARGET_AMBIGUOUS",
     "LABEL_CONTEXT_INSUFFICIENT",
 })
 ALLOWED_SEVERITY: frozenset[str] = frozenset({"LOW", "MEDIUM", "HIGH"})
 
 REUSABLE_DECISIONS: frozenset[str] = frozenset({
-    "APPROVE", "EDIT_VALUE", "SYSTEM_APPROVE",
+    "APPROVE",
+    "EDIT_VALUE",
+    "SYSTEM_APPROVE",
 })
 
 # 개인정보 가능성 패턴 (raw 저장 금지)
@@ -81,6 +111,7 @@ MIGRATION_002_PATH = SCHEMA_DIR / "002_audit_learning_logs.sql"
 
 # ── schema init ─────────────────────────────────────────────────────────────
 
+
 def init_audit_learning_log_schema(conn: sqlite3.Connection) -> None:
     """Migration 002 적용 — idempotent. 001이 이미 적용되어 있어야 한다."""
     sql = MIGRATION_002_PATH.read_text(encoding="utf-8")
@@ -90,12 +121,8 @@ def init_audit_learning_log_schema(conn: sqlite3.Connection) -> None:
 
 
 def validate_log_schema(conn: sqlite3.Connection) -> dict:
-    tables = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )}
-    views = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='view'"
-    )}
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    views = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='view'")}
     missing_t = [t for t in REQUIRED_LOG_TABLES if t not in tables]
     missing_v = [v for v in REQUIRED_LOG_VIEWS if v not in views]
     return {
@@ -106,6 +133,7 @@ def validate_log_schema(conn: sqlite3.Connection) -> dict:
 
 
 # ── hash / redaction ────────────────────────────────────────────────────────
+
 
 def hash_value(v: str | None) -> str | None:
     if v is None:
@@ -135,16 +163,15 @@ def validate_no_sensitive_raw_values(record: dict) -> None:
     raw로 저장되려 하면 ValueError.
     """
     forbidden_keys = (
-        "proposed_value", "edited_value",
-        "expected_before", "actual_after",
+        "proposed_value",
+        "edited_value",
+        "expected_before",
+        "actual_after",
         "current_value",
     )
     for k in forbidden_keys:
         if k in record:
-            raise ValueError(
-                f"raw value forbidden: key '{k}' must be hashed "
-                f"(use '{k}_hash')"
-            )
+            raise ValueError(f"raw value forbidden: key '{k}' must be hashed (use '{k}_hash')")
     for k, v in record.items():
         if not isinstance(v, str):
             continue
@@ -152,17 +179,14 @@ def validate_no_sensitive_raw_values(record: dict) -> None:
             continue
         if k in ("redacted_preview", "redactedPreview"):
             if len(v) > 20:
-                raise ValueError(
-                    f"redactedPreview too long ({len(v)} > 20)"
-                )
+                raise ValueError(f"redactedPreview too long ({len(v)} > 20)")
             continue
         if _BIZNO_RE.search(v) or _PHONE_RE.search(v) or _RRN_RE.search(v):
-            raise ValueError(
-                f"sensitive value pattern detected in field '{k}'"
-            )
+            raise ValueError(f"sensitive value pattern detected in field '{k}'")
 
 
 # ── builders ────────────────────────────────────────────────────────────────
+
 
 def build_fill_review_session_log(
     *,
@@ -205,10 +229,20 @@ def insert_session(conn: sqlite3.Connection, rec: dict) -> None:
         " sub_type, classifier_version, dictionary_version,"
         " started_at, completed_at, session_status, created_by, notes"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (rec["session_id"], rec["document_id"], rec["source_document_hash"],
-         rec["document_type"], rec["sub_type"], rec["classifier_version"],
-         rec["dictionary_version"], rec["started_at"], rec["completed_at"],
-         rec["session_status"], rec["created_by"], rec["notes"]),
+        (
+            rec["session_id"],
+            rec["document_id"],
+            rec["source_document_hash"],
+            rec["document_type"],
+            rec["sub_type"],
+            rec["classifier_version"],
+            rec["dictionary_version"],
+            rec["started_at"],
+            rec["completed_at"],
+            rec["session_status"],
+            rec["created_by"],
+            rec["notes"],
+        ),
     )
 
 
@@ -233,15 +267,25 @@ def insert_decision(conn: sqlite3.Connection, d: dict) -> int:
         " decision, decision_source, decided_by, decided_at,"
         " evidence_refs_json, reason, risk_flags_json"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (d["session_id"], d["review_item_id"], d.get("requirement_id"),
-         d.get("normalized_label"), d.get("semantic_type"),
-         d.get("target_type"), d.get("target_key"),
-         d.get("current_value_hash"), d.get("proposed_value_hash"),
-         d.get("edited_value_hash"),
-         d["decision"], d["decision_source"],
-         d.get("decided_by"), d["decided_at"],
-         d.get("evidence_refs_json"), d.get("reason"),
-         d.get("risk_flags_json")),
+        (
+            d["session_id"],
+            d["review_item_id"],
+            d.get("requirement_id"),
+            d.get("normalized_label"),
+            d.get("semantic_type"),
+            d.get("target_type"),
+            d.get("target_key"),
+            d.get("current_value_hash"),
+            d.get("proposed_value_hash"),
+            d.get("edited_value_hash"),
+            d["decision"],
+            d["decision_source"],
+            d.get("decided_by"),
+            d["decided_at"],
+            d.get("evidence_refs_json"),
+            d.get("reason"),
+            d.get("risk_flags_json"),
+        ),
     )
     return cur.lastrowid
 
@@ -251,15 +295,11 @@ def build_writer_operation_log_records(ops: list[dict]) -> list[dict]:
     for op in ops:
         validate_no_sensitive_raw_values(op)
         if op["operation_type"] in FORBIDDEN_OPERATION_TYPE:
-            raise ValueError(
-                f"forbidden operation_type: {op['operation_type']}"
-            )
+            raise ValueError(f"forbidden operation_type: {op['operation_type']}")
         if op["operation_type"] not in ALLOWED_OPERATION_TYPE:
             raise ValueError(f"invalid operation_type: {op['operation_type']}")
         if op["operation_status"] not in ALLOWED_OPERATION_STATUS:
-            raise ValueError(
-                f"invalid operation_status: {op['operation_status']}"
-            )
+            raise ValueError(f"invalid operation_status: {op['operation_status']}")
         if not op.get("expected_before_hash"):
             raise ValueError("expected_before_hash required")
         out.append(op)
@@ -273,12 +313,19 @@ def insert_writer_operation(conn: sqlite3.Connection, op: dict) -> int:
         " target_type, target_key, expected_before_hash, value_hash,"
         " operation_status, blocked_reason, created_at"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (op["session_id"], op.get("decision_log_id"),
-         op["operation_type"], op.get("writer_method"),
-         op["target_type"], op["target_key"],
-         op["expected_before_hash"], op.get("value_hash"),
-         op["operation_status"], op.get("blocked_reason"),
-         op["created_at"]),
+        (
+            op["session_id"],
+            op.get("decision_log_id"),
+            op["operation_type"],
+            op.get("writer_method"),
+            op["target_type"],
+            op["target_key"],
+            op["expected_before_hash"],
+            op.get("value_hash"),
+            op["operation_status"],
+            op.get("blocked_reason"),
+            op["created_at"],
+        ),
     )
     return cur.lastrowid
 
@@ -288,9 +335,7 @@ def build_readback_log_records(reads: list[dict]) -> list[dict]:
     for r in reads:
         validate_no_sensitive_raw_values(r)
         if r["readback_status"] not in ALLOWED_READBACK_STATUS:
-            raise ValueError(
-                f"invalid readback_status: {r['readback_status']}"
-            )
+            raise ValueError(f"invalid readback_status: {r['readback_status']}")
         out.append(r)
     return out
 
@@ -302,27 +347,32 @@ def insert_readback(conn: sqlite3.Connection, r: dict) -> int:
         " expected_after_hash, actual_after_hash,"
         " divergence_code, divergence_summary, checked_at"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (r["session_id"], r.get("operation_log_id"),
-         r["readback_status"], r.get("expected_after_hash"),
-         r.get("actual_after_hash"), r.get("divergence_code"),
-         r.get("divergence_summary"), r["checked_at"]),
+        (
+            r["session_id"],
+            r.get("operation_log_id"),
+            r["readback_status"],
+            r.get("expected_after_hash"),
+            r.get("actual_after_hash"),
+            r.get("divergence_code"),
+            r.get("divergence_summary"),
+            r["checked_at"],
+        ),
     )
     return cur.lastrowid
 
 
 # ── learning signal derivation ─────────────────────────────────────────────
 
-def _is_reusable(
-    *,
-    decision: str,
-    decision_source: str,
-    writer_status: str,
-    readback_status: str,
-    semantic_type: str | None,
-    target_key: str | None,
-    normalized_label: str | None,
-    has_conflict: bool,
-) -> tuple[bool, str | None]:
+
+def _is_reusable(signal: dict) -> tuple[bool, str | None]:
+    decision = signal["decision"]
+    _ = signal["decision_source"]  # 미사용이지만 원래 필수 키였으므로 누락 시 KeyError 동작 보존
+    writer_status = signal.get("writer_status", "NOT_RUN")
+    readback_status = signal.get("readback_status", "NOT_RUN")
+    semantic_type = signal.get("semantic_type")
+    target_key = signal.get("target_key")
+    normalized_label = signal.get("normalized_label")
+    has_conflict = bool(signal.get("has_conflict"))
     if decision not in REUSABLE_DECISIONS:
         return False, f"DECISION_NOT_REUSABLE:{decision}"
     if writer_status != "APPLIED":
@@ -354,21 +404,10 @@ def build_learning_signal_records(signals: list[dict]) -> list[dict]:
     out: list[dict] = []
     for s in signals:
         validate_no_sensitive_raw_values(s)
-        reusable, blocked = _is_reusable(
-            decision=s["decision"],
-            decision_source=s["decision_source"],
-            writer_status=s.get("writer_status", "NOT_RUN"),
-            readback_status=s.get("readback_status", "NOT_RUN"),
-            semantic_type=s.get("semantic_type"),
-            target_key=s.get("target_key"),
-            normalized_label=s.get("normalized_label"),
-            has_conflict=bool(s.get("has_conflict", False)),
-        )
+        reusable, blocked = _is_reusable(s)
         score = float(s.get("signal_score", 0.9 if reusable else 0.1))
-        if score < 0.0:
-            score = 0.0
-        if score > 1.0:
-            score = 1.0
+        score = max(score, 0.0)
+        score = min(score, 1.0)
         out.append({
             "session_id": s["session_id"],
             "document_id": s["document_id"],
@@ -400,17 +439,31 @@ def insert_learning_signal(conn: sqlite3.Connection, r: dict) -> int:
         " reusable, promotion_candidate_id, blocked_reason,"
         " signal_score, created_at"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (r["session_id"], r["document_id"], r["document_type"], r["sub_type"],
-         r["normalized_label"], r["semantic_type"], r["target_type"],
-         r["target_pattern"], r["evidence_type"], r["decision_source"],
-         r["writer_success"], r["readback_success"],
-         r["reusable"], r["promotion_candidate_id"], r["blocked_reason"],
-         r["signal_score"], r["created_at"]),
+        (
+            r["session_id"],
+            r["document_id"],
+            r["document_type"],
+            r["sub_type"],
+            r["normalized_label"],
+            r["semantic_type"],
+            r["target_type"],
+            r["target_pattern"],
+            r["evidence_type"],
+            r["decision_source"],
+            r["writer_success"],
+            r["readback_success"],
+            r["reusable"],
+            r["promotion_candidate_id"],
+            r["blocked_reason"],
+            r["signal_score"],
+            r["created_at"],
+        ),
     )
     return cur.lastrowid
 
 
 # ── XML deep analyzer backlog ──────────────────────────────────────────────
+
 
 def build_xml_deep_analyzer_need_flags(flags: list[dict]) -> list[dict]:
     out: list[dict] = []
@@ -429,19 +482,26 @@ def insert_xml_backlog(conn: sqlite3.Connection, f: dict) -> int:
         "session_id, document_id, reason_code, target_key,"
         " normalized_label, context_json, severity, created_at"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (f.get("session_id"), f["document_id"], f["reason_code"],
-         f.get("target_key"), f.get("normalized_label"),
-         f.get("context_json"), f["severity"], f["created_at"]),
+        (
+            f.get("session_id"),
+            f["document_id"],
+            f["reason_code"],
+            f.get("target_key"),
+            f.get("normalized_label"),
+            f.get("context_json"),
+            f["severity"],
+            f["created_at"],
+        ),
     )
     return cur.lastrowid
 
 
 # ── summaries ──────────────────────────────────────────────────────────────
 
+
 def summarize_learning_signals(conn: sqlite3.Connection) -> dict:
     rows = conn.execute(
-        "SELECT COUNT(*), SUM(reusable),"
-        " AVG(signal_score) FROM fill_review_learning_signals"
+        "SELECT COUNT(*), SUM(reusable), AVG(signal_score) FROM fill_review_learning_signals"
     ).fetchone()
     total = rows[0] or 0
     reusable = rows[1] or 0
@@ -499,8 +559,7 @@ def audit_log_contract_isolation() -> dict:
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
                 })
-    return {"violations": violations, "ok": not violations,
-              "filesChecked": checked}
+    return {"violations": violations, "ok": not violations, "filesChecked": checked}
 
 
 def migration_002_checksum() -> dict:

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import struct
 import zlib
-from typing import Any
-
+from pathlib import Path
+from typing import Any, NamedTuple
 
 Color = tuple[int, int, int]
 
@@ -23,7 +22,12 @@ PALETTE: list[Color] = [
 
 
 def _chunk(kind: bytes, data: bytes) -> bytes:
-    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    return (
+        struct.pack(">I", len(data))
+        + kind
+        + data
+        + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    )
 
 
 def _encode_png(width: int, height: int, pixels: bytearray) -> bytes:
@@ -33,34 +37,38 @@ def _encode_png(width: int, height: int, pixels: bytearray) -> bytes:
         raw.append(0)
         start = y * stride
         raw.extend(pixels[start : start + stride])
-    return b"".join(
-        [
-            b"\x89PNG\r\n\x1a\n",
-            _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)),
-            _chunk(b"IDAT", zlib.compress(bytes(raw), level=9)),
-            _chunk(b"IEND", b""),
-        ]
-    )
+    return b"".join([
+        b"\x89PNG\r\n\x1a\n",
+        _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)),
+        _chunk(b"IDAT", zlib.compress(bytes(raw), level=9)),
+        _chunk(b"IEND", b""),
+    ])
 
 
-def _set_pixel(pixels: bytearray, width: int, height: int, x: int, y: int, color: Color) -> None:
-    if x < 0 or y < 0 or x >= width or y >= height:
+class _Canvas(NamedTuple):
+    pixels: bytearray
+    width: int
+    height: int
+
+
+def _set_pixel(canvas: _Canvas, x: int, y: int, color: Color) -> None:
+    if x < 0 or y < 0 or x >= canvas.width or y >= canvas.height:
         return
-    index = (y * width + x) * 3
-    pixels[index : index + 3] = bytes(color)
+    index = (y * canvas.width + x) * 3
+    canvas.pixels[index : index + 3] = bytes(color)
 
 
-def _fill_rect(pixels: bytearray, width: int, height: int, x0: int, y0: int, x1: int, y1: int, color: Color) -> None:
+def _fill_rect(canvas: _Canvas, x0: int, y0: int, x1: int, y1: int, color: Color) -> None:
     left = max(0, min(x0, x1))
-    right = min(width, max(x0, x1))
+    right = min(canvas.width, max(x0, x1))
     top = max(0, min(y0, y1))
-    bottom = min(height, max(y0, y1))
+    bottom = min(canvas.height, max(y0, y1))
     for y in range(top, bottom):
         for x in range(left, right):
-            _set_pixel(pixels, width, height, x, y, color)
+            _set_pixel(canvas, x, y, color)
 
 
-def _draw_line(pixels: bytearray, width: int, height: int, x0: int, y0: int, x1: int, y1: int, color: Color) -> None:
+def _draw_line(canvas: _Canvas, x0: int, y0: int, x1: int, y1: int, color: Color) -> None:
     dx = abs(x1 - x0)
     sx = 1 if x0 < x1 else -1
     dy = -abs(y1 - y0)
@@ -68,7 +76,7 @@ def _draw_line(pixels: bytearray, width: int, height: int, x0: int, y0: int, x1:
     err = dx + dy
     x, y = x0, y0
     while True:
-        _set_pixel(pixels, width, height, x, y, color)
+        _set_pixel(canvas, x, y, color)
         if x == x1 and y == y1:
             break
         e2 = 2 * err
@@ -116,6 +124,7 @@ def generate_bar_chart_png(data: dict[str, Any], output: Path) -> dict[str, Any]
     grid = (224, 228, 235)
     axis = (60, 64, 72)
     pixels = bytearray(bg * (width * height))
+    canvas = _Canvas(pixels, width, height)
     margin_left = max(36, width // 12)
     margin_right = max(20, width // 24)
     margin_top = max(24, height // 12)
@@ -127,9 +136,9 @@ def generate_bar_chart_png(data: dict[str, Any], output: Path) -> dict[str, Any]
 
     for i in range(6):
         y = plot_top + round((plot_bottom - plot_top) * i / 5)
-        _draw_line(pixels, width, height, plot_left, y, plot_right, y, grid)
-    _draw_line(pixels, width, height, plot_left, plot_top, plot_left, plot_bottom, axis)
-    _draw_line(pixels, width, height, plot_left, plot_bottom, plot_right, plot_bottom, axis)
+        _draw_line(canvas, plot_left, y, plot_right, y, grid)
+    _draw_line(canvas, plot_left, plot_top, plot_left, plot_bottom, axis)
+    _draw_line(canvas, plot_left, plot_bottom, plot_right, plot_bottom, axis)
 
     values = [item["value"] for item in chart["series"]]
     max_value = max(values) or 1.0
@@ -142,8 +151,8 @@ def generate_bar_chart_png(data: dict[str, Any], output: Path) -> dict[str, Any]
         x1 = x0 + bar_width
         y0 = plot_bottom - bar_height
         color = PALETTE[index % len(PALETTE)]
-        _fill_rect(pixels, width, height, x0, y0, x1, plot_bottom, color)
-        _fill_rect(pixels, width, height, x0, plot_bottom + 4, x1, plot_bottom + 8, color)
+        _fill_rect(canvas, x0, y0, x1, plot_bottom, color)
+        _fill_rect(canvas, x0, plot_bottom + 4, x1, plot_bottom + 8, color)
 
     output.write_bytes(_encode_png(width, height, pixels))
     return {

@@ -9,7 +9,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COM_BATCH_SCRIPT = REPO_ROOT / "scripts" / "hwpx" / "hancom_hwp_to_hwpx_batch.py"
 STANDALONE_CONVERTER_SCRIPT = REPO_ROOT / "scripts" / "hwpx" / "hwp_to_hwpx_standalone.py"
@@ -17,7 +16,13 @@ HWPXJS_ADAPTER_SCRIPT = REPO_ROOT / "scripts" / "hwpx" / "hwpxjs_hwp_to_hwpx.py"
 HWPXJS_DEFAULT_REPO = REPO_ROOT / "tmp" / "external_hwpxjs_source"
 LOCAL_GUI_SCRIPT = REPO_ROOT / "scripts" / "local-gui" / "hancom_hwp_to_hwpx_local_gui.py"
 USER_PRESENT_SCRIPT = REPO_ROOT / "scripts" / "hwp-worker" / "Convert-HwpToHwpx-UserPresent.ps1"
-PS32 = Path(os.environ.get("WINDIR", r"C:\Windows")) / "SysWOW64" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+PS32 = (
+    Path(os.environ.get("WINDIR", r"C:\Windows"))
+    / "SysWOW64"
+    / "WindowsPowerShell"
+    / "v1.0"
+    / "powershell.exe"
+)
 
 
 PROVIDER_ORDER = [
@@ -105,7 +110,7 @@ def read_json(path: Path) -> object | None:
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
 
 
@@ -127,7 +132,8 @@ def _official_converter_contract(help_rows: list[Any], exe_hits: list[str]) -> d
     matching_rows = [
         row
         for row in help_rows
-        if isinstance(row, dict) and Path(str(row.get("exe") or "")).name.lower() == "hwpconverter.exe"
+        if isinstance(row, dict)
+        and Path(str(row.get("exe") or "")).name.lower() == "hwpconverter.exe"
     ]
     statuses = [str(row.get("status")) for row in matching_rows]
     has_stdout = any(str(row.get("stdout") or "").strip() for row in matching_rows)
@@ -138,7 +144,11 @@ def _official_converter_contract(help_rows: list[Any], exe_hits: list[str]) -> d
     elif matching_rows and all(status == "TIMEOUT" for status in statuses):
         contract = "GUI_OR_BLOCKING_PROCESS"
         reason = "Help probes timed out without stdout/stderr"
-    elif matching_rows and any(status == "EXITED" for status in statuses) and (has_stdout or has_stderr):
+    elif (
+        matching_rows
+        and any(status == "EXITED" for status in statuses)
+        and (has_stdout or has_stderr)
+    ):
         contract = "CLI_HELP_VISIBLE"
         reason = "Help probe exited and emitted text"
     elif matching_rows:
@@ -162,14 +172,42 @@ def official_converter_discovery_dirs() -> list[Path]:
         REPO_ROOT / "tmp" / "hancom_hwpx_converter_post_install",
         REPO_ROOT / "tmp" / "hancom_official_hwpx_converter_discovery",
     ]
-    try:
-        return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return None
 
 
 class OfficialConverterProvider(ConverterProvider):
     provider_name = "official_converter"
+
+    def _scan_discovery_dir(
+        self,
+        base: Path,
+        shortcut_hits: list[str],
+        uninstall_hits: list[str],
+        exe_hits: list[str],
+        help_rows_all: list[Any],
+    ) -> None:
+        shortcuts = read_json(base / "shortcut_candidates.json")
+        for item in _as_list(shortcuts):
+            text = _row_text(item)
+            if any(token in text.lower() for token in ("hwpx", "converter")):
+                shortcut_hits.append(text)
+
+        for name in ("uninstall_hkcu.json", "uninstall_hklm.json"):
+            rows = read_json(base / name)
+            for item in _as_list(rows):
+                text = _row_text(item)
+                if any(token in text.lower() for token in ("hwpx", "converter")):
+                    uninstall_hits.append(text)
+
+        exes = read_json(base / "exe_candidates.json")
+        for item in _as_list(exes):
+            if isinstance(item, dict):
+                full = str(item.get("FullName") or item.get("fullName") or "")
+                name = Path(full).name.lower()
+                if name == "hwpconverter.exe":
+                    exe_hits.append(full)
+
+        help_rows = read_json(base / "help_probe.json")
+        help_rows_all.extend(_as_list(help_rows))
 
     def detect(self) -> ProviderStatus:
         shortcut_hits: list[str] = []
@@ -178,29 +216,7 @@ class OfficialConverterProvider(ConverterProvider):
         help_rows_all: list[Any] = []
 
         for base in official_converter_discovery_dirs():
-            shortcuts = read_json(base / "shortcut_candidates.json")
-            for item in _as_list(shortcuts):
-                text = _row_text(item)
-                if any(token in text.lower() for token in ("hwpx", "converter")):
-                    shortcut_hits.append(text)
-
-            for name in ("uninstall_hkcu.json", "uninstall_hklm.json"):
-                rows = read_json(base / name)
-                for item in _as_list(rows):
-                    text = _row_text(item)
-                    if any(token in text.lower() for token in ("hwpx", "converter")):
-                        uninstall_hits.append(text)
-
-            exes = read_json(base / "exe_candidates.json")
-            for item in _as_list(exes):
-                if isinstance(item, dict):
-                    full = str(item.get("FullName") or item.get("fullName") or "")
-                    name = Path(full).name.lower()
-                    if name == "hwpconverter.exe":
-                        exe_hits.append(full)
-
-            help_rows = read_json(base / "help_probe.json")
-            help_rows_all.extend(_as_list(help_rows))
+            self._scan_discovery_dir(base, shortcut_hits, uninstall_hits, exe_hits, help_rows_all)
 
         contract = _official_converter_contract(help_rows_all, exe_hits)
         metadata = {
@@ -286,7 +302,11 @@ class HwpxJsProvider(ConverterProvider):
     def detect(self) -> ProviderStatus:
         adapter_exists = HWPXJS_ADAPTER_SCRIPT.exists()
         env_cli = os.environ.get("HWPXJS_CLI", "").strip()
-        env_repo = Path(os.environ.get("HWPXJS_REPO", "")).expanduser() if os.environ.get("HWPXJS_REPO") else None
+        env_repo = (
+            Path(os.environ.get("HWPXJS_REPO", "")).expanduser()
+            if os.environ.get("HWPXJS_REPO")
+            else None
+        )
         repo = (env_repo or HWPXJS_DEFAULT_REPO).resolve()
         dist_cli = repo / "dist" / "cli.js"
         package_json = repo / "package.json"
@@ -374,7 +394,9 @@ class SdkProvider(ConverterProvider):
     provider_name = "sdk"
 
     def detect(self) -> ProviderStatus:
-        sdk_catalog = read_json(REPO_ROOT / "tmp" / "hancom_full_function_explorer" / "sdk_capability_catalog.json")
+        sdk_catalog = read_json(
+            REPO_ROOT / "tmp" / "hancom_full_function_explorer" / "sdk_capability_catalog.json"
+        )
         hwp_sdk = None
         if isinstance(sdk_catalog, list):
             hwp_sdk = next((row for row in sdk_catalog if row.get("tool_name") == "Hwp SDK"), None)
@@ -384,7 +406,9 @@ class SdkProvider(ConverterProvider):
             verified=False,
             status="LICENSE_REQUIRED",
             blocker="SDK_NOT_INSTALLED_OR_LICENSE_NOT_CONFIRMED",
-            evidence=json.dumps(hwp_sdk, ensure_ascii=False) if hwp_sdk else "No installed SDK evidence",
+            evidence=json.dumps(hwp_sdk, ensure_ascii=False)
+            if hwp_sdk
+            else "No installed SDK evidence",
             execution_allowed=False,
             next_action="Confirm Hwp SDK license, install path, and sample conversion API",
             metadata={"sdk_catalog_entry": hwp_sdk},

@@ -6,6 +6,7 @@ Runs one real safe-HWPX cell replace scenario and validates:
 - verify7 PASS
 - output reread matches replacement text
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,11 +20,11 @@ PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
 
-from scripts.hwpx.web_office.cell_save_pipeline import save_cell_edits  # noqa: E402
-from scripts.hwpx.web_office.edit_command_model import (  # noqa: E402
+from scripts.hwpx.web_office.cell_save_pipeline import save_cell_edits  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.edit_command_model import (  # ruff: ignore[module-import-not-at-top-of-file]
     make_set_cell_text_command,
 )
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
+from scripts.hwpx.web_office.ro_view_importer import (  # ruff: ignore[module-import-not-at-top-of-file]
     import_hwpx_as_ro_view,
 )
 
@@ -36,6 +37,43 @@ REPLACE_AFTER = "CELL_VERIFY_OK_005"
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _pipeline_result_findings(res: dict, out: Path, target_cell_id: str) -> list[dict]:
+    findings: list[dict] = []
+    if res.get("verdict") != "PASS":
+        findings.append({
+            "code": "PIPELINE_NOT_PASS",
+            "level": "FAIL",
+            "detail": res.get("verdict"),
+        })
+    if res.get("outputCreated") is not True:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL"})
+    if res.get("sourceUnchanged") is not True:
+        findings.append({"code": "SOURCE_MUTATED_FLAG", "level": "FAIL"})
+
+    verify7 = res.get("verify7") or {}
+    if verify7.get("verdict") != "PASS":
+        findings.append({
+            "code": "VERIFY7_NOT_PASS",
+            "level": "FAIL",
+            "detail": verify7,
+        })
+
+    if out.is_file():
+        out_doc = import_hwpx_as_ro_view(out)
+        out_cell = next((c for c in out_doc.cells if c.cellId == target_cell_id), None)
+        if out_cell is None:
+            findings.append({"code": "OUTPUT_CELL_MISSING", "level": "FAIL"})
+        elif out_cell.text != REPLACE_AFTER:
+            findings.append({
+                "code": "OUTPUT_TEXT_NOT_APPLIED",
+                "level": "FAIL",
+                "detail": out_cell.text,
+            })
+    else:
+        findings.append({"code": "OUTPUT_FILE_MISSING", "level": "FAIL"})
+    return findings
 
 
 def verify() -> dict:
@@ -89,38 +127,7 @@ def verify() -> dict:
         dry_run_only=False,
     )
 
-    if res.get("verdict") != "PASS":
-        findings.append({
-            "code": "PIPELINE_NOT_PASS",
-            "level": "FAIL",
-            "detail": res.get("verdict"),
-        })
-    if res.get("outputCreated") is not True:
-        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL"})
-    if res.get("sourceUnchanged") is not True:
-        findings.append({"code": "SOURCE_MUTATED_FLAG", "level": "FAIL"})
-
-    verify7 = res.get("verify7") or {}
-    if verify7.get("verdict") != "PASS":
-        findings.append({
-            "code": "VERIFY7_NOT_PASS",
-            "level": "FAIL",
-            "detail": verify7,
-        })
-
-    if out.is_file():
-        out_doc = import_hwpx_as_ro_view(out)
-        out_cell = next((c for c in out_doc.cells if c.cellId == target.cellId), None)
-        if out_cell is None:
-            findings.append({"code": "OUTPUT_CELL_MISSING", "level": "FAIL"})
-        elif out_cell.text != REPLACE_AFTER:
-            findings.append({
-                "code": "OUTPUT_TEXT_NOT_APPLIED",
-                "level": "FAIL",
-                "detail": out_cell.text,
-            })
-    else:
-        findings.append({"code": "OUTPUT_FILE_MISSING", "level": "FAIL"})
+    findings.extend(_pipeline_result_findings(res, out, target.cellId))
 
     if _sha(SAFE_FIXTURE) != source_sha_before:
         findings.append({"code": "SOURCE_SHA_CHANGED", "level": "FAIL"})

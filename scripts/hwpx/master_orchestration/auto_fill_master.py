@@ -13,10 +13,12 @@
 본 모듈은 production fill_review를 import하지 않는다.
 모든 외부 의존은 callable injection으로 받는다.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 CONTRACT_NAME = "HWPX-AUTO-FILL-MASTER-ORCHESTRATION-01"
 CONTRACT_VERSION = "v1"
@@ -29,7 +31,7 @@ CONTRACT_VERSION = "v1"
 # (모두 optional — 없으면 placeholder 반환)
 
 
-def run_auto_fill_master(
+def run_auto_fill_master(  # ruff: ignore[too-many-arguments] - 여러 호출부(live_smoke_harness, batch_hwpx_100_*) 있는 orchestration facade, 전부 keyword-only 옵션
     *,
     source_hwpx_ref: str,
     source_documents: list[dict] | None = None,
@@ -46,8 +48,8 @@ def run_auto_fill_master(
     반환은 운영동 fill_review_live_pipeline 결과와 호환되는 dict.
     실제 writer 호출은 별도 단계 — 본 함수는 review item까지만 만든다.
     """
-    from scripts.hwpx.source_extractor import source_extractor_contract as se
     from scripts.hwpx.ai_proposal import review_item_builder as rib
+    from scripts.hwpx.source_extractor import source_extractor_contract as se
 
     result: dict[str, Any] = {
         "contractName": CONTRACT_NAME,
@@ -61,8 +63,7 @@ def run_auto_fill_master(
 
     # ── ① 인식 ────────────────────────────────────────────────────────
     if recognition_fn is None:
-        recognition_result = {"documentId": source_hwpx_ref,
-                                "labelOccurrences": []}
+        recognition_result = {"documentId": source_hwpx_ref, "labelOccurrences": []}
         result["warnings"].append({
             "code": "RECOGNITION_FN_NOT_INJECTED",
             "stage": "recognition",
@@ -70,38 +71,35 @@ def run_auto_fill_master(
     else:
         try:
             recognition_result = recognition_fn(source_hwpx_ref) or {}
-        except Exception as e:
-            result["errors"].append({"stage": "recognition",
-                                          "error": str(e)[:200]})
-            recognition_result = {"documentId": source_hwpx_ref,
-                                    "labelOccurrences": []}
+        except Exception as e:  # ruff: ignore[blind-except] - 외부 주입 콜백, 예외 타입 예측 불가, 보고 후 계속
+            result["errors"].append({"stage": "recognition", "error": str(e)[:200]})
+            recognition_result = {"documentId": source_hwpx_ref, "labelOccurrences": []}
     result["recognitionResult"] = recognition_result
-    result["stages"].append({"stage": "recognition", "ok": True,
-                                "labelCount": len(
-                                    recognition_result.get(
-                                        "labelOccurrences") or [])})
+    result["stages"].append({
+        "stage": "recognition",
+        "ok": True,
+        "labelCount": len(recognition_result.get("labelOccurrences") or []),
+    })
 
     # ── ② 입력칸 감지 ─────────────────────────────────────────────────
     slots: list[dict] = []
     if slot_detect_fn is not None:
         try:
             slots = slot_detect_fn(recognition_result) or []
-        except Exception as e:
-            result["errors"].append({"stage": "slot_detection",
-                                          "error": str(e)[:200]})
+        except Exception as e:  # ruff: ignore[blind-except] - 외부 주입 콜백, 예외 타입 예측 불가, 보고 후 계속
+            result["errors"].append({"stage": "slot_detection", "error": str(e)[:200]})
     result["inputSlots"] = slots
-    result["stages"].append({"stage": "slot_detection",
-                                "ok": True, "slotCount": len(slots)})
+    result["stages"].append({"stage": "slot_detection", "ok": True, "slotCount": len(slots)})
 
     # ── ③ 통합 Source Extractor ──────────────────────────────────────
     targets = target_labels or [
         (occ.get("normalizedLabel") or "")
-            for occ in recognition_result.get("labelOccurrences") or []
+        for occ in recognition_result.get("labelOccurrences") or []
     ]
     targets = [t for t in targets if t]
     extracted_result = se.extract_values_from_sources(
-        source_documents or [], targets,
-        extractor_registry=extractor_registry)
+        source_documents or [], targets, extractor_registry=extractor_registry
+    )
     result["extractedValues"] = extracted_result["extractedValues"]
     result["stages"].append({
         "stage": "source_extraction",
@@ -126,16 +124,15 @@ def run_auto_fill_master(
         })
     else:
         try:
-            ai_proposals = ai_proposal_fn(
-                recognition_result, slots,
-                extracted_result["extractedValues"]) or []
-        except Exception as e:
-            result["errors"].append({"stage": "ai_proposal",
-                                          "error": str(e)[:200]})
+            ai_proposals = (
+                ai_proposal_fn(recognition_result, slots, extracted_result["extractedValues"]) or []
+            )
+        except Exception as e:  # ruff: ignore[blind-except] - 외부 주입 콜백, 예외 타입 예측 불가, 보고 후 계속
+            result["errors"].append({"stage": "ai_proposal", "error": str(e)[:200]})
 
     ai_review = rib.build_review_items_from_proposals(
-        ai_proposals, recognition_result,
-        conflict_labels=conflict_labels, request_id=request_id)
+        ai_proposals, recognition_result, conflict_labels=conflict_labels, request_id=request_id
+    )
     result["aiProposalSummary"] = ai_review["summary"]
     result["reviewItems"] = ai_review["reviewItems"]
     result["holdProposals"] = ai_review["holdProposals"]
@@ -148,8 +145,7 @@ def run_auto_fill_master(
 
     # ── ⑤ 운영동 호환 출력 형태 ──────────────────────────────────────
     # 배관(orchestration)이 받을 수 있는 dict로 변환.
-    result["pipelineStatus"] = ("READY_FOR_REVIEW"
-                                       if result["reviewItems"] else "READY_FOR_REVIEW")
+    result["pipelineStatus"] = "READY_FOR_REVIEW" if result["reviewItems"] else "READY_FOR_REVIEW"
     result["sourceDocumentHash"] = source_hwpx_ref
     result["documentId"] = recognition_result.get("documentId") or source_hwpx_ref
     result["fillReview"] = {"reviewItems": result["reviewItems"]}
@@ -171,8 +167,7 @@ def _proposals_from_extracted(extracted_values: list[dict]) -> list[dict]:
             "label": v.get("label"),
             "value": v.get("value"),
             "confidence": float(v.get("confidence") or 0.0),
-            "evidence": [{"sourceRef": v.get("sourceRef"),
-                            "evidenceType": v.get("evidenceType")}],
+            "evidence": [{"sourceRef": v.get("sourceRef"), "evidenceType": v.get("evidenceType")}],
             "modelId": "source_extractor_fallback",
         })
     return out
@@ -182,8 +177,7 @@ def dump_contract_snapshot() -> dict:
     return {
         "contractName": CONTRACT_NAME,
         "contractVersion": CONTRACT_VERSION,
-        "stages": ["recognition", "slot_detection",
-                      "source_extraction", "ai_proposal_routing"],
+        "stages": ["recognition", "slot_detection", "source_extraction", "ai_proposal_routing"],
     }
 
 
@@ -216,5 +210,4 @@ def audit_master_isolation() -> dict:
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
                 })
-    return {"violations": violations, "ok": not violations,
-              "filesChecked": checked}
+    return {"violations": violations, "ok": not violations, "filesChecked": checked}

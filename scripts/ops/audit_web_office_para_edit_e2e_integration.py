@@ -23,7 +23,9 @@ ro_view → state → command → plan → writer → verify7 → readback 동�
 PASS 화는 multi-run writer / paragraph readback parser / adapter
 applyCharPrIDRef 보강 트리거에서 별도 공정으로 진행한다.
 """
+
 from __future__ import annotations
+
 import json
 import re
 import sqlite3
@@ -103,7 +105,8 @@ REQUIRED_READBACK_GATES = (
     "V7_READBACK_MATCH",
 )
 READBACK_REQUIRED_SCENARIOS = {
-    "REPLACE_TEXT_RANGE", "DELETE_TEXT_RANGE",
+    "REPLACE_TEXT_RANGE",
+    "DELETE_TEXT_RANGE",
     # WEB-OFFICE-PARA-TYPE-TEXT-CONTRACT-01 — TYPE_TEXT readback 활성화.
     "TYPE_TEXT",
 }
@@ -114,7 +117,8 @@ def _check_files_exist() -> list[dict]:
     for p in REQUIRED_FILES:
         if not p.is_file():
             findings.append({
-                "code": "MISSING_FILE", "level": "FAIL",
+                "code": "MISSING_FILE",
+                "level": "FAIL",
                 "detail": str(p.relative_to(PR)),
             })
     return findings
@@ -141,16 +145,24 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(PR),
+                timeout=20,
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({
-                "code": "GIT_DIFF_FAILED", "level": "WARN",
+                "code": "GIT_DIFF_FAILED",
+                "level": "WARN",
                 "detail": f"{rel}: {e}",
             })
             continue
         if r.returncode != 0:
             findings.append({
-                "code": "GIT_DIFF_FAILED", "level": "WARN",
+                "code": "GIT_DIFF_FAILED",
+                "level": "WARN",
                 "detail": f"{rel}: rc={r.returncode}",
             })
             continue
@@ -168,8 +180,8 @@ def _pick_fixture() -> Path | None:
     if not db.is_file():
         # 레거시 corpus DB 부재 — 카탈로그 표본으로 대체한다.
         # 이게 없으면 감리가 조용히 SKIP 되어 안 돈 채 통과처럼 보인다.
-        from scripts.hwpx.web_office.hwpx_sample_source import (
-            resolve_sample as _catalog_sample)
+        from scripts.hwpx.web_office.hwpx_sample_source import resolve_sample as _catalog_sample
+
         return _catalog_sample()
     try:
         conn = sqlite3.connect(db)
@@ -194,9 +206,13 @@ def _pick_fixture() -> Path | None:
 def _pick_paragraph(doc) -> Any:
     for p in doc.paragraphs:
         cs = p.containerScope or {}
-        if (cs.get("kind") == "cell" and p.parPrIDRef
-                and p.runs and p.runs[0].charPrIDRef
-                and len(p.text or "") >= 2):
+        if (
+            cs.get("kind") == "cell"
+            and p.parPrIDRef
+            and p.runs
+            and p.runs[0].charPrIDRef
+            and len(p.text or "") >= 2
+        ):
             return p
     return None
 
@@ -209,12 +225,14 @@ def _run_dynamic() -> dict[str, Any]:
             "scenarios": [],
             "shaPreserved": None,
         }
-    from scripts.hwpx.web_office.ro_view_importer import (
-        import_hwpx_as_ro_view)
-    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (
-        run_para_edit_e2e,
-        SCENARIO_REPLACE, SCENARIO_DELETE)
     import hashlib
+
+    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (
+        SCENARIO_DELETE,
+        SCENARIO_REPLACE,
+        run_para_edit_e2e,
+    )
+    from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
 
     sha_before = hashlib.sha256(fixture.read_bytes()).hexdigest()
     doc = import_hwpx_as_ro_view(fixture)
@@ -222,17 +240,23 @@ def _run_dynamic() -> dict[str, Any]:
     if ro_p is None:
         return {
             "status": "NO_SUITABLE_PARAGRAPH",
-            "scenarios": [], "shaPreserved": True,
+            "scenarios": [],
+            "shaPreserved": True,
         }
 
     scenarios_out: list[dict] = []
     with tempfile.TemporaryDirectory() as td:
         td_p = Path(td)
         r2 = run_para_edit_e2e(
-            source_path=fixture, output_path=td_p / "e2e_replace.hwpx",
-            scenario=SCENARIO_REPLACE, paragraph_id=ro_p.paragraphId,
-            range_anchor=0, range_focus=1, replace_after="Q",
-            allow_writer=True)
+            source_path=fixture,
+            output_path=td_p / "e2e_replace.hwpx",
+            scenario=SCENARIO_REPLACE,
+            paragraph_id=ro_p.paragraphId,
+            range_anchor=0,
+            range_focus=1,
+            replace_after="Q",
+            allow_writer=True,
+        )
         scenarios_out.append({
             "name": SCENARIO_REPLACE,
             "verdict": r2.get("verdict"),
@@ -242,9 +266,14 @@ def _run_dynamic() -> dict[str, Any]:
             "rejectedCount": len(r2.get("rejected") or []),
         })
         r3 = run_para_edit_e2e(
-            source_path=fixture, output_path=td_p / "e2e_delete.hwpx",
-            scenario=SCENARIO_DELETE, paragraph_id=ro_p.paragraphId,
-            range_anchor=0, range_focus=1, allow_writer=True)
+            source_path=fixture,
+            output_path=td_p / "e2e_delete.hwpx",
+            scenario=SCENARIO_DELETE,
+            paragraph_id=ro_p.paragraphId,
+            range_anchor=0,
+            range_focus=1,
+            allow_writer=True,
+        )
         scenarios_out.append({
             "name": SCENARIO_DELETE,
             "verdict": r3.get("verdict"),
@@ -264,6 +293,46 @@ def _run_dynamic() -> dict[str, Any]:
     }
 
 
+def _scenario_findings(sc: dict) -> tuple[list[dict], bool]:
+    findings: list[dict] = []
+    partial = False
+    if not sc["outputCreated"]:
+        findings.append({
+            "code": "E2E_OUTPUT_NOT_CREATED",
+            "level": "FAIL",
+            "detail": f"{sc['name']}",
+        })
+    v17 = sc["v17"] or {}
+    for k in REQUIRED_V_GATES:
+        if v17.get(k) != "PASS":
+            findings.append({
+                "code": "REQUIRED_GATE_NOT_PASS",
+                "level": "FAIL",
+                "detail": f"{sc['name']}: {k}={v17.get(k)}",
+            })
+    # DEFERRED 게이트는 partialCompletion 신호로만 적재
+    for k in DEFERRED_V_GATES:
+        if v17.get(k) != "PASS":
+            findings.append({
+                "code": "DEFERRED_GATE_PARTIAL",
+                "level": "WARN",
+                "detail": (f"{sc['name']}: {k}={v17.get(k)} (LOCKED 모듈 제약 — 다음 트리거)"),
+            })
+            partial = True
+    # WEB-OFFICE-PARA-READBACK-PARSER-01 — REPLACE/DELETE 의 V1/V7
+    # 은 e2e_pipeline.readback gate 로 PASS 요구.
+    if sc["name"] in READBACK_REQUIRED_SCENARIOS:
+        rb = sc.get("readback") or {}
+        for k in REQUIRED_READBACK_GATES:
+            if rb.get(k) != "PASS":
+                findings.append({
+                    "code": "READBACK_GATE_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": (f"{sc['name']}: {k}={rb.get(k)} notes={rb.get('notes')}"),
+                })
+    return findings, partial
+
+
 def audit() -> dict[str, Any]:
     findings: list[dict] = []
     findings.extend(_check_files_exist())
@@ -274,15 +343,12 @@ def audit() -> dict[str, Any]:
     partial = False
     try:
         dyn = _run_dynamic()
-    except Exception as e:  # noqa: BLE001
-        dyn = {"status": "EXCEPTION", "error": str(e),
-               "scenarios": [], "shaPreserved": None}
-        findings.append({"code": "DYNAMIC_EXCEPTION",
-                         "level": "WARN", "detail": str(e)})
+    except Exception as e:  # ruff: ignore[blind-except]
+        dyn = {"status": "EXCEPTION", "error": str(e), "scenarios": [], "shaPreserved": None}
+        findings.append({"code": "DYNAMIC_EXCEPTION", "level": "WARN", "detail": str(e)})
     summary["dynamic"] = dyn
 
-    if dyn["status"] in ("FIXTURE_MISSING", "NO_SUITABLE_PARAGRAPH",
-                         "EXCEPTION"):
+    if dyn["status"] in ("FIXTURE_MISSING", "NO_SUITABLE_PARAGRAPH", "EXCEPTION"):
         partial = True
     else:
         # 본 부분 준공 게이트:
@@ -292,45 +358,13 @@ def audit() -> dict[str, Any]:
         #     이 LOCKED 모듈 제약으로 FAIL — DEFERRED).
         #   - 원본 sha 보존
         for sc in dyn["scenarios"]:
-            if not sc["outputCreated"]:
-                findings.append({
-                    "code": "E2E_OUTPUT_NOT_CREATED",
-                    "level": "FAIL",
-                    "detail": f"{sc['name']}",
-                })
-            v17 = sc["v17"] or {}
-            for k in REQUIRED_V_GATES:
-                if v17.get(k) != "PASS":
-                    findings.append({
-                        "code": "REQUIRED_GATE_NOT_PASS",
-                        "level": "FAIL",
-                        "detail": f"{sc['name']}: {k}={v17.get(k)}",
-                    })
-            # DEFERRED 게이트는 partialCompletion 신호로만 적재
-            for k in DEFERRED_V_GATES:
-                if v17.get(k) != "PASS":
-                    findings.append({
-                        "code": "DEFERRED_GATE_PARTIAL",
-                        "level": "WARN",
-                        "detail": (f"{sc['name']}: {k}={v17.get(k)} "
-                                   "(LOCKED 모듈 제약 — 다음 트리거)"),
-                    })
-                    partial = True
-            # WEB-OFFICE-PARA-READBACK-PARSER-01 — REPLACE/DELETE 의 V1/V7
-            # 은 e2e_pipeline.readback gate 로 PASS 요구.
-            if sc["name"] in READBACK_REQUIRED_SCENARIOS:
-                rb = sc.get("readback") or {}
-                for k in REQUIRED_READBACK_GATES:
-                    if rb.get(k) != "PASS":
-                        findings.append({
-                            "code": "READBACK_GATE_NOT_PASS",
-                            "level": "FAIL",
-                            "detail": (f"{sc['name']}: {k}={rb.get(k)} "
-                                       f"notes={rb.get('notes')}"),
-                        })
+            sc_findings, sc_partial = _scenario_findings(sc)
+            findings.extend(sc_findings)
+            partial = partial or sc_partial
         if dyn.get("shaPreserved") is False:
             findings.append({
-                "code": "SOURCE_SHA_TOUCHED", "level": "FAIL",
+                "code": "SOURCE_SHA_TOUCHED",
+                "level": "FAIL",
                 "detail": "fixture sha before != after",
             })
 
@@ -343,8 +377,10 @@ def audit() -> dict[str, Any]:
         "verdict": verdict,
         "partialCompletion": partial,
         "nextActivationTrigger": (
-            "V1/V4/V7 — paragraph readback parser + adapter "
-            "applyCharPrIDRef 보강 트리거" if partial else None),
+            "V1/V4/V7 — paragraph readback parser + adapter applyCharPrIDRef 보강 트리거"
+            if partial
+            else None
+        ),
         "summary": summary,
         "findings": findings,
     }

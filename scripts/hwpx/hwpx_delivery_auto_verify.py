@@ -9,19 +9,18 @@ prove that Hancom accepts the package without a manual check.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import importlib
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from hwpx_package import HwpxValidator
 from hwpx_package_audit import audit_hwpx_package
 from hwpx_spine_repair import repair_hwpx_spine
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIAG_DIR = Path(__file__).resolve().parent / "diagnostics"
@@ -34,7 +33,7 @@ check_roundtrip_text = importlib.import_module("06_roundtrip_text_probe").check_
 
 
 def iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _check(name: str, passed: bool, **details: Any) -> dict[str, Any]:
@@ -53,20 +52,32 @@ def _status_check(name: str, status: str, **details: Any) -> dict[str, Any]:
 def repair_shadow_check(hwpx_path: Path, work_dir: Path, strict: bool) -> dict[str, Any]:
     repaired = work_dir / f"{hwpx_path.stem}.repaired.hwpx"
     repair = repair_hwpx_spine(hwpx_path, repaired)
-    audit = audit_hwpx_package(repaired, strict=strict) if repaired.exists() else {"status": "FAIL", "error": "REPAIRED_OUTPUT_NOT_FOUND"}
+    audit = (
+        audit_hwpx_package(repaired, strict=strict)
+        if repaired.exists()
+        else {"status": "FAIL", "error": "REPAIRED_OUTPUT_NOT_FOUND"}
+    )
     return {
-        "status": "PASS" if repair.get("status") == "PASS" and audit.get("status") == "PASS" else "FAIL",
+        "status": "PASS"
+        if repair.get("status") == "PASS" and audit.get("status") == "PASS"
+        else "FAIL",
         "repaired": str(repaired),
         "repair": repair,
         "audit": audit,
     }
 
 
-def hancom_render_check(hwpx_path: Path, work_dir: Path, page: int, resolution: int, timeout_sec: int) -> dict[str, Any]:
+def hancom_render_check(
+    hwpx_path: Path, work_dir: Path, page: int, resolution: int, timeout_sec: int
+) -> dict[str, Any]:
     if not PS32.exists():
         return {"status": "SKIPPED", "reason": "POWERSHELL_32BIT_NOT_FOUND", "path": str(PS32)}
     if not RENDER_SCRIPT.exists():
-        return {"status": "SKIPPED", "reason": "RENDER_SCRIPT_NOT_FOUND", "path": str(RENDER_SCRIPT)}
+        return {
+            "status": "SKIPPED",
+            "reason": "RENDER_SCRIPT_NOT_FOUND",
+            "path": str(RENDER_SCRIPT),
+        }
     output = work_dir / "hancom_render" / f"{hwpx_path.stem}.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     command = [
@@ -88,7 +99,9 @@ def hancom_render_check(hwpx_path: Path, work_dir: Path, page: int, resolution: 
         completed = subprocess.run(
             command,
             cwd=REPO_ROOT,
-            text=True, encoding="utf-8", errors="replace",
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             timeout=timeout_sec,
         )
@@ -117,7 +130,9 @@ def hancom_render_check(hwpx_path: Path, work_dir: Path, page: int, resolution: 
             payload = {"raw_stdout_tail": completed.stdout[-4000:]}
     rendered = Path(str(payload.get("output") or output))
     return {
-        "status": "PASS" if payload.get("ok") is True and rendered.exists() and rendered.stat().st_size > 0 else "FAIL",
+        "status": "PASS"
+        if payload.get("ok") is True and rendered.exists() and rendered.stat().st_size > 0
+        else "FAIL",
         "mode": "hancom_open_print_to_image",
         "page": page,
         "resolution": resolution,
@@ -131,14 +146,16 @@ def hancom_render_check(hwpx_path: Path, work_dir: Path, page: int, resolution: 
 def final_status(checks: list[dict[str, Any]], *, require_hancom: bool) -> str:
     if any(check.get("status") == "FAIL" for check in checks):
         return "FAIL"
-    if require_hancom and not any(check.get("name") == "hancom_render" and check.get("status") == "PASS" for check in checks):
+    if require_hancom and not any(
+        check.get("name") == "hancom_render" and check.get("status") == "PASS" for check in checks
+    ):
         return "FAIL"
     if any(check.get("status") in {"WARN", "SKIPPED"} for check in checks):
         return "WARN"
     return "PASS"
 
 
-def verify_hwpx_delivery(
+def verify_hwpx_delivery(  # ruff: ignore[too-many-arguments] - hwpx_api.py 등 외부 호출부 존재, 시그니처 변경 보류
     hwpx_path: Path,
     *,
     source_hwp: Path | None = None,
@@ -162,7 +179,11 @@ def verify_hwpx_delivery(
     try:
         validation = HwpxValidator.validate_hwpx(hwpx_path)
         audit = audit_hwpx_package(hwpx_path, strict=strict)
-        repair_shadow = repair_shadow_check(hwpx_path, work_dir, strict=strict) if hwpx_path.exists() else {"status": "FAIL", "error": "HWPX_NOT_FOUND"}
+        repair_shadow = (
+            repair_shadow_check(hwpx_path, work_dir, strict=strict)
+            if hwpx_path.exists()
+            else {"status": "FAIL", "error": "HWPX_NOT_FOUND"}
+        )
         roundtrip = (
             check_roundtrip_text(source_hwp, hwpx_path, 0.98)
             if source_hwp and source_hwp.exists()
@@ -172,12 +193,30 @@ def verify_hwpx_delivery(
         checks = [
             _check("file_exists", hwpx_path.exists(), path=str(hwpx_path)),
             _check("zip_open", validation.get("zip_ok") is True, validation=validation),
-            _check("xml_parse", validation.get("xml_ok") is True, xml_errors=validation.get("xml_errors")),
-            _check("strict_package_audit", audit.get("status") == "PASS", audit_status=audit.get("status")),
-            _check("shadow_repair_audit", repair_shadow.get("status") == "PASS", repair_status=repair_shadow.get("status")),
+            _check(
+                "xml_parse",
+                validation.get("xml_ok") is True,
+                xml_errors=validation.get("xml_errors"),
+            ),
+            _check(
+                "strict_package_audit",
+                audit.get("status") == "PASS",
+                audit_status=audit.get("status"),
+            ),
+            _check(
+                "shadow_repair_audit",
+                repair_shadow.get("status") == "PASS",
+                repair_status=repair_shadow.get("status"),
+            ),
         ]
         if source_hwp:
-            checks.append(_status_check("source_text_roundtrip", str(roundtrip.get("status") or "FAIL"), roundtrip_status=roundtrip.get("status")))
+            checks.append(
+                _status_check(
+                    "source_text_roundtrip",
+                    str(roundtrip.get("status") or "FAIL"),
+                    roundtrip_status=roundtrip.get("status"),
+                )
+            )
         else:
             checks.append(_warn("source_text_roundtrip", reason="SOURCE_HWP_NOT_PROVIDED"))
 
@@ -187,7 +226,14 @@ def verify_hwpx_delivery(
             if hancom_report.get("status") == "SKIPPED" and hancom == "auto":
                 checks.append(_warn("hancom_render", reason=hancom_report.get("reason")))
             else:
-                checks.append(_check("hancom_render", hancom_report.get("status") == "PASS", hancom_status=hancom_report.get("status"), reason=hancom_report.get("reason")))
+                checks.append(
+                    _check(
+                        "hancom_render",
+                        hancom_report.get("status") == "PASS",
+                        hancom_status=hancom_report.get("status"),
+                        reason=hancom_report.get("reason"),
+                    )
+                )
         elif hancom == "off":
             checks.append(_warn("hancom_render", reason="HANCOM_CHECK_OFF"))
         else:
@@ -239,7 +285,9 @@ def main() -> int:
     )
     if args.report_json:
         args.report_json.parent.mkdir(parents=True, exist_ok=True)
-        args.report_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.report_json.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report.get("status") == "PASS" else 1
 

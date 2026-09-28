@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from hwpx_package import HwpxPackage, local_name
 
@@ -93,7 +93,34 @@ def _set_line_spacing(para_pr: ET.Element, value: Any) -> bool:
     return True
 
 
-def create_char_property(root: ET.Element, name: str, spec: dict[str, Any]) -> tuple[str | None, list[dict[str, Any]]]:
+def _apply_char_color_fields(
+    char_pr: ET.Element, spec: dict[str, Any], name: str, warnings: list[dict[str, Any]]
+) -> None:
+    color = _normalize_color(spec.get("text_color"))
+    if color:
+        char_pr.attrib["textColor"] = color
+    elif "text_color" in spec:
+        warnings.append({
+            "type": "TEXT_COLOR_INVALID",
+            "name": name,
+            "value": spec.get("text_color"),
+        })
+    shade = _normalize_color(spec.get("shade_color"))
+    if shade:
+        char_pr.attrib["shadeColor"] = shade
+    elif spec.get("shade_color") in {"none", "NONE"}:
+        char_pr.attrib["shadeColor"] = "none"
+    elif "shade_color" in spec:
+        warnings.append({
+            "type": "SHADE_COLOR_INVALID",
+            "name": name,
+            "value": spec.get("shade_color"),
+        })
+
+
+def create_char_property(
+    root: ET.Element, name: str, spec: dict[str, Any]
+) -> tuple[str | None, list[dict[str, Any]]]:
     warnings: list[dict[str, Any]] = []
     container = _find_container(root, "charProperties")
     if container is None:
@@ -108,19 +135,12 @@ def create_char_property(root: ET.Element, name: str, spec: dict[str, Any]) -> t
         try:
             char_pr.attrib["height"] = str(int(spec["height"]))
         except (TypeError, ValueError):
-            warnings.append({"type": "CHAR_HEIGHT_INVALID", "name": name, "value": spec.get("height")})
-    color = _normalize_color(spec.get("text_color"))
-    if color:
-        char_pr.attrib["textColor"] = color
-    elif "text_color" in spec:
-        warnings.append({"type": "TEXT_COLOR_INVALID", "name": name, "value": spec.get("text_color")})
-    shade = _normalize_color(spec.get("shade_color"))
-    if shade:
-        char_pr.attrib["shadeColor"] = shade
-    elif spec.get("shade_color") in {"none", "NONE"}:
-        char_pr.attrib["shadeColor"] = "none"
-    elif "shade_color" in spec:
-        warnings.append({"type": "SHADE_COLOR_INVALID", "name": name, "value": spec.get("shade_color")})
+            warnings.append({
+                "type": "CHAR_HEIGHT_INVALID",
+                "name": name,
+                "value": spec.get("height"),
+            })
+    _apply_char_color_fields(char_pr, spec, name, warnings)
     if "bold" in spec:
         _set_child_presence(char_pr, "bold", bool(spec["bold"]))
     unsupported = sorted(set(spec) - {"height", "text_color", "shade_color", "bold"})
@@ -131,7 +151,9 @@ def create_char_property(root: ET.Element, name: str, spec: dict[str, Any]) -> t
     return next_id, warnings
 
 
-def create_para_property(root: ET.Element, name: str, spec: dict[str, Any]) -> tuple[str | None, list[dict[str, Any]]]:
+def create_para_property(
+    root: ET.Element, name: str, spec: dict[str, Any]
+) -> tuple[str | None, list[dict[str, Any]]]:
     warnings: list[dict[str, Any]] = []
     container = _find_container(root, "paraProperties")
     if container is None:
@@ -145,7 +167,11 @@ def create_para_property(root: ET.Element, name: str, spec: dict[str, Any]) -> t
     if "align" in spec:
         _set_para_align(para_pr, str(spec["align"]))
     if "line_spacing" in spec and not _set_line_spacing(para_pr, spec["line_spacing"]):
-        warnings.append({"type": "LINE_SPACING_INVALID", "name": name, "value": spec.get("line_spacing")})
+        warnings.append({
+            "type": "LINE_SPACING_INVALID",
+            "name": name,
+            "value": spec.get("line_spacing"),
+        })
     unsupported = sorted(set(spec) - {"align", "line_spacing"})
     for field in unsupported:
         warnings.append({"type": "PARA_STYLE_FIELD_PENDING", "name": name, "field": field})
@@ -154,7 +180,9 @@ def create_para_property(root: ET.Element, name: str, spec: dict[str, Any]) -> t
     return next_id, warnings
 
 
-def apply_header_style_definitions(package: HwpxPackage, definitions: dict[str, Any] | None) -> dict[str, Any]:
+def apply_header_style_definitions(
+    package: HwpxPackage, definitions: dict[str, Any] | None
+) -> dict[str, Any]:
     if not definitions:
         return {"status": "SKIPPED", "char_styles": {}, "para_styles": {}, "warnings": []}
     header_entry = "Contents/header.xml"
@@ -190,7 +218,9 @@ def apply_header_style_definitions(package: HwpxPackage, definitions: dict[str, 
     }
 
 
-def style_refs_from_names(style: dict[str, Any] | None, style_maps: dict[str, dict[str, str]]) -> dict[str, str]:
+def style_refs_from_names(
+    style: dict[str, Any] | None, style_maps: dict[str, dict[str, str]]
+) -> dict[str, str]:
     if not style:
         return {}
     refs: dict[str, str] = {}

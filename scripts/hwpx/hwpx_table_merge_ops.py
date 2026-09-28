@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 from hwpx_package import HwpxPackage, local_name, text_nodes
 
@@ -144,6 +144,49 @@ def _insert_cell_sorted(row: ET.Element, cell: ET.Element) -> None:
     row.append(cell)
 
 
+class _MergeRegion(NamedTuple):
+    row_index: int
+    col_index: int
+    row_span: int
+    col_span: int
+
+
+def _scan_merge_region(
+    rows: list[Any],
+    table_index: int,
+    region: _MergeRegion,
+    anchor: Any,
+) -> tuple[dict[str, Any] | None, list[dict[str, int]], int, int]:
+    row_index, col_index, row_span, col_span = region
+    covered: list[dict[str, int]] = []
+    total_width = 0
+    total_height = 0
+    first_row_height = 0
+    for r in range(row_index, row_index + row_span):
+        row_width = 0
+        row_height = 0
+        for c in range(col_index, col_index + col_span):
+            cell = _cell_by_addr(rows, r, c)
+            if cell is None:
+                error = {
+                    "status": "CELL_NOT_FOUND",
+                    "table_index": table_index,
+                    "row_index": r,
+                    "col_index": c,
+                }
+                return error, covered, total_width, total_height
+            width, height = _cell_size(cell)
+            row_width += width
+            row_height = max(row_height, height)
+            if cell is not anchor:
+                covered.append({"row": r, "col": c})
+        if r == row_index:
+            total_width = row_width
+            first_row_height = row_height
+        total_height += row_height or first_row_height
+    return None, covered, total_width, total_height
+
+
 def merge_table_cells(
     package: HwpxPackage,
     table_index: int,
@@ -182,31 +225,11 @@ def merge_table_cells(
             "row_index": row_index,
             "col_index": col_index,
         }
-    covered: list[dict[str, int]] = []
-    total_width = 0
-    total_height = 0
-    first_row_height = 0
-    for r in range(row_index, row_index + row_span):
-        row_width = 0
-        row_height = 0
-        for c in range(col_index, col_index + col_span):
-            cell = _cell_by_addr(rows, r, c)
-            if cell is None:
-                return {
-                    "status": "CELL_NOT_FOUND",
-                    "table_index": table_index,
-                    "row_index": r,
-                    "col_index": c,
-                }
-            width, height = _cell_size(cell)
-            row_width += width
-            row_height = max(row_height, height)
-            if cell is not anchor:
-                covered.append({"row": r, "col": c})
-        if r == row_index:
-            total_width = row_width
-            first_row_height = row_height
-        total_height += row_height or first_row_height
+    error, covered, total_width, total_height = _scan_merge_region(
+        rows, table_index, _MergeRegion(row_index, col_index, row_span, col_span), anchor
+    )
+    if error is not None:
+        return error
 
     for item in covered:
         row = rows[item["row"]]

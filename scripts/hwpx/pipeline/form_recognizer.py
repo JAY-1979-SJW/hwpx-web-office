@@ -3,29 +3,31 @@
 ParserV2Result를 받아 서식 유형·표 역할·입력칸을 판단한다.
 규칙 기반 skeleton. LLM 연결은 HWPX-LLM-PLANNER-REVIEW-GATE-01에서 진행.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 # ── 상수 ──────────────────────────────────────────────────────────────────────
 
 _KNOWN_FIELD_HINTS: dict[str, tuple[str, ...]] = {
-    "projectName":    ("공사명", "사업명", "프로젝트명"),
-    "siteName":       ("현장명", "현장", "사업위치", "사업장소재지"),
+    "projectName": ("공사명", "사업명", "프로젝트명"),
+    "siteName": ("현장명", "현장", "사업위치", "사업장소재지"),
     "contractorName": ("시공사", "도급사", "수급인", "업체명", "회사명", "상호"),
-    "reportDate":     ("작성일", "보고일", "제출일", "신고일자"),
-    "receiptNumber":  ("접수번호", "접수번", "문서번호"),
-    "startDate":      ("착수일", "착공일", "시작일"),
-    "endDate":        ("종료일", "완료일", "준공일"),
+    "reportDate": ("작성일", "보고일", "제출일", "신고일자"),
+    "receiptNumber": ("접수번호", "접수번", "문서번호"),
+    "startDate": ("착수일", "착공일", "시작일"),
+    "endDate": ("종료일", "완료일", "준공일"),
     "completionDate": ("준공일", "완공일"),
-    "inspector":      ("담당자", "검사자", "검토자", "감리원", "책임자"),
-    "materialName":   ("품명", "자재명", "품목"),
-    "quantity":       ("수량",),
-    "unit":           ("단위",),
-    "spec":           ("규격", "사양"),
-    "status":         ("상태", "진행상태"),
-    "remarks":        ("비고", "참고", "특이사항"),
+    "inspector": ("담당자", "검사자", "검토자", "감리원", "책임자"),
+    "materialName": ("품명", "자재명", "품목"),
+    "quantity": ("수량",),
+    "unit": ("단위",),
+    "spec": ("규격", "사양"),
+    "status": ("상태", "진행상태"),
+    "remarks": ("비고", "참고", "특이사항"),
 }
 
 # 입력 금지 표 탐지 패턴
@@ -35,17 +37,18 @@ _PAGE_MARKER_KEYWORDS = ("쪽", "페이지", "page")
 
 # formType 분류 키워드
 _FORM_TYPE_HINTS: dict[str, tuple[str, ...]] = {
-    "application_form":         ("신청서", "신고서", "접수번호", "신청인"),
-    "inspection_form":          ("검측요청서", "감리일지", "검사요청", "착공계"),
+    "application_form": ("신청서", "신고서", "접수번호", "신청인"),
+    "inspection_form": ("검측요청서", "감리일지", "검사요청", "착공계"),
     "material_inspection_form": ("품명", "규격", "수량", "단가", "자재"),
-    "schedule_form":            ("공정표", "일정표", "공정계획"),
-    "contract_form":            ("도급계약", "계약금액", "수급인", "도급인"),
-    "agreement_form":           ("협약서", "합의서", "각서"),
-    "legal_form":               ("별지", "서식", "처리기간", "처리절차"),
+    "schedule_form": ("공정표", "일정표", "공정계획"),
+    "contract_form": ("도급계약", "계약금액", "수급인", "도급인"),
+    "agreement_form": ("협약서", "합의서", "각서"),
+    "legal_form": ("별지", "서식", "처리기간", "처리절차"),
 }
 
 
 # ── 결과 dataclass ────────────────────────────────────────────────────────────
+
 
 @dataclass
 class EnhancedSlot:
@@ -98,7 +101,7 @@ class EnhancedSlot:
 class FormRecognitionResult:
     formType: str = "unknown_form"
     formTypeConfidence: float = 0.0
-    tableRoles: dict[str, str] = field(default_factory=dict)   # tableId → role
+    tableRoles: dict[str, str] = field(default_factory=dict)  # tableId → role
     enhancedSlots: list[EnhancedSlot] = field(default_factory=list)
     unsafeTableIds: list[str] = field(default_factory=list)
     evidence: list[str] = field(default_factory=list)
@@ -119,6 +122,7 @@ class FormRecognitionResult:
 
 
 # ── 헬퍼 함수 ─────────────────────────────────────────────────────────────────
+
 
 def _guess_field(text: str) -> str:
     for fname, hints in _KNOWN_FIELD_HINTS.items():
@@ -144,68 +148,62 @@ def _is_unsafe_table(table) -> bool:
     return False
 
 
+def _classify_generic_table_role(layout: str, cells: list) -> str:
+    total = len(cells)
+
+    # 알려진 라벨 수
+    known_label_count = sum(
+        1 for c in cells if _guess_field(getattr(c, "normalizedText", "") or "") != "unknown"
+    )
+    # 빈칸 비율
+    empty_count = sum(1 for c in cells if not getattr(c, "normalizedText", ""))
+    empty_ratio = empty_count / total if total else 0
+
+    # 법령 안내 패턴
+    all_text = " ".join(getattr(c, "normalizedText", "") or "" for c in cells)
+    if _UNSAFE_TEXT_PATTERNS.search(all_text):
+        return "legal_notice"
+    if any(k in all_text for k in _UNSAFE_TABLE_KEYWORDS):
+        return "approval_stamp"
+    if any(k.lower() in all_text.lower() for k in _PAGE_MARKER_KEYWORDS) and total <= 4:
+        return "page_marker"
+    if known_label_count >= 2 and empty_ratio >= 0.2:
+        return "basic_info"
+    if layout in ("gantt_like_table", "calendar_like_table"):
+        return "schedule_grid"
+    if layout == "horizontal_table" and empty_ratio >= 0.3:
+        return "data_table"
+    return "unknown"
+
+
+def _classify_one_table_role(tbl: Any) -> str:
+    layout = getattr(tbl, "layoutGuess", "")
+
+    if layout == "stamp_or_approval_table":
+        return "approval_stamp"
+    if layout == "page_marker_table":
+        return "page_marker"
+    if layout == "nested_container_table":
+        # 내부 셀을 보고 기본정보표 여부 판단
+        cells = getattr(tbl, "cells", [])
+        known_label_count = sum(
+            1 for c in cells if _guess_field(getattr(c, "normalizedText", "") or "") != "unknown"
+        )
+        return "basic_info" if known_label_count >= 2 else "unknown"
+
+    cells = getattr(tbl, "cells", [])
+    if not cells:
+        return "unknown"
+
+    return _classify_generic_table_role(layout, cells)
+
+
 def classify_table_roles(tables: list) -> dict[str, str]:
     """표 목록에서 각 표의 역할을 분류한다."""
     roles: dict[str, str] = {}
     for tbl in tables:
         tid = getattr(tbl, "tableId", "")
-        layout = getattr(tbl, "layoutGuess", "")
-
-        if layout == "stamp_or_approval_table":
-            roles[tid] = "approval_stamp"
-            continue
-        if layout == "page_marker_table":
-            roles[tid] = "page_marker"
-            continue
-        if layout == "nested_container_table":
-            # 내부 셀을 보고 기본정보표 여부 판단
-            cells = getattr(tbl, "cells", [])
-            known_label_count = sum(
-                1 for c in cells
-                if _guess_field(getattr(c, "normalizedText", "") or "") != "unknown"
-            )
-            if known_label_count >= 2:
-                roles[tid] = "basic_info"
-            else:
-                roles[tid] = "unknown"
-            continue
-
-        cells = getattr(tbl, "cells", [])
-        if not cells:
-            roles[tid] = "unknown"
-            continue
-
-        # 텍스트 비율
-        total = len(cells)
-        text_count = sum(1 for c in cells if getattr(c, "normalizedText", ""))
-        text_ratio = text_count / total if total else 0
-
-        # 알려진 라벨 수
-        known_label_count = sum(
-            1 for c in cells
-            if _guess_field(getattr(c, "normalizedText", "") or "") != "unknown"
-        )
-        # 빈칸 비율
-        empty_count = sum(1 for c in cells if not getattr(c, "normalizedText", ""))
-        empty_ratio = empty_count / total if total else 0
-
-        # 법령 안내 패턴
-        all_text = " ".join(getattr(c, "normalizedText", "") or "" for c in cells)
-        if _UNSAFE_TEXT_PATTERNS.search(all_text):
-            roles[tid] = "legal_notice"
-        elif any(k in all_text for k in _UNSAFE_TABLE_KEYWORDS):
-            roles[tid] = "approval_stamp"
-        elif any(k.lower() in all_text.lower() for k in _PAGE_MARKER_KEYWORDS) and total <= 4:
-            roles[tid] = "page_marker"
-        elif known_label_count >= 2 and empty_ratio >= 0.2:
-            roles[tid] = "basic_info"
-        elif layout in ("gantt_like_table", "calendar_like_table"):
-            roles[tid] = "schedule_grid"
-        elif layout == "horizontal_table" and empty_ratio >= 0.3:
-            roles[tid] = "data_table"
-        else:
-            roles[tid] = "unknown"
-
+        roles[tid] = _classify_one_table_role(tbl)
     return roles
 
 
@@ -214,7 +212,7 @@ def classify_form_type(parser_result) -> tuple[str, float, list[str]]:
     full_text = getattr(getattr(parser_result, "document", None), "fullText", "") or ""
     candidates = getattr(parser_result, "inputSlotCandidates", []) or []
 
-    scores: dict[str, int] = {k: 0 for k in _FORM_TYPE_HINTS}
+    scores: dict[str, int] = dict.fromkeys(_FORM_TYPE_HINTS, 0)
     evidence: list[str] = []
 
     for ftype, hints in _FORM_TYPE_HINTS.items():
@@ -270,7 +268,11 @@ def _detect_label_value_pair_slots(table, table_role: str) -> list[EnhancedSlot]
             continue
         value_col = col + 1
         right = cell_map.get((row, value_col))
-        if right and not getattr(right, "normalizedText", "") and not getattr(right, "isCoveredByMerge", False):
+        if (
+            right
+            and not getattr(right, "normalizedText", "")
+            and not getattr(right, "isCoveredByMerge", False)
+        ):
             key = (row, value_col)
             if key in seen_pairs:
                 continue
@@ -286,7 +288,8 @@ def _detect_label_value_pair_slots(table, table_role: str) -> list[EnhancedSlot]
                 fieldGuess=fg,
                 source="label_value_pair",
                 labelText=cell.normalizedText,
-                row=right.row, col=right.col,
+                row=right.row,
+                col=right.col,
                 visualRow=getattr(right, "visualRow", right.row),
                 visualCol=getattr(right, "visualCol", right.col),
                 confidence=conf,
@@ -321,22 +324,31 @@ def _detect_merged_input_slots(table, table_role: str) -> list[EnhancedSlot]:
         row, col = cell.row, cell.col
         # 오른쪽 병합 셀
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
-        if right and getattr(right, "isMergedOrigin", False) and not getattr(right, "normalizedText", ""):
+        if (
+            right
+            and getattr(right, "isMergedOrigin", False)
+            and not getattr(right, "normalizedText", "")
+        ):
             span = getattr(right, "colSpan", 1) * getattr(right, "rowSpan", 1)
             if span >= 2:
-                slots.append(EnhancedSlot(
-                    slotId=f"slot_{tid}_r{right.row}c{right.col}_merged",
-                    tableId=tid, tableRole=table_role,
-                    fieldGuess=fg, source="merged_input_cell",
-                    labelText=text,
-                    row=right.row, col=right.col,
-                    visualRow=getattr(right, "visualRow", right.row),
-                    visualCol=getattr(right, "visualCol", right.col),
-                    confidence=0.75,
-                    autoEditAllowed=False,
-                    reviewRequiredReason="merged_cell_review",
-                    evidence=[f"label='{text}'", "merged_right_cell_empty", f"span={span}"],
-                ))
+                slots.append(
+                    EnhancedSlot(
+                        slotId=f"slot_{tid}_r{right.row}c{right.col}_merged",
+                        tableId=tid,
+                        tableRole=table_role,
+                        fieldGuess=fg,
+                        source="merged_input_cell",
+                        labelText=text,
+                        row=right.row,
+                        col=right.col,
+                        visualRow=getattr(right, "visualRow", right.row),
+                        visualCol=getattr(right, "visualCol", right.col),
+                        confidence=0.75,
+                        autoEditAllowed=False,
+                        reviewRequiredReason="merged_cell_review",
+                        evidence=[f"label='{text}'", "merged_right_cell_empty", f"span={span}"],
+                    )
+                )
     return slots
 
 
@@ -350,8 +362,11 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
 
     enhanced: list[EnhancedSlot] = []
     seen_targets: set[tuple] = set()
-    unsafe_tables = {tid for tid, role in table_roles.items()
-                     if role in ("approval_stamp", "page_marker", "legal_notice")}
+    unsafe_tables = {
+        tid
+        for tid, role in table_roles.items()
+        if role in ("approval_stamp", "page_marker", "legal_notice")
+    }
 
     # ── 기존 슬롯 보강 ───────────────────────────────────────────────────────
     for slot in getattr(parser_result, "inputSlotCandidates", []) or []:
@@ -376,11 +391,13 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
         review = getattr(slot, "reviewRequired", conf < 0.70)
         es = EnhancedSlot(
             slotId=getattr(slot, "slotId", f"slot_{tid}_r{row}c{col}"),
-            tableId=tid, tableRole=role,
+            tableId=tid,
+            tableRole=role,
             fieldGuess=fg,
             source=getattr(slot, "source", "label_right"),
             labelText=getattr(slot, "labelText", ""),
-            row=row, col=col,
+            row=row,
+            col=col,
             visualRow=getattr(slot, "visualRow", row),
             visualCol=getattr(slot, "visualCol", col),
             rowSpan=getattr(slot, "rowSpan", 1),
@@ -388,9 +405,8 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
             confidence=round(conf, 2),
             autoEditAllowed=conf >= 0.90 and not review,
             reviewRequired=review,
-            reviewRequiredReason=getattr(slot, "reviewRequiredReason", None) or (
-                "low_confidence" if conf < 0.70 else None
-            ),
+            reviewRequiredReason=getattr(slot, "reviewRequiredReason", None)
+            or ("low_confidence" if conf < 0.70 else None),
             unsafeReason=getattr(slot, "unsafeReason", None),
             evidence=evidence,
         )
@@ -409,23 +425,28 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
         role = table_roles.get(slot.tableId, slot.tableRole)
         conf = slot.confidence
         review = slot.reviewRequired or conf < 0.70
-        enhanced.append(EnhancedSlot(
-            slotId=slot.slotId,
-            tableId=slot.tableId,
-            tableRole=role,
-            fieldGuess=slot.fieldGuess,
-            source=slot.source,
-            labelText=slot.labelText,
-            row=slot.row, col=slot.col,
-            visualRow=slot.visualRow, visualCol=slot.visualCol,
-            rowSpan=slot.rowSpan, colSpan=slot.colSpan,
-            confidence=conf,
-            autoEditAllowed=conf >= 0.90 and not review,
-            reviewRequired=review,
-            reviewRequiredReason=slot.reviewRequiredReason,
-            unsafeReason=slot.unsafeReason,
-            evidence=slot.evidence,
-        ))
+        enhanced.append(
+            EnhancedSlot(
+                slotId=slot.slotId,
+                tableId=slot.tableId,
+                tableRole=role,
+                fieldGuess=slot.fieldGuess,
+                source=slot.source,
+                labelText=slot.labelText,
+                row=slot.row,
+                col=slot.col,
+                visualRow=slot.visualRow,
+                visualCol=slot.visualCol,
+                rowSpan=slot.rowSpan,
+                colSpan=slot.colSpan,
+                confidence=conf,
+                autoEditAllowed=conf >= 0.90 and not review,
+                reviewRequired=review,
+                reviewRequiredReason=slot.reviewRequiredReason,
+                unsafeReason=slot.unsafeReason,
+                evidence=slot.evidence,
+            )
+        )
 
     return enhanced
 
@@ -438,8 +459,11 @@ def recognize_form(parser_result) -> FormRecognitionResult:
     table_roles = classify_table_roles(tables)
 
     # 2. 안전 제외 표 목록
-    unsafe_ids = [tid for tid, role in table_roles.items()
-                  if role in ("approval_stamp", "page_marker", "legal_notice")]
+    unsafe_ids = [
+        tid
+        for tid, role in table_roles.items()
+        if role in ("approval_stamp", "page_marker", "legal_notice")
+    ]
 
     # 3. 서식 유형 분류
     ftype, ftype_conf, ftype_evidence = classify_form_type(parser_result)
@@ -450,9 +474,7 @@ def recognize_form(parser_result) -> FormRecognitionResult:
 
     # 5. 전체 confidence
     if safe_slots:
-        overall_conf = round(
-            sum(s.confidence for s in safe_slots) / len(safe_slots), 2
-        )
+        overall_conf = round(sum(s.confidence for s in safe_slots) / len(safe_slots), 2)
     else:
         overall_conf = 0.0
 

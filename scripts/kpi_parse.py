@@ -193,6 +193,19 @@ def nearest_col(x, col_map, tol=30):
 # ── 단위 헤더 x 좌표 탐지 ────────────────────────────────────────────────────
 
 
+def _find_wi_matching_dan(sorted_rows, around_y, dan_xs):
+    """'단' 바로 아래 행(+20px 이내)에 '위'가 같은 x에 있으면 그 x 반환."""
+    for y, row in sorted_rows:
+        if not (around_y - 30 <= y <= around_y + 90):
+            continue
+        for x, t in row:
+            if t.replace(" ", "") == "위":
+                for dx, dy in dan_xs.items():
+                    if abs(dx - x) <= 10 and 0 < y - dy <= 20:
+                        return dx
+    return None
+
+
 def find_unit_col_x(sorted_rows, around_y):
     """헤더 행 근방에서 '단위' 텍스트의 x 좌표 반환. 없으면 None.
     '단'과 '위'가 인접 두 행에 분리된 경우도 인식한다.
@@ -207,16 +220,7 @@ def find_unit_col_x(sorted_rows, around_y):
                 return x
             if tn == "단":
                 dan_xs[x] = y
-    # '단' 바로 아래 행(+20px 이내)에 '위'가 같은 x에 있으면 단위 열로 인식
-    for y, row in sorted_rows:
-        if not (around_y - 30 <= y <= around_y + 90):
-            continue
-        for x, t in row:
-            if t.replace(" ", "") == "위":
-                for dx, dy in dan_xs.items():
-                    if abs(dx - x) <= 10 and 0 < y - dy <= 20:
-                        return dx
-    return None
+    return _find_wi_matching_dan(sorted_rows, around_y, dan_xs)
 
 
 # ── (단위 : XXX) 괄호 헤더에서 단위 추출 ─────────────────────────────────────
