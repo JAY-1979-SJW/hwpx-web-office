@@ -24,6 +24,7 @@ import re
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -334,6 +335,141 @@ def anomaly_check(rows: list[dict]) -> dict:
     }
 
 
+def _process_one_pdf(pdf: Path, pages_dir: Path, parsed_dir: Path, year_min: int) -> dict:
+    """PDF 한 건을 파싱하고 결과 JSON을 기록한다.
+
+    반환: {"rec": dict|None, "failed": dict|None, "usage_in": int, "usage_out": int,
+           "n_rows": int}. rec 는 성공 시에만 채워진다(파싱 예외 시 None).
+    """
+    t0 = time.time()
+    try:
+        res = parse_pdf(pdf, pages_dir, year_min=year_min)
+    except Exception as e:  # ruff: ignore[blind-except] — 이 PDF만 실패 기록, 나머지 배치 계속
+        log(f"  FATAL  {type(e).__name__}: {e}")
+        return {
+            "rec": None,
+            "failed": {"pdf": pdf.name, "err": f"{type(e).__name__}: {e}"},
+            "usage_in": 0,
+            "usage_out": 0,
+            "n_rows": 0,
+        }
+    elapsed = time.time() - t0
+
+    anom = anomaly_check(res["rows"])
+    rec = {
+        "pdf": res["pdf"],
+        "ok": res["ok"],
+        "partial": res["partial"],
+        "n_pages": res["n_pages"],
+        "n_rows": len(res["rows"]),
+        "n_items": len(res["pivot"]),
+        "usage": res["usage"],
+        "anomaly": anom,
+        "elapsed_sec": round(elapsed, 2),
+    }
+
+    # 파일별 JSON 저장
+    out_path = parsed_dir / f"{pdf.stem}.json"
+    out_path.write_text(
+        json.dumps(
+            {
+                "pdf": pdf.name,
+                "생성일시": datetime.now().isoformat(timespec="seconds"),
+                "model": MODEL,
+                "n_pages": res["n_pages"],
+                "n_rows": len(res["rows"]),
+                "n_items": len(res["pivot"]),
+                "usage": res["usage"],
+                "anomaly": anom,
+                "rows": res["rows"],
+                "pivot": res["pivot"],
+                "pages": res["pages"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    failed_entry = None
+    if not res["ok"]:
+        failed_entry = {
+            "pdf": pdf.name,
+            "partial": res["partial"],
+            "fail_pages": [c for c in res["pages"] if not c["ok"]],
+        }
+
+    log(
+        f"  → rows={len(res['rows'])}  tok_in={res['usage']['input_tokens']:,}  "
+        f"tok_out={res['usage']['output_tokens']:,}  elapsed={elapsed:.1f}s"
+    )
+
+    return {
+        "rec": rec,
+        "failed": failed_entry,
+        "usage_in": res["usage"]["input_tokens"],
+        "usage_out": res["usage"]["output_tokens"],
+        "n_rows": len(res["rows"]),
+    }
+
+
+@dataclass
+class _BatchOutcome:
+    """`_write_batch_summary` 의 누적 결과 묶음 (원래 7개 개별 인자였음)."""
+
+    pdfs: list[Path]
+    results: list[dict]
+    failed: list[dict]
+    total_in: int
+    total_out: int
+    total_rows: int
+    total_elapsed: float
+
+
+def _write_batch_summary(out_dir: Path, batch: str, outcome: _BatchOutcome) -> Path:
+    pdfs, results, failed = outcome.pdfs, outcome.results, outcome.failed
+    total_in, total_out, total_rows = outcome.total_in, outcome.total_out, outcome.total_rows
+    total_elapsed = outcome.total_elapsed
+    ok_cnt = sum(1 for r in results if r["ok"])
+    fail_cnt = len(pdfs) - ok_cnt
+    total_tok = total_in + total_out
+    avg_tok_per_file = (total_tok / len(pdfs)) if pdfs else 0
+    avg_tok_per_row = (total_tok / total_rows) if total_rows else 0
+
+    summary = {
+        "batch": batch,
+        "생성일시": datetime.now().isoformat(timespec="seconds"),
+        "model": MODEL,
+        "n_pdfs": len(pdfs),
+        "n_success": ok_cnt,
+        "n_failed": fail_cnt,
+        "total_rows": total_rows,
+        "total_input_tokens": total_in,
+        "total_output_tokens": total_out,
+        "total_tokens": total_tok,
+        "avg_tokens_per_file": round(avg_tok_per_file, 1),
+        "avg_tokens_per_row": round(avg_tok_per_row, 2),
+        "total_elapsed_sec": round(total_elapsed, 2),
+        "files": results,
+    }
+    summary_path = out_dir / f"batch_summary_{batch}.json"
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if failed:
+        failed_path = out_dir / f"failed_files_{batch}.json"
+        failed_path.write_text(json.dumps(failed, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    log("=" * 60)
+    log(f"BATCH {batch}  완료")
+    log(f"  files={len(pdfs)}  ok={ok_cnt}  fail={fail_cnt}")
+    log(f"  rows={total_rows:,}")
+    log(f"  tokens  in={total_in:,}  out={total_out:,}  total={total_tok:,}")
+    log(f"  avg/file={avg_tok_per_file:,.0f}  avg/row={avg_tok_per_row:,.2f}")
+    log(f"  elapsed={total_elapsed:.1f}s")
+    log(f"  summary: {summary_path}")
+    return summary_path
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdfs", nargs="+", required=True, help="대상 PDF 경로 (공백 구분)")
@@ -365,105 +501,20 @@ def main():
 
     for idx, pdf in enumerate(pdfs, 1):
         log(f"[{idx}/{len(pdfs)}] {pdf.name}")
-        t0 = time.time()
-        try:
-            res = parse_pdf(pdf, pages_dir, year_min=args.year_min)
-        except Exception as e:  # ruff: ignore[blind-except] — 이 PDF만 실패 기록, 나머지 배치 계속
-            log(f"  FATAL  {type(e).__name__}: {e}")
-            failed.append({"pdf": pdf.name, "err": f"{type(e).__name__}: {e}"})
-            continue
-        elapsed = time.time() - t0
-
-        anom = anomaly_check(res["rows"])
-        rec = {
-            "pdf": res["pdf"],
-            "ok": res["ok"],
-            "partial": res["partial"],
-            "n_pages": res["n_pages"],
-            "n_rows": len(res["rows"]),
-            "n_items": len(res["pivot"]),
-            "usage": res["usage"],
-            "anomaly": anom,
-            "elapsed_sec": round(elapsed, 2),
-        }
-        results.append(rec)
-        total_in += res["usage"]["input_tokens"]
-        total_out += res["usage"]["output_tokens"]
-        total_rows += len(res["rows"])
-
-        # 파일별 JSON 저장
-        out_path = parsed_dir / f"{pdf.stem}.json"
-        out_path.write_text(
-            json.dumps(
-                {
-                    "pdf": pdf.name,
-                    "생성일시": datetime.now().isoformat(timespec="seconds"),
-                    "model": MODEL,
-                    "n_pages": res["n_pages"],
-                    "n_rows": len(res["rows"]),
-                    "n_items": len(res["pivot"]),
-                    "usage": res["usage"],
-                    "anomaly": anom,
-                    "rows": res["rows"],
-                    "pivot": res["pivot"],
-                    "pages": res["pages"],
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-        if not res["ok"]:
-            failed.append({
-                "pdf": pdf.name,
-                "partial": res["partial"],
-                "fail_pages": [c for c in res["pages"] if not c["ok"]],
-            })
-
-        log(
-            f"  → rows={len(res['rows'])}  tok_in={res['usage']['input_tokens']:,}  "
-            f"tok_out={res['usage']['output_tokens']:,}  elapsed={elapsed:.1f}s"
-        )
+        outcome = _process_one_pdf(pdf, pages_dir, parsed_dir, args.year_min)
+        if outcome["rec"] is not None:
+            results.append(outcome["rec"])
+        if outcome["failed"] is not None:
+            failed.append(outcome["failed"])
+        total_in += outcome["usage_in"]
+        total_out += outcome["usage_out"]
+        total_rows += outcome["n_rows"]
 
     total_elapsed = time.time() - batch_start
-    ok_cnt = sum(1 for r in results if r["ok"])
-    fail_cnt = len(pdfs) - ok_cnt
-    total_tok = total_in + total_out
-    avg_tok_per_file = (total_tok / len(pdfs)) if pdfs else 0
-    avg_tok_per_row = (total_tok / total_rows) if total_rows else 0
-
-    summary = {
-        "batch": args.batch,
-        "생성일시": datetime.now().isoformat(timespec="seconds"),
-        "model": MODEL,
-        "n_pdfs": len(pdfs),
-        "n_success": ok_cnt,
-        "n_failed": fail_cnt,
-        "total_rows": total_rows,
-        "total_input_tokens": total_in,
-        "total_output_tokens": total_out,
-        "total_tokens": total_tok,
-        "avg_tokens_per_file": round(avg_tok_per_file, 1),
-        "avg_tokens_per_row": round(avg_tok_per_row, 2),
-        "total_elapsed_sec": round(total_elapsed, 2),
-        "files": results,
-    }
-    summary_path = out_dir / f"batch_summary_{args.batch}.json"
-    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    if failed:
-        failed_path = out_dir / f"failed_files_{args.batch}.json"
-        failed_path.write_text(json.dumps(failed, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    log("=" * 60)
-    log(f"BATCH {args.batch}  완료")
-    log(f"  files={len(pdfs)}  ok={ok_cnt}  fail={fail_cnt}")
-    log(f"  rows={total_rows:,}")
-    log(f"  tokens  in={total_in:,}  out={total_out:,}  total={total_tok:,}")
-    log(f"  avg/file={avg_tok_per_file:,.0f}  avg/row={avg_tok_per_row:,.2f}")
-    log(f"  elapsed={total_elapsed:.1f}s")
-    log(f"  summary: {summary_path}")
+    batch_outcome = _BatchOutcome(
+        pdfs, results, failed, total_in, total_out, total_rows, total_elapsed
+    )
+    _write_batch_summary(out_dir, args.batch, batch_outcome)
 
 
 if __name__ == "__main__":
