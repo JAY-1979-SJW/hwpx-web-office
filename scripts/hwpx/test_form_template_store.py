@@ -55,7 +55,7 @@ def _sample_recognition() -> FakeRecognition:
     )
 
 
-def test_setup_excludes_unsafe_tables(tmp_dir: Path) -> None:
+def test_setup_excludes_unsafe_tables(tmp_path: Path) -> None:
     """셋팅 — 직인표(t2) 슬롯은 바인딩에서 제외된다."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
@@ -72,21 +72,21 @@ def test_setup_excludes_unsafe_tables(tmp_dir: Path) -> None:
     print("PASS setup_excludes_unsafe_tables")
 
 
-def test_save_load_roundtrip(tmp_dir: Path) -> None:
+def test_save_load_roundtrip(tmp_path: Path) -> None:
     """저장→로드 왕복 — 바인딩·지문 보존."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
         form_name="착공신고서", recognition_result=rec, now=FIXED_NOW)
-    path = store.save_template(tpl, template_dir=tmp_dir)
+    path = store.save_template(tpl, template_dir=tmp_path)
     assert path.exists()
-    loaded = store.load_template(tpl.templateId, template_dir=tmp_dir)
+    loaded = store.load_template(tpl.templateId, template_dir=tmp_path)
     assert loaded is not None
     assert loaded.structureFingerprint == tpl.structureFingerprint
     assert len(loaded.bindings) == len(tpl.bindings)
     print("PASS save_load_roundtrip")
 
 
-def test_apply_produces_cell_writes(tmp_dir: Path) -> None:
+def test_apply_produces_cell_writes(tmp_path: Path) -> None:
     """자동입력 — 값 주입 시 셀 쓰기 계획 생성(재인식 없음)."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
@@ -105,7 +105,7 @@ def test_apply_produces_cell_writes(tmp_dir: Path) -> None:
     print("PASS apply_produces_cell_writes")
 
 
-def test_missing_required_flags_needs_input(tmp_dir: Path) -> None:
+def test_missing_required_flags_needs_input(tmp_path: Path) -> None:
     """필수 필드 값 누락 → NEEDS_INPUT."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
@@ -117,7 +117,7 @@ def test_missing_required_flags_needs_input(tmp_dir: Path) -> None:
     print("PASS missing_required_flags_needs_input")
 
 
-def test_fingerprint_mismatch_refuses_fill(tmp_dir: Path) -> None:
+def test_fingerprint_mismatch_refuses_fill(tmp_path: Path) -> None:
     """다른 구조 서식엔 블라인드 채움 거부."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
@@ -135,7 +135,7 @@ def test_fingerprint_mismatch_refuses_fill(tmp_dir: Path) -> None:
     print("PASS fingerprint_mismatch_refuses_fill")
 
 
-def test_fingerprint_match_allows_fill(tmp_dir: Path) -> None:
+def test_fingerprint_match_allows_fill(tmp_path: Path) -> None:
     """같은 구조면 지문 대조 통과 후 채움."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
@@ -149,14 +149,14 @@ def test_fingerprint_match_allows_fill(tmp_dir: Path) -> None:
     print("PASS fingerprint_match_allows_fill")
 
 
-def test_find_by_fingerprint(tmp_dir: Path) -> None:
+def test_find_by_fingerprint(tmp_path: Path) -> None:
     """지문으로 템플릿 검색 (formName 문자열 매칭보다 견고)."""
     rec = _sample_recognition()
     tpl = store.build_template_from_recognition(
         form_name="착공신고서", recognition_result=rec, now=FIXED_NOW)
-    store.save_template(tpl, template_dir=tmp_dir)
+    store.save_template(tpl, template_dir=tmp_path)
     found = store.find_template_by_fingerprint(
-        tpl.structureFingerprint, template_dir=tmp_dir)
+        tpl.structureFingerprint, template_dir=tmp_path)
     assert found is not None
     assert found.templateId == tpl.templateId
     print("PASS find_by_fingerprint")
