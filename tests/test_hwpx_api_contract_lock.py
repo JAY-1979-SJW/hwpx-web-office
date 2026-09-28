@@ -292,56 +292,12 @@ def test_t55_applied_with_output(cn):
     assert r["ok"] is True
 
 
-# ── T60 Java contract synchronization ──────────────────────────────────────
-# 아래 5개는 src/main/java/... 를 직접 읽는다 — 02 저장소 분리(2026-05-22)
-# 이전 시절의 Java 백엔드 흔적으로 33(office-analysis-engine) 소관이다.
-# 2026-09-28 완성도 감사에서 실측 확인. 02↔33 통합 결정 대기. 이 파일의
-# 나머지 T01-T59/T70+ 는 Python 쪽 계약만 검사해 Java 유무와 무관하므로
-# 그대로 유지한다.
-_JAVA_SKIP_REASON = (
-    "Java 백엔드(src/main/java/...)는 33 저장소 소관 — 02 분리 이후 범위 밖 (02↔33 통합 결정 대기)"
-)
-
-
-@pytest.mark.skip(reason=_JAVA_SKIP_REASON)
-def test_t60_envelope_fields_in_java(cn):
-    fields = cn.java_command_envelope_fields()
-    for required in ("commandId", "commandType", "artifactId", "target", "payload", "dryRun"):
-        assert required in fields, required
-
-
-@pytest.mark.skip(reason=_JAVA_SKIP_REASON)
-def test_t61_schema_version_java_equals_python(cn):
-    assert cn.java_response_schema_version() == cn.EXPECTED_SCHEMA_VERSION
-
-
-@pytest.mark.skip(reason=_JAVA_SKIP_REASON)
-def test_t62_engine_version_prefix_match(cn):
-    jv = cn.java_response_engine_version()
-    assert jv is not None
-    assert jv.startswith(cn.EXPECTED_ENGINE_VERSION_PREFIX)
-
-
-@pytest.mark.skip(reason=_JAVA_SKIP_REASON)
-def test_t63_apply_engine_cases_covered(cn):
-    cases = cn.java_apply_engine_command_types()
-    # 모든 Java apply case가 Python contract에 존재
-    overlap = cases & {
-        "replaceText",
-        "replacePlaceholder",
-        "updateTableCell",
-        "addTableRow",
-        "deleteTableRow",
-        "validateDocument",
-    }
-    for c in overlap:
-        assert c in cn.ALLOWED_COMMAND_TYPES, c
-
-
-@pytest.mark.skip(reason=_JAVA_SKIP_REASON)
-def test_t64_full_sync_check(cn):
-    res = cn.check_python_java_sync()
-    assert res["ok"], res["findings"]
+# T60-T64(Java contract synchronization)는 2026-09-28 완성도 감사에서 폐기.
+# src/main/java/... 는 02 저장소 분리(2026-05-22) 이전 시절 흔적으로
+# 33(office-analysis-engine) 소관이었고, 실측 결과 지금 실제로 쓰이는
+# 파이썬/frontend 구현(artifactId 개념 자체를 안 씀)이 이를 대체했다 —
+# 되살릴 대상이 없어 테스트와 scripts/hwpx/api_contract/
+# editor_command_contract.py 의 java_* 함수들을 함께 삭제했다.
 
 
 # ── T70 isolation + snapshot ──────────────────────────────────────────────

@@ -11,6 +11,7 @@ Python 클라이언트와 deterministic test에서 공유 가능한 형태로 �
 - 본 모듈은 production fill_review / writer / live pipeline을 import 하지 않는다.
 - raw HWPX / output / AI / OCR / secret 출력 금지.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,15 +35,15 @@ ALLOWED_COMMAND_TYPES: frozenset[str] = frozenset({
     "deleteTableRow",
     "validateDocument",
     # V2 확장 9개 — 모두 기존 자재 wrapping/dispatch만 (신규 로직 없음)
-    "fillScheduleBars",          # 공정표 막대 + 색
+    "fillScheduleBars",  # 공정표 막대 + 색
     "buildMonthlyScheduleTable",  # 월 단위 공정표 생성
-    "buildDailyScheduleTable",    # 일 단위 공정표 생성
-    "mergeCells",                 # 셀 병합
-    "splitCells",                 # 셀 분할
-    "setCellFill",                # 셀 색 채우기
-    "applyStyleFromSource",       # 원본 폰트/스타일 유지
-    "autoFillFromAI",             # AI 제안 일괄 입력 (자동채움설계실)
-    "autoDetectInputSlots",       # 입력칸 자동 인지
+    "buildDailyScheduleTable",  # 일 단위 공정표 생성
+    "mergeCells",  # 셀 병합
+    "splitCells",  # 셀 분할
+    "setCellFill",  # 셀 색 채우기
+    "applyStyleFromSource",  # 원본 폰트/스타일 유지
+    "autoFillFromAI",  # AI 제안 일괄 입력 (자동채움설계실)
+    "autoDetectInputSlots",  # 입력칸 자동 인지
 })
 
 # 각 commandType별 필수 target/payload 키
@@ -129,8 +130,13 @@ OPTIONAL_RESPONSE_KEYS: tuple[str, ...] = (
 
 # 외부 호출자가 노출하면 안 되는 필드
 FORBIDDEN_REQUEST_FIELDS: tuple[str, ...] = (
-    "filesystemPath", "outputPath", "absolutePath",
-    "credential", "token", "password", "secret",
+    "filesystemPath",
+    "outputPath",
+    "absolutePath",
+    "credential",
+    "token",
+    "password",
+    "secret",
     "sessionCookie",
 )
 
@@ -142,6 +148,7 @@ class ContractViolation(ValueError):
 
 
 # ── command validation ─────────────────────────────────────────────────────
+
 
 def is_known_command_type(t: str) -> bool:
     return t in ALLOWED_COMMAND_TYPES
@@ -213,6 +220,7 @@ def validate_command(cmd: dict) -> dict:
 
 # ── response validation ────────────────────────────────────────────────────
 
+
 def validate_response(resp: dict) -> dict:
     errors: list[str] = []
     if not isinstance(resp, dict):
@@ -234,6 +242,7 @@ def validate_response(resp: dict) -> dict:
 
 
 # ── client-side builder ────────────────────────────────────────────────────
+
 
 def build_command(
     *,
@@ -266,96 +275,8 @@ def build_command(
     return cmd
 
 
-# ── Java contract synchronization ──────────────────────────────────────────
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-JAVA_COMMAND_PATH = (PROJECT_ROOT
-                          / "src/main/java/com/haehan/engine/contract"
-                            "/HwpxEditorCommand.java")
-JAVA_RESPONSE_META_PATH = (PROJECT_ROOT
-                                / "src/main/java/com/haehan/engine/contract"
-                                  "/ApiResponseMeta.java")
-JAVA_APPLY_ENGINE_PATH = (PROJECT_ROOT
-                                / "src/main/java/com/haehan/engine"
-                                  "/usecase/HwpxEditorApplyEngine.java")
-
-
-def java_command_envelope_fields() -> set[str]:
-    """HwpxEditorCommand.java에 선언된 @SerializedName 필드 추출."""
-    text = JAVA_COMMAND_PATH.read_text(encoding="utf-8", errors="ignore")
-    return set(re.findall(r'@SerializedName\("([^"]+)"\)', text))
-
-
-def java_response_schema_version() -> str | None:
-    text = JAVA_RESPONSE_META_PATH.read_text(encoding="utf-8", errors="ignore")
-    m = re.search(r'SCHEMA_VERSION\s*=\s*"([^"]+)"', text)
-    return m.group(1) if m else None
-
-
-def java_response_engine_version() -> str | None:
-    text = JAVA_RESPONSE_META_PATH.read_text(encoding="utf-8", errors="ignore")
-    m = re.search(r'ENGINE_VERSION\s*=\s*"([^"]+)"', text)
-    return m.group(1) if m else None
-
-
-def java_apply_engine_command_types() -> set[str]:
-    """ApplyEngine switch 안의 case "...": 문자열 모음."""
-    text = JAVA_APPLY_ENGINE_PATH.read_text(encoding="utf-8", errors="ignore")
-    return set(re.findall(r'case\s+"([a-zA-Z_]+)"', text))
-
-
-def check_python_java_sync() -> dict:
-    findings: list[dict] = []
-    # envelope 필드 비교
-    java_fields = java_command_envelope_fields()
-    expected_envelope = {"commandId", "commandType", "artifactId",
-                            "target", "payload", "dryRun",
-                            "expectedVersion", "requestId"}
-    missing = expected_envelope - java_fields
-    extra = java_fields - expected_envelope
-    findings.append({
-        "check": "envelope_fields_match",
-        "ok": not missing and not extra,
-        "detail": {"missing": sorted(missing),
-                      "extraInJava": sorted(extra),
-                      "javaFields": sorted(java_fields)},
-    })
-    # schemaVersion
-    jsv = java_response_schema_version()
-    findings.append({
-        "check": "schema_version_locked",
-        "ok": jsv == EXPECTED_SCHEMA_VERSION,
-        "detail": {"java": jsv, "python": EXPECTED_SCHEMA_VERSION},
-    })
-    # engineVersion prefix
-    jev = java_response_engine_version()
-    findings.append({
-        "check": "engine_version_prefix_match",
-        "ok": (jev or "").startswith(EXPECTED_ENGINE_VERSION_PREFIX),
-        "detail": {"java": jev,
-                      "pythonPrefix": EXPECTED_ENGINE_VERSION_PREFIX},
-    })
-    # commandType 동기화 — Java apply switch에 있는 것은 Python에도 있어야 함.
-    # validateDocument는 ApplyEngine switch 밖에서 처리되므로 별도.
-    java_apply_cases = java_apply_engine_command_types()
-    must_have = java_apply_cases & {
-        "replaceText", "replacePlaceholder", "updateTableCell",
-        "addTableRow", "deleteTableRow", "validateDocument",
-    }
-    not_in_python = must_have - ALLOWED_COMMAND_TYPES
-    findings.append({
-        "check": "command_types_in_sync_with_java_apply",
-        "ok": not not_in_python,
-        "detail": {"javaApplyCases": sorted(java_apply_cases),
-                      "missingInPython": sorted(not_in_python)},
-    })
-    return {
-        "findings": findings,
-        "ok": all(f["ok"] for f in findings),
-    }
-
-
 # ── helpers ────────────────────────────────────────────────────────────────
+
 
 def _contains_key_deep(obj: Any, key: str) -> bool:
     if isinstance(obj, dict):
@@ -373,6 +294,7 @@ def _contains_key_deep(obj: Any, key: str) -> bool:
 
 # ── production isolation ───────────────────────────────────────────────────
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PRODUCTION_PATHS_FOR_API_CONTRACT: tuple[Path, ...] = (
     PROJECT_ROOT / "scripts/hwpx/fill_review/fill_review_contract.py",
     PROJECT_ROOT / "scripts/hwpx/fill_review/fill_review_ui_adapter.py",
@@ -400,8 +322,7 @@ def audit_api_contract_isolation() -> dict:
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
                 })
-    return {"violations": violations, "ok": not violations,
-              "filesChecked": checked}
+    return {"violations": violations, "ok": not violations, "filesChecked": checked}
 
 
 def dump_contract_snapshot() -> dict:
