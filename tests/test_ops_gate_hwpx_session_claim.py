@@ -4,6 +4,7 @@
 막는 장치다. 막는 것보다 **잘못 막지 않는 것**이 더 중요해서, 통과해야
 하는 경우를 더 촘촘히 고정한다.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,7 @@ import pytest
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
-from scripts.ops import gate_hwpx_session_claim as G  # noqa: E402
+from scripts.ops import gate_hwpx_session_claim as G  # ruff: ignore[module-import-not-at-top-of-file]
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +28,7 @@ def _isolated(tmp_path, monkeypatch):
 
 
 # ── 막아야 하는 경우 ────────────────────────────────────────────
+
 
 def test_other_session_claim_blocks(monkeypatch):
     G.claim("S_OTHER", ["scripts/a.py"], note="좌표 수리")
@@ -40,8 +42,7 @@ def test_other_session_claim_blocks(monkeypatch):
 def test_partial_overlap_blocks(monkeypatch):
     """내 파일에 남의 파일이 하나만 섞여도 막는다 — 실제 사고 형태."""
     G.claim("S_OTHER", ["scripts/theirs.py"])
-    monkeypatch.setattr(G, "_staged_files",
-                        lambda: ["scripts/mine.py", "scripts/theirs.py"])
+    monkeypatch.setattr(G, "_staged_files", lambda: ["scripts/mine.py", "scripts/theirs.py"])
     r = G.check("S_ME")
     assert r["verdict"] == G.FAIL
     assert r["conflicts"][0]["paths"] == ["scripts/theirs.py"]
@@ -75,6 +76,7 @@ def test_leading_dot_slash_stripped(monkeypatch):
 
 
 # ── 통과해야 하는 경우 (오탐이 더 위험하다) ─────────────────────
+
 
 def test_own_claim_does_not_block(monkeypatch):
     G.claim("S_ME", ["scripts/a.py"])
@@ -124,7 +126,7 @@ def test_heartbeat_keeps_claim_alive(monkeypatch):
 
 def test_nothing_staged_passes(monkeypatch):
     G.claim("S_OTHER", ["scripts/a.py"])
-    monkeypatch.setattr(G, "_staged_files", lambda: [])
+    monkeypatch.setattr(G, "_staged_files", list)
     assert G.check("S_ME")["verdict"] == G.PASS
 
 
@@ -137,6 +139,7 @@ def test_release_unblocks(monkeypatch):
 
 
 # ── 점유 관리 ───────────────────────────────────────────────────
+
 
 def test_reclaim_replaces_not_appends():
     G.claim("S_ME", ["a.py"])
@@ -167,17 +170,25 @@ def test_status_counts_live_and_stale():
 def test_append_only_log_records_events():
     G.claim("S1", ["a.py"], note="시공")
     G.release("S1")
-    lines = [json.loads(x) for x in
-             G.LOG_FILE.read_text(encoding="utf-8").splitlines() if x.strip()]
+    lines = [
+        json.loads(x) for x in G.LOG_FILE.read_text(encoding="utf-8").splitlines() if x.strip()
+    ]
     assert [x["event"] for x in lines] == ["claim", "release"]
 
 
 # ── 훅 배선 ─────────────────────────────────────────────────────
 
+
 def test_pre_commit_hook_invokes_guard():
+    # 2026-09-13 commit-checklist-wrapper 도입 후 pre-commit 은 체크리스트만
+    # 돌리고, 기존 가드 체인(session claim + repo guard)은 그 안에서 호출하는
+    # pre-commit.orig 로 옮겨갔다 — 실제 배선은 두 파일을 합친 것이다.
     hook = PR / ".githooks" / "pre-commit"
     assert hook.is_file(), "pre-commit 훅이 없다"
     src = hook.read_text(encoding="utf-8")
+    orig = PR / ".githooks" / "pre-commit.orig"
+    if orig.is_file():
+        src += "\n" + orig.read_text(encoding="utf-8")
     assert "gate_hwpx_session_claim.py --check" in src, "게이트가 배선되지 않았다"
     assert "run_hwpx_repo_commit_guard.py" in src, "기존 가드가 사라졌다"
     # 앞 가드가 실패해도 뒤가 실행돼 결과가 묻히지 않도록 || exit 1 로 끊는다
