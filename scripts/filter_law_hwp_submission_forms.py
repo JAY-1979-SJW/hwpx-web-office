@@ -6,7 +6,6 @@ import json
 import shutil
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 INCLUDE_TERMS = [
@@ -156,6 +155,47 @@ def is_submission_form(title: str) -> tuple[bool, str]:
     return False, "no_submission_keyword"
 
 
+def _classify_and_copy_row(
+    row: dict[str, object], output_dir: Path
+) -> tuple[bool, dict[str, object]]:
+    keep, reason = is_submission_form(row["title"])
+    target = dict(row)
+    target["filter_reason"] = reason
+    if not keep:
+        return False, target
+    if not row.get("path"):
+        target["filter_reason"] = "excluded_missing_downloaded_file"
+        return False, target
+    src = ROOT / row["path"]
+    if not src.is_file():
+        target["filter_reason"] = "excluded_missing_downloaded_file"
+        return False, target
+    rel_parts = Path(row["path"]).parts
+    # Keep the trade/law/title folder structure under the new root.
+    try:
+        tmp_idx = rel_parts.index("agency_submission_law_byl_hwp_all_downloads_final")
+        rel = Path(*rel_parts[tmp_idx + 1 :])
+    except ValueError:
+        rel = Path(row["trade"]) / Path(row["path"]).name
+    dst = output_dir / rel
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    target["submission_path"] = str(dst)
+    return True, target
+
+
+def _write_manifest_files(output_dir: Path, name: str, items: list[dict[str, object]]) -> None:
+    (output_dir / f"{name}_manifest.json").write_text(
+        json.dumps(items, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / f"{name}_manifest.csv").open("w", encoding="utf-8-sig", newline="") as fp:
+        fields = list(items[0].keys()) if items else ["title"]
+        writer = csv.DictWriter(fp, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(items)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -177,53 +217,12 @@ def main() -> None:
     filtered = []
     rejected = []
     for row in rows:
-        keep, reason = is_submission_form(row["title"])
-        target = dict(row)
-        target["filter_reason"] = reason
-        if keep:
-            if not row.get("path"):
-                target["filter_reason"] = "excluded_missing_downloaded_file"
-                rejected.append(target)
-                continue
-            src = ROOT / row["path"]
-            if not src.is_file():
-                target["filter_reason"] = "excluded_missing_downloaded_file"
-                rejected.append(target)
-                continue
-            rel_parts = Path(row["path"]).parts
-            # Keep the trade/law/title folder structure under the new root.
-            try:
-                tmp_idx = rel_parts.index("agency_submission_law_byl_hwp_all_downloads_final")
-                rel = Path(*rel_parts[tmp_idx + 1 :])
-            except ValueError:
-                rel = Path(row["trade"]) / Path(row["path"]).name
-            dst = output_dir / rel
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
-            target["submission_path"] = str(dst)
-            filtered.append(target)
-        else:
-            rejected.append(target)
+        keep, target = _classify_and_copy_row(row, output_dir)
+        (filtered if keep else rejected).append(target)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "submission_manifest.json").write_text(
-        json.dumps(filtered, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    (output_dir / "rejected_manifest.json").write_text(
-        json.dumps(rejected, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    with (output_dir / "submission_manifest.csv").open("w", encoding="utf-8-sig", newline="") as fp:
-        fields = list(filtered[0].keys()) if filtered else ["title"]
-        writer = csv.DictWriter(fp, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(filtered)
-    with (output_dir / "rejected_manifest.csv").open("w", encoding="utf-8-sig", newline="") as fp:
-        fields = list(rejected[0].keys()) if rejected else ["title"]
-        writer = csv.DictWriter(fp, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rejected)
+    _write_manifest_files(output_dir, "submission", filtered)
+    _write_manifest_files(output_dir, "rejected", rejected)
 
     print(f"source={len(rows)}")
     print(f"submission={len(filtered)}")

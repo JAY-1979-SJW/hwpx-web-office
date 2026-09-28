@@ -574,6 +574,37 @@ def extract_day_from_date(value: str) -> int | None:
 # ── STEP 3: date range → col range 변환 ──────────────────────────────────────
 
 
+def _resolve_column_for_date(
+    normalized_date: str,
+    col_map: dict[str, int],
+    sorted_cols: list,
+    *,
+    reverse: bool,
+    label: str,
+) -> tuple[int, str | None]:
+    col = col_map.get(normalized_date, -1)
+    if col != -1:
+        return col, None
+    search_order = reversed(sorted_cols) if reverse else sorted_cols
+    for d in search_order:
+        if d.normalized == normalized_date:
+            return d.col, None
+    return -1, f"{label}_not_in_axis: {normalized_date}"
+
+
+def _clamp_partial_range(
+    col_start: int, col_end: int, sorted_cols: list
+) -> tuple[int, int, list[str]]:
+    clamp_warnings: list[str] = []
+    if col_start == -1 and col_end != -1:
+        col_start = sorted_cols[0].col
+        clamp_warnings.append("start_out_of_range_clamped_to_first_col")
+    if col_end == -1 and col_start != -1:
+        col_end = sorted_cols[-1].col
+        clamp_warnings.append("end_out_of_range_clamped_to_last_col")
+    return col_start, col_end, clamp_warnings
+
+
 def map_date_range_to_columns(
     time_axis: TimeAxisInfo,
     start_date: str,
@@ -604,33 +635,21 @@ def map_date_range_to_columns(
     col_map: dict[str, int] = {d.normalized: d.col for d in time_axis.dateColumns}
     sorted_cols = sorted(time_axis.dateColumns, key=lambda d: d.col)
 
-    col_start = col_map.get(norm_start, -1)
-    col_end = col_map.get(norm_end, -1)
-
     # 범위 시작/끝이 직접 매핑 안 되면 인접 탐색 (같은 unit prefix)
-    if col_start == -1:
-        for d in sorted_cols:
-            if d.normalized == norm_start:
-                col_start = d.col
-                break
-        if col_start == -1:
-            warnings.append(f"start_not_in_axis: {norm_start}")
-
-    if col_end == -1:
-        for d in reversed(sorted_cols):
-            if d.normalized == norm_end:
-                col_end = d.col
-                break
-        if col_end == -1:
-            warnings.append(f"end_not_in_axis: {norm_end}")
+    col_start, start_warning = _resolve_column_for_date(
+        norm_start, col_map, sorted_cols, reverse=False, label="start"
+    )
+    if start_warning:
+        warnings.append(start_warning)
+    col_end, end_warning = _resolve_column_for_date(
+        norm_end, col_map, sorted_cols, reverse=True, label="end"
+    )
+    if end_warning:
+        warnings.append(end_warning)
 
     # 부분 매핑 처리
-    if col_start == -1 and col_end != -1:
-        col_start = sorted_cols[0].col
-        warnings.append("start_out_of_range_clamped_to_first_col")
-    if col_end == -1 and col_start != -1:
-        col_end = sorted_cols[-1].col
-        warnings.append("end_out_of_range_clamped_to_last_col")
+    col_start, col_end, clamp_warnings = _clamp_partial_range(col_start, col_end, sorted_cols)
+    warnings.extend(clamp_warnings)
     if col_start == -1 and col_end == -1:
         warnings.append("no_range_match")
         date_range.warnings = warnings

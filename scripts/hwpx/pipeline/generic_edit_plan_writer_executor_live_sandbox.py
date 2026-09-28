@@ -485,6 +485,41 @@ def _modify_cell_valign_in_section_xml(
     return new_bytes, True
 
 
+def _find_target_cell(tbl: ET.Element, row: int, col: int) -> ET.Element | None:
+    tr_idx = 0
+    for tr in list(tbl):
+        if tr.tag != f"{{{NS_HP}}}tr":
+            continue
+        if tr_idx == row:
+            tc_idx = 0
+            for tc in list(tr):
+                if tc.tag != f"{{{NS_HP}}}tc":
+                    continue
+                if tc_idx == col:
+                    return tc
+                tc_idx += 1
+            return None
+        tr_idx += 1
+    return None
+
+
+def _apply_cell_text(tc: ET.Element, new_value: str) -> bool:
+    t_elements = list(tc.iter(f"{{{NS_HP}}}t"))
+    if t_elements:
+        t_elements[0].text = new_value
+        for t in t_elements[1:]:
+            t.text = ""
+        return True
+    # <hp:t>가 없으면 첫 p>run에 신규 t 삽입
+    for p in tc.iter(f"{{{NS_HP}}}p"):
+        run = p.find(f"{{{NS_HP}}}run")
+        target_parent = run if run is not None else p
+        new_t = ET.SubElement(target_parent, f"{{{NS_HP}}}t")
+        new_t.text = new_value
+        return True
+    return False
+
+
 def _modify_cell_text_in_section_xml(
     section_xml: bytes, table_index: int, row: int, col: int, new_value: str
 ) -> tuple[bytes, bool]:
@@ -505,35 +540,9 @@ def _modify_cell_text_in_section_xml(
             tbl_count += 1
             continue
         # 일치 테이블
-        tr_idx = 0
-        for tr in list(tbl):
-            if tr.tag != f"{{{NS_HP}}}tr":
-                continue
-            if tr_idx == row:
-                tc_idx = 0
-                for tc in list(tr):
-                    if tc.tag != f"{{{NS_HP}}}tc":
-                        continue
-                    if tc_idx == col:
-                        t_elements = list(tc.iter(f"{{{NS_HP}}}t"))
-                        if t_elements:
-                            t_elements[0].text = new_value
-                            for t in t_elements[1:]:
-                                t.text = ""
-                            modified = True
-                        else:
-                            # <hp:t>가 없으면 첫 p>run에 신규 t 삽입
-                            for p in tc.iter(f"{{{NS_HP}}}p"):
-                                run = p.find(f"{{{NS_HP}}}run")
-                                target_parent = run if run is not None else p
-                                new_t = ET.SubElement(target_parent, f"{{{NS_HP}}}t")
-                                new_t.text = new_value
-                                modified = True
-                                break
-                        break
-                    tc_idx += 1
-                break
-            tr_idx += 1
+        tc = _find_target_cell(tbl, row, col)
+        if tc is not None:
+            modified = _apply_cell_text(tc, new_value)
         break
 
     if not modified:

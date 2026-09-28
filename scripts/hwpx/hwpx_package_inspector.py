@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
-import zipfile
 import xml.etree.ElementTree as ET
-
+import zipfile
+from pathlib import Path
 
 IMAGE_EXTENSIONS = {".bmp", ".gif", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".wmf", ".emf"}
 
@@ -52,6 +51,42 @@ def _read_text_from_zip(zf: zipfile.ZipFile, entry: str) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _element_image_hits(elem: ET.Element) -> int:
+    hits = 0
+    for value in elem.attrib.values():
+        value_lower = value.lower()
+        if "bindata" in value_lower or any(ext in value_lower for ext in IMAGE_EXTENSIONS):
+            hits += 1
+    if elem.text and re.search(r"BinData|\.png|\.jpg|\.jpeg|\.bmp|\.gif", elem.text, re.I):
+        hits += 1
+    return hits
+
+
+def _scan_xml_root(root: ET.Element, result: dict) -> int:
+    image_hits = 0
+    for elem in root.iter():
+        local = _local_name(elem.tag).lower()
+        if elem.text and elem.text.strip():
+            result["text_node_count"] += 1
+        if local in {"tbl", "table"} or "tbl" in local or "table" in local:
+            result["table_candidate_count"] += 1
+        image_hits += _element_image_hits(elem)
+    return image_hits
+
+
+def _scan_xml_entries(zf: zipfile.ZipFile, xml_entries: list[str], result: dict) -> int:
+    image_count = 0
+    for entry in xml_entries:
+        try:
+            text = _read_text_from_zip(zf, entry)
+            root = ET.fromstring(text.encode("utf-8"))
+        except Exception as exc:  # ruff: ignore[blind-except] - metadata report, not strict parser
+            result["xml_parse_errors"].append({"entry": entry, "error": str(exc)})
+            continue
+        image_count += _scan_xml_root(root, result)
+    return image_count
+
+
 def inspect_hwpx(path: Path) -> dict:
     path = Path(path)
     result = {
@@ -82,7 +117,11 @@ def inspect_hwpx(path: Path) -> dict:
             result["zip_ok"] = True
             result["entry_count"] = len(names)
             result["entries"] = [
-                {"name": info.filename, "size": info.file_size, "compressed_size": info.compress_size}
+                {
+                    "name": info.filename,
+                    "size": info.file_size,
+                    "compressed_size": info.compress_size,
+                }
                 for info in zf.infolist()
             ]
             result["xml_entries"] = [name for name in names if _is_xml_entry(name)]
@@ -98,31 +137,12 @@ def inspect_hwpx(path: Path) -> dict:
                 if _is_image_entry(entry):
                     image_count += 1
 
-            for entry in result["xml_entries"]:
-                try:
-                    text = _read_text_from_zip(zf, entry)
-                    root = ET.fromstring(text.encode("utf-8"))
-                except Exception as exc:  # noqa: BLE001 - metadata report, not strict parser
-                    result["xml_parse_errors"].append({"entry": entry, "error": str(exc)})
-                    continue
-
-                for elem in root.iter():
-                    local = _local_name(elem.tag).lower()
-                    if elem.text and elem.text.strip():
-                        result["text_node_count"] += 1
-                    if local in {"tbl", "table"} or "tbl" in local or "table" in local:
-                        result["table_candidate_count"] += 1
-                    for value in elem.attrib.values():
-                        value_lower = value.lower()
-                        if "bindata" in value_lower or any(ext in value_lower for ext in IMAGE_EXTENSIONS):
-                            image_count += 1
-                    if elem.text and re.search(r"BinData|\.png|\.jpg|\.jpeg|\.bmp|\.gif", elem.text, re.I):
-                        image_count += 1
+            image_count += _scan_xml_entries(zf, result["xml_entries"], result)
 
             result["image_candidate_count"] = image_count
     except zipfile.BadZipFile:
         result["error"] = "BAD_ZIP"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         result["error"] = str(exc)
 
     return result

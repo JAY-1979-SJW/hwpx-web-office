@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 REQUIRED_FIELDS = [
     "provider",
     "input_path",
@@ -31,7 +30,7 @@ def read_promotion_evidence(path: str | Path | None) -> dict[str, Any] | None:
         }
     try:
         data = json.loads(evidence_path.read_text(encoding="utf-8-sig"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         return {
             "status": "FAIL",
             "path": str(evidence_path),
@@ -49,7 +48,29 @@ def read_promotion_evidence(path: str | Path | None) -> dict[str, Any] | None:
     return data
 
 
-def validate_promotion_evidence(evidence: dict[str, Any] | None, provider_name: str | None = None) -> dict[str, Any]:
+def _check_output_validation(validation: object) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not isinstance(validation, dict):
+        errors.append("OUTPUT_VALIDATION_NOT_OBJECT")
+        return errors, warnings
+    validation_status = validation.get("status")
+    zip_ok = validation.get("zip_ok")
+    xml_ok = validation.get("xml_ok")
+    if validation_status not in {"PASS", "WARN"}:
+        errors.append("OUTPUT_VALIDATION_STATUS_NOT_PASS_OR_WARN")
+    if zip_ok is not True:
+        errors.append("OUTPUT_VALIDATION_ZIP_NOT_TRUE")
+    if xml_ok is not True:
+        errors.append("OUTPUT_VALIDATION_XML_NOT_TRUE")
+    if validation_status == "WARN":
+        warnings.append("OUTPUT_VALIDATION_WARN")
+    return errors, warnings
+
+
+def validate_promotion_evidence(
+    evidence: dict[str, Any] | None, provider_name: str | None = None
+) -> dict[str, Any]:
     if evidence is None:
         return {
             "status": "NOT_PROVIDED",
@@ -87,21 +108,11 @@ def validate_promotion_evidence(evidence: dict[str, Any] | None, provider_name: 
     if not output_path.exists():
         errors.append("OUTPUT_PATH_NOT_FOUND")
 
-    validation = evidence.get("output_validation")
-    if not isinstance(validation, dict):
-        errors.append("OUTPUT_VALIDATION_NOT_OBJECT")
-    else:
-        validation_status = validation.get("status")
-        zip_ok = validation.get("zip_ok")
-        xml_ok = validation.get("xml_ok")
-        if validation_status not in {"PASS", "WARN"}:
-            errors.append("OUTPUT_VALIDATION_STATUS_NOT_PASS_OR_WARN")
-        if zip_ok is not True:
-            errors.append("OUTPUT_VALIDATION_ZIP_NOT_TRUE")
-        if xml_ok is not True:
-            errors.append("OUTPUT_VALIDATION_XML_NOT_TRUE")
-        if validation_status == "WARN":
-            warnings.append("OUTPUT_VALIDATION_WARN")
+    validation_errors, validation_warnings = _check_output_validation(
+        evidence.get("output_validation")
+    )
+    errors.extend(validation_errors)
+    warnings.extend(validation_warnings)
 
     return {
         "status": "PASS" if not errors else "FAIL",
