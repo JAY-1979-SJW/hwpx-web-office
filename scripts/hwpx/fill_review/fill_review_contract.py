@@ -471,6 +471,27 @@ def _user_message_for_material(material: str, semantic: str | None) -> str:
     return mapping.get(material, f"{material} 자료를 업로드해주세요.")
 
 
+def _compute_risk_level(proposed_value: object, evidence_refs: list[str], req: dict) -> str:
+    # risk: evidence 없는 proposedValue → HIGH, evidence 있으면 MEDIUM, 이미 matched이면 LOW
+    if proposed_value and evidence_refs:
+        return RISK_MEDIUM
+    if proposed_value and not evidence_refs:
+        return RISK_HIGH
+    if req.get("status") == STATUS_MATCHED:
+        return RISK_LOW
+    return RISK_MEDIUM
+
+
+def _compute_review_status(related_requests: list[dict], proposed_value: object, req: dict) -> str:
+    if related_requests:
+        return STATUS_NEEDS_USER_INPUT
+    if proposed_value:
+        return STATUS_READY_FOR_REVIEW
+    if req.get("status") == STATUS_MATCHED:
+        return STATUS_MATCHED
+    return STATUS_NEEDS_VALUE
+
+
 def build_review_items(
     requirements: list[dict], matches: list[dict], missing_requests: list[dict]
 ) -> list[dict]:
@@ -496,25 +517,8 @@ def build_review_items(
                 evidence_refs.append(m["evidenceId"])
         current_value = req.get("currentValue", "")
         related_requests = requests_by_req.get(rid, [])
-        # risk: evidence 없는 proposedValue → HIGH, evidence 있으면 MEDIUM,
-        # 이미 matched이면 LOW
-        if proposed_value and evidence_refs:
-            risk = RISK_MEDIUM
-        elif proposed_value and not evidence_refs:
-            risk = RISK_HIGH
-        elif req.get("status") == STATUS_MATCHED:
-            risk = RISK_LOW
-        else:
-            risk = RISK_MEDIUM
-        # status 결정
-        if related_requests:
-            status = STATUS_NEEDS_USER_INPUT
-        elif proposed_value:
-            status = STATUS_READY_FOR_REVIEW
-        elif req.get("status") == STATUS_MATCHED:
-            status = STATUS_MATCHED
-        else:
-            status = STATUS_NEEDS_VALUE
+        risk = _compute_risk_level(proposed_value, evidence_refs, req)
+        status = _compute_review_status(related_requests, proposed_value, req)
         items.append({
             "reviewItemId": f"rev_{counter:03d}",
             "requirementId": rid,

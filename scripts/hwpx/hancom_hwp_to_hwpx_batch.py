@@ -9,6 +9,7 @@ Policy:
 - Input samples are read from a local folder. Outputs and reports are written
   under tmp/ by default and must not be committed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,15 +17,22 @@ import json
 import os
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HANCOM_CONVERTER_SCRIPT = REPO_ROOT / "scripts" / "hwp-worker" / "Convert-HwpToHwpx-v2.ps1"
-HANCOM_USER_PRESENT_SCRIPT = REPO_ROOT / "scripts" / "hwp-worker" / "Convert-HwpToHwpx-UserPresent.ps1"
-HANCOM_32BIT_POWERSHELL = Path(os.environ.get("WINDIR", r"C:\Windows")) / "SysWOW64" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+HANCOM_USER_PRESENT_SCRIPT = (
+    REPO_ROOT / "scripts" / "hwp-worker" / "Convert-HwpToHwpx-UserPresent.ps1"
+)
+HANCOM_32BIT_POWERSHELL = (
+    Path(os.environ.get("WINDIR", r"C:\Windows"))
+    / "SysWOW64"
+    / "WindowsPowerShell"
+    / "v1.0"
+    / "powershell.exe"
+)
 HWP_CONVERSION_PROVIDER = "HANCOM_COM_32BIT_ONLY"
 HWP_USER_PRESENT_PROVIDER = "HANCOM_USER_PRESENT_GUI"
 DISALLOWED_CONVERTERS = ("libreoffice", "soffice", "pyhwp", "hwp5txt", "hwp5odt")
@@ -89,7 +97,12 @@ def stop_pids(pids: set[int]) -> list[int]:
     stopped: list[int] = []
     for pid in sorted(pids):
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue"],
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue",
+            ],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -234,7 +247,11 @@ def convert_one(
             except json.JSONDecodeError:
                 parsed = None
             break
-    ok = bool(parsed and parsed.get("ok") and (mode == "open-only" or (output_path.exists() and is_hwpx_zip(output_path))))
+    ok = bool(
+        parsed
+        and parsed.get("ok")
+        and (mode == "open-only" or (output_path.exists() and is_hwpx_zip(output_path)))
+    )
 
     return {
         "input": str(input_path),
@@ -273,7 +290,10 @@ def convert_one_with_strategy(
 
     haction = convert_one(input_path, output_dir, timeout_sec, mode, diag_dir, "haction")
     haction["save_strategy"] = "auto"
-    haction["strategy_attempts"] = [strategy_attempt_summary(direct), strategy_attempt_summary(haction)]
+    haction["strategy_attempts"] = [
+        strategy_attempt_summary(direct),
+        strategy_attempt_summary(haction),
+    ]
     return haction
 
 
@@ -377,7 +397,9 @@ def convert_user_present_one(
         "returncode": proc.returncode,
         "ok": ok,
         "converter_json": parsed,
-        "error_code": "USER_PRESENT_OUTPUT_VALID" if ok else (str(parsed.get("status")) if parsed else "USER_PRESENT_SAVEAS_FAILED"),
+        "error_code": "USER_PRESENT_OUTPUT_VALID"
+        if ok
+        else (str(parsed.get("status")) if parsed else "USER_PRESENT_SAVEAS_FAILED"),
         "result_path": str(result_path),
         "stdout_log": str(stdout_log),
         "stderr_log": str(stderr_log),
@@ -385,12 +407,37 @@ def convert_user_present_one(
     }
 
 
+def _validate_converter_ready(args: argparse.Namespace, converter: dict) -> None:
+    if args.provider == HWP_CONVERSION_PROVIDER and not converter["converter_script_exists"]:
+        raise SystemExit("HANCOM_CONVERTER_SCRIPT_NOT_FOUND")
+    if args.provider == HWP_USER_PRESENT_PROVIDER and not converter["user_present_script_exists"]:
+        raise SystemExit("HANCOM_USER_PRESENT_SCRIPT_NOT_FOUND")
+    if args.provider == HWP_CONVERSION_PROVIDER and not converter["powershell_32bit_exists"]:
+        raise SystemExit("POWERSHELL_32BIT_NOT_FOUND")
+
+
+def _convert_one(hwp: Path, output_dir: Path, diag_dir: Path, args: argparse.Namespace) -> dict:
+    if args.provider == HWP_USER_PRESENT_PROVIDER:
+        return convert_user_present_one(
+            hwp, output_dir, args.timeout_sec, args.wait_user_sec, diag_dir
+        )
+    return convert_one_with_strategy(
+        hwp, output_dir, args.timeout_sec, args.mode, diag_dir, args.save_strategy
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dir", required=True, help="Local folder containing downloaded G2B HWP/HWPX files")
+    parser.add_argument(
+        "--input-dir", required=True, help="Local folder containing downloaded G2B HWP/HWPX files"
+    )
     parser.add_argument("--output-dir", default="tmp/p3d_g2b_hancom_converted_hwpx_20260508")
-    parser.add_argument("--report-json", default="tmp/p3d_g2b_hancom_conversion_report_20260508.json")
-    parser.add_argument("--limit", type=int, default=3, help="Maximum HWP files to convert; 0 means all")
+    parser.add_argument(
+        "--report-json", default="tmp/p3d_g2b_hancom_conversion_report_20260508.json"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=3, help="Maximum HWP files to convert; 0 means all"
+    )
     parser.add_argument(
         "--skip-name-contains",
         action="append",
@@ -433,29 +480,21 @@ def main() -> int:
     inv = inventory(input_dir)
     converter = check_hancom_converter()
     if not args.dry_run:
-        if args.provider == HWP_CONVERSION_PROVIDER and not converter["converter_script_exists"]:
-            raise SystemExit("HANCOM_CONVERTER_SCRIPT_NOT_FOUND")
-        if args.provider == HWP_USER_PRESENT_PROVIDER and not converter["user_present_script_exists"]:
-            raise SystemExit("HANCOM_USER_PRESENT_SCRIPT_NOT_FOUND")
-        if args.provider == HWP_CONVERSION_PROVIDER and not converter["powershell_32bit_exists"]:
-            raise SystemExit("POWERSHELL_32BIT_NOT_FOUND")
+        _validate_converter_ready(args, converter)
         output_dir.mkdir(parents=True, exist_ok=True)
         diag_dir.mkdir(parents=True, exist_ok=True)
 
     hwp_candidates = sorted(inv["hwp"], key=lambda p: (p.stat().st_size, p.name))
     if args.skip_name_contains:
         hwp_candidates = [
-            p for p in hwp_candidates
+            p
+            for p in hwp_candidates
             if not any(token in p.name for token in args.skip_name_contains)
         ]
     hwp_targets = hwp_candidates if args.limit == 0 else hwp_candidates[: args.limit]
     conversions = []
     if not args.dry_run:
-        for hwp in hwp_targets:
-            if args.provider == HWP_USER_PRESENT_PROVIDER:
-                conversions.append(convert_user_present_one(hwp, output_dir, args.timeout_sec, args.wait_user_sec, diag_dir))
-            else:
-                conversions.append(convert_one_with_strategy(hwp, output_dir, args.timeout_sec, args.mode, diag_dir, args.save_strategy))
+        conversions = [_convert_one(hwp, output_dir, diag_dir, args) for hwp in hwp_targets]
 
     valid_hwpx = []
     for path in inv["hwpx"]:
@@ -466,13 +505,15 @@ def main() -> int:
         })
 
     report = {
-        "executed_at": datetime.now(timezone.utc).isoformat(),
+        "executed_at": datetime.now(UTC).isoformat(),
         "input_dir": str(input_dir),
         "output_dir": str(output_dir),
         "diag_dir": str(diag_dir),
         "policy": {
             "hwp_conversion_provider": args.provider,
-            "com_direct_open": "BLOCKED" if args.provider == HWP_USER_PRESENT_PROVIDER else "ENABLED",
+            "com_direct_open": "BLOCKED"
+            if args.provider == HWP_USER_PRESENT_PROVIDER
+            else "ENABLED",
             "disallowed_converters": list(DISALLOWED_CONVERTERS),
             "server_upload": False,
             "git_stage_outputs": False,
@@ -491,17 +532,23 @@ def main() -> int:
 
     report_json.parent.mkdir(parents=True, exist_ok=True)
     report_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({
-        "ok": all(c.get("ok") for c in conversions) if conversions else True,
-        "provider": args.provider,
-        "input_dir": str(input_dir),
-        "counts": report["counts"],
-        "mode": args.mode,
-        "hwp_target_count": len(hwp_targets),
-        "converted_ok": sum(1 for c in conversions if c.get("ok")),
-        "valid_hwpx_count": report["valid_hwpx_count"],
-        "report_json": str(report_json),
-    }, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "ok": all(c.get("ok") for c in conversions) if conversions else True,
+                "provider": args.provider,
+                "input_dir": str(input_dir),
+                "counts": report["counts"],
+                "mode": args.mode,
+                "hwp_target_count": len(hwp_targets),
+                "converted_ok": sum(1 for c in conversions if c.get("ok")),
+                "valid_hwpx_count": report["valid_hwpx_count"],
+                "report_json": str(report_json),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

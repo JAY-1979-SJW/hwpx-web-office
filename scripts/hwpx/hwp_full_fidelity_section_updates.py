@@ -622,6 +622,80 @@ def _parse_row_cell_counts(row_cell_counts: Any) -> list[int] | None:
     return counts
 
 
+def _apply_col_spans_to_row(
+    row: ET.Element,
+    row_index: int,
+    row_cells: list[ET.Element],
+    logical_count: int,
+    parsed_col_count: int,
+) -> tuple[str, dict[str, Any] | None, int, int]:
+    """단일 행에 대한 colSpan 재분배. (outcome, skip_reason, applied_cells, removed_cells) 반환."""
+    if logical_count <= 0 or logical_count > parsed_col_count or logical_count > len(row_cells):
+        return (
+            "skip",
+            {
+                "row_index": row_index,
+                "reason": "INVALID_LOGICAL_CELL_COUNT",
+                "logical_count": logical_count,
+                "target_cells": len(row_cells),
+            },
+            0,
+            0,
+        )
+    if logical_count == parsed_col_count:
+        return ("noop", None, 0, 0)
+    covered_cells = row_cells[logical_count:]
+    non_empty_covered = [
+        cell_index
+        for cell_index, cell in enumerate(covered_cells, start=logical_count)
+        if _element_text(cell)
+    ]
+    if non_empty_covered:
+        return (
+            "skip",
+            {
+                "row_index": row_index,
+                "reason": "COVERED_CELL_HAS_TEXT",
+                "covered_cell_indexes": non_empty_covered[:10],
+            },
+            0,
+            0,
+        )
+    spans = _distributed_col_spans(parsed_col_count, logical_count)
+    if not spans:
+        return (
+            "skip",
+            {
+                "row_index": row_index,
+                "reason": "SPAN_DISTRIBUTION_FAILED",
+                "logical_count": logical_count,
+                "col_count": parsed_col_count,
+            },
+            0,
+            0,
+        )
+    col_addr = 0
+    applied_cells = 0
+    for cell, col_span in zip(row_cells[:logical_count], spans, strict=True):
+        addr = _first_child_local(cell, "cellAddr")
+        if addr is None:
+            addr = ET.SubElement(cell, f"{{{HP_NS}}}cellAddr")
+        addr.attrib["rowAddr"] = str(row_index)
+        addr.attrib["colAddr"] = str(col_addr)
+        span = _first_child_local(cell, "cellSpan")
+        if span is None:
+            span = ET.SubElement(cell, f"{{{HP_NS}}}cellSpan")
+        span.attrib["rowSpan"] = str(max(_int_or_none(span.attrib.get("rowSpan")) or 1, 1))
+        span.attrib["colSpan"] = str(col_span)
+        col_addr += col_span
+        applied_cells += 1
+    removed = 0
+    for cell in covered_cells:
+        row.remove(cell)
+        removed += 1
+    return ("applied", None, applied_cells, removed)
+
+
 def _apply_row_cell_count_col_spans(
     target_table: ET.Element, row_cell_counts: Any, col_count: Any
 ) -> dict[str, Any]:
@@ -652,58 +726,17 @@ def _apply_row_cell_count_col_spans(
     skipped_reasons: list[dict[str, Any]] = []
     for row_index, (row, logical_count) in enumerate(zip(rows, counts, strict=False)):
         row_cells = _direct_table_cells(row)
-        if logical_count <= 0 or logical_count > parsed_col_count or logical_count > len(row_cells):
+        outcome, reason, row_applied_cells, row_removed = _apply_col_spans_to_row(
+            row, row_index, row_cells, logical_count, parsed_col_count
+        )
+        if outcome == "skip":
             skipped_rows += 1
-            skipped_reasons.append({
-                "row_index": row_index,
-                "reason": "INVALID_LOGICAL_CELL_COUNT",
-                "logical_count": logical_count,
-                "target_cells": len(row_cells),
-            })
+            skipped_reasons.append(reason)
             continue
-        if logical_count == parsed_col_count:
+        if outcome == "noop":
             continue
-        covered_cells = row_cells[logical_count:]
-        non_empty_covered = [
-            cell_index
-            for cell_index, cell in enumerate(covered_cells, start=logical_count)
-            if _element_text(cell)
-        ]
-        if non_empty_covered:
-            skipped_rows += 1
-            skipped_reasons.append({
-                "row_index": row_index,
-                "reason": "COVERED_CELL_HAS_TEXT",
-                "covered_cell_indexes": non_empty_covered[:10],
-            })
-            continue
-        spans = _distributed_col_spans(parsed_col_count, logical_count)
-        if not spans:
-            skipped_rows += 1
-            skipped_reasons.append({
-                "row_index": row_index,
-                "reason": "SPAN_DISTRIBUTION_FAILED",
-                "logical_count": logical_count,
-                "col_count": parsed_col_count,
-            })
-            continue
-        col_addr = 0
-        for cell, col_span in zip(row_cells[:logical_count], spans, strict=True):
-            addr = _first_child_local(cell, "cellAddr")
-            if addr is None:
-                addr = ET.SubElement(cell, f"{{{HP_NS}}}cellAddr")
-            addr.attrib["rowAddr"] = str(row_index)
-            addr.attrib["colAddr"] = str(col_addr)
-            span = _first_child_local(cell, "cellSpan")
-            if span is None:
-                span = ET.SubElement(cell, f"{{{HP_NS}}}cellSpan")
-            span.attrib["rowSpan"] = str(max(_int_or_none(span.attrib.get("rowSpan")) or 1, 1))
-            span.attrib["colSpan"] = str(col_span)
-            col_addr += col_span
-            applied_cells += 1
-        for cell in covered_cells:
-            row.remove(cell)
-            removed_covered_cells += 1
+        applied_cells += row_applied_cells
+        removed_covered_cells += row_removed
         applied_rows += 1
     return {
         "status": "PASS" if applied_rows else "NO_ROWS_CHANGED",
@@ -756,6 +789,42 @@ def _apply_cell_size_from_list_header(
     return True
 
 
+def _apply_addr_span_from_list_header(
+    cell: ET.Element, list_header: dict[str, Any]
+) -> tuple[int, int]:
+    applied_addr = 0
+    applied_span = 0
+    cell_addr = (
+        list_header.get("cell_addr") if isinstance(list_header.get("cell_addr"), dict) else {}
+    )
+    row_addr = _int_or_none(cell_addr.get("row"))
+    col_addr = _int_or_none(cell_addr.get("col"))
+    if row_addr is not None or col_addr is not None:
+        addr = _first_child_local(cell, "cellAddr")
+        if addr is None:
+            addr = ET.SubElement(cell, f"{{{HP_NS}}}cellAddr")
+        if row_addr is not None:
+            addr.attrib["rowAddr"] = str(row_addr)
+        if col_addr is not None:
+            addr.attrib["colAddr"] = str(col_addr)
+        applied_addr = 1
+    cell_span = (
+        list_header.get("cell_span") if isinstance(list_header.get("cell_span"), dict) else {}
+    )
+    row_span = _int_or_none(cell_span.get("row"))
+    col_span = _int_or_none(cell_span.get("col"))
+    if row_span is not None or col_span is not None:
+        span = _first_child_local(cell, "cellSpan")
+        if span is None:
+            span = ET.SubElement(cell, f"{{{HP_NS}}}cellSpan")
+        if row_span is not None:
+            span.attrib["rowSpan"] = str(max(row_span, 1))
+        if col_span is not None:
+            span.attrib["colSpan"] = str(max(col_span, 1))
+        applied_span = 1
+    return applied_addr, applied_span
+
+
 def _apply_exact_cell_geometry_from_list_header(
     cell: ET.Element,
     list_header: dict[str, Any],
@@ -768,34 +837,7 @@ def _apply_exact_cell_geometry_from_list_header(
     applied_border = 0
     unresolved_border_refs = []
     if apply_addr_span:
-        cell_addr = (
-            list_header.get("cell_addr") if isinstance(list_header.get("cell_addr"), dict) else {}
-        )
-        row_addr = _int_or_none(cell_addr.get("row"))
-        col_addr = _int_or_none(cell_addr.get("col"))
-        if row_addr is not None or col_addr is not None:
-            addr = _first_child_local(cell, "cellAddr")
-            if addr is None:
-                addr = ET.SubElement(cell, f"{{{HP_NS}}}cellAddr")
-            if row_addr is not None:
-                addr.attrib["rowAddr"] = str(row_addr)
-            if col_addr is not None:
-                addr.attrib["colAddr"] = str(col_addr)
-            applied_addr = 1
-        cell_span = (
-            list_header.get("cell_span") if isinstance(list_header.get("cell_span"), dict) else {}
-        )
-        row_span = _int_or_none(cell_span.get("row"))
-        col_span = _int_or_none(cell_span.get("col"))
-        if row_span is not None or col_span is not None:
-            span = _first_child_local(cell, "cellSpan")
-            if span is None:
-                span = ET.SubElement(cell, f"{{{HP_NS}}}cellSpan")
-            if row_span is not None:
-                span.attrib["rowSpan"] = str(max(row_span, 1))
-            if col_span is not None:
-                span.attrib["colSpan"] = str(max(col_span, 1))
-            applied_span = 1
+        applied_addr, applied_span = _apply_addr_span_from_list_header(cell, list_header)
     border_fill_id = _int_or_none(list_header.get("border_fill_id"))
     if border_fill_id is not None:
         resolved_border_fill_id = _resolve_ref_id(border_fill_id, border_fill_ids or set())

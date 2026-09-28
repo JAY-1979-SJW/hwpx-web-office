@@ -66,6 +66,72 @@ def file_sha256(path: Path, chunk: int = 1 << 20) -> str:
 
 
 # ── scan ─────────────────────────────────────────────────────────────────────
+def _load_existing_queue(queue_path: Path) -> dict[str, dict]:
+    existing: dict[str, dict] = {}
+    with queue_path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            existing[r["file_path"]] = r
+    return existing
+
+
+def _scan_one_pdf(p: Path, existing: dict[str, dict]) -> tuple[dict, str]:
+    """단일 PDF 파일 처리. (row, category) 반환 — category: stat_error/skipped_small/reused/new."""
+    try:
+        st = p.stat()
+    except OSError as e:
+        return {
+            "file_id": short_id(p, 0, 0),
+            "file_path": str(p),
+            "file_name": p.name,
+            "file_size": 0,
+            "modified_at": None,
+            "file_hash": None,
+            "parse_status": "failed",
+            "error_type": "stat_error",
+            "error_message": str(e),
+            "queued_at": now_iso(),
+        }, "stat_error"
+    if st.st_size < 1024:
+        return {
+            "file_id": short_id(p, st.st_size, st.st_mtime),
+            "file_path": str(p),
+            "file_name": p.name,
+            "file_size": st.st_size,
+            "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+            "file_hash": None,
+            "parse_status": "skipped",
+            "error_type": "tiny_file",
+            "error_message": f"size<{1024}",
+            "queued_at": now_iso(),
+        }, "skipped_small"
+    key = str(p)
+    prev = existing.get(key)
+    fid = short_id(p, st.st_size, st.st_mtime)
+    if (
+        prev
+        and prev.get("file_id") == fid
+        and prev.get("parse_status") in ("success", "partial", "skipped")
+    ):
+        return prev, "reused"
+    return {
+        "file_id": fid,
+        "file_path": key,
+        "file_name": p.name,
+        "file_size": st.st_size,
+        "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+        "file_hash": None,  # sha256은 parse 단계에서 채움(비용)
+        "parse_status": "pending",
+        "queued_at": now_iso(),
+    }, "new"
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     work = Path(args.work).expanduser().resolve()
@@ -77,16 +143,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     existing: dict[str, dict] = {}
     if queue_path.exists() and not args.rebuild:
-        with queue_path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    r = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                existing[r["file_path"]] = r
+        existing = _load_existing_queue(queue_path)
 
     rows: list[dict] = []
     found = 0
@@ -98,60 +155,14 @@ def cmd_scan(args: argparse.Namespace) -> int:
         if not p.is_file():
             continue
         found += 1
-        try:
-            st = p.stat()
-        except OSError as e:
-            rows.append({
-                "file_id": short_id(p, 0, 0),
-                "file_path": str(p),
-                "file_name": p.name,
-                "file_size": 0,
-                "modified_at": None,
-                "file_hash": None,
-                "parse_status": "failed",
-                "error_type": "stat_error",
-                "error_message": str(e),
-                "queued_at": now_iso(),
-            })
-            continue
-        if st.st_size < 1024:
+        row, category = _scan_one_pdf(p, existing)
+        rows.append(row)
+        if category == "skipped_small":
             skipped_small += 1
-            rows.append({
-                "file_id": short_id(p, st.st_size, st.st_mtime),
-                "file_path": str(p),
-                "file_name": p.name,
-                "file_size": st.st_size,
-                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
-                "file_hash": None,
-                "parse_status": "skipped",
-                "error_type": "tiny_file",
-                "error_message": f"size<{1024}",
-                "queued_at": now_iso(),
-            })
-            continue
-        key = str(p)
-        prev = existing.get(key)
-        fid = short_id(p, st.st_size, st.st_mtime)
-        if (
-            prev
-            and prev.get("file_id") == fid
-            and prev.get("parse_status") in ("success", "partial", "skipped")
-        ):
-            # 동일 파일 + 이미 완결 → 재사용
-            rows.append(prev)
+        elif category == "reused":
             reuse_cnt += 1
-            continue
-        new_cnt += 1
-        rows.append({
-            "file_id": fid,
-            "file_path": key,
-            "file_name": p.name,
-            "file_size": st.st_size,
-            "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
-            "file_hash": None,  # sha256은 parse 단계에서 채움(비용)
-            "parse_status": "pending",
-            "queued_at": now_iso(),
-        })
+        elif category == "new":
+            new_cnt += 1
 
     tmp = queue_path.with_suffix(".jsonl.tmp")
     with tmp.open("w", encoding="utf-8") as fh:
@@ -220,7 +231,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     # 열기 + 메타
     try:
         import fitz  # PyMuPDF
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         res = ParseResult(
             file_id=fid,
             file_name=src.name,
@@ -240,7 +251,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
 
     try:
         doc = fitz.open(str(src))
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"OPEN_FAIL {e}")
         res = ParseResult(
             file_id=fid,
@@ -265,7 +276,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     meta = {}
     try:
         meta = dict(doc.metadata or {})
-    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         meta = {}
 
     text_parts: list[str] = []
@@ -273,7 +284,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     for i in range(page_count):
         try:
             text_parts.append(doc[i].get_text("text") or "")
-        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+        except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
             text_errors.append(f"page{i + 1}:{type(e).__name__}:{e}")
             text_parts.append("")
     text_all = "\n".join(text_parts)
@@ -302,7 +313,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
                         log(f"OCR_OK new_len={text_len}")
                     else:
                         log("OCR_DISCARDED not_longer")
-            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+            except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
                 log(f"OCR_FAIL {type(e).__name__}:{e}")
                 text_errors.append(f"ocr:{type(e).__name__}:{e}")
 
@@ -321,13 +332,13 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
                 for ti, tb in enumerate(tlist):
                     try:
                         rows = tb.extract()
-                    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+                    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
                         table_errors.append(f"page{i + 1}_tbl{ti}:{type(e).__name__}:{e}")
                         continue
                     tables.append({"page": i + 1, "table_idx": ti, "rows": rows})
-            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+            except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
                 table_errors.append(f"page{i + 1}:{type(e).__name__}:{e}")
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         table_errors.append(f"global:{type(e).__name__}:{e}")
 
     doc.close()
@@ -335,7 +346,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     # 산출물 쓰기
     try:
         (text_dir / f"{fid}.txt").write_text(text_all, encoding="utf-8")
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"TEXT_WRITE_FAIL {e}")
 
     try:
@@ -345,13 +356,13 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
                 tf,
                 ensure_ascii=False,
             )
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"TABLE_WRITE_FAIL {e}")
 
     # 해시 (성공/부분성공 시에만 기록 — 비용 고려)
     try:
         fhash = file_sha256(src)
-    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         fhash = None
 
     # 상태 결정
@@ -396,7 +407,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     try:
         with (parsed_dir / f"{fid}.json").open("w", encoding="utf-8") as pf:
             json.dump(d, pf, ensure_ascii=False)
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"RESULT_WRITE_FAIL {e}")
 
     log(
@@ -478,7 +489,7 @@ def cmd_parse(args: argparse.Namespace) -> int:
             t = futs[fut]
             try:
                 res = fut.result()
-            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+            except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 다음 단계/파일 계속
                 res = {
                     "file_id": t["file_id"],
                     "file_name": t["file_name"],

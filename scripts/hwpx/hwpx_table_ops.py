@@ -1053,6 +1053,25 @@ def clone_table(package: HwpxPackage, table_index: int) -> dict:
     return {"status": "CLONE_TABLE_PASS", "table_index": table_index, "entry": entry}
 
 
+def _apply_row_values(
+    physical_rows: list[ET.Element], rows: list[list[str]], clear_extra_cells: bool
+) -> tuple[int, int]:
+    updated_cells = 0
+    cleared_cells = 0
+    for row_index, row in enumerate(physical_rows):
+        cells = cell_elements(row)
+        for col_index, cell in enumerate(cells):
+            if row_index < len(rows) and col_index < len(rows[row_index]):
+                mutation = set_cell_single_text(cell, str(rows[row_index][col_index]))
+                if mutation is not None:
+                    updated_cells += 1
+            elif clear_extra_cells:
+                mutation = set_cell_single_text(cell, "")
+                if mutation is not None:
+                    cleared_cells += 1
+    return updated_cells, cleared_cells
+
+
 def append_cloned_table_to_section(
     package: HwpxPackage,
     source_table_index: int,
@@ -1090,20 +1109,8 @@ def append_cloned_table_to_section(
     if cloned_table is None:
         return {"status": "CLONED_TABLE_NOT_FOUND", "table_index": source_table_index}
 
-    updated_cells = 0
-    cleared_cells = 0
     physical_rows = row_elements(cloned_table)
-    for row_index, row in enumerate(physical_rows):
-        cells = cell_elements(row)
-        for col_index, cell in enumerate(cells):
-            if row_index < len(rows) and col_index < len(rows[row_index]):
-                mutation = set_cell_single_text(cell, str(rows[row_index][col_index]))
-                if mutation is not None:
-                    updated_cells += 1
-            elif clear_extra_cells:
-                mutation = set_cell_single_text(cell, "")
-                if mutation is not None:
-                    cleared_cells += 1
+    updated_cells, cleared_cells = _apply_row_values(physical_rows, rows, clear_extra_cells)
     target_root.append(clone)
     package.write_xml(target_entry, target_root)
     return {

@@ -10,11 +10,13 @@
 
 return {"verdict": "PASS"|"FAIL", "findings": [...], "summary": {...}}
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
-import subprocess
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,18 +26,22 @@ if str(PR) not in sys.path:
 if str(PR / "scripts/hwpx") not in sys.path:
     sys.path.insert(0, str(PR / "scripts/hwpx"))
 
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-    import_hwpx_as_ro_view,
-)
-from scripts.hwpx.web_office.render_payload import (  # noqa: E402
+from scripts.hwpx.web_office.render_payload import (  # ruff: ignore[module-import-not-at-top-of-file]
     build_render_payload,
 )
-
+from scripts.hwpx.web_office.ro_view_importer import (  # ruff: ignore[module-import-not-at-top-of-file]
+    import_hwpx_as_ro_view,
+)
 
 FORBIDDEN_TOKENS_IMPORTER = (
-    "apply_edit_plan", "hwpx_edit_tool", "set_table_cell_text",
-    "write_package", "HwpxValidator", "EditCommand",
-    "package.write_xml", "package.save",
+    "apply_edit_plan",
+    "hwpx_edit_tool",
+    "set_table_cell_text",
+    "write_package",
+    "HwpxValidator",
+    "EditCommand",
+    "package.write_xml",
+    "package.save",
 )
 
 PROTECTED_FILES = (
@@ -67,14 +73,17 @@ def _resolve_fixtures(limit: int = 3) -> list[Path]:
         return _resolve_checked_in_fixtures(limit)
     conn = sqlite3.connect(db)
     try:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT d.source_path FROM hwpx_documents d
             JOIN document_classifications c ON c.document_id=d.document_id
             WHERE d.inventory_status='FOUND'
               AND c.document_type='fillable_form'
               AND d.file_size BETWEEN 30000 AND 120000
             ORDER BY d.first_seen_at LIMIT ?
-        """, (limit,)).fetchall()
+        """,
+            (limit,),
+        ).fetchall()
     finally:
         conn.close()
     fixtures = [PR / r[0] for r in rows if (PR / r[0]).is_file()]
@@ -89,16 +98,12 @@ def _resolve_checked_in_fixtures(limit: int) -> list[Path]:
     fixture_dir = PR / "tests/fixtures/hwpx/corpus"
     if not fixture_dir.is_dir():
         return []
-    fixtures = sorted(
-        p for p in fixture_dir.glob("*.hwpx")
-        if 30000 <= p.stat().st_size <= 120000
-    )
+    fixtures = sorted(p for p in fixture_dir.glob("*.hwpx") if 30000 <= p.stat().st_size <= 120000)
     return fixtures[:limit]
 
 
 def _static_checks(findings: list[dict]) -> None:
-    importer_src = (PR / "scripts/hwpx/web_office/ro_view_importer.py"
-                            ).read_text(encoding="utf-8")
+    importer_src = (PR / "scripts/hwpx/web_office/ro_view_importer.py").read_text(encoding="utf-8")
     for tok in FORBIDDEN_TOKENS_IMPORTER:
         if tok in importer_src:
             findings.append({
@@ -112,44 +117,106 @@ def _static_checks(findings: list[dict]) -> None:
         findings.append({"code": "DOCUMENT_MODEL_CONTAINER_SCOPE_MISSING"})
     try:
         diff = subprocess.run(
-            ["git", "diff", BASELINE, "--",
-              "scripts/hwpx/web_office/document_model.py"],
-            cwd=PR, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=20)
-        added = [ln for ln in diff.stdout.splitlines()
-                      if ln.startswith("+") and not ln.startswith("+++")]
+            ["git", "diff", BASELINE, "--", "scripts/hwpx/web_office/document_model.py"],
+            cwd=PR,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=20,
+        )
+        added = [
+            ln for ln in diff.stdout.splitlines() if ln.startswith("+") and not ln.startswith("+++")
+        ]
         added_non_blank = [ln for ln in added if ln.strip(" +")]
         if len(added_non_blank) > 2:
             findings.append({
                 "code": "DOCUMENT_MODEL_DIFF_TOO_LARGE",
                 "addedLines": len(added_non_blank),
             })
-    except Exception as exc:
-        findings.append({"code": "GIT_DIFF_FAIL",
-                                "file": "document_model.py",
-                                "reason": str(exc)})
+    except Exception as exc:  # ruff: ignore[blind-except] - git diff 실패 사유 무관, finding 으로 기록
+        findings.append({"code": "GIT_DIFF_FAIL", "file": "document_model.py", "reason": str(exc)})
 
     # 변경 금지 파일 git diff baseline 0 줄
     for f in PROTECTED_FILES:
         try:
             out = subprocess.run(
                 ["git", "diff", BASELINE, "--", f],
-                cwd=PR, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=20)
+                cwd=PR,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=20,
+            )
             if out.stdout.strip():
                 findings.append({
                     "code": "PROTECTED_FILE_MODIFIED",
                     "file": f,
                 })
-        except Exception as exc:
-            findings.append({"code": "GIT_DIFF_FAIL",
-                                    "file": f, "reason": str(exc)})
+        except Exception as exc:  # ruff: ignore[blind-except] - git diff 실패 사유 무관, finding 으로 기록
+            findings.append({"code": "GIT_DIFF_FAIL", "file": f, "reason": str(exc)})
+
+
+def _process_fixture(f: Path) -> dict:
+    sha_before = _sha(f)
+    mt_before = f.stat().st_mtime_ns
+    doc = import_hwpx_as_ro_view(f)
+    sha_after = _sha(f)
+    mt_after = f.stat().st_mtime_ns
+    mutated = not (sha_before == sha_after and mt_before == mt_after)
+
+    par_ids = [p.paragraphId for p in doc.paragraphs]
+    run_ids = [r.runId for p in doc.paragraphs for r in p.runs]
+    dup_par = len(par_ids) != len(set(par_ids))
+    dup_run = len(run_ids) != len(set(run_ids))
+
+    n_par = len(doc.paragraphs) or 1
+    n_runs = sum(len(p.runs) for p in doc.paragraphs) or 1
+    n_scope = sum(1 for p in doc.paragraphs if p.containerScope is not None)
+    n_charpr = sum(1 for p in doc.paragraphs for r in p.runs if r.charPrIDRef)
+    n_parpr = sum(1 for p in doc.paragraphs if p.parPrIDRef)
+
+    # render payload paragraph 에 containerScope 키 존재 확인
+    payload = build_render_payload(doc)
+    # paragraph_index 는 직접 노출되지 않고 blocks/cells 에 매개됨.
+    # block paragraph 에 대해 containerScope 키 존재 확인.
+    missing_scope_block_id = None
+    for blk in payload.get("blocks", []):
+        if blk.get("type") == "paragraph" and "paragraph" in blk:
+            if "containerScope" not in blk["paragraph"]:
+                missing_scope_block_id = blk.get("blockId")
+                break
+
+    return {
+        "mutated": mutated,
+        "dup_par": dup_par,
+        "dup_run": dup_run,
+        "scope_rate": n_scope / n_par,
+        "charpr_rate": n_charpr / n_runs,
+        "parpr_rate": n_parpr / n_par,
+        "missing_scope_block_id": missing_scope_block_id,
+    }
+
+
+def _append_aggregate_findings(
+    findings: list[dict], dup_par: int, dup_run: int, sha_ok: int, total: int
+) -> None:
+    if dup_par:
+        findings.append({"code": "PARAGRAPH_ID_DUP", "count": dup_par})
+    if dup_run:
+        findings.append({"code": "RUN_ID_DUP", "count": dup_run})
+    if sha_ok != total:
+        findings.append({"code": "SHA_PRESERVED_PARTIAL", "ok": sha_ok, "total": total})
 
 
 def _dynamic_checks(findings: list[dict], summary: dict) -> None:
     fixtures = _resolve_fixtures(3)
     summary["sampleCount"] = len(fixtures)
     if len(fixtures) < 3:
-        findings.append({"code": "INSUFFICIENT_FIXTURES",
-                                "available": len(fixtures)})
+        findings.append({"code": "INSUFFICIENT_FIXTURES", "available": len(fixtures)})
         return
 
     rates_scope: list[float] = []
@@ -159,58 +226,26 @@ def _dynamic_checks(findings: list[dict], summary: dict) -> None:
     dup_run = 0
     sha_ok = 0
     for f in fixtures:
-        sha_before = _sha(f)
-        mt_before = f.stat().st_mtime_ns
-        doc = import_hwpx_as_ro_view(f)
-        sha_after = _sha(f)
-        mt_after = f.stat().st_mtime_ns
-        if sha_before == sha_after and mt_before == mt_after:
-            sha_ok += 1
+        r = _process_fixture(f)
+        if r["mutated"]:
+            findings.append({"code": "ORIGINAL_HWPX_MUTATED", "file": f.name})
         else:
-            findings.append({"code": "ORIGINAL_HWPX_MUTATED",
-                                    "file": f.name})
-
-        par_ids = [p.paragraphId for p in doc.paragraphs]
-        run_ids = [r.runId for p in doc.paragraphs for r in p.runs]
-        if len(par_ids) != len(set(par_ids)):
+            sha_ok += 1
+        if r["dup_par"]:
             dup_par += 1
-        if len(run_ids) != len(set(run_ids)):
+        if r["dup_run"]:
             dup_run += 1
+        rates_scope.append(r["scope_rate"])
+        rates_charpr.append(r["charpr_rate"])
+        rates_parpr.append(r["parpr_rate"])
+        if r["missing_scope_block_id"] is not None:
+            findings.append({
+                "code": "RENDER_PAYLOAD_PARAGRAPH_MISSING_SCOPE",
+                "file": f.name,
+                "blockId": r["missing_scope_block_id"],
+            })
 
-        n_par = len(doc.paragraphs) or 1
-        n_runs = sum(len(p.runs) for p in doc.paragraphs) or 1
-        n_scope = sum(1 for p in doc.paragraphs
-                              if p.containerScope is not None)
-        n_charpr = sum(1 for p in doc.paragraphs for r in p.runs
-                                if r.charPrIDRef)
-        n_parpr = sum(1 for p in doc.paragraphs if p.parPrIDRef)
-        rates_scope.append(n_scope / n_par)
-        rates_charpr.append(n_charpr / n_runs)
-        rates_parpr.append(n_parpr / n_par)
-
-        # render payload paragraph 에 containerScope 키 존재 확인
-        payload = build_render_payload(doc)
-        # paragraph_index 는 직접 노출되지 않고 blocks/cells 에 매개됨.
-        # block paragraph 에 대해 containerScope 키 존재 확인.
-        for blk in payload.get("blocks", []):
-            if blk.get("type") == "paragraph" and "paragraph" in blk:
-                if "containerScope" not in blk["paragraph"]:
-                    findings.append({
-                        "code": "RENDER_PAYLOAD_PARAGRAPH_MISSING_SCOPE",
-                        "file": f.name,
-                        "blockId": blk.get("blockId"),
-                    })
-                    break
-
-    if dup_par:
-        findings.append({"code": "PARAGRAPH_ID_DUP",
-                              "count": dup_par})
-    if dup_run:
-        findings.append({"code": "RUN_ID_DUP",
-                              "count": dup_run})
-    if sha_ok != len(fixtures):
-        findings.append({"code": "SHA_PRESERVED_PARTIAL",
-                              "ok": sha_ok, "total": len(fixtures)})
+    _append_aggregate_findings(findings, dup_par, dup_run, sha_ok, len(fixtures))
 
     def _avg(xs: list[float]) -> float:
         return round(sum(xs) / len(xs), 4) if xs else 0.0
@@ -220,7 +255,7 @@ def _dynamic_checks(findings: list[dict], summary: dict) -> None:
     summary["parPrIDRefRate"] = _avg(rates_parpr)
     summary["paragraphIdDupSamples"] = dup_par
     summary["runIdDupSamples"] = dup_run
-    summary["shaPreservedAll"] = (sha_ok == len(fixtures))
+    summary["shaPreservedAll"] = sha_ok == len(fixtures)
 
 
 def audit() -> dict:
@@ -229,8 +264,7 @@ def audit() -> dict:
     _static_checks(findings)
     _dynamic_checks(findings, summary)
     verdict = "PASS" if not findings else "FAIL"
-    return {"verdict": verdict, "findings": findings,
-                "summary": summary, "baseline": BASELINE}
+    return {"verdict": verdict, "findings": findings, "summary": summary, "baseline": BASELINE}
 
 
 if __name__ == "__main__":

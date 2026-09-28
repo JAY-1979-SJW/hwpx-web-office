@@ -261,7 +261,7 @@ class DocumentBuilder:
         self._job.setdefault("table_operations", []).append(operation)
         return self
 
-    def image_png(
+    def image_png(  # ruff: ignore[too-many-arguments] - 공개 fluent 빌더 API(chart_png과 동일 사유), 시그니처 변경 보류
         self,
         path: str | Path,
         width: int | None = None,

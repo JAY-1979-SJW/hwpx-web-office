@@ -56,6 +56,27 @@ def _resolve_path(value: str, base_dir: Path) -> Path:
     return base_dir / path
 
 
+def _validate_margins(page_layout: dict[str, Any], path: str, errors: list[dict[str, Any]]) -> None:
+    margins = page_layout.get("margins", {})
+    if margins is not None and not isinstance(margins, dict):
+        errors.append(
+            _error(path + ".margins", "PAGE_MARGINS_NOT_OBJECT", "margins must be an object")
+        )
+    elif isinstance(margins, dict):
+        for field in ("left", "right", "top", "bottom", "header", "footer", "gutter"):
+            if field in margins:
+                value = margins[field]
+                if not isinstance(value, int) or value < 0:
+                    errors.append(
+                        _error(
+                            f"{path}.margins.{field}",
+                            "PAGE_MARGIN_INVALID",
+                            f"{field} must be a non-negative integer",
+                            value,
+                        )
+                    )
+
+
 def _validate_page_layout_spec(page_layout: Any, path: str, errors: list[dict[str, Any]]) -> None:
     if not isinstance(page_layout, dict):
         errors.append(_error(path, "PAGE_LAYOUT_NOT_OBJECT", "page layout must be an object"))
@@ -92,24 +113,7 @@ def _validate_page_layout_spec(page_layout: Any, path: str, errors: list[dict[st
                         value,
                     )
                 )
-    margins = page_layout.get("margins", {})
-    if margins is not None and not isinstance(margins, dict):
-        errors.append(
-            _error(path + ".margins", "PAGE_MARGINS_NOT_OBJECT", "margins must be an object")
-        )
-    elif isinstance(margins, dict):
-        for field in ("left", "right", "top", "bottom", "header", "footer", "gutter"):
-            if field in margins:
-                value = margins[field]
-                if not isinstance(value, int) or value < 0:
-                    errors.append(
-                        _error(
-                            f"{path}.margins.{field}",
-                            "PAGE_MARGIN_INVALID",
-                            f"{field} must be a non-negative integer",
-                            value,
-                        )
-                    )
+    _validate_margins(page_layout, path, errors)
 
 
 def _validate_header_footer_fields(

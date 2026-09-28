@@ -12,6 +12,7 @@ CLAUDE.md 준수:
 - raw 개인정보 미참조 — 라벨 텍스트만 모델에 전달.
 - 모델 출력은 '제안'일 뿐 — 자동 승인 없음(사람이 검토·확정).
 """
+
 from __future__ import annotations
 
 import json
@@ -20,7 +21,7 @@ from typing import Any
 
 from .form_field_roles import _subject_of
 
-CLAUDE_MODEL = "haiku"   # §9 — 최하위 모델만
+CLAUDE_MODEL = "haiku"  # §9 — 최하위 모델만
 DEFAULT_TIMEOUT_SEC = 120
 
 
@@ -47,8 +48,70 @@ def partition_by_subject(fields: list[dict]) -> tuple[list[dict], list[dict]]:
     return own, third
 
 
-def propose_values(fields: list[dict], *, source_data: dict | None = None,
-                   timeout_sec: int = DEFAULT_TIMEOUT_SEC) -> dict[str, Any]:
+def _invoke_claude_cli(prompt: str, timeout_sec: int) -> tuple[Any, dict[str, Any] | None]:
+    try:
+        proc = subprocess.run(
+            ["claude", "-p", "--model", CLAUDE_MODEL, prompt],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_sec,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None, {
+            "ok": False,
+            "provider": "claude_cli_haiku",
+            "proposals": [],
+            "error": "AI_TIMEOUT",
+        }
+    except FileNotFoundError:
+        return None, {
+            "ok": False,
+            "provider": "claude_cli_haiku",
+            "proposals": [],
+            "error": "CLAUDE_CLI_NOT_FOUND",
+        }
+    if proc.returncode != 0:
+        return None, {
+            "ok": False,
+            "provider": "claude_cli_haiku",
+            "proposals": [],
+            "error": f"CLAUDE_CLI_EXIT_{proc.returncode}",
+            "detail": (proc.stderr or "")[:300],
+        }
+    return proc, None
+
+
+def _build_proposal(f: dict, by_label: dict[str, dict]) -> dict[str, Any] | None:
+    lab = str(f.get("label", "")).strip()
+    r = by_label.get(lab)
+    if not r:
+        return None
+    val = str(r.get("value", "")).strip()
+    if not val:
+        return None
+    try:
+        conf = float(r.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        conf = 0.0
+    # 민감칸(주민등록번호 등)은 제안하되 자동 확정 금지 — 매번 사람이
+    # 확인한다(§4 원칙 2). requiresConfirmation 로 프론트에 신호한다.
+    sensitive = bool(f.get("sensitive")) or f.get("inputType") == "secret"
+    return {
+        "key": f.get("key"),
+        "label": lab,
+        "value": val,
+        "confidence": max(0.0, min(1.0, conf)),
+        "subject": "self",
+        "requiresConfirmation": sensitive,
+    }
+
+
+def propose_values(
+    fields: list[dict], *, source_data: dict | None = None, timeout_sec: int = DEFAULT_TIMEOUT_SEC
+) -> dict[str, Any]:
     """입력칸 라벨에 대한 AI 제안 값을 반환.
 
     Args:
@@ -64,10 +127,15 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
     # '법정대리인성명' 같은 칸에 매핑하면 §4 원칙 3 위반이다. 모델에게
     # 라벨조차 보내지 않는다(추측할 기회를 주지 않음).
     own_fields, third_fields = partition_by_subject(fields)
-    held = [{"key": f.get("key"),
-             "label": str(f.get("label", "")).strip(),
-             "reason": "THIRD_PARTY_FIELD"}
-            for f in third_fields if str(f.get("label", "")).strip()]
+    held = [
+        {
+            "key": f.get("key"),
+            "label": str(f.get("label", "")).strip(),
+            "reason": "THIRD_PARTY_FIELD",
+        }
+        for f in third_fields
+        if str(f.get("label", "")).strip()
+    ]
 
     labels = []
     seen = set()
@@ -79,26 +147,18 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
 
     mode = "source_mapping" if source_data else "example"
     if not labels:
-        return {"ok": True, "provider": "claude_cli_haiku", "mode": mode,
-                "proposals": [], "heldForThirdParty": held}
+        return {
+            "ok": True,
+            "provider": "claude_cli_haiku",
+            "mode": mode,
+            "proposals": [],
+            "heldForThirdParty": held,
+        }
 
-    prompt = (_build_source_prompt(labels, source_data) if source_data
-              else _build_prompt(labels))
-    try:
-        proc = subprocess.run(
-            ["claude", "-p", "--model", CLAUDE_MODEL, prompt],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=timeout_sec, check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "provider": "claude_cli_haiku", "proposals": [], "error": "AI_TIMEOUT"}
-    except FileNotFoundError:
-        return {"ok": False, "provider": "claude_cli_haiku", "proposals": [], "error": "CLAUDE_CLI_NOT_FOUND"}
-
-    if proc.returncode != 0:
-        return {"ok": False, "provider": "claude_cli_haiku", "proposals": [],
-                "error": f"CLAUDE_CLI_EXIT_{proc.returncode}",
-                "detail": (proc.stderr or "")[:300]}
+    prompt = _build_source_prompt(labels, source_data) if source_data else _build_prompt(labels)
+    proc, cli_error = _invoke_claude_cli(prompt, timeout_sec)
+    if cli_error is not None:
+        return cli_error
 
     raw = _parse_json_array(proc.stdout)
     by_label: dict[str, dict] = {}
@@ -107,33 +167,19 @@ def propose_values(fields: list[dict], *, source_data: dict | None = None,
         if lab and lab not in by_label:
             by_label[lab] = r
 
-    proposals: list[dict] = []
-    for f in own_fields:      # 제3자 칸은 애초에 여기 없다
-        lab = str(f.get("label", "")).strip()
-        r = by_label.get(lab)
-        if not r:
-            continue
-        val = str(r.get("value", "")).strip()
-        if not val:
-            continue
-        try:
-            conf = float(r.get("confidence") or 0.0)
-        except (TypeError, ValueError):
-            conf = 0.0
-        # 민감칸(주민등록번호 등)은 제안하되 자동 확정 금지 — 매번 사람이
-        # 확인한다(§4 원칙 2). requiresConfirmation 로 프론트에 신호한다.
-        sensitive = bool(f.get("sensitive")) or f.get("inputType") == "secret"
-        proposals.append({
-            "key": f.get("key"),
-            "label": lab,
-            "value": val,
-            "confidence": max(0.0, min(1.0, conf)),
-            "subject": "self",
-            "requiresConfirmation": sensitive,
-        })
+    proposals = [
+        p
+        for f in own_fields  # 제3자 칸은 애초에 여기 없다
+        if (p := _build_proposal(f, by_label)) is not None
+    ]
 
-    return {"ok": True, "provider": "claude_cli_haiku", "mode": mode,
-            "proposals": proposals, "heldForThirdParty": held}
+    return {
+        "ok": True,
+        "provider": "claude_cli_haiku",
+        "mode": mode,
+        "proposals": proposals,
+        "heldForThirdParty": held,
+    }
 
 
 def _build_source_prompt(labels: list[str], source: dict) -> str:
@@ -175,8 +221,8 @@ def _parse_json_array(stdout: str) -> list[dict]:
             text = text.split("```", 1)[1].split("```", 1)[0]
         i, j = text.find("["), text.rfind("]")
         if i >= 0 and j > i:
-            text = text[i:j + 1]
+            text = text[i : j + 1]
         data = json.loads(text)
         return [d for d in data if isinstance(d, dict)] if isinstance(data, list) else []
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except] - 파싱 실패 사유 무관, 빈 목록으로 폴백
         return []

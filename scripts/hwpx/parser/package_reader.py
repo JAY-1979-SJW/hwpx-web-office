@@ -17,6 +17,39 @@ NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_OPF = "http://www.idpf.org/2007/opf/"
 
 
+def _read_mimetype(
+    zf: zipfile.ZipFile, names: list[str]
+) -> tuple[bool, str, int, ParserWarning | None]:
+    has_mimetype = "mimetype" in names
+    mt_value = ""
+    mt_compress = -1
+    if has_mimetype:
+        try:
+            mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
+            mt_compress = zf.getinfo("mimetype").compress_type
+        except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
+            return (
+                has_mimetype,
+                mt_value,
+                mt_compress,
+                ParserWarning(WarnCode.PACKAGE_STRUCTURE_WARN, f"mimetype read error: {exc}"),
+            )
+    return has_mimetype, mt_value, mt_compress, None
+
+
+def _scan_non_utf8_files(zf: zipfile.ZipFile, names: list[str]) -> tuple[bool, list[str]]:
+    ok = True
+    file_warnings: list[str] = []
+    for n in names:
+        if n.endswith((".xml", ".hpf")):
+            try:
+                zf.read(n).decode("utf-8")
+            except UnicodeDecodeError:
+                file_warnings.append(f"non-utf8: {n}")
+                ok = False
+    return ok, file_warnings
+
+
 def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
     """HWPX ZIP 패키지 기본 정보를 읽어 PackageInfo로 반환."""
     warnings: list[ParserWarning] = []
@@ -28,19 +61,9 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
         with zipfile.ZipFile(path, "r") as zf:
             names = zf.namelist()
 
-            has_mimetype = "mimetype" in names
-            mt_value = ""
-            mt_compress = -1
-            if has_mimetype:
-                try:
-                    mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
-                    mt_compress = zf.getinfo("mimetype").compress_type
-                except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
-                    warnings.append(
-                        ParserWarning(
-                            WarnCode.PACKAGE_STRUCTURE_WARN, f"mimetype read error: {exc}"
-                        )
-                    )
+            has_mimetype, mt_value, mt_compress, mimetype_warning = _read_mimetype(zf, names)
+            if mimetype_warning is not None:
+                warnings.append(mimetype_warning)
 
             has_content_hpf = "Contents/content.hpf" in names
             has_container = "META-INF/container.xml" in names
@@ -54,17 +77,13 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
                 try:
                     header_raw = zf.read("Contents/header.xml")
                     ET.fromstring(header_raw)
-                except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
+                except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
                     pkg_warnings.append(f"header.xml parse failed: {exc}")
                     xml_decode_ok = False
 
-            for n in names:
-                if n.endswith((".xml", ".hpf")):
-                    try:
-                        zf.read(n).decode("utf-8")
-                    except UnicodeDecodeError:
-                        pkg_warnings.append(f"non-utf8: {n}")
-                        xml_decode_ok = False
+            non_utf8_ok, non_utf8_warnings = _scan_non_utf8_files(zf, names)
+            xml_decode_ok = xml_decode_ok and non_utf8_ok
+            pkg_warnings.extend(non_utf8_warnings)
 
             if has_mimetype and mt_compress != 0:
                 pkg_warnings.append(f"mimetype not ZIP_STORED (compress_type={mt_compress})")
@@ -85,7 +104,7 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
             )
             return info, warnings
 
-    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 ZIP_OPEN_FAIL 로 기록 후 폴백
+    except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 ZIP_OPEN_FAIL 로 기록 후 폴백
         return PackageInfo(), [ParserWarning(ErrCode.ZIP_OPEN_FAIL, str(exc))]
 
 

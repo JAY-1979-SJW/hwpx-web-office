@@ -35,6 +35,7 @@
     gate_hwpx_session_claim.py --session S1 --release
     gate_hwpx_session_claim.py --session S1 --heartbeat
 """
+
 from __future__ import annotations
 
 import argparse
@@ -77,8 +78,7 @@ def _read() -> dict[str, Any]:
 def _write(data: dict[str, Any]) -> None:
     CLAIM_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = CLAIM_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                   encoding="utf-8")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(CLAIM_FILE)
 
 
@@ -132,14 +132,15 @@ def live_claims(data: dict[str, Any] | None = None) -> list[dict[str, Any]]:
 
 def claim(session: str, paths: list[str], note: str = "") -> dict[str, Any]:
     data = _read()
-    claims = [c for c in data.get("claims", [])
-              if c.get("session") != session]
-    mine = {"session": session,
-            "paths": sorted({_norm(p) for p in paths if p.strip()}),
-            "note": note,
-            "pid": os.getpid(),
-            "claimedAt": _now(),
-            "heartbeatAt": _now()}
+    claims = [c for c in data.get("claims", []) if c.get("session") != session]
+    mine = {
+        "session": session,
+        "paths": sorted({_norm(p) for p in paths if p.strip()}),
+        "note": note,
+        "pid": os.getpid(),
+        "claimedAt": _now(),
+        "heartbeatAt": _now(),
+    }
     claims.append(mine)
     _write({"claims": claims})
     _append_log({"event": "claim", **mine})
@@ -151,8 +152,7 @@ def claim(session: str, paths: list[str], note: str = "") -> dict[str, Any]:
 def release(session: str) -> dict[str, Any]:
     data = _read()
     before = len(data.get("claims", []))
-    claims = [c for c in data.get("claims", [])
-              if c.get("session") != session]
+    claims = [c for c in data.get("claims", []) if c.get("session") != session]
     _write({"claims": claims})
     _append_log({"event": "release", "session": session, "at": _now()})
     return {"released": before - len(claims)}
@@ -178,18 +178,26 @@ def _conflicts(paths: list[str], session: str) -> list[dict[str, Any]]:
             continue
         overlap = sorted(want & {_norm(p) for p in c.get("paths", [])})
         if overlap:
-            out.append({"session": c.get("session"),
-                        "note": c.get("note", ""),
-                        "paths": overlap,
-                        "heartbeatAt": c.get("heartbeatAt")})
+            out.append({
+                "session": c.get("session"),
+                "note": c.get("note", ""),
+                "paths": overlap,
+                "heartbeatAt": c.get("heartbeatAt"),
+            })
     return out
 
 
 def _staged_files() -> list[str]:
     try:
-        r = subprocess.run(["git", "diff", "--cached", "--name-only"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
-                           timeout=20)
+        r = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(ROOT),
+            timeout=20,
+        )
         if r.returncode != 0:
             return []
         return [_norm(x) for x in r.stdout.splitlines() if x.strip()]
@@ -199,8 +207,7 @@ def _staged_files() -> list[str]:
 
 def current_session() -> str:
     """이 세션의 식별자. 환경변수로 주지 않으면 빈 값(= 소유 없음)."""
-    return (os.environ.get("HWPX_SESSION_ID")
-            or os.environ.get("CLAUDE_SESSION_ID") or "").strip()
+    return (os.environ.get("HWPX_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or "").strip()
 
 
 def check(session: str | None = None) -> dict[str, Any]:
@@ -210,31 +217,63 @@ def check(session: str | None = None) -> dict[str, Any]:
     if not staged:
         return {"verdict": PASS, "staged": 0, "conflicts": []}
     conflicts = _conflicts(staged, session or "__unknown__")
-    return {"verdict": FAIL if conflicts else PASS,
-            "session": session or "(미설정)",
-            "staged": len(staged),
-            "conflicts": conflicts}
+    return {
+        "verdict": FAIL if conflicts else PASS,
+        "session": session or "(미설정)",
+        "staged": len(staged),
+        "conflicts": conflicts,
+    }
 
 
 def status() -> dict[str, Any]:
     all_c = _read().get("claims", [])
     live = live_claims()
     stale = len(all_c) - len(live)
-    return {"live": [{"session": c.get("session"),
-                      "note": c.get("note", ""),
-                      "paths": len(c.get("paths", [])),
-                      "ageMin": round((_now() - float(
-                          c.get("heartbeatAt") or 0)) / 60, 1)}
-                     for c in live],
-            "staleIgnored": stale,
-            # 저장소 밖 경로여도 죽지 않는다 — 상태 조회가 실패하면
-            # 게이트가 왜 막는지 확인할 방법이 사라진다.
-            "claimFile": _rel_or_abs(CLAIM_FILE),
-            "staleAfterHours": STALE_AFTER_SEC / 3600}
+    return {
+        "live": [
+            {
+                "session": c.get("session"),
+                "note": c.get("note", ""),
+                "paths": len(c.get("paths", [])),
+                "ageMin": round((_now() - float(c.get("heartbeatAt") or 0)) / 60, 1),
+            }
+            for c in live
+        ],
+        "staleIgnored": stale,
+        # 저장소 밖 경로여도 죽지 않는다 — 상태 조회가 실패하면
+        # 게이트가 왜 막는지 확인할 방법이 사라진다.
+        "claimFile": _rel_or_abs(CLAIM_FILE),
+        "staleAfterHours": STALE_AFTER_SEC / 3600,
+    }
 
 
 def _print(obj: Any) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
+
+
+def _handle_check(sess: str | None) -> int:
+    r = check(sess)
+    if r["verdict"] == PASS:
+        return 0
+    sys.stderr.write(
+        "\n[STOP] 다른 세션이 점유한 파일이 staged 에 섞였습니다.\n"
+        "        같은 저장소를 여러 세션이 쓰고 있어, 그대로 커밋하면\n"
+        "        남의 작업을 자기 커밋에 쓸어담게 됩니다.\n\n"
+    )
+    for c in r["conflicts"]:
+        sys.stderr.write(f"  세션 {c['session']}  ({c['note']})\n")
+        for p in c["paths"]:
+            sys.stderr.write(f"      {p}\n")
+    sys.stderr.write(
+        "\n  조치:\n"
+        "    git restore --staged <위 경로>      ← 인덱스에서만 내림"
+        " (내용은 그대로)\n"
+        "    python scripts/ops/gate_hwpx_session_claim.py --status\n"
+        "    (그 세션이 끝났다면)  --session <그세션> --release\n"
+        f"    점유는 {STALE_AFTER_SEC // 3600}시간 heartbeat 없으면"
+        " 자동 만료됩니다.\n\n"
+    )
+    return 1
 
 
 def main() -> int:
@@ -254,26 +293,7 @@ def main() -> int:
         _print(status())
         return 0
     if args.check:
-        r = check(sess)
-        if r["verdict"] == PASS:
-            return 0
-        sys.stderr.write(
-            "\n[STOP] 다른 세션이 점유한 파일이 staged 에 섞였습니다.\n"
-            "        같은 저장소를 여러 세션이 쓰고 있어, 그대로 커밋하면\n"
-            "        남의 작업을 자기 커밋에 쓸어담게 됩니다.\n\n")
-        for c in r["conflicts"]:
-            sys.stderr.write(f"  세션 {c['session']}  ({c['note']})\n")
-            for p in c["paths"]:
-                sys.stderr.write(f"      {p}\n")
-        sys.stderr.write(
-            "\n  조치:\n"
-            "    git restore --staged <위 경로>      ← 인덱스에서만 내림"
-            " (내용은 그대로)\n"
-            "    python scripts/ops/gate_hwpx_session_claim.py --status\n"
-            "    (그 세션이 끝났다면)  --session <그세션> --release\n"
-            f"    점유는 {STALE_AFTER_SEC//3600}시간 heartbeat 없으면"
-            " 자동 만료됩니다.\n\n")
-        return 1
+        return _handle_check(sess)
     if args.release:
         if not sess:
             _print({"error": "SESSION_REQUIRED"})

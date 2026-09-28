@@ -220,6 +220,29 @@ def call_claude(prompt: str, image_path: Path, timeout: int = 180) -> dict:
     }
 
 
+def _rows_from_page_items(items: list[dict], src_label: str, year_min: int) -> list[dict]:
+    rows = []
+    for item in items:
+        for p in item.get("가격", []):
+            y = p.get("연도")
+            m = p.get("월")
+            v = p.get("가격")
+            if not isinstance(y, int) or v is None:
+                continue
+            if y < year_min:
+                continue
+            rows.append({
+                "품목명": item.get("품목명", ""),
+                "규격": item.get("규격", ""),
+                "단위": item.get("단위", ""),
+                "연도": y,
+                "월": m,
+                "가격": v,
+                "출처": src_label,
+            })
+    return rows
+
+
 def parse_pdf(pdf: Path, pages_dir: Path, year_min: int = 2023) -> dict:
     """PDF 1개 파싱.
     반환: {ok, pdf, n_pages, rows, pivot, usage:{input/output/total}, pages:[call results]}"""
@@ -257,24 +280,7 @@ def parse_pdf(pdf: Path, pages_dir: Path, year_min: int = 2023) -> dict:
 
         if r["ok"]:
             src_label = "차트페이지" if i < 4 else "종합표"
-            for item in r["items"]:
-                for p in item.get("가격", []):
-                    y = p.get("연도")
-                    m = p.get("월")
-                    v = p.get("가격")
-                    if not isinstance(y, int) or v is None:
-                        continue
-                    if y < year_min:
-                        continue
-                    all_rows.append({
-                        "품목명": item.get("품목명", ""),
-                        "규격": item.get("규격", ""),
-                        "단위": item.get("단위", ""),
-                        "연도": y,
-                        "월": m,
-                        "가격": v,
-                        "출처": src_label,
-                    })
+            all_rows.extend(_rows_from_page_items(r["items"], src_label, year_min))
         log(
             f"  page {i + 1}/{n}  ok={r['ok']}  items={len(r.get('items', []))}  tok_in={r['input_tokens']} tok_out={r['output_tokens']}"
         )
@@ -362,7 +368,7 @@ def main():
         t0 = time.time()
         try:
             res = parse_pdf(pdf, pages_dir, year_min=args.year_min)
-        except Exception as e:  # noqa: BLE001 — 이 PDF만 실패 기록, 나머지 배치 계속
+        except Exception as e:  # ruff: ignore[blind-except] — 이 PDF만 실패 기록, 나머지 배치 계속
             log(f"  FATAL  {type(e).__name__}: {e}")
             failed.append({"pdf": pdf.name, "err": f"{type(e).__name__}: {e}"})
             continue
