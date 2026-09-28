@@ -9,3 +9,58 @@ node_modules/
 *.hwpx
 data/
 reports/
+
+# recognition_corpus DB/내보내기 (위 data/ 규칙으로 이미 제외되지만,
+# HWPX-RECOGNITION-CORPUS-DB-SCHEMA-CONTRACT-01 이 명시적 항목을 요구함)
+data/recognition_corpus/*.sqlite3
+data/recognition_corpus/exports/
+
+# 분석/테스트 스크립트 (일회성)
+ai_validate_field_mapping.py
+analyze_form_structure.py
+auto_map_fields.py
+extract_form_331_details.py
+export_test_data.py
+generate_test_report.py
+inspect_detailed_hwpx.py
+inspect_saved_hwpx.py
+reparse_supervision_forms.py
+test_*.py
+test-results/
+playwright-report/
+
+# 프론트엔드 프로토타입 (UI 검증용)
+frontend/web_office_viewer/*.html
+package.json
+package-lock.json
+
+# 스크립트 임시 산출물
+scripts/hwpx/analyze_supervision_fields_ai.py
+scripts/hwpx/apply_form_data_to_cells.py
+scripts/hwpx/build_supervision_cache.py
+scripts/hwpx/create_sample_guides.py
+scripts/hwpx/generate_field_mappings.py
+docs/supervision_form_*.md
+smart_field_mapping.py
+tests/supervision_form_ui.spec.js
+update_supervision_cache.py
+
+# 감리 서류 검증 스크립트 (임시)
+docs/SUPERVISION_READINESS.md
+validate_field_addresses.py
+reparse_form_331_fields.py
+scripts/ops/gate_api_key_detection.py
+
+# 대량 생성 웹폼 산출물 (재생성 가능 - 스크립트+기준서로 언제든 복원)
+forms_construction_clean/
+forms_construction_full/
+forms_construction10/
+forms_catalog/
+
+# 문서 파일 캐시(기계생성 기준서) - parse/generate 스크립트로 언제든
+# 재생성 가능하므로 커밋하지 않는다. 손수 검증/AI 해설 반영한
+# supervision_forms_final.json만 예외로 계속 추적한다.
+docs/specifications/*_spec.json
+docs/specifications/*_parsed.json
+docs/specifications/*_cache.json
+!docs/specifications/supervision_forms_final.json
