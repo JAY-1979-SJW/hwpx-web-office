@@ -1,4 +1,5 @@
 """P11A/P12/P13 tests: HWPX browser editor product focus structure audit."""
+
 from __future__ import annotations
 
 import json
@@ -6,22 +7,35 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "audit_hwpx_browser_editor_structure.py"
+
+# 이 테스트가 검사하는 Java 백엔드(src/main/java/com/haehan/engine/...)는
+# 02 저장소 분리(2026-05-22) 이전 시절의 흔적이다 — 02는 Python+frontend
+# 전용이고 Java 는 33(office-analysis-engine) 소관이다. 2026-09-28 완성도
+# 감사에서 실측 확인. 33을 02로 통합하는 결정이 나기 전까지는 검증 불가.
+pytestmark = pytest.mark.skip(
+    reason="Java 백엔드(src/main/java/...)는 33 저장소 소관 — 02 분리 이후 범위 밖 (02↔33 통합 결정 대기)"
+)
 
 
 def run_audit(tmp_path: Path) -> dict:
     out = tmp_path / "result.json"
     subprocess.run(
         [sys.executable, str(SCRIPT), "--json", str(out)],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     return json.loads(out.read_text(encoding="utf-8"))
 
 
 def test_audit_status_pass(tmp_path):
     result = run_audit(tmp_path)
-    assert result["status"] == "PASS", f"Expected PASS, got {result['status']}. Findings: {result['findings']}"
+    assert result["status"] == "PASS", (
+        f"Expected PASS, got {result['status']}. Findings: {result['findings']}"
+    )
 
 
 def test_all_arch_docs_present(tmp_path):
@@ -50,13 +64,16 @@ def test_gates_present(tmp_path):
 
 def test_editor_endpoint_registered(tmp_path):
     result = run_audit(tmp_path)
-    assert result["editor_endpoint_registered"], "/api/hwpx/editor must be registered in EngineHttpServer"
+    assert result["editor_endpoint_registered"], (
+        "/api/hwpx/editor must be registered in EngineHttpServer"
+    )
 
 
 def test_exec_gate_user_present_enforced(tmp_path):
     result = run_audit(tmp_path)
-    assert result["exec_gate"]["user_present_required_enforced"], \
+    assert result["exec_gate"]["user_present_required_enforced"], (
         "ExecutionLocationGate must enforce USER_PRESENT_REQUIRED"
+    )
 
 
 def test_filetype_gate_hwpx_allowed(tmp_path):
@@ -95,26 +112,30 @@ def test_p12_contracts_present(tmp_path):
 
 def test_p12_usecase_no_http_import(tmp_path):
     result = run_audit(tmp_path)
-    assert result["p12"]["usecase_no_http_import"], \
+    assert result["p12"]["usecase_no_http_import"], (
         "HwpxEditorCommandUseCase must not import http package"
+    )
 
 
 def test_p12_gate_no_side_effects(tmp_path):
     result = run_audit(tmp_path)
-    assert result["p12"]["gate_no_side_effects"], \
+    assert result["p12"]["gate_no_side_effects"], (
         "HwpxEditorValidationGate must have no side effects"
+    )
 
 
 def test_p12_gate_raw_path_check(tmp_path):
     result = run_audit(tmp_path)
-    assert result["p12"]["gate_raw_path_check"], \
+    assert result["p12"]["gate_raw_path_check"], (
         "HwpxEditorValidationGate must check for raw filesystem paths"
+    )
 
 
 def test_p12_gate_forbidden_key_check(tmp_path):
     result = run_audit(tmp_path)
-    assert result["p12"]["gate_forbidden_key_check"], \
+    assert result["p12"]["gate_forbidden_key_check"], (
         "HwpxEditorValidationGate must check for forbidden security-sensitive keys"
+    )
 
 
 def test_p13_phase(tmp_path):
@@ -123,43 +144,51 @@ def test_p13_phase(tmp_path):
 
 
 def test_p13_build_editor_command(tmp_path):
-    assert run_audit(tmp_path)["p13"]["build_editor_command"], \
+    assert run_audit(tmp_path)["p13"]["build_editor_command"], (
         "buildEditorCommand must be present in HwpxUploadPageScripts"
+    )
 
 
 def test_p13_dispatch_editor_command(tmp_path):
-    assert run_audit(tmp_path)["p13"]["dispatch_editor_command"], \
+    assert run_audit(tmp_path)["p13"]["dispatch_editor_command"], (
         "dispatchEditorCommand must be present in HwpxUploadPageScripts"
+    )
 
 
 def test_p13_render_editor_command_result(tmp_path):
-    assert run_audit(tmp_path)["p13"]["render_editor_command_result"], \
+    assert run_audit(tmp_path)["p13"]["render_editor_command_result"], (
         "renderEditorCommandResult must be present in HwpxUploadPageScripts"
+    )
 
 
 def test_p13_validate_editor_document(tmp_path):
-    assert run_audit(tmp_path)["p13"]["validate_editor_document"], \
+    assert run_audit(tmp_path)["p13"]["validate_editor_document"], (
         "validateEditorDocument must be present in HwpxUploadPageScripts"
+    )
 
 
 def test_p13_handler_wired_to_usecase(tmp_path):
-    assert run_audit(tmp_path)["p13"]["handler_wired_to_usecase"], \
+    assert run_audit(tmp_path)["p13"]["handler_wired_to_usecase"], (
         "HwpxEditorApiHandler must reference HwpxEditorCommandUseCase"
+    )
 
 
 def test_p13_handler_wired_to_command(tmp_path):
-    assert run_audit(tmp_path)["p13"]["handler_wired_to_command"], \
+    assert run_audit(tmp_path)["p13"]["handler_wired_to_command"], (
         "HwpxEditorApiHandler must reference HwpxEditorCommand"
+    )
 
 
 def test_p13_no_xml_zip_in_scripts(tmp_path):
-    assert run_audit(tmp_path)["p13"]["no_xml_zip_in_scripts"], \
+    assert run_audit(tmp_path)["p13"]["no_xml_zip_in_scripts"], (
         "Browser scripts must not contain BinData/ or Contents/ (XML/ZIP access forbidden)"
+    )
 
 
 def test_p13_dry_run_default_true(tmp_path):
-    assert run_audit(tmp_path)["p13"]["dry_run_default_true"], \
+    assert run_audit(tmp_path)["p13"]["dry_run_default_true"], (
         "Command dispatch must default dryRun to true"
+    )
 
 
 def test_policy_flags(tmp_path):

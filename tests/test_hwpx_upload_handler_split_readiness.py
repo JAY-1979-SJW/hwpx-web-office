@@ -2,11 +2,25 @@ import json
 import subprocess
 import sys
 
+import pytest
+
+# 이 테스트가 검사하는 Java 백엔드(HwpxUploadHandler.java 등)는 02 저장소
+# 분리(2026-05-22) 이전 시절의 흔적이다 — 33(office-analysis-engine) 소관.
+# 2026-09-28 완성도 감사에서 실측 확인. 02↔33 통합 결정 대기.
+pytestmark = pytest.mark.skip(
+    reason="Java 백엔드(src/main/java/...)는 33 저장소 소관 — 02 분리 이후 범위 밖 (02↔33 통합 결정 대기)"
+)
+
 
 def test_hwpx_upload_handler_split_readiness_audit_runs(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     proc = subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=False,
@@ -34,7 +48,12 @@ def test_hwpx_upload_handler_split_readiness_audit_runs(tmp_path):
 def test_hwpx_upload_handler_gate_candidates_are_reported(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -51,7 +70,12 @@ def test_hwpx_upload_handler_gate_candidates_are_reported(tmp_path):
 def test_hwpx_upload_handler_baseline_has_no_fail_level_runtime_risks(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -69,7 +93,12 @@ def test_hwpx_upload_handler_baseline_has_no_fail_level_runtime_risks(tmp_path):
 def test_hwpx_upload_handler_filetype_upload_gates_are_connected(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -83,7 +112,12 @@ def test_hwpx_upload_handler_filetype_upload_gates_are_connected(tmp_path):
 def test_hwpx_upload_handler_execution_location_gate_p8h_connected(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -101,7 +135,12 @@ def test_hwpx_upload_handler_execution_location_gate_p8h_connected(tmp_path):
 def test_hwpx_upload_handler_output_artifact_gate_p8i_connected(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -112,17 +151,21 @@ def test_hwpx_upload_handler_output_artifact_gate_p8i_connected(tmp_path):
     assert p8i["raw_path_guard_present"] is True
     assert p8i["sanitize_download_name_present"] is True
     assert data["pattern_counts"]["output_artifact_gate_ref"] >= 1
-    no_unguarded = not any(
-        f["rule"] == "raw_path_candidate_unguarded"
-        for f in data["findings"]
+    no_unguarded = not any(f["rule"] == "raw_path_candidate_unguarded" for f in data["findings"])
+    assert no_unguarded, (
+        "raw_path_candidate_unguarded should not fire when OutputArtifactGate is connected"
     )
-    assert no_unguarded, "raw_path_candidate_unguarded should not fire when OutputArtifactGate is connected"
 
 
 def test_hwpx_upload_handler_p9a_view_split_completed(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -143,7 +186,12 @@ def test_hwpx_upload_handler_p9a_view_split_completed(tmp_path):
 def test_hwpx_upload_handler_p9b_view_helpers_split_completed(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
@@ -160,7 +208,12 @@ def test_hwpx_upload_handler_p9b_view_helpers_split_completed(tmp_path):
 def test_hwpx_upload_parse_usecase_p9c_skeleton_exists(tmp_path):
     output = tmp_path / "hwpx_upload_handler_split_readiness.json"
     subprocess.run(
-        [sys.executable, "scripts/audit_hwpx_upload_handler_split_readiness.py", "--json", str(output)],
+        [
+            sys.executable,
+            "scripts/audit_hwpx_upload_handler_split_readiness.py",
+            "--json",
+            str(output),
+        ],
         text=True,
         capture_output=True,
         check=True,
