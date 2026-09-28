@@ -10,7 +10,6 @@ HWPX Evidence Verification Script
 - 최종 PASS/WARN/FAIL 판정
 """
 
-import os
 import sys
 import json
 from pathlib import Path
@@ -19,13 +18,13 @@ from datetime import datetime
 def verify_evidence(inventory_path, batch_summary_path, sample_dir):
     """Main verification function"""
 
-    print(f"[verify_hwpx_evidence] Starting evidence verification...", file=sys.stderr)
+    print("[verify_hwpx_evidence] Starting evidence verification...", file=sys.stderr)
     print(f"[verify_hwpx_evidence] Inventory: {inventory_path}", file=sys.stderr)
     print(f"[verify_hwpx_evidence] Batch summary: {batch_summary_path}", file=sys.stderr)
     print(f"[verify_hwpx_evidence] Sample dir: {sample_dir}", file=sys.stderr)
 
     # Load inventory
-    with open(inventory_path, "r", encoding="utf-8") as f:
+    with Path(inventory_path).open("r", encoding="utf-8") as f:
         inventory = json.load(f)
 
     real_samples = [s for s in inventory["inventory"] if not s["isFixture"]]
@@ -34,7 +33,7 @@ def verify_evidence(inventory_path, batch_summary_path, sample_dir):
     print(f"[verify_hwpx_evidence] Inventory real samples: {inventory_count}", file=sys.stderr)
 
     # Load batch summary
-    with open(batch_summary_path, "r", encoding="utf-8") as f:
+    with Path(batch_summary_path).open("r", encoding="utf-8") as f:
         batch_summary = json.load(f)
 
     batch_count = len(batch_summary["results"])
@@ -177,19 +176,19 @@ def verify_evidence(inventory_path, batch_summary_path, sample_dir):
         else:
             validation_result["judgment"] = "EVIDENCE_COMPLETE_PASS"
 
-    print(f"\n[verify_hwpx_evidence] Checks:", file=sys.stderr)
+    print("\n[verify_hwpx_evidence] Checks:", file=sys.stderr)
     for check_name, check_result in validation_result["checks"].items():
         print(f"  {check_name}: {check_result}", file=sys.stderr)
 
     print(f"\n[verify_hwpx_evidence] Judgment: {validation_result['judgment']}", file=sys.stderr)
 
     if validation_result["warnings"]:
-        print(f"[verify_hwpx_evidence] Warnings:", file=sys.stderr)
+        print("[verify_hwpx_evidence] Warnings:", file=sys.stderr)
         for warning in validation_result["warnings"]:
             print(f"  - {warning}", file=sys.stderr)
 
     if validation_result["failures"]:
-        print(f"[verify_hwpx_evidence] Failures:", file=sys.stderr)
+        print("[verify_hwpx_evidence] Failures:", file=sys.stderr)
         for failure in validation_result["failures"]:
             print(f"  - {failure}", file=sys.stderr)
 
@@ -229,49 +228,49 @@ if __name__ == "__main__":
     verification_result = verify_evidence(args.inventory, args.batch_summary, args.sample_dir)
 
     # Save results
-    os.makedirs(args.out_dir, exist_ok=True)
+    Path(args.out_dir).mkdir(exist_ok=True, parents=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     json_path = f"{args.out_dir}/hwpx_evidence_verification_{timestamp}.json"
-    with open(json_path, "w", encoding="utf-8") as f:
+    with Path(json_path).open("w", encoding="utf-8") as f:
         json.dump(verification_result, f, indent=2, ensure_ascii=False)
 
     # Save latest
     latest_json = f"{args.out_dir}/hwpx_evidence_verification_latest.json"
-    with open(latest_json, "w", encoding="utf-8") as f:
+    with Path(latest_json).open("w", encoding="utf-8") as f:
         json.dump(verification_result, f, indent=2, ensure_ascii=False)
 
     # Generate Markdown report
     md_path = f"{args.out_dir}/hwpx_evidence_verification_{timestamp}.md"
-    with open(md_path, "w", encoding="utf-8") as f:
+    with Path(md_path).open("w", encoding="utf-8") as f:
         f.write("# HWPX Evidence Verification Report\n\n")
         f.write(f"**Verification Time**: {verification_result['verificationTime']}\n\n")
-        f.write(f"## Summary\n\n")
-        f.write(f"| 항목 | 값 |\n")
-        f.write(f"|-----|-----|\n")
+        f.write("## Summary\n\n")
+        f.write("| 항목 | 값 |\n")
+        f.write("|-----|-----|\n")
         f.write(f"| Inventory Real Samples | {verification_result['inventoryCount']} |\n")
         f.write(f"| Batch Results | {verification_result['batchCount']} |\n")
         f.write(f"| Batch Passed | {verification_result['batchPassed']} |\n")
         f.write(f"| Judgment | {verification_result['judgment']} |\n\n")
 
-        f.write(f"## Checks\n\n")
+        f.write("## Checks\n\n")
         for check_name, check_result in verification_result["checks"].items():
             f.write(f"- {check_name}: {check_result}\n")
 
         if verification_result["warnings"]:
-            f.write(f"\n## Warnings\n\n")
+            f.write("\n## Warnings\n\n")
             for warning in verification_result["warnings"]:
                 f.write(f"- {warning}\n")
 
         if verification_result["failures"]:
-            f.write(f"\n## Failures\n\n")
+            f.write("\n## Failures\n\n")
             for failure in verification_result["failures"]:
                 f.write(f"- {failure}\n")
 
     # Save latest MD
     latest_md = f"{args.out_dir}/hwpx_evidence_verification_latest.md"
-    with open(latest_md, "w", encoding="utf-8") as f:
-        with open(md_path, "r", encoding="utf-8") as src:
+    with Path(latest_md).open("w", encoding="utf-8") as f:
+        with Path(md_path).open("r", encoding="utf-8") as src:
             f.write(src.read())
 
     print(json.dumps(verification_result, indent=2, ensure_ascii=False))

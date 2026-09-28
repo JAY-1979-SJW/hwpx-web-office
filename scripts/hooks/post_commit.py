@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Post-commit devlog writer.
 
 Default behavior writes change history and devlog files only. It never creates
@@ -144,7 +144,7 @@ def claude_available() -> bool:
     try:
         subprocess.run(["claude", "--version"], capture_output=True, timeout=5)
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         return False
 
 
@@ -179,7 +179,7 @@ def main():
     jsonl_path = repo / "logs" / "change_history.jsonl"
     jsonl_path.parent.mkdir(parents=True, exist_ok=True)
     existing = jsonl_path.read_text(encoding="utf-8") if jsonl_path.exists() else ""
-    with open(jsonl_path, "w", encoding="utf-8", newline="\n") as f:
+    with Path(jsonl_path).open("w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         if existing:
             f.write(existing)
@@ -206,7 +206,7 @@ def main():
                 branch,
                 commit_hash,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             print(f"[post-commit] Claude failed ({exc}); writing stub", file=sys.stderr)
             content = make_stub(mask_secret_literals(commit_msg), changed_files, date_str, author, branch, commit_hash)
     else:
@@ -222,6 +222,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         print(f"[post-commit] warning: {exc}", file=sys.stderr)
         sys.exit(0)

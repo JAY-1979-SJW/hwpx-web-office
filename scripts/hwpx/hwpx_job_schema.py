@@ -128,7 +128,7 @@ def validate_compose_job(
 ) -> dict[str, Any]:
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
-    base_dir = base_dir or Path(".")
+    base_dir = base_dir or Path()
 
     if not isinstance(job, dict):
         return {

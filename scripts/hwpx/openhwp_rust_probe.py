@@ -15,14 +15,14 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_TOOLCHAIN = "stable-x86_64-pc-windows-gnu"
-DEFAULT_TARGET_DIR = Path("C:/tmp/openhwp_probe_target")
+DEFAULT_TARGET_DIR = Path("tmp/openhwp_probe_target")
 DEFAULT_WORK_DIR = Path("tmp/openhwp_rust_probe")
 DEFAULT_OPENHWP_ROOT = Path("tmp/oss_openhwp")
 
 
-PROBE_MAIN_RS = r'''
+PROBE_MAIN_RS = (
+    r"""
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -117,7 +117,9 @@ fn main() {
         }
     }
 }
-'''.strip() + "\n"
+""".strip()
+    + "\n"
+)
 
 
 def cargo_toml(openhwp_root: Path) -> str:

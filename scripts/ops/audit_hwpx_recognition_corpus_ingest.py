@@ -56,7 +56,7 @@ def _now_iso() -> str:
 
 def _file_sha256(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -125,7 +125,7 @@ def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
     try:
         sha_after = _file_sha256(path)
         mt_after = path.stat().st_mtime
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         res["ingest_status"] = "FAIL_SOURCE_READ"
         res["errors"].append(str(exc))
         return res
@@ -150,7 +150,7 @@ def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
     # 2) parse
     try:
         r = parser_engine.parse_hwpx_v2(path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         res["ingest_status"] = "FAIL_PARSE"
         res["errors"].append(str(exc)[:200])
         return res
@@ -276,7 +276,7 @@ def run_ingest(limit: int | None = None) -> dict:
         for i, item in enumerate(targets, 1):
             try:
                 res = _ingest_one(conn, item, parser_engine, now_iso)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
                 res = {"sourcePath": item["sourcePath"],
                          "document_id": item["sha256"],
                          "ingest_status": "FAIL_INGEST",

@@ -201,7 +201,7 @@ def run_fill_review_live_pipeline_sandbox(input_dict: dict,
     out = Path(output_path)
     try:
         same_path = src.resolve() == out.resolve()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         same_path = str(src) == str(out)
     if same_path:
         result["pipelineStatus"] = "WRITER_BLOCKED"
@@ -261,7 +261,7 @@ def run_fill_review_live_pipeline_sandbox(input_dict: dict,
 
 def sha256_of_file(path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()

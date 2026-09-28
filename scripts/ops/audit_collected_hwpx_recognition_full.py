@@ -44,11 +44,11 @@ def _audit_one(path: Path) -> dict:
         stat = path.stat()
         out["mtimeBefore"] = stat.st_mtime
         sha = hashlib.sha256()
-        with open(path, "rb") as f:
+        with Path(path).open("rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 sha.update(chunk)
         out["sha256Before"] = sha.hexdigest()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         out["verdict"] = "FAIL_PARSE_ERROR"
         out["errors"].append({"stage": "stat", "detail": str(exc)})
         return out
@@ -56,7 +56,7 @@ def _audit_one(path: Path) -> dict:
     try:
         from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
         r = parse_hwpx_v2(path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         out["verdict"] = "FAIL_PARSE_ERROR"
         out["errors"].append({"stage": "parse", "detail": str(exc)[:200]})
         out["sha256After"] = out["sha256Before"]
@@ -101,7 +101,7 @@ def _audit_one(path: Path) -> dict:
                                           and "summary" in payload)
         out["reviewItemCount"] = len(items)
         out["missingMaterialCount"] = len(missing)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         out["fillRequirementCount"] = -1
         out["uiPayloadReady"] = False
         out["errors"].append({"stage": "fill_review", "detail": str(exc)[:200]})
@@ -110,11 +110,11 @@ def _audit_one(path: Path) -> dict:
     try:
         out["mtimeAfter"] = path.stat().st_mtime
         sha_after = hashlib.sha256()
-        with open(path, "rb") as f:
+        with Path(path).open("rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 sha_after.update(chunk)
         out["sha256After"] = sha_after.hexdigest()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         out["sha256After"] = out["sha256Before"]
         out["mtimeAfter"] = out["mtimeBefore"]
         out["errors"].append({"stage": "rehash", "detail": str(exc)})
@@ -175,7 +175,7 @@ def run_recognition_audit(limit: int | None = None) -> dict:
         path = PROJECT_ROOT / it["sourcePath"]
         try:
             res = _audit_one(path)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             res = {"verdict": "FAIL_PARSE_ERROR",
                      "errors": [{"stage": "outer", "detail": str(exc)[:200]}],
                      "sha256Before": it.get("sha256"),

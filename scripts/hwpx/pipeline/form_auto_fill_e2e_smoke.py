@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
 import re
 import zipfile
 from pathlib import Path
@@ -33,7 +32,7 @@ _PII_RE = re.compile(r"\d{6}-\d{7}|\d{3}-\d{2}-\d{5}")
 
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -46,6 +45,7 @@ def _val_hash(v: str) -> str:
 # ---------------------------------------------------------------------------
 # Synthetic HWPX fixture generator
 # ---------------------------------------------------------------------------
+
 
 def _make_synthetic_hwpx(rows: list[tuple[str, str]]) -> bytes:
     """
@@ -70,7 +70,9 @@ def _make_synthetic_hwpx(rows: list[tuple[str, str]]) -> bytes:
         row.append(_cell(label))
         row.append(_cell(value))
 
-    xml_bytes = b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(sec, encoding="unicode").encode()
+    xml_bytes = (
+        b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(sec, encoding="unicode").encode()
+    )
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -82,6 +84,7 @@ def _make_synthetic_hwpx(rows: list[tuple[str, str]]) -> bytes:
 # ---------------------------------------------------------------------------
 # Stage 1: Synthetic recommend
 # ---------------------------------------------------------------------------
+
 
 def _stage_recommend(query: str) -> dict:
     """synthetic: query에 '소방' 또는 '완공' 포함이면 target form 추천."""
@@ -110,30 +113,72 @@ _SYNTHETIC_CATALOG = {
     "byeoljiNumber": "",
     "fileCount": 1,
     "fields": [
-        {"primaryLabel": "신청인 성명", "labels": ["신청인 성명", "성명", "대표자"],
-         "semanticField": "representativeName", "autoFillable": True,
-         "inputCellTypes": ["text"], "required": True,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "사업자등록증"},
-        {"primaryLabel": "상호(법인명)", "labels": ["상호", "법인명", "업체명", "시공업체"],
-         "semanticField": "contractorName", "autoFillable": True,
-         "inputCellTypes": ["text"], "required": True,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "사업자등록증"},
-        {"primaryLabel": "공사명", "labels": ["공사명", "현장명", "시설명"],
-         "semanticField": "siteName", "autoFillable": True,
-         "inputCellTypes": ["text"], "required": True,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "공사계약서"},
-        {"primaryLabel": "착공일", "labels": ["착공일", "착공일자", "공사시작"],
-         "semanticField": "startDate", "autoFillable": True,
-         "inputCellTypes": ["date"], "required": True,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "착공신고서"},
-        {"primaryLabel": "완공일", "labels": ["완공일", "완공일자", "준공일"],
-         "semanticField": "completionDate", "autoFillable": True,
-         "inputCellTypes": ["date"], "required": True,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "준공서류"},
-        {"primaryLabel": "공사금액", "labels": ["공사금액", "도급금액", "계약금액"],
-         "semanticField": "amount", "autoFillable": True,
-         "inputCellTypes": ["amount"], "required": False,
-         "fileOccurrenceCount": 1, "totalOccurrenceCount": 1, "sourceEvidenceHint": "공사계약서"},
+        {
+            "primaryLabel": "신청인 성명",
+            "labels": ["신청인 성명", "성명", "대표자"],
+            "semanticField": "representativeName",
+            "autoFillable": True,
+            "inputCellTypes": ["text"],
+            "required": True,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "사업자등록증",
+        },
+        {
+            "primaryLabel": "상호(법인명)",
+            "labels": ["상호", "법인명", "업체명", "시공업체"],
+            "semanticField": "contractorName",
+            "autoFillable": True,
+            "inputCellTypes": ["text"],
+            "required": True,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "사업자등록증",
+        },
+        {
+            "primaryLabel": "공사명",
+            "labels": ["공사명", "현장명", "시설명"],
+            "semanticField": "siteName",
+            "autoFillable": True,
+            "inputCellTypes": ["text"],
+            "required": True,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "공사계약서",
+        },
+        {
+            "primaryLabel": "착공일",
+            "labels": ["착공일", "착공일자", "공사시작"],
+            "semanticField": "startDate",
+            "autoFillable": True,
+            "inputCellTypes": ["date"],
+            "required": True,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "착공신고서",
+        },
+        {
+            "primaryLabel": "완공일",
+            "labels": ["완공일", "완공일자", "준공일"],
+            "semanticField": "completionDate",
+            "autoFillable": True,
+            "inputCellTypes": ["date"],
+            "required": True,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "준공서류",
+        },
+        {
+            "primaryLabel": "공사금액",
+            "labels": ["공사금액", "도급금액", "계약금액"],
+            "semanticField": "amount",
+            "autoFillable": True,
+            "inputCellTypes": ["amount"],
+            "required": False,
+            "fileOccurrenceCount": 1,
+            "totalOccurrenceCount": 1,
+            "sourceEvidenceHint": "공사계약서",
+        },
     ],
 }
 
@@ -155,18 +200,54 @@ def _stage_catalog() -> dict:
 # ---------------------------------------------------------------------------
 
 _SYNTHETIC_PARSE_FIELDS = [
-    {"fieldKey": "representativeName", "value": "홍길동", "confidence": 0.91,
-     "sourceLabel": "대표자", "location": "sec0_tbl0_row1_col1", "extractMethod": "horizontal"},
-    {"fieldKey": "contractorName", "value": "대한소방공사(주)", "confidence": 0.88,
-     "sourceLabel": "시공업체", "location": "sec0_tbl0_row2_col1", "extractMethod": "horizontal"},
-    {"fieldKey": "siteName", "value": "서울 강남구 테스트빌딩 소방설비공사", "confidence": 0.85,
-     "sourceLabel": "공사명", "location": "sec0_tbl0_row3_col1", "extractMethod": "horizontal"},
-    {"fieldKey": "startDate", "value": "2026.01.15", "confidence": 0.90,
-     "sourceLabel": "착공일", "location": "sec0_tbl0_row4_col1", "extractMethod": "horizontal"},
-    {"fieldKey": "completionDate", "value": "2026.05.10", "confidence": 0.87,
-     "sourceLabel": "완공일", "location": "sec0_tbl0_row5_col1", "extractMethod": "horizontal"},
-    {"fieldKey": "amount", "value": "50,000,000원", "confidence": 0.82,
-     "sourceLabel": "공사금액", "location": "sec0_tbl0_row6_col1", "extractMethod": "horizontal"},
+    {
+        "fieldKey": "representativeName",
+        "value": "홍길동",
+        "confidence": 0.91,
+        "sourceLabel": "대표자",
+        "location": "sec0_tbl0_row1_col1",
+        "extractMethod": "horizontal",
+    },
+    {
+        "fieldKey": "contractorName",
+        "value": "대한소방공사(주)",
+        "confidence": 0.88,
+        "sourceLabel": "시공업체",
+        "location": "sec0_tbl0_row2_col1",
+        "extractMethod": "horizontal",
+    },
+    {
+        "fieldKey": "siteName",
+        "value": "서울 강남구 테스트빌딩 소방설비공사",
+        "confidence": 0.85,
+        "sourceLabel": "공사명",
+        "location": "sec0_tbl0_row3_col1",
+        "extractMethod": "horizontal",
+    },
+    {
+        "fieldKey": "startDate",
+        "value": "2026.01.15",
+        "confidence": 0.90,
+        "sourceLabel": "착공일",
+        "location": "sec0_tbl0_row4_col1",
+        "extractMethod": "horizontal",
+    },
+    {
+        "fieldKey": "completionDate",
+        "value": "2026.05.10",
+        "confidence": 0.87,
+        "sourceLabel": "완공일",
+        "location": "sec0_tbl0_row5_col1",
+        "extractMethod": "horizontal",
+    },
+    {
+        "fieldKey": "amount",
+        "value": "50,000,000원",
+        "confidence": 0.82,
+        "sourceLabel": "공사금액",
+        "location": "sec0_tbl0_row6_col1",
+        "extractMethod": "horizontal",
+    },
 ]
 
 
@@ -186,9 +267,10 @@ def _stage_upload_parser() -> dict:
 # Stage 4: Field mapping
 # ---------------------------------------------------------------------------
 
+
 def _stage_mapping() -> dict:
-    from scripts.hwpx.pipeline.upload_document_parser import ParseResult, ExtractedField
     from scripts.hwpx.pipeline.form_field_mapper import map_fields
+    from scripts.hwpx.pipeline.upload_document_parser import ExtractedField, ParseResult
 
     parse_result = ParseResult(
         maskedStem="synthetic_upload",
@@ -217,6 +299,7 @@ def _stage_mapping() -> dict:
 # Stage 5: Review panel
 # ---------------------------------------------------------------------------
 
+
 def _stage_review_panel(mapping) -> dict:
     from scripts.hwpx.pipeline.review_panel import build_review_panel
 
@@ -239,10 +322,14 @@ def _stage_review_panel(mapping) -> dict:
 # Stage 6: Human approval (synthetic decisions — CONFIRM_FIELD all auto-fill)
 # ---------------------------------------------------------------------------
 
+
 def _stage_human_approval(panel) -> dict:
     from scripts.hwpx.pipeline.approval_gate import (
-        apply_decisions_from_panel, result_to_dict, FieldDecision,
-        ACTION_CONFIRM, ACTION_HOLD,
+        ACTION_CONFIRM,
+        ACTION_HOLD,
+        FieldDecision,
+        apply_decisions_from_panel,
+        result_to_dict,
     )
 
     decisions = []
@@ -273,13 +360,12 @@ def _stage_human_approval(panel) -> dict:
 # Stage 7: Sandbox writer
 # ---------------------------------------------------------------------------
 
+
 def _stage_sandbox_writer(approval, template_path: Path, output_dir: Path) -> dict:
     from scripts.hwpx.pipeline.form_auto_fill_writer_sandbox import run_sandbox_write
 
     result = run_sandbox_write(approval, template_path, output_dir)
     written = len(result.writtenFields)
-    rb_pass = sum(1 for f in result.writtenFields if f.get("readbackStatus") == "READBACK_PASS")
-    rb_fail = len(result.writtenFields) - rb_pass
 
     return {
         "stage": "sandboxWriter",
@@ -296,22 +382,27 @@ def _stage_sandbox_writer(approval, template_path: Path, output_dir: Path) -> di
 # Stage 8: Readback hardening
 # ---------------------------------------------------------------------------
 
+
 def _stage_readback_hardening(approval, template_path: Path, output_path: Path) -> dict:
     from scripts.hwpx.pipeline.form_writer_readback_hardening import verify_readback
 
-    # approval_dict 재구성
-    from scripts.hwpx.pipeline.approval_gate import result_to_dict
-    approval_dict = result_to_dict(approval)
-
     # writer result dict — readback hardening에서 targets 재파싱
     writer_result_dict: dict = {}
-    hardening = verify_readback(template_path, output_path, approval.approvedFields, writer_result_dict)
+    hardening = verify_readback(
+        template_path, output_path, approval.approvedFields, writer_result_dict
+    )
 
-    rb_fail = sum(1 for fr in hardening.fieldResults
-                  if fr.get("readbackStatus", "").startswith("READBACK_FAIL"))
+    rb_fail = sum(
+        1
+        for fr in hardening.fieldResults
+        if fr.get("readbackStatus", "").startswith("READBACK_FAIL")
+    )
     unexpected = hardening.structureCheck.unexpectedCellMutationCount
 
-    verdict_ok = hardening.overallVerdict in ("PASS_READBACK_HARDENED", "WARN_READBACK_NORMALIZED_MATCH_ONLY")
+    verdict_ok = hardening.overallVerdict in (
+        "PASS_READBACK_HARDENED",
+        "WARN_READBACK_NORMALIZED_MATCH_ONLY",
+    )
 
     return {
         "stage": "readbackHardening",
@@ -328,13 +419,16 @@ def _stage_readback_hardening(approval, template_path: Path, output_path: Path) 
 # Stage 9: Download review
 # ---------------------------------------------------------------------------
 
+
 def _stage_download_review(sandbox_result, hardening_result) -> dict:
     from scripts.hwpx.pipeline.form_writer_download_review import build_download_payload
 
     # sandbox result → ui result dict
     sr = sandbox_result  # SandboxWriteResult instance
     ui_result = {
-        "writerStatus": "SUCCESS" if not sr.sourceMutated and not sr._readback_any_fail(hardening_result) else "FAILED_READBACK",
+        "writerStatus": "SUCCESS"
+        if not sr.sourceMutated and not sr._readback_any_fail(hardening_result)
+        else "FAILED_READBACK",
         "summary": {
             "written": len(sr.writtenFields),
             "blocked": len(sr.blockedFields),
@@ -349,8 +443,12 @@ def _stage_download_review(sandbox_result, hardening_result) -> dict:
         },
         "fieldResults": [],
         "warnings": list(sr.warnings),
-        "security": {"sourceMutationAllowed": False, "rawPathVisible": False,
-                     "rawFilenameVisible": False, "piiMasked": True},
+        "security": {
+            "sourceMutationAllowed": False,
+            "rawPathVisible": False,
+            "rawFilenameVisible": False,
+            "piiMasked": True,
+        },
     }
 
     dl_payload = build_download_payload(ui_result)
@@ -368,6 +466,7 @@ def _stage_download_review(sandbox_result, hardening_result) -> dict:
 # Stage 10: Final export gate
 # ---------------------------------------------------------------------------
 
+
 def _stage_final_export(dl_payload: dict) -> dict:
     from scripts.hwpx.pipeline.form_writer_final_export_gate import build_final_export_payload
 
@@ -383,10 +482,13 @@ def _stage_final_export(dl_payload: dict) -> dict:
         "security": {"sourceMutationAllowed": False},
     }
 
-    export_payload = build_final_export_payload(dl_payload, decision_dict,
-                                                form_id="fire_completion_inspection",
-                                                form_title="소방시설공사 완공검사 신청서",
-                                                display_name="최종작성본_소방완공검사신청서.hwpx")
+    export_payload = build_final_export_payload(
+        dl_payload,
+        decision_dict,
+        form_id="fire_completion_inspection",
+        form_title="소방시설공사 완공검사 신청서",
+        display_name="최종작성본_소방완공검사신청서.hwpx",
+    )
     return {
         "stage": "finalExportGate",
         "status": "PASS" if export_payload["finalExportEnabled"] else "FAIL",
@@ -399,6 +501,7 @@ def _stage_final_export(dl_payload: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Helpers attached to SandboxWriteResult
 # ---------------------------------------------------------------------------
+
 
 def _patch_sandbox_result():
     """SandboxWriteResult에 _readback_any_fail 헬퍼 임시 주입."""
@@ -413,6 +516,7 @@ def _patch_sandbox_result():
 # ---------------------------------------------------------------------------
 # Main E2E runner
 # ---------------------------------------------------------------------------
+
 
 def run_e2e_smoke(tmp_dir: Path) -> dict:
     """
@@ -455,7 +559,7 @@ def run_e2e_smoke(tmp_dir: Path) -> dict:
     template_path = tmp_dir / "synthetic_template.hwpx"
     template_path.write_bytes(hwpx_bytes)
     source_sha256_before = _sha256(template_path)
-    source_mtime_before = os.stat(template_path).st_mtime
+    source_mtime_before = template_path.stat().st_mtime
 
     output_dir = tmp_dir / "sandbox_out"
     output_dir.mkdir(exist_ok=True)
@@ -466,7 +570,7 @@ def run_e2e_smoke(tmp_dir: Path) -> dict:
 
     # source 불변 확인
     source_sha256_after = _sha256(template_path)
-    source_mtime_after = os.stat(template_path).st_mtime
+    source_mtime_after = template_path.stat().st_mtime
     assert source_sha256_before == source_sha256_after, "SOURCE HWPX MUTATED (sha256)"
     assert source_mtime_before == source_mtime_after, "SOURCE HWPX MUTATED (mtime)"
 
@@ -475,25 +579,45 @@ def run_e2e_smoke(tmp_dir: Path) -> dict:
     if not output_candidates:
         # dry_run 또는 no writable fields → readback skip with zero counts
         hardening = {
-            "stage": "readbackHardening", "status": "PASS",
-            "readbackPass": 0, "readbackFail": 0, "unexpectedMutation": 0,
+            "stage": "readbackHardening",
+            "status": "PASS",
+            "readbackPass": 0,
+            "readbackFail": 0,
+            "unexpectedMutation": 0,
             "overallVerdict": "PASS_READBACK_HARDENED",
         }
         dl_payload = {
             "schemaVersion": "form_writer_download_review_v1",
             "writerStatus": "SUCCESS",
             "reviewStatus": "WAITING_USER_REVIEW",
-            "summary": {"written": 0, "blocked": 0, "readbackPass": 0,
-                        "readbackFail": 0, "sourceMutated": False},
-            "download": {"downloadEnabled": True, "outputFileId": sr.outputPathMasked or "no_output",
-                         "outputHash": sr.outputHash[:16] if sr.outputHash else "000000000000000a",
-                         "sourceTemplateHash": ""},
-            "warnings": [], "allowedReviewActions": [],
-            "security": {"sourceMutationAllowed": False, "rawPathVisible": False,
-                         "rawFilenameVisible": False, "piiMasked": True},
+            "summary": {
+                "written": 0,
+                "blocked": 0,
+                "readbackPass": 0,
+                "readbackFail": 0,
+                "sourceMutated": False,
+            },
+            "download": {
+                "downloadEnabled": True,
+                "outputFileId": sr.outputPathMasked or "no_output",
+                "outputHash": sr.outputHash[:16] if sr.outputHash else "000000000000000a",
+                "sourceTemplateHash": "",
+            },
+            "warnings": [],
+            "allowedReviewActions": [],
+            "security": {
+                "sourceMutationAllowed": False,
+                "rawPathVisible": False,
+                "rawFilenameVisible": False,
+                "piiMasked": True,
+            },
         }
-        download = {"stage": "downloadReview", "status": "PASS", "downloadEnabled": True,
-                    "_dl_payload": dl_payload}
+        download = {
+            "stage": "downloadReview",
+            "status": "PASS",
+            "downloadEnabled": True,
+            "_dl_payload": dl_payload,
+        }
     else:
         output_path = output_candidates[0]
 
@@ -509,12 +633,22 @@ def run_e2e_smoke(tmp_dir: Path) -> dict:
     export = _stage_final_export(dl_payload)
 
     # ── Security scan ─────────────────────────────────────────────────────────
-    full_str = str(rec) + str(cat) + str(parser) + str(mapping_result) + \
-               str(panel_result) + str(approval_result) + str(sandbox) + \
-               str(hardening) + str(download) + str(export)
+    full_str = (
+        str(rec)
+        + str(cat)
+        + str(parser)
+        + str(mapping_result)
+        + str(panel_result)
+        + str(approval_result)
+        + str(sandbox)
+        + str(hardening)
+        + str(download)
+        + str(export)
+    )
     pii_leak = bool(_PII_RE.search(full_str))
-    raw_path_leak = ("C:\\" in full_str or "/home/" in full_str or
-                     str(tmp_dir).replace("\\", "/") in full_str)
+    raw_path_leak = (
+        "C:\\" in full_str or "/home/" in full_str or str(tmp_dir).replace("\\", "/") in full_str
+    )
 
     stage_results = {
         "recommend": rec["status"],

@@ -10,7 +10,6 @@ HWPX API Smoke Test Script
 - 민감정보 마스킹
 """
 
-import os
 import sys
 import json
 import time
@@ -71,12 +70,12 @@ def analyze_text_quality(fulltext):
 def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, include_fixtures=False):
     """Main smoke test function"""
 
-    print(f"[smoke_hwpx_api] Starting API smoke test...", file=sys.stderr)
+    print("[smoke_hwpx_api] Starting API smoke test...", file=sys.stderr)
     print(f"[smoke_hwpx_api] Base URL: {base_url}", file=sys.stderr)
     print(f"[smoke_hwpx_api] Inventory: {inventory_path}", file=sys.stderr)
 
     # Load inventory
-    with open(inventory_path, "r", encoding="utf-8") as f:
+    with Path(inventory_path).open("r", encoding="utf-8") as f:
         inventory = json.load(f)
 
     # Filter samples
@@ -89,14 +88,14 @@ def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, inc
     # Create output directory
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = f"{out_dir}/evidence/{run_id}"
-    os.makedirs(run_dir, exist_ok=True)
-    os.makedirs(f"{out_dir}/logs", exist_ok=True)
+    Path(run_dir).mkdir(exist_ok=True, parents=True)
+    Path(f"{out_dir}/logs").mkdir(exist_ok=True, parents=True)
 
     # Test health first
     try:
         health = requests.get(f"{base_url}/health", timeout=3)
         print(f"[smoke_hwpx_api] Health check: {health.status_code}", file=sys.stderr)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         print(f"[smoke_hwpx_api] ERROR: Health check failed: {e}", file=sys.stderr)
         return None
 
@@ -117,7 +116,7 @@ def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, inc
 
         try:
             # Read file
-            with open(filepath, "rb") as f:
+            with Path(filepath).open("rb") as f:
                 file_content = f.read()
 
             # POST to /parse-hwpx
@@ -189,20 +188,20 @@ def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, inc
                     print(f"✅ PASS ({elapsed_ms:.0f}ms)", file=sys.stderr)
                     passed += 1
                 else:
-                    print(f"❌ FAIL", file=sys.stderr)
+                    print("❌ FAIL", file=sys.stderr)
                     failed += 1
                     if missing_keys:
                         print(f"   Missing keys: {missing_keys}", file=sys.stderr)
                     if text_quality["broken_chars"] > 0:
                         print(f"   Broken chars: {text_quality['broken_chars']}", file=sys.stderr)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
                 print(f"❌ JSON ERROR: {e}", file=sys.stderr)
                 result["error"] = str(e)
                 result["is_pass"] = False
                 failed += 1
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             print(f"❌ REQUEST ERROR: {e}", file=sys.stderr)
             result = {
                 "filename": filename,
@@ -217,7 +216,7 @@ def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, inc
         # Save individual summary
         safe_name = filename.replace("/", "_").replace("\\", "_")
         summary_path = f"{run_dir}/{safe_name}.summary.json"
-        with open(summary_path, "w", encoding="utf-8") as f:
+        with Path(summary_path).open("w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
 
     # Generate batch summary
@@ -234,15 +233,15 @@ def smoke_hwpx_api(base_url, inventory_path, out_dir, max_preview_chars=300, inc
 
     # Save batch summary
     batch_json = f"{run_dir}/batch_summary.json"
-    with open(batch_json, "w", encoding="utf-8") as f:
+    with Path(batch_json).open("w", encoding="utf-8") as f:
         json.dump(batch_summary, f, indent=2, ensure_ascii=False)
 
     # Save latest
     latest_batch = f"{out_dir}/evidence/latest_batch_summary.json"
-    with open(latest_batch, "w", encoding="utf-8") as f:
+    with Path(latest_batch).open("w", encoding="utf-8") as f:
         json.dump(batch_summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[smoke_hwpx_api] Summary:", file=sys.stderr)
+    print("\n[smoke_hwpx_api] Summary:", file=sys.stderr)
     print(f"  Total: {len(batch_results)}", file=sys.stderr)
     print(f"  Passed: {passed}", file=sys.stderr)
     print(f"  Failed: {failed}", file=sys.stderr)

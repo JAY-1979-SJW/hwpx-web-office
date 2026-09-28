@@ -27,20 +27,19 @@ import argparse
 import csv
 import hashlib
 import json
-import os
 import re
 import sys
 import time
+from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 # ── 상수 ──────────────────────────────────────────────────────────────────────
-OCR_MIN_CHARS_PER_PAGE = 20   # 페이지당 이 미만이면 OCR fallback 대상
-OCR_MAX_PAGES = 30            # OCR 과부하 방지: 상한
-TABLE_MAX_PAGES = 50          # 표 추출 페이지 상한 (대형 PDF 병목 방지)
+OCR_MIN_CHARS_PER_PAGE = 20  # 페이지당 이 미만이면 OCR fallback 대상
+OCR_MAX_PAGES = 30  # OCR 과부하 방지: 상한
+TABLE_MAX_PAGES = 50  # 표 추출 페이지 상한 (대형 PDF 병목 방지)
 SNIPPET_CHARS = 400
 
 
@@ -57,7 +56,7 @@ def short_id(path: Path, size: int, mtime: float) -> str:
 
 def file_sha256(path: Path, chunk: int = 1 << 20) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as fh:
+    with Path(path).open("rb") as fh:
         while True:
             b = fh.read(chunk)
             if not b:
@@ -133,7 +132,11 @@ def cmd_scan(args: argparse.Namespace) -> int:
         key = str(p)
         prev = existing.get(key)
         fid = short_id(p, st.st_size, st.st_mtime)
-        if prev and prev.get("file_id") == fid and prev.get("parse_status") in ("success", "partial", "skipped"):
+        if (
+            prev
+            and prev.get("file_id") == fid
+            and prev.get("parse_status") in ("success", "partial", "skipped")
+        ):
             # 동일 파일 + 이미 완결 → 재사용
             rows.append(prev)
             reuse_cnt += 1
@@ -154,7 +157,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     with tmp.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    os.replace(tmp, queue_path)
+    Path(tmp).replace(queue_path)
 
     print(f"[scan] root           : {root}")
     print(f"[scan] queue          : {queue_path}")
@@ -171,7 +174,7 @@ class ParseResult:
     file_id: str
     file_name: str
     source_path: str
-    parse_status: str          # success | partial | failed | skipped
+    parse_status: str  # success | partial | failed | skipped
     text_extracted: bool
     text_length: int
     table_count: int
@@ -217,12 +220,19 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     # 열기 + 메타
     try:
         import fitz  # PyMuPDF
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         res = ParseResult(
-            file_id=fid, file_name=src.name, source_path=str(src),
-            parse_status="failed", text_extracted=False, text_length=0,
-            table_count=0, used_ocr=False, ocr_reason=None,
-            page_count=None, error_type="import_error",
+            file_id=fid,
+            file_name=src.name,
+            source_path=str(src),
+            parse_status="failed",
+            text_extracted=False,
+            text_length=0,
+            table_count=0,
+            used_ocr=False,
+            ocr_reason=None,
+            page_count=None,
+            error_type="import_error",
             error_message=f"PyMuPDF import failed: {e}",
             parsed_at=now_iso(),
         )
@@ -230,16 +240,23 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
 
     try:
         doc = fitz.open(str(src))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"OPEN_FAIL {e}")
         res = ParseResult(
-            file_id=fid, file_name=src.name, source_path=str(src),
-            parse_status="failed", text_extracted=False, text_length=0,
-            table_count=0, used_ocr=False, ocr_reason=None,
-            page_count=None, error_type="open_error",
+            file_id=fid,
+            file_name=src.name,
+            source_path=str(src),
+            parse_status="failed",
+            text_extracted=False,
+            text_length=0,
+            table_count=0,
+            used_ocr=False,
+            ocr_reason=None,
+            page_count=None,
+            error_type="open_error",
             error_message=str(e)[:500],
             parsed_at=now_iso(),
-            duration_ms=int((time.time()-t0)*1000),
+            duration_ms=int((time.time() - t0) * 1000),
         )
         return asdict(res)
 
@@ -248,7 +265,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     meta = {}
     try:
         meta = dict(doc.metadata or {})
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         meta = {}
 
     text_parts: list[str] = []
@@ -256,8 +273,8 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     for i in range(page_count):
         try:
             text_parts.append(doc[i].get_text("text") or "")
-        except Exception as e:
-            text_errors.append(f"page{i+1}:{type(e).__name__}:{e}")
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+            text_errors.append(f"page{i + 1}:{type(e).__name__}:{e}")
             text_parts.append("")
     text_all = "\n".join(text_parts)
     text_len = _safe_text_len(text_all)
@@ -272,7 +289,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
             ocr_reason = f"need_ocr_skipped_pages>{OCR_MAX_PAGES}"
             log(f"OCR_SKIP pages={page_count}>{OCR_MAX_PAGES}")
         else:
-            ocr_reason = "text_len<{}".format(threshold)
+            ocr_reason = f"text_len<{threshold}"
             log(f"OCR_START reason={ocr_reason}")
             try:
                 ocr_text = _run_ocr(src, page_count)
@@ -285,7 +302,7 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
                         log(f"OCR_OK new_len={text_len}")
                     else:
                         log("OCR_DISCARDED not_longer")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
                 log(f"OCR_FAIL {type(e).__name__}:{e}")
                 text_errors.append(f"ocr:{type(e).__name__}:{e}")
 
@@ -293,11 +310,9 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     # 페이지 상한 TABLE_MAX_PAGES 초과 시 앞부분만 스캔 (대형 PDF 병목 방지)
     tables: list[dict] = []
     table_errors: list[str] = []
-    table_truncated = False
     try:
         n = min(page_count, TABLE_MAX_PAGES)
         if page_count > TABLE_MAX_PAGES:
-            table_truncated = True
             table_errors.append(f"truncated_to_first_{TABLE_MAX_PAGES}_pages_of_{page_count}")
         for i in range(n):
             try:
@@ -306,13 +321,13 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
                 for ti, tb in enumerate(tlist):
                     try:
                         rows = tb.extract()
-                    except Exception as e:
-                        table_errors.append(f"page{i+1}_tbl{ti}:{type(e).__name__}:{e}")
+                    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+                        table_errors.append(f"page{i + 1}_tbl{ti}:{type(e).__name__}:{e}")
                         continue
                     tables.append({"page": i + 1, "table_idx": ti, "rows": rows})
-            except Exception as e:
-                table_errors.append(f"page{i+1}:{type(e).__name__}:{e}")
-    except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
+                table_errors.append(f"page{i + 1}:{type(e).__name__}:{e}")
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         table_errors.append(f"global:{type(e).__name__}:{e}")
 
     doc.close()
@@ -320,20 +335,23 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     # 산출물 쓰기
     try:
         (text_dir / f"{fid}.txt").write_text(text_all, encoding="utf-8")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"TEXT_WRITE_FAIL {e}")
 
     try:
         with (tables_dir / f"{fid}.json").open("w", encoding="utf-8") as tf:
-            json.dump({"file_id": fid, "tables": tables, "table_errors": table_errors},
-                      tf, ensure_ascii=False)
-    except Exception as e:
+            json.dump(
+                {"file_id": fid, "tables": tables, "table_errors": table_errors},
+                tf,
+                ensure_ascii=False,
+            )
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"TABLE_WRITE_FAIL {e}")
 
     # 해시 (성공/부분성공 시에만 기록 — 비용 고려)
     try:
         fhash = file_sha256(src)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         fhash = None
 
     # 상태 결정
@@ -346,20 +364,28 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     elif text_errors or table_errors:
         status = "partial"
         error_type = "partial_extract"
-        error_message = "; ".join((text_errors[:3] + table_errors[:2]))[:500]
+        error_message = "; ".join(text_errors[:3] + table_errors[:2])[:500]
     else:
         status = "success"
 
     snippet = text_all[:SNIPPET_CHARS].replace("\n", " ")
     res = ParseResult(
-        file_id=fid, file_name=src.name, source_path=str(src),
-        parse_status=status, text_extracted=(text_len > 0),
-        text_length=text_len, table_count=len(tables),
-        used_ocr=used_ocr, ocr_reason=ocr_reason,
-        page_count=page_count, error_type=error_type,
-        error_message=error_message, parsed_at=now_iso(),
-        file_hash=fhash, text_snippet=snippet,
-        duration_ms=int((time.time()-t0)*1000),
+        file_id=fid,
+        file_name=src.name,
+        source_path=str(src),
+        parse_status=status,
+        text_extracted=(text_len > 0),
+        text_length=text_len,
+        table_count=len(tables),
+        used_ocr=used_ocr,
+        ocr_reason=ocr_reason,
+        page_count=page_count,
+        error_type=error_type,
+        error_message=error_message,
+        parsed_at=now_iso(),
+        file_hash=fhash,
+        text_snippet=snippet,
+        duration_ms=int((time.time() - t0) * 1000),
     )
     d = asdict(res)
     d["meta"] = {k: v for k, v in meta.items() if isinstance(v, (str, int, float))}
@@ -370,17 +396,19 @@ def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
     try:
         with (parsed_dir / f"{fid}.json").open("w", encoding="utf-8") as pf:
             json.dump(d, pf, ensure_ascii=False)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
         log(f"RESULT_WRITE_FAIL {e}")
 
-    log(f"END status={status} text_len={text_len} tables={len(tables)} ocr={used_ocr} dur_ms={d['duration_ms']}")
+    log(
+        f"END status={status} text_len={text_len} tables={len(tables)} ocr={used_ocr} dur_ms={d['duration_ms']}"
+    )
     return d
 
 
 def _run_ocr(pdf_path: Path, page_count: int) -> str:
     """pdf2image + pytesseract (kor+eng) — fallback 전용."""
-    from pdf2image import convert_from_path
     import pytesseract
+    from pdf2image import convert_from_path
 
     limit = min(page_count, OCR_MAX_PAGES)
     imgs = convert_from_path(str(pdf_path), dpi=200, first_page=1, last_page=limit)
@@ -409,7 +437,7 @@ def _write_queue(queue_path: Path, rows: list[dict]):
     with tmp.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    os.replace(tmp, queue_path)
+    Path(tmp).replace(queue_path)
 
 
 def cmd_parse(args: argparse.Namespace) -> int:
@@ -421,6 +449,7 @@ def cmd_parse(args: argparse.Namespace) -> int:
 
     rows = list(_iter_queue(queue_path))
     # 재처리 대상: pending 또는 (failed AND --retry-failed)
+
     def needs_run(r):
         s = r.get("parse_status")
         if s == "pending":
@@ -449,7 +478,7 @@ def cmd_parse(args: argparse.Namespace) -> int:
             t = futs[fut]
             try:
                 res = fut.result()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 다음 단계/파일 계속
                 res = {
                     "file_id": t["file_id"],
                     "file_name": t["file_name"],
@@ -481,8 +510,10 @@ def cmd_parse(args: argparse.Namespace) -> int:
             done += 1
             if done % flush_every == 0 or done == len(todo):
                 _write_queue(queue_path, rows)
-                print(f"[parse] progress {done:,}/{len(todo):,} "
-                      f"status={res['parse_status']} file={res['file_name']}")
+                print(
+                    f"[parse] progress {done:,}/{len(todo):,} "
+                    f"status={res['parse_status']} file={res['file_name']}"
+                )
 
     _write_queue(queue_path, rows)
     print(f"[parse] done {done:,}/{len(todo):,}")
@@ -537,10 +568,21 @@ def cmd_report(args: argparse.Namespace) -> int:
         json.dump(summary, fh, ensure_ascii=False, indent=2)
 
     fieldnames = [
-        "file_id", "file_name", "file_path", "file_size", "modified_at",
-        "page_count", "parse_status", "text_length", "table_count",
-        "used_ocr", "ocr_reason", "error_type", "error_message",
-        "duration_ms", "parsed_at",
+        "file_id",
+        "file_name",
+        "file_path",
+        "file_size",
+        "modified_at",
+        "page_count",
+        "parse_status",
+        "text_length",
+        "table_count",
+        "used_ocr",
+        "ocr_reason",
+        "error_type",
+        "error_message",
+        "duration_ms",
+        "parsed_at",
     ]
     with out_csv.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
@@ -568,21 +610,24 @@ def main() -> int:
     ap_scan = sub.add_parser("scan", help="PDF 디렉터리 스캔 → 큐 생성/갱신")
     ap_scan.add_argument("--root", required=True)
     ap_scan.add_argument("--work", required=True)
-    ap_scan.add_argument("--rebuild", action="store_true",
-                         help="기존 큐 무시하고 재생성")
+    ap_scan.add_argument("--rebuild", action="store_true", help="기존 큐 무시하고 재생성")
     ap_scan.set_defaults(func=cmd_scan)
 
     ap_parse = sub.add_parser("parse", help="큐 pending/failed 재처리")
     ap_parse.add_argument("--work", required=True)
     ap_parse.add_argument("--workers", type=int, default=4)
-    ap_parse.add_argument("--limit", type=int, default=0,
-                          help="처리 건수 상한 (0=무제한)")
-    ap_parse.add_argument("--retry-failed", action="store_true",
-                          help="failed 행도 재시도")
-    ap_parse.add_argument("--ocr", dest="ocr", action="store_true", default=True,
-                          help="OCR fallback 활성화 (default: on)")
-    ap_parse.add_argument("--no-ocr", dest="ocr", action="store_false",
-                          help="OCR fallback 비활성화")
+    ap_parse.add_argument("--limit", type=int, default=0, help="처리 건수 상한 (0=무제한)")
+    ap_parse.add_argument("--retry-failed", action="store_true", help="failed 행도 재시도")
+    ap_parse.add_argument(
+        "--ocr",
+        dest="ocr",
+        action="store_true",
+        default=True,
+        help="OCR fallback 활성화 (default: on)",
+    )
+    ap_parse.add_argument(
+        "--no-ocr", dest="ocr", action="store_false", help="OCR fallback 비활성화"
+    )
     ap_parse.set_defaults(func=cmd_parse)
 
     ap_rep = sub.add_parser("report", help="집계 리포트 생성")

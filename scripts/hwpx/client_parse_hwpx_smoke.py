@@ -46,7 +46,7 @@ class HwpxSmokeTest:
             self.result['error'] = f"Engine not running: {e}"
             self.result['error_type'] = 'ENGINE_NOT_RUNNING'
             return False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             self.result['error'] = f"Health check timeout/error: {e}"
             self.result['error_type'] = 'TIMEOUT'
             return False
@@ -59,7 +59,7 @@ class HwpxSmokeTest:
             return False
 
         try:
-            with open(self.sample_path, 'rb') as f:
+            with Path(self.sample_path).open('rb') as f:
                 sample_data = f.read()
 
             url = f"{self.base_url}/parse-hwpx"
@@ -96,7 +96,7 @@ class HwpxSmokeTest:
             self.result['error'] = f"Invalid JSON response: {e}"
             self.result['error_type'] = 'PARSE_HTTP_FAIL'
             return False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             self.result['error'] = f"Parse request error: {e}"
             self.result['error_type'] = 'TIMEOUT'
             return False
@@ -140,7 +140,7 @@ class HwpxSmokeTest:
 
     def run(self) -> bool:
         """Run smoke test."""
-        print(f"\n=== HWPX Client Smoke Test ===")
+        print("\n=== HWPX Client Smoke Test ===")
         print(f"Base URL: {self.base_url}")
         print(f"Sample:   {self.sample_path}")
 
@@ -169,7 +169,7 @@ class HwpxSmokeTest:
                 print(f"  • {key}: {status}")
 
         resp = self.result['response']
-        print(f"\n=== Response Summary ===")
+        print("\n=== Response Summary ===")
         print(f"  Schema Version: {resp.get('schemaVersion')}")
         print(f"  Engine Version: {resp.get('engineVersion')}")
         print(f"  Full Text Length: {self.result['validation'].get('fullText_length', 0)}")
@@ -180,7 +180,7 @@ class HwpxSmokeTest:
         print(f"  Errors: {len(resp.get('errors', []))}")
 
         if resp.get('errors'):
-            print(f"\n  Errors in response:")
+            print("\n  Errors in response:")
             for err in resp['errors'][:3]:  # Show first 3
                 print(f"    - {err}")
 
@@ -222,7 +222,7 @@ def main():
     success = test.run()
 
     if args.json_output:
-        with open(args.json_output, 'w') as f:
+        with Path(args.json_output).open('w') as f:
             f.write(test.to_json())
         print(f"\nJSON output: {args.json_output}")
 

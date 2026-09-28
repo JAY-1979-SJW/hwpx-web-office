@@ -10,7 +10,6 @@ HWPX Sample Inventory Audit Script
 - 중복 감지
 """
 
-import os
 import sys
 import json
 import hashlib
@@ -22,11 +21,11 @@ def calculate_sha256(filepath, chunk_size=65536):
     """Calculate SHA256 hash of file"""
     sha256_hash = hashlib.sha256()
     try:
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             for chunk in iter(lambda: f.read(chunk_size), b""):
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         return f"ERROR: {str(e)}"
 
 def is_fixture(filepath, filename):
@@ -72,7 +71,7 @@ def find_all_hwpx_files(sample_root):
         Path(sample_root) / "samples/hwpx-real",
         Path(sample_root) / "docs/samples",
         Path(sample_root) / "src/test/resources",
-        Path(".") / "samples",
+        Path("samples"),
     ]
 
     visited = set()
@@ -89,7 +88,7 @@ def find_all_hwpx_files(sample_root):
                     continue
                 visited.add(abs_path)
                 hwpx_files.append(hwpx_file)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             print(f"Warning: Error scanning {search_dir}: {e}", file=sys.stderr)
 
     return sorted(hwpx_files)
@@ -97,7 +96,7 @@ def find_all_hwpx_files(sample_root):
 def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
     """Main audit function"""
 
-    print(f"[audit_hwpx_samples] Starting inventory audit...", file=sys.stderr)
+    print("[audit_hwpx_samples] Starting inventory audit...", file=sys.stderr)
     print(f"[audit_hwpx_samples] Sample root: {sample_root}", file=sys.stderr)
 
     # Find all HWPX files
@@ -105,8 +104,8 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
     print(f"[audit_hwpx_samples] Found {len(hwpx_files)} HWPX files", file=sys.stderr)
 
     # Create output directory
-    os.makedirs(f"{output_dir}/inventories", exist_ok=True)
-    os.makedirs(f"{output_dir}/logs", exist_ok=True)
+    Path(f"{output_dir}/inventories").mkdir(exist_ok=True, parents=True)
+    Path(f"{output_dir}/logs").mkdir(exist_ok=True, parents=True)
 
     # Collect metadata
     inventory = []
@@ -185,44 +184,44 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
 
     # Save JSON
     json_path = f"{output_dir}/inventories/hwpx_sample_inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(json_path, "w", encoding="utf-8") as f:
+    with Path(json_path).open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
     # Save latest symlink equivalent
     latest_json = f"{output_dir}/inventories/hwpx_sample_inventory_latest.json"
-    with open(latest_json, "w", encoding="utf-8") as f:
+    with Path(latest_json).open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
     # Generate Markdown report
     md_path = f"{output_dir}/inventories/hwpx_sample_inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    with open(md_path, "w", encoding="utf-8") as f:
+    with Path(md_path).open("w", encoding="utf-8") as f:
         f.write("# HWPX Sample Inventory\n\n")
         f.write(f"**Audit Time**: {audit_time}\n\n")
-        f.write(f"## Summary\n\n")
-        f.write(f"| 구분 | 개수 |\n")
-        f.write(f"|------|------|\n")
+        f.write("## Summary\n\n")
+        f.write("| 구분 | 개수 |\n")
+        f.write("|------|------|\n")
         f.write(f"| Total | {report['totalFiles']} |\n")
         f.write(f"| Real Samples | {report['realSamples']} |\n")
         f.write(f"| Fixtures | {report['fixtures']} |\n\n")
 
-        f.write(f"## Inventory\n\n")
-        f.write(f"| # | Filename | Size (B) | Category | Fixture |\n")
-        f.write(f"|---|----------|----------|----------|----------|\n")
+        f.write("## Inventory\n\n")
+        f.write("| # | Filename | Size (B) | Category | Fixture |\n")
+        f.write("|---|----------|----------|----------|----------|\n")
         for item in inventory:
             is_fixture_mark = "✅" if item["isFixture"] else "❌"
             f.write(f"| {item['index']:2d} | {item['filename'][:50]} | {item['sizeBytes']:>10} | {item['sampleCategory']:<10} | {is_fixture_mark} |\n")
 
-        f.write(f"\n## SHA256 Hashes\n\n")
+        f.write("\n## SHA256 Hashes\n\n")
         for item in real_samples:
             f.write(f"- `{item['sha256']}`  {item['filename']}\n")
 
     # Save latest MD
     latest_md = f"{output_dir}/inventories/hwpx_sample_inventory_latest.md"
-    with open(latest_md, "w", encoding="utf-8") as f:
-        with open(md_path, "r", encoding="utf-8") as src:
+    with Path(latest_md).open("w", encoding="utf-8") as f:
+        with Path(md_path).open("r", encoding="utf-8") as src:
             f.write(src.read())
 
-    print(f"\n[audit_hwpx_samples] Results:", file=sys.stderr)
+    print("\n[audit_hwpx_samples] Results:", file=sys.stderr)
     print(f"  Real samples: {report['realSamples']}", file=sys.stderr)
     print(f"  Fixtures: {report['fixtures']}", file=sys.stderr)
     print(f"  JSON: {latest_json}", file=sys.stderr)

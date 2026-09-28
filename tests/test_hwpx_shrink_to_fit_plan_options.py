@@ -5,19 +5,21 @@ shrink_to_fit / vertical_align 옵션이 set_cells, set_cells_by_label,
 set_cells_by_text, set_visual_cells 4개 plan 키에서 모두 동일하게
 동작하는지 검증한다.
 """
+
 from __future__ import annotations
 
+import os
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
 import pytest
-import xml.etree.ElementTree as ET
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "hwpx"))
 
-from hwpx_edit_tool import apply_edit_plan  # noqa: E402
+from hwpx_edit_tool import apply_edit_plan  # ruff: ignore[module-import-not-at-top-of-file]
 
 NS = {
     "hp": "http://www.hancom.co.kr/hwpml/2011/paragraph",
@@ -28,9 +30,15 @@ NS = {
 
 @pytest.fixture
 def fixture_path() -> Path:
-    """굴착공사 협의서 hancom-converted hwpx fixture path."""
-    base = Path(r"C:\Users\skyjw\Downloads\hwpx_compare")
-    matches = list(base.glob("08_*/*.hwpx"))
+    """굴착공사 협의서 hancom-converted hwpx fixture path.
+
+    실제 변환 결과물이 있는 로컬 개발자 PC에서만 존재하는 수동 비교용
+    자재라 저장소에 커밋되지 않는다 — 환경변수로 위치를 지정하고, 없으면
+    (원래 있던) 특정 PC 개인 경로를 폴백으로만 시도한다. 못 찾으면 skip.
+    """
+    override = os.environ.get("HWPX_COMPARE_FIXTURE_DIR")
+    base = Path(override) if override else Path(r"C:\Users\skyjw\Downloads\hwpx_compare")
+    matches = list(base.glob("08_*/*.hwpx")) if base.is_dir() else []
     if not matches:
         pytest.skip("fixture HWPX not available")
     return matches[0]
@@ -41,10 +49,22 @@ def _ref_ids(path: Path) -> tuple[set[str], set[str], set[str], set[str]]:
     with zipfile.ZipFile(path) as zf:
         header = ET.fromstring(zf.read("Contents/header.xml"))
         section = ET.fromstring(zf.read("Contents/section0.xml"))
-    defined_char = {cp.attrib.get("id") for cp in header.iter(f"{{{NS['hh']}}}charPr") if cp.attrib.get("id")}
-    defined_para = {pp.attrib.get("id") for pp in header.iter(f"{{{NS['hh']}}}paraPr") if pp.attrib.get("id")}
-    referenced_char = {run.attrib.get("charPrIDRef") for run in section.iter(f"{{{NS['hp']}}}run") if run.attrib.get("charPrIDRef")}
-    referenced_para = {p.attrib.get("paraPrIDRef") for p in section.iter(f"{{{NS['hp']}}}p") if p.attrib.get("paraPrIDRef")}
+    defined_char = {
+        cp.attrib.get("id") for cp in header.iter(f"{{{NS['hh']}}}charPr") if cp.attrib.get("id")
+    }
+    defined_para = {
+        pp.attrib.get("id") for pp in header.iter(f"{{{NS['hh']}}}paraPr") if pp.attrib.get("id")
+    }
+    referenced_char = {
+        run.attrib.get("charPrIDRef")
+        for run in section.iter(f"{{{NS['hp']}}}run")
+        if run.attrib.get("charPrIDRef")
+    }
+    referenced_para = {
+        p.attrib.get("paraPrIDRef")
+        for p in section.iter(f"{{{NS['hp']}}}p")
+        if p.attrib.get("paraPrIDRef")
+    }
     return defined_char, referenced_char, defined_para, referenced_para
 
 
@@ -76,7 +96,9 @@ def test_set_cells_without_shrink_keeps_original_charpr(tmp_path, fixture_path):
     """옵션 없으면 기존 동작 유지 (charPr 신규 정의 없음)."""
     out = tmp_path / "out.hwpx"
     before = _charpr_heights(fixture_path)
-    apply_edit_plan(fixture_path, out, {"set_cells": [{"table": 1, "row": 0, "col": 1, "value": "TEST"}]})
+    apply_edit_plan(
+        fixture_path, out, {"set_cells": [{"table": 1, "row": 0, "col": 1, "value": "TEST"}]}
+    )
     after = _charpr_heights(out)
     assert set(after.keys()) == set(before.keys()), "charPr id set changed without shrink_to_fit"
     _assert_no_dangling(out)
@@ -90,7 +112,11 @@ def test_set_cells_with_shrink_to_fit_creates_clone(tmp_path, fixture_path):
     apply_edit_plan(
         fixture_path,
         out,
-        {"set_cells": [{"table": 1, "row": 0, "col": 1, "value": long_value, "shrink_to_fit": True}]},
+        {
+            "set_cells": [
+                {"table": 1, "row": 0, "col": 1, "value": long_value, "shrink_to_fit": True}
+            ]
+        },
     )
     after = _charpr_heights(out)
     new_ids = set(after.keys()) - set(before.keys())
@@ -121,7 +147,9 @@ def test_set_cells_by_label_with_shrink_to_fit_creates_clone(tmp_path, fixture_p
         },
     )
     after_ids = set(_charpr_heights(out))
-    assert after_ids - before_ids, "set_cells_by_label did not produce charPr clone with shrink_to_fit"
+    assert after_ids - before_ids, (
+        "set_cells_by_label did not produce charPr clone with shrink_to_fit"
+    )
     _assert_no_dangling(out)
 
 
@@ -145,7 +173,9 @@ def test_set_cells_by_text_with_shrink_to_fit_creates_clone(tmp_path, fixture_pa
         },
     )
     after_ids = set(_charpr_heights(out))
-    assert after_ids - before_ids, "set_cells_by_text did not produce charPr clone with shrink_to_fit"
+    assert after_ids - before_ids, (
+        "set_cells_by_text did not produce charPr clone with shrink_to_fit"
+    )
     _assert_no_dangling(out)
 
 
@@ -181,11 +211,17 @@ def test_shrink_to_fit_does_not_alter_original_charpr(tmp_path, fixture_path):
     apply_edit_plan(
         fixture_path,
         out,
-        {"set_cells": [{"table": 1, "row": 0, "col": 1, "value": "긴" * 80, "shrink_to_fit": True}]},
+        {
+            "set_cells": [
+                {"table": 1, "row": 0, "col": 1, "value": "긴" * 80, "shrink_to_fit": True}
+            ]
+        },
     )
     after = _charpr_heights(out)
     for cid, height in before.items():
-        assert after.get(cid) == height, f"original charPr id={cid} mutated: {height} -> {after.get(cid)}"
+        assert after.get(cid) == height, (
+            f"original charPr id={cid} mutated: {height} -> {after.get(cid)}"
+        )
 
 
 def test_mimetype_remains_zip_stored_with_shrink(tmp_path, fixture_path):
@@ -194,7 +230,11 @@ def test_mimetype_remains_zip_stored_with_shrink(tmp_path, fixture_path):
     apply_edit_plan(
         fixture_path,
         out,
-        {"set_cells": [{"table": 1, "row": 0, "col": 1, "value": "긴 텍스트 " * 30, "shrink_to_fit": True}]},
+        {
+            "set_cells": [
+                {"table": 1, "row": 0, "col": 1, "value": "긴 텍스트 " * 30, "shrink_to_fit": True}
+            ]
+        },
     )
     assert _mimetype_compress_type(out) == zipfile.ZIP_STORED
 
@@ -214,4 +254,6 @@ def test_no_options_means_no_post_edit_calls(tmp_path, fixture_path):
         },
     )
     after_ids = set(_charpr_heights(out))
-    assert after_ids == before_ids, f"charPr ids changed without options: extra={after_ids - before_ids}"
+    assert after_ids == before_ids, (
+        f"charPr ids changed without options: extra={after_ids - before_ids}"
+    )

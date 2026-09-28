@@ -64,7 +64,7 @@ def _hwpx_zip_ok(path: Path) -> bool:
         with zipfile.ZipFile(path) as zf:
             names = zf.namelist()
             return any(n.endswith("header.xml") for n in names)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 계속
         return False
 
 
@@ -95,7 +95,7 @@ def build_inventory(skip_hash: bool = False) -> dict:
         fid = f"hwpx_{file_id_counter:06d}"
         try:
             stat = p.stat()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             items.append({
                 "fileId": fid, "sourceKind": source_kind, "sourcePath": rel,
                 "originalFileName": p.name, "extension": p.suffix.lstrip("."),
@@ -114,11 +114,11 @@ def build_inventory(skip_hash: bool = False) -> dict:
         else:
             try:
                 h = hashlib.sha256()
-                with open(p, "rb") as f:
+                with Path(p).open("rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         h.update(chunk)
                 sha = h.hexdigest()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
                 sha = ""
                 items.append({
                     "fileId": fid, "sourceKind": source_kind, "sourcePath": rel,
@@ -215,7 +215,7 @@ def build_inventory(skip_hash: bool = False) -> dict:
         f"- uniqueSha256: {unique_sha}",
         f"- parseCandidate: {parse_cands}",
         f"- collected source: {collected_count} / repo_sample: {repo_sample_count}",
-        f"- dbStatus: DB_SKIPPED",
+        "- dbStatus: DB_SKIPPED",
         f"- elapsed: {elapsed:.1f}s",
         "",
         "## Discovered paths",

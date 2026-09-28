@@ -65,7 +65,7 @@ class HwpxParser:
                 'fields': non_empty,       # 텍스트 있는 셀만
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
             return {
                 'error': str(e),
                 'form_path': str(self.hwpx_path),
@@ -163,7 +163,7 @@ def parse_supervision_forms():
         print(f"   파일: {file_path.name}")
 
         if not file_path.exists():
-            print(f"   ❌ 파일 없음")
+            print("   ❌ 파일 없음")
             results[form_id] = {'error': 'File not found'}
             continue
 
@@ -195,7 +195,7 @@ def save_metadata(data: Dict, output_path: str):
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output, 'w', encoding='utf-8') as f:
+    with Path(output).open('w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     print(f"\n✅ 메타데이터 저장: {output}")

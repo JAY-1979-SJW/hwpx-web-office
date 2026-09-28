@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # module_category: audit
 # primary_trade: common
 """커밋 전 체크리스트 — 모든 저장소 공통 pre-commit 검사기(표준 라이브러리만).
@@ -10,6 +9,7 @@
 스테이징된 파일을 검사하고 결과를 .git/commit_checklist_last.md 로 생성한다. 차단 항목이 하나라도
 있으면 종료코드 1. 우회: 환경변수 SKIP_COMMIT_CHECKLIST=<사유>(사유 필수, 리포트에 기록).
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -19,8 +19,7 @@ import os
 import re
 import subprocess
 import sys
-from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Tuple
+from pathlib import Path, PurePosixPath
 
 MAX_BYTES = 50 * 1024 * 1024
 SCAN_TEXT_MAX = 2 * 1024 * 1024
@@ -42,23 +41,23 @@ SECRET_CONTENT_PATTERNS = [
 CONFLICT_RE = re.compile(r"^(<{7} |>{7} )", re.M)
 
 
-def _git(args: List[str], cwd: Optional[str] = None, binary: bool = False):
+def _git(args: list[str], cwd: str | None = None, binary: bool = False):
     out = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.decode("utf-8", "replace").strip())
     return out.stdout if binary else out.stdout.decode("utf-8", "replace")
 
 
-def staged_files(cwd: Optional[str] = None) -> List[str]:
+def staged_files(cwd: str | None = None) -> list[str]:
     raw = _git(["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"], cwd, binary=True)
     return [p.decode("utf-8", "replace") for p in raw.split(b"\0") if p]
 
 
-def staged_blob(path: str, cwd: Optional[str] = None) -> bytes:
+def staged_blob(path: str, cwd: str | None = None) -> bytes:
     return _git(["show", f":{path}"], cwd, binary=True)
 
 
-def check_secret_name(path: str) -> Optional[str]:
+def check_secret_name(path: str) -> str | None:
     p = path.replace("\\", "/")
     if any(a.search(p) for a in SECRET_NAME_ALLOW):
         return None
@@ -68,8 +67,8 @@ def check_secret_name(path: str) -> Optional[str]:
     return None
 
 
-def check_content(path: str, data: bytes) -> List[str]:
-    issues: List[str] = []
+def check_content(path: str, data: bytes) -> list[str]:
+    issues: list[str] = []
     if len(data) > MAX_BYTES:
         issues.append(f"대용량 파일 {len(data) / 1024 / 1024:.1f}MB > 50MB: {path}")
         return issues
@@ -95,9 +94,9 @@ def check_content(path: str, data: bytes) -> List[str]:
     return issues
 
 
-def run_checklist(cwd: Optional[str] = None) -> Tuple[bool, Dict[str, List[str]], List[str]]:
+def run_checklist(cwd: str | None = None) -> tuple[bool, dict[str, list[str]], list[str]]:
     files = staged_files(cwd)
-    results: Dict[str, List[str]] = {
+    results: dict[str, list[str]] = {
         # 빈 커밋·메시지만 수정(--amend)은 정상 작업이라 차단하지 않는다(실측: 3개 저장소 과잉차단).
         "1. 스테이징 파일 검사 대상": [],
         "2. 비밀정보(파일명·내용)": [],
@@ -129,16 +128,23 @@ def run_checklist(cwd: Optional[str] = None) -> Tuple[bool, Dict[str, List[str]]
     return ok, results, files
 
 
-def write_report(git_dir: str, ok: bool, results: Dict[str, List[str]], files: List[str], skip_reason: str) -> str:
-    lines = [f"# 커밋 전 체크리스트 — {_dt.datetime.now().isoformat(timespec='seconds')}",
-             f"판정: {'PASS' if ok else ('BYPASS(' + skip_reason + ')' if skip_reason else 'FAIL')}",
-             f"스테이징 파일 {len(files)}개", ""]
+def write_report(
+    git_dir: str, ok: bool, results: dict[str, list[str]], files: list[str], skip_reason: str
+) -> str:
+    lines = [
+        f"# 커밋 전 체크리스트 — {_dt.datetime.now().isoformat(timespec='seconds')}",
+        f"판정: {'PASS' if ok else ('BYPASS(' + skip_reason + ')' if skip_reason else 'FAIL')}",
+        f"스테이징 파일 {len(files)}개",
+        "",
+    ]
     for k, v in results.items():
         lines.append(f"- [{'x' if not v else ' '}] {k}" + ("" if not v else f" — {len(v)}건"))
         lines += [f"    - {i}" for i in v[:50]]
-    lines.append("\n저장소 고유 게이트(기준서·lane·테스트 등)는 기존 훅(pre-commit.orig·commit-msg)이 이어서 검사한다.")
-    path = os.path.join(git_dir, "commit_checklist_last.md")
-    with open(path, "w", encoding="utf-8") as fh:
+    lines.append(
+        "\n저장소 고유 게이트(기준서·lane·테스트 등)는 기존 훅(pre-commit.orig·commit-msg)이 이어서 검사한다."
+    )
+    path = str(Path(git_dir) / "commit_checklist_last.md")
+    with Path(path).open("w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     return path
 
