@@ -13,6 +13,9 @@ tmp/
 # 없어서 로컬에서만 통과하고 깨끗한 CI 환경에서는 항상 실패하고 있었음.
 !tests/fixtures/hwpx/**/*.hwpx
 !tests/fixtures/*.hwpx
+# scripts/hwpx/hwpx_api.py 등 여러 곳의 기본 스모크 템플릿 인자값 —
+# 저장소 루트에 있어야 그 기본값(bare filename)이 그대로 맞는다.
+!/smoke-test.hwpx
 
 # 데이터 디렉토리 (data/reports/와 data/cache/는 제외)
 data/

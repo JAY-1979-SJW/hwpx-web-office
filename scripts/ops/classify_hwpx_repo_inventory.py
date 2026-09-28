@@ -130,6 +130,10 @@ def classify_path(path: str) -> tuple[str, str, str]:
     # .github/ 는 CI 워크플로 등 저장소 빌드/자동화 설정 — 같은 성격.
     if lower.startswith(".github/"):
         return "CONFIG_BUILD", "unassigned", "keep_github_config"
+    # 여러 스크립트(hwpx_api.py 등)의 기본 스모크 템플릿 인자값 — 저장소
+    # 루트에 있어야 하는 테스트 자재.
+    if path == "smoke-test.hwpx":
+        return "TEST_FIXTURE", "test_support", "keep_smoke_template"
     if path in {".gitignore", "CLAUDE.md"} or name in {
         "package.json",
         "package-lock.json",

@@ -1,5 +1,8 @@
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hwpx_composer import compose_hwpx
 from hwpx_document_builder import document
@@ -63,13 +66,11 @@ def test_compose_schema_rejects_invalid_audit_log_shape() -> None:
 
 def test_compose_hwpx_schema_failure_still_reports_write_gate(tmp_path: Path) -> None:
     audit_log = tmp_path / "schema_fail.jsonl"
-    report = compose_hwpx(
-        {
-            "template": str(tmp_path / "missing.hwpx"),
-            "output": str(tmp_path / "missing_out.hwpx"),
-            "write_audit_log": str(audit_log),
-        }
-    )
+    report = compose_hwpx({
+        "template": str(tmp_path / "missing.hwpx"),
+        "output": str(tmp_path / "missing_out.hwpx"),
+        "write_audit_log": str(audit_log),
+    })
 
     row = json.loads(audit_log.read_text(encoding="utf-8").splitlines()[0])
     assert report["status"] == "FAIL"
