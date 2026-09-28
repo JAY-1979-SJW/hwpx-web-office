@@ -1,4 +1,7 @@
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import hancom_hwp_converter_providers as providers
 from hancom_hwp_converter_providers import (
