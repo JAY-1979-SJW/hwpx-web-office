@@ -8,6 +8,7 @@
 
 읽기 전용 — 카탈로그 빌드가 진행 중이어도 조회 가능.
 """
+
 from __future__ import annotations
 
 import json
@@ -77,22 +78,34 @@ def by_category(domain: str, *, limit: int = 40) -> dict[str, Any]:
         rows = con.execute(
             f"SELECT form_id,form_type,statute_no,name,field_count,table_count,cell_count,source_path "
             f"FROM forms WHERE status='OK' AND ({clause}) "
-            f"ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?", params).fetchall()
+            f"ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
+            params,
+        ).fetchall()
         results = []
         for r in rows:
-            labels = [x[0] for x in con.execute(
-                "SELECT label FROM fields WHERE form_id=? LIMIT 12", (r["form_id"],))]
+            labels = [
+                x[0]
+                for x in con.execute(
+                    "SELECT label FROM fields WHERE form_id=? LIMIT 12", (r["form_id"],)
+                )
+            ]
             # sourcePath: 프론트가 hwpx-load/fill-plan 에 그대로 넘겨 서식을
             # 연다. 이미 그 두 엔드포인트의 입력 계약이라 노출 일관성 유지.
             # 프로젝트 밖 절대경로는 로드가 거부하므로 목록에서도 뺀다.
             rel = r["source_path"] or ""
             if rel.startswith(("/", "\\")) or ":" in rel[:3]:
                 continue
-            results.append({"formId": r["form_id"], "formType": r["form_type"],
-                            "statuteNo": r["statute_no"], "name": r["name"],
-                            "fieldCount": r["field_count"], "tableCount": r["table_count"],
-                            "cellCount": r["cell_count"], "sampleFields": labels,
-                            "sourcePath": rel})
+            results.append({
+                "formId": r["form_id"],
+                "formType": r["form_type"],
+                "statuteNo": r["statute_no"],
+                "name": r["name"],
+                "fieldCount": r["field_count"],
+                "tableCount": r["table_count"],
+                "cellCount": r["cell_count"],
+                "sampleFields": labels,
+                "sourcePath": rel,
+            })
         con.close()
         return {"ready": True, "domain": domain, "results": results}
     except sqlite3.Error as e:
@@ -117,14 +130,20 @@ def stats() -> dict[str, Any]:
         statute = con.execute("SELECT COUNT(*) FROM forms WHERE statute_no != ''").fetchone()[0]
         fields = con.execute("SELECT COUNT(*) FROM fields").fetchone()[0]
         con.close()
-        return {"ready": True, "total": total, "parsed": ok,
-                "statuteForms": statute, "totalFields": fields}
+        return {
+            "ready": True,
+            "total": total,
+            "parsed": ok,
+            "statuteForms": statute,
+            "totalFields": fields,
+        }
     except sqlite3.Error as e:
         return {"ready": False, "total": 0, "error": str(e)[:120]}
 
 
 def _requirements_of(row) -> dict[str, Any]:
     """행정 요건(해부 결과)을 결과에 실어 보낸다. 미해부 행은 빈 값."""
+
     def _arr(v):
         if not v:
             return []
@@ -133,6 +152,7 @@ def _requirements_of(row) -> dict[str, Any]:
             return out if isinstance(out, list) else []
         except (json.JSONDecodeError, TypeError):
             return []
+
     keys = row.keys() if hasattr(row, "keys") else []
     if "attachments" not in keys:
         return {}
@@ -159,15 +179,15 @@ def institutions(*, limit: int = 300) -> dict[str, Any]:
             (limit,),
         ).fetchall()
         con.close()
-        return {"ready": True,
-                "institutions": [{"institution": r["institution"], "count": r["n"]}
-                                 for r in rows]}
+        return {
+            "ready": True,
+            "institutions": [{"institution": r["institution"], "count": r["n"]} for r in rows],
+        }
     except sqlite3.Error as e:
         return {"ready": False, "institutions": [], "error": str(e)[:120]}
 
 
-def search(query: str, *, limit: int = 20,
-           institution: str | None = None) -> dict[str, Any]:
+def search(query: str, *, limit: int = 20, institution: str | None = None) -> dict[str, Any]:
     """이름/종류/법정번호 텍스트 검색. institution 지정 시 해당 기관으로 한정하며,
     질의어가 비어 있어도 기관만으로 목록 조회가 가능하다."""
     if not catalog_ready():
@@ -191,32 +211,73 @@ def search(query: str, *, limit: int = 20,
         rows = con.execute(
             "SELECT form_id,form_type,statute_no,name,field_count,table_count,"
             "cell_count,institution,attachments,attachment_count,processing_time,"
-            "fee,legal_basis,submit_to FROM forms WHERE " + " AND ".join(where) +
-            " ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
+            "fee,legal_basis,submit_to FROM forms WHERE "
+            + " AND ".join(where)
+            + " ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
             tuple(params),
         ).fetchall()
         results = []
         for r in rows:
-            labels = [x[0] for x in con.execute(
-                "SELECT label FROM fields WHERE form_id=? LIMIT 12", (r["form_id"],))]
+            labels = [
+                x[0]
+                for x in con.execute(
+                    "SELECT label FROM fields WHERE form_id=? LIMIT 12", (r["form_id"],)
+                )
+            ]
             results.append({
-                "formId": r["form_id"], "formType": r["form_type"],
-                "statuteNo": r["statute_no"], "name": r["name"],
-                "fieldCount": r["field_count"], "tableCount": r["table_count"],
-                "cellCount": r["cell_count"], "sampleFields": labels,
+                "formId": r["form_id"],
+                "formType": r["form_type"],
+                "statuteNo": r["statute_no"],
+                "name": r["name"],
+                "fieldCount": r["field_count"],
+                "tableCount": r["table_count"],
+                "cellCount": r["cell_count"],
+                "sampleFields": labels,
                 "institution": r["institution"],
                 **_requirements_of(r),
             })
         con.close()
-        return {"ready": True, "query": q, "institution": inst or None,
-                "results": results}
+        return {"ready": True, "query": q, "institution": inst or None, "results": results}
     except sqlite3.Error as e:
         return {"ready": False, "results": [], "error": str(e)[:120]}
 
 
-def match_form(*, fingerprint: str | None = None,
-               field_labels: list[str] | None = None,
-               limit: int = 5) -> dict[str, Any]:
+def _jaccard_candidates(con, norm_labels: set[str], limit: int) -> list[dict[str, Any]]:
+    """필드 라벨 겹침(Jaccard) 기준 유사 서식 후보 목록."""
+    overlap: dict[int, int] = {}
+    # 라벨 정규화 대조를 위해 전체 fields 스캔(카탈로그 규모상 허용;
+    # 커지면 정규화 컬럼+인덱스로 최적화)
+    for fid, lab in con.execute("SELECT form_id,label FROM fields"):
+        if _norm(lab) in norm_labels:
+            overlap[fid] = overlap.get(fid, 0) + 1
+    if not overlap:
+        return []
+    top = sorted(overlap.items(), key=lambda x: -x[1])[: limit * 3]
+    cands = []
+    for fid, ov in top:
+        r = con.execute(
+            "SELECT name,statute_no,form_type,field_count FROM forms WHERE form_id=?", (fid,)
+        ).fetchone()
+        if not r:
+            continue
+        denom = len(norm_labels) + (r["field_count"] or 0) - ov
+        jac = ov / denom if denom > 0 else 0.0
+        cands.append({
+            "formId": fid,
+            "name": r["name"],
+            "statuteNo": r["statute_no"],
+            "formType": r["form_type"],
+            "overlap": ov,
+            "jaccard": round(jac, 3),
+            "fieldCount": r["field_count"],
+        })
+    cands.sort(key=lambda c: (-c["overlap"], -c["jaccard"]))
+    return cands[:limit]
+
+
+def match_form(
+    *, fingerprint: str | None = None, field_labels: list[str] | None = None, limit: int = 5
+) -> dict[str, Any]:
     """업로드 서식을 카탈로그와 대조 → 후보 목록(분류).
 
     Returns: {ready, exactMatch?, candidates:[{formId,name,statuteNo,overlap,jaccard,...}]}
@@ -233,39 +294,25 @@ def match_form(*, fingerprint: str | None = None,
         if fingerprint:
             rows = con.execute(
                 "SELECT form_id,name,statute_no,field_count FROM forms "
-                "WHERE status='OK' AND fingerprint=? LIMIT 3", (fingerprint,)).fetchall()
+                "WHERE status='OK' AND fingerprint=? LIMIT 3",
+                (fingerprint,),
+            ).fetchall()
             if rows:
-                result["exactMatch"] = [{"formId": r["form_id"], "name": r["name"],
-                                          "statuteNo": r["statute_no"],
-                                          "fieldCount": r["field_count"]} for r in rows]
+                result["exactMatch"] = [
+                    {
+                        "formId": r["form_id"],
+                        "name": r["name"],
+                        "statuteNo": r["statute_no"],
+                        "fieldCount": r["field_count"],
+                    }
+                    for r in rows
+                ]
 
         # ② 필드 라벨 겹침(Jaccard) — 유사 서식 순위
         if norm_labels:
-            # 후보 폼별 겹침 수 집계
-            overlap: dict[int, int] = {}
-            # 라벨 정규화 대조를 위해 전체 fields 스캔(카탈로그 규모상 허용;
-            # 커지면 정규화 컬럼+인덱스로 최적화)
-            for fid, lab in con.execute("SELECT form_id,label FROM fields"):
-                if _norm(lab) in norm_labels:
-                    overlap[fid] = overlap.get(fid, 0) + 1
-            if overlap:
-                top = sorted(overlap.items(), key=lambda x: -x[1])[:limit * 3]
-                cands = []
-                for fid, ov in top:
-                    r = con.execute(
-                        "SELECT name,statute_no,form_type,field_count FROM forms WHERE form_id=?",
-                        (fid,)).fetchone()
-                    if not r:
-                        continue
-                    denom = len(norm_labels) + (r["field_count"] or 0) - ov
-                    jac = ov / denom if denom > 0 else 0.0
-                    cands.append({
-                        "formId": fid, "name": r["name"], "statuteNo": r["statute_no"],
-                        "formType": r["form_type"], "overlap": ov,
-                        "jaccard": round(jac, 3), "fieldCount": r["field_count"],
-                    })
-                cands.sort(key=lambda c: (-c["overlap"], -c["jaccard"]))
-                result["candidates"] = cands[:limit]
+            cands = _jaccard_candidates(con, norm_labels, limit)
+            if cands:
+                result["candidates"] = cands
 
         con.close()
         return result
@@ -279,15 +326,21 @@ def form_fields(form_id: int) -> dict[str, Any]:
         return {"ready": False, "fields": []}
     try:
         con = _con()
-        r = con.execute("SELECT name,statute_no,form_type FROM forms WHERE form_id=?",
-                        (form_id,)).fetchone()
+        r = con.execute(
+            "SELECT name,statute_no,form_type FROM forms WHERE form_id=?", (form_id,)
+        ).fetchone()
         if not r:
             con.close()
             return {"ready": True, "fields": [], "error": "FORM_NOT_FOUND"}
-        labels = [x[0] for x in con.execute(
-            "SELECT label FROM fields WHERE form_id=?", (form_id,))]
+        labels = [x[0] for x in con.execute("SELECT label FROM fields WHERE form_id=?", (form_id,))]
         con.close()
-        return {"ready": True, "formId": form_id, "name": r["name"],
-                "statuteNo": r["statute_no"], "formType": r["form_type"], "fields": labels}
+        return {
+            "ready": True,
+            "formId": form_id,
+            "name": r["name"],
+            "statuteNo": r["statute_no"],
+            "formType": r["form_type"],
+            "fields": labels,
+        }
     except sqlite3.Error as e:
         return {"ready": False, "fields": [], "error": str(e)[:120]}

@@ -668,7 +668,7 @@ def parse_pdf(pdf_path: Path, stats=None):
     for pi in range(doc.page_count):
         try:
             rows.extend(parse_page(doc[pi], meta, stats=stats))
-        except Exception:  # noqa: BLE001 — 이 페이지만 건너뛰고 나머지 페이지 계속 파싱
+        except Exception:  # ruff: ignore[blind-except] — 이 페이지만 건너뛰고 나머지 페이지 계속 파싱
             if stats is not None:
                 stats["parse_crash_pages"] = stats.get("parse_crash_pages", 0) + 1
     doc.close()
@@ -718,6 +718,19 @@ def save_csv(rows, path):
 # ── 메인 ─────────────────────────────────────────────────────────────────────
 
 
+def _process_all_pdfs(pdfs: list[Path], conn, rt_stats: dict) -> list:
+    all_rows = []
+    for i, pdf in enumerate(pdfs, 1):
+        rows = parse_pdf(pdf, stats=rt_stats)
+        if rows:
+            save_db(conn, rows)
+            all_rows.extend(rows)
+            print(f"[{i}/{len(pdfs)}] {pdf.name}: {len(rows)}행")
+        else:
+            print(f"[{i}/{len(pdfs)}] {pdf.name}: 스킵")
+    return all_rows
+
+
 def main():
     import sys
 
@@ -733,15 +746,7 @@ def main():
     conn.commit()
 
     rt_stats = dict(RT_STATS_SCHEMA)
-    all_rows = []
-    for i, pdf in enumerate(pdfs, 1):
-        rows = parse_pdf(pdf, stats=rt_stats)
-        if rows:
-            save_db(conn, rows)
-            all_rows.extend(rows)
-            print(f"[{i}/{len(pdfs)}] {pdf.name}: {len(rows)}행")
-        else:
-            print(f"[{i}/{len(pdfs)}] {pdf.name}: 스킵")
+    all_rows = _process_all_pdfs(pdfs, conn, rt_stats)
 
     conn.close()
     save_csv(all_rows, CSV_PATH)

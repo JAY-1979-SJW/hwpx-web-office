@@ -13,6 +13,7 @@
 조사도 이 원칙으로 370,505칸을 검증했다). 여기서 안 풀리면 그 스키마는
 기입 단계에서도 반려되므로, AI 해석에 넘기기 전에 걸러내는 게 싸다.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,10 +29,14 @@ if str(PROJECT_ROOT) not in sys.path:
 if str(PROJECT_ROOT / "scripts/hwpx") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "scripts/hwpx"))
 
-from hwpx_package import HwpxPackage  # noqa: E402
-from hwpx_paragraph_ops import find_paragraph_in_cell, paragraph_runs  # noqa: E402
-from scripts.hwpx.web_office.form_direct_fill import (  # noqa: E402
-    _direct, _section_entry_by_number, _tables_in_root, parse_paragraph_id)
+from hwpx_package import HwpxPackage  # ruff: ignore[module-import-not-at-top-of-file]
+from hwpx_paragraph_ops import find_paragraph_in_cell, paragraph_runs  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_direct_fill import (  # ruff: ignore[module-import-not-at-top-of-file]
+    _direct,
+    _section_entry_by_number,
+    _tables_in_root,
+    parse_paragraph_id,
+)
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 TABLE = "schema_address_verification"
@@ -49,10 +54,18 @@ CREATE TABLE IF NOT EXISTS {TABLE}(
     elapsed_sec REAL
 );
 """
-COLS = ["form_id", "status", "total_cells", "ok_cells", "fail_cells",
-        "fail_reasons", "verdict", "elapsed_sec"]
+COLS = [
+    "form_id",
+    "status",
+    "total_cells",
+    "ok_cells",
+    "fail_cells",
+    "fail_reasons",
+    "verdict",
+    "elapsed_sec",
+]
 
-PASS_MIN_RATIO = 0.98      # 이 아래면 그 서식은 FAIL(전수 조사 실측 기준선)
+PASS_MIN_RATIO = 0.98  # 이 아래면 그 서식은 FAIL(전수 조사 실측 기준선)
 
 
 def _log(m: str) -> None:
@@ -66,12 +79,10 @@ def _connect() -> sqlite3.Connection:
     return con
 
 
-def _flush(con: sqlite3.Connection, pending: list[dict],
-           retries: int = 10) -> None:
+def _flush(con: sqlite3.Connection, pending: list[dict], retries: int = 10) -> None:
     if not pending:
         return
-    sql = (f"INSERT OR REPLACE INTO {TABLE}({', '.join(COLS)}) "
-           f"VALUES({', '.join('?' * len(COLS))})")
+    sql = f"INSERT OR REPLACE INTO {TABLE}({', '.join(COLS)}) VALUES({', '.join('?' * len(COLS))})"
     payload = [tuple(r.get(c) for c in COLS) for r in pending]
     for attempt in range(retries):
         try:
@@ -91,76 +102,81 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
     raise sqlite3.OperationalError("검증 스테이징 쓰기 실패 — 잠김")
 
 
-def verify_one(source_rel: str, schema: list[dict],
-               *, project_root: Path = PROJECT_ROOT) -> dict:
+def _resolve_one_field(
+    f: dict, pkg, entry_by_sec: dict, tables_by_sec: dict[int, list | None], reasons: dict[str, int]
+) -> bool:
+    """스키마 1개 필드의 좌표를 해석. 실패 시 reasons 카운터를 올리고 False."""
+
+    def _fail(reason: str) -> bool:
+        reasons[reason] = reasons.get(reason, 0) + 1
+        return False
+
+    pid = f.get("paragraphId") or ""
+    coord = parse_paragraph_id(pid)
+    if coord is None:
+        return _fail("PID_UNPARSEABLE")
+    sec, tbl_i, row, col, p_i = coord
+    if sec not in tables_by_sec:
+        entry = entry_by_sec.get(sec)
+        tables_by_sec[sec] = _tables_in_root(pkg.read_xml(entry)) if entry else None
+    tbls = tables_by_sec[sec]
+    if tbls is None or not 0 <= tbl_i < len(tbls):
+        return _fail("TABLE_NOT_FOUND")
+    rows = _direct(tbls[tbl_i], "tr")
+    if not 0 <= row < len(rows):
+        return _fail("ROW_NOT_FOUND")
+    cols = _direct(rows[row], "tc")
+    if not 0 <= col < len(cols):
+        return _fail("CELL_NOT_FOUND")
+    para = find_paragraph_in_cell(cols[col], p_i)
+    if para is None:
+        return _fail("PARAGRAPH_NOT_FOUND")
+    if not paragraph_runs(para):
+        return _fail("NO_RUN")
+    return True
+
+
+def verify_one(source_rel: str, schema: list[dict], *, project_root: Path = PROJECT_ROOT) -> dict:
     """스키마 1건의 좌표 해석 결과. 원본은 읽기만 한다."""
     src = project_root / source_rel
     if not src.is_file():
-        return {"status": "SOURCE_MISSING", "total_cells": len(schema),
-                "ok_cells": 0, "fail_cells": len(schema),
-                "fail_reasons": "{}"}
+        return {
+            "status": "SOURCE_MISSING",
+            "total_cells": len(schema),
+            "ok_cells": 0,
+            "fail_cells": len(schema),
+            "fail_reasons": "{}",
+        }
     pkg = HwpxPackage(src)
     entry_by_sec = _section_entry_by_number(pkg)
     tables_by_sec: dict[int, list | None] = {}
-    ok = 0
     reasons: dict[str, int] = {}
-
-    def _fail(reason: str) -> None:
-        reasons[reason] = reasons.get(reason, 0) + 1
-
-    for f in schema:
-        pid = f.get("paragraphId") or ""
-        coord = parse_paragraph_id(pid)
-        if coord is None:
-            _fail("PID_UNPARSEABLE")
-            continue
-        sec, tbl_i, row, col, p_i = coord
-        if sec not in tables_by_sec:
-            entry = entry_by_sec.get(sec)
-            tables_by_sec[sec] = (
-                _tables_in_root(pkg.read_xml(entry)) if entry else None)
-        tbls = tables_by_sec[sec]
-        if tbls is None or not 0 <= tbl_i < len(tbls):
-            _fail("TABLE_NOT_FOUND")
-            continue
-        rows = _direct(tbls[tbl_i], "tr")
-        if not 0 <= row < len(rows):
-            _fail("ROW_NOT_FOUND")
-            continue
-        cols = _direct(rows[row], "tc")
-        if not 0 <= col < len(cols):
-            _fail("CELL_NOT_FOUND")
-            continue
-        para = find_paragraph_in_cell(cols[col], p_i)
-        if para is None:
-            _fail("PARAGRAPH_NOT_FOUND")
-            continue
-        if not paragraph_runs(para):
-            _fail("NO_RUN")
-            continue
-        ok += 1
+    ok = sum(1 for f in schema if _resolve_one_field(f, pkg, entry_by_sec, tables_by_sec, reasons))
     total = len(schema)
     fail = total - ok
     ratio = ok / total if total else 1.0
     return {
-        "status": "OK", "total_cells": total, "ok_cells": ok,
-        "fail_cells": fail, "fail_reasons": json.dumps(reasons),
+        "status": "OK",
+        "total_cells": total,
+        "ok_cells": ok,
+        "fail_cells": fail,
+        "fail_reasons": json.dumps(reasons),
         "verdict": "PASS" if ratio >= PASS_MIN_RATIO else "FAIL",
     }
 
 
-def run(limit: int = 0, shard: int = 0, shards: int = 1,
-        scope: str | None = None) -> None:
+def run(limit: int = 0, shard: int = 0, shards: int = 1, scope: str | None = None) -> None:
     con = _connect()
     con.execute(DDL)
     done = {r[0] for r in con.execute(f"SELECT form_id FROM {TABLE}")}
-    q = ("SELECT form_id, source_path, input_schema FROM forms"
-        " WHERE input_schema IS NOT NULL AND input_schema != ''")
+    q = (
+        "SELECT form_id, source_path, input_schema FROM forms"
+        " WHERE input_schema IS NOT NULL AND input_schema != ''"
+    )
     if scope:
         q += f" AND source_path LIKE '%{scope}%'"
     rows = con.execute(q + " ORDER BY form_id").fetchall()
-    targets = [r for r in rows
-              if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
+    targets = [r for r in rows if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
     if limit:
         targets = targets[:limit]
     _log(f"검증 대상 {len(targets)}건 (shard {shard}/{shards})")
@@ -172,18 +188,17 @@ def run(limit: int = 0, shard: int = 0, shards: int = 1,
         try:
             schema = json.loads(schema_json)
             r = verify_one(source_path, schema)
-        except Exception as exc:  # noqa: BLE001
-            r = {"status": "ERROR",
-                "fail_reasons": f"{type(exc).__name__}: {exc}"[:200]}
+        except Exception as exc:  # ruff: ignore[blind-except]
+            r = {"status": "ERROR", "fail_reasons": f"{type(exc).__name__}: {exc}"[:200]}
         r["form_id"] = form_id
         r["elapsed_sec"] = round(time.time() - t1, 2)
         pending.append(r)
         if len(pending) >= FLUSH_EVERY:
             _flush(con, pending)
             rate = (time.time() - t0) / n
-            _log(f"[{n}/{len(targets)}] {rate*1000:.0f}ms/건")
+            _log(f"[{n}/{len(targets)}] {rate * 1000:.0f}ms/건")
     _flush(con, pending)
-    _log(f"완료 {len(targets)}건 / {time.time()-t0:.1f}s")
+    _log(f"완료 {len(targets)}건 / {time.time() - t0:.1f}s")
     con.close()
 
 
@@ -191,20 +206,20 @@ def status() -> None:
     con = _connect()
     con.execute(DDL)
     total = con.execute(
-        "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL"
-        " AND input_schema != ''").fetchone()[0]
+        "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL AND input_schema != ''"
+    ).fetchone()[0]
     staged = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
-    _log(f"파싱 완료 {total} · 검증 완료 {staged} ({staged/max(1,total)*100:.1f}%)")
+    _log(f"파싱 완료 {total} · 검증 완료 {staged} ({staged / max(1, total) * 100:.1f}%)")
     for v, n in con.execute(
-            f"SELECT COALESCE(verdict,status), COUNT(*) FROM {TABLE}"
-            f" GROUP BY COALESCE(verdict,status)"):
+        f"SELECT COALESCE(verdict,status), COUNT(*) FROM {TABLE} GROUP BY COALESCE(verdict,status)"
+    ):
         _log(f"  {v}: {n}")
     agg = con.execute(
-        f"SELECT SUM(total_cells), SUM(ok_cells), SUM(fail_cells)"
-        f" FROM {TABLE} WHERE status='OK'").fetchone()
+        f"SELECT SUM(total_cells), SUM(ok_cells), SUM(fail_cells) FROM {TABLE} WHERE status='OK'"
+    ).fetchone()
     if agg and agg[0]:
         tot, ok, fail = agg
-        _log(f"  칸 {tot} · 해석성공 {ok} ({ok/tot*100:.2f}%) · 실패 {fail}")
+        _log(f"  칸 {tot} · 해석성공 {ok} ({ok / tot * 100:.2f}%) · 실패 {fail}")
     con.close()
 
 

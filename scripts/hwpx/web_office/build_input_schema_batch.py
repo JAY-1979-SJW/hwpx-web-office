@@ -11,6 +11,7 @@
 정확도는 정답셋 3종으로 측정했다(tests/test_web_office_field_roles.py):
     ①튜닝 96.7% · ②검증 97.5% · ③최종(무오염) 94.2%
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,19 +23,19 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
-from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
-from scripts.hwpx.web_office.form_input_schema import build_input_schema  # noqa: E402
+from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_input_schema import build_input_schema  # ruff: ignore[module-import-not-at-top-of-file]
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 
 COLUMNS = [
-    ("form_kind", "TEXT"),          # 민원신청 / 발급증서 / 행정내부
-    ("input_schema", "TEXT"),       # JSON 배열 — 입력칸 전체
+    ("form_kind", "TEXT"),  # 민원신청 / 발급증서 / 행정내부
+    ("input_schema", "TEXT"),  # JSON 배열 — 입력칸 전체
     ("input_count", "INTEGER"),
     ("applicant_count", "INTEGER"),
     ("office_count", "INTEGER"),
     ("sensitive_count", "INTEGER"),
-    ("schema_status", "TEXT"),      # OK / SKIP:<사유> / FAIL:<사유>
+    ("schema_status", "TEXT"),  # OK / SKIP:<사유> / FAIL:<사유>
 ]
 
 
@@ -58,7 +59,8 @@ def run(limit: int = 0, size_cap_mb: float = 1.5) -> None:
         "SELECT form_id, source_path, name, field_count FROM forms "
         "WHERE status='OK' AND fillable=1 "
         "AND (schema_status IS NULL OR schema_status='') "
-        "ORDER BY form_id").fetchall()
+        "ORDER BY form_id"
+    ).fetchall()
     if limit:
         rows = rows[:limit]
     _log(f"[start] 입력스키마 대상 {len(rows):,}종 (재개형 — 완료분 제외)")
@@ -70,58 +72,74 @@ def run(limit: int = 0, size_cap_mb: float = 1.5) -> None:
     cap = size_cap_mb * 1024 * 1024
     for i, (fid, rel, name, fc) in enumerate(rows, 1):
         if not rel or Path(rel).is_absolute() or rel.startswith(("/", "\\")):
-            con.execute("UPDATE forms SET schema_status=? WHERE form_id=?",
-                        ("SKIP_OUTSIDE_PROJECT", fid))
+            con.execute(
+                "UPDATE forms SET schema_status=? WHERE form_id=?", ("SKIP_OUTSIDE_PROJECT", fid)
+            )
             skip += 1
             continue
         src = PROJECT_ROOT / rel
         try:
             if not src.is_file() or src.stat().st_size > cap:
-                con.execute("UPDATE forms SET schema_status=? WHERE form_id=?",
-                            ("SKIP_SIZE_OR_MISSING", fid))
+                con.execute(
+                    "UPDATE forms SET schema_status=? WHERE form_id=?",
+                    ("SKIP_SIZE_OR_MISSING", fid),
+                )
                 skip += 1
                 continue
             res = load_hwpx_for_editor(
-                {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
-                project_root=PROJECT_ROOT)
+                {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel}, project_root=PROJECT_ROOT
+            )
             if res.get("verdict") != "PASS":
-                con.execute("UPDATE forms SET schema_status=? WHERE form_id=?",
-                            ("FAIL:PARSE", fid))
+                con.execute("UPDATE forms SET schema_status=? WHERE form_id=?", ("FAIL:PARSE", fid))
                 fail += 1
                 continue
-            s = build_input_schema(res["documentModel"], res["renderPayload"],
-                                   name=name, field_count=fc)
+            s = build_input_schema(
+                res["documentModel"], res["renderPayload"], name=name, field_count=fc
+            )
             con.execute(
                 "UPDATE forms SET form_kind=?, input_schema=?, input_count=?,"
                 " applicant_count=?, office_count=?, sensitive_count=?,"
                 " schema_status='OK' WHERE form_id=?",
-                (s["formKind"], json.dumps(s["inputs"], ensure_ascii=False),
-                 s["inputCount"], s["applicantCount"], s["officeCount"],
-                 s["sensitiveCount"], fid))
+                (
+                    s["formKind"],
+                    json.dumps(s["inputs"], ensure_ascii=False),
+                    s["inputCount"],
+                    s["applicantCount"],
+                    s["officeCount"],
+                    s["sensitiveCount"],
+                    fid,
+                ),
+            )
             ok += 1
             agg_app += s["applicantCount"]
             agg_off += s["officeCount"]
             agg_sec += s["sensitiveCount"]
             kinds[s["formKind"]] = kinds.get(s["formKind"], 0) + 1
-        except Exception as e:  # noqa: BLE001
-            con.execute("UPDATE forms SET schema_status=? WHERE form_id=?",
-                        (f"FAIL:{type(e).__name__}", fid))
+        except Exception as e:  # ruff: ignore[blind-except]
+            con.execute(
+                "UPDATE forms SET schema_status=? WHERE form_id=?",
+                (f"FAIL:{type(e).__name__}", fid),
+            )
             fail += 1
         if i % 500 == 0:
             con.commit()
             el = time.time() - t0
             rate = i / el if el else 0
             eta = (len(rows) - i) / rate / 60 if rate else 0
-            _log(f"  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} 스킵 {skip} "
-                 f"[{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
-                 f"신청인칸 {agg_app:,} 관공서칸 {agg_off:,} 민감 {agg_sec:,}")
+            _log(
+                f"  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} 스킵 {skip} "
+                f"[{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
+                f"신청인칸 {agg_app:,} 관공서칸 {agg_off:,} 민감 {agg_sec:,}"
+            )
     con.commit()
     con.close()
     el = time.time() - t0
-    _log(f"[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el/60:.1f}분")
+    _log(f"[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el / 60:.1f}분")
     _log(f"[집계] 신청인칸 {agg_app:,} · 관공서칸 {agg_off:,} · 민감칸 {agg_sec:,}")
-    _log("[서식종류] " + " · ".join(f"{k} {v:,}" for k, v in
-                                    sorted(kinds.items(), key=lambda x: -x[1])))
+    _log(
+        "[서식종류] "
+        + " · ".join(f"{k} {v:,}" for k, v in sorted(kinds.items(), key=lambda x: -x[1]))
+    )
 
 
 def backfill_subject() -> dict:
@@ -132,11 +150,13 @@ def backfill_subject() -> dict:
     같은 제3자 칸에 신청인 프로필이 자동으로 들어간다.
     """
     from scripts.hwpx.web_office.form_field_roles import _subject_of
+
     con = sqlite3.connect(CATALOG, timeout=600)
     con.execute("PRAGMA journal_mode=WAL")
     rows = con.execute(
         "SELECT form_id, input_schema FROM forms WHERE schema_status='OK' "
-        "AND input_schema IS NOT NULL").fetchall()
+        "AND input_schema IS NOT NULL"
+    ).fetchall()
     updated = third = 0
     for fid, raw in rows:
         try:
@@ -145,21 +165,55 @@ def backfill_subject() -> dict:
             continue
         changed = False
         for f in fields:
-            want = (_subject_of(f.get("label", ""))
-                    if f.get("role") == "applicant" else "self")
+            want = _subject_of(f.get("label", "")) if f.get("role") == "applicant" else "self"
             if f.get("subject") != want:
                 f["subject"] = want
                 changed = True
             if want == "thirdParty":
                 third += 1
         if changed:
-            con.execute("UPDATE forms SET input_schema=? WHERE form_id=?",
-                        (json.dumps(fields, ensure_ascii=False), fid))
+            con.execute(
+                "UPDATE forms SET input_schema=? WHERE form_id=?",
+                (json.dumps(fields, ensure_ascii=False), fid),
+            )
             updated += 1
     con.commit()
     con.close()
-    return {"formsUpdated": updated, "thirdPartyFields": third,
-            "scanned": len(rows)}
+    return {"formsUpdated": updated, "thirdPartyFields": third, "scanned": len(rows)}
+
+
+def _update_field_semantics(f: dict, semantic_of, subject_of) -> tuple[bool, bool, bool]:
+    """단일 입력칸 dict에 semantic/inputType/subject/sensitive 를 채운다.
+
+    Returns: (changed, gained_semantic, gained_sensitive)
+    """
+    lab = f.get("label", "")
+    sem, typ = semantic_of(lab)
+    subj = subject_of(lab)
+    sensitive = typ == "secret"
+    changed = False
+    gained_sem = False
+    gained_sensitive = False
+
+    if f.get("semantic") != sem:
+        if not f.get("semantic") and sem:
+            gained_sem = True
+        f["semantic"] = sem
+        changed = True
+    new_type = typ or f.get("inputType") or "text"
+    if f.get("inputType") != new_type:
+        f["inputType"] = new_type
+        changed = True
+    if f.get("subject") != subj:
+        f["subject"] = subj
+        changed = True
+    if bool(f.get("sensitive")) != sensitive:
+        if sensitive:
+            gained_sensitive = True
+        f["sensitive"] = sensitive
+        changed = True
+
+    return changed, gained_sem, gained_sensitive
 
 
 def backfill_semantics() -> dict:
@@ -174,13 +228,14 @@ def backfill_semantics() -> dict:
     잡음 칸은 애초에 스키마에 없으므로(form_input_schema 가 제외) 여기 오는
     칸은 전부 applicant/office 다.
     """
-    from scripts.hwpx.web_office.form_field_roles import (
-        _semantic_of, _subject_of)
+    from scripts.hwpx.web_office.form_field_roles import _semantic_of, _subject_of
+
     con = sqlite3.connect(CATALOG, timeout=600)
     con.execute("PRAGMA journal_mode=WAL")
     rows = con.execute(
         "SELECT form_id, input_schema FROM forms WHERE schema_status='OK' "
-        "AND input_schema IS NOT NULL").fetchall()
+        "AND input_schema IS NOT NULL"
+    ).fetchall()
     forms_updated = cells_gained_sem = cells_gained_sensitive = 0
     for fid, raw in rows:
         try:
@@ -189,60 +244,60 @@ def backfill_semantics() -> dict:
             continue
         changed = False
         for f in fields:
-            lab = f.get("label", "")
-            sem, typ = _semantic_of(lab)
-            subj = _subject_of(lab)
-            sensitive = typ == "secret"
-            if f.get("semantic") != sem:
-                if not f.get("semantic") and sem:
-                    cells_gained_sem += 1
-                f["semantic"] = sem
-                changed = True
-            new_type = typ or f.get("inputType") or "text"
-            if f.get("inputType") != new_type:
-                f["inputType"] = new_type
-                changed = True
-            if f.get("subject") != subj:
-                f["subject"] = subj
-                changed = True
-            if bool(f.get("sensitive")) != sensitive:
-                if sensitive:
-                    cells_gained_sensitive += 1
-                f["sensitive"] = sensitive
-                changed = True
+            f_changed, gained_sem, gained_sensitive = _update_field_semantics(
+                f, _semantic_of, _subject_of
+            )
+            changed = changed or f_changed
+            if gained_sem:
+                cells_gained_sem += 1
+            if gained_sensitive:
+                cells_gained_sensitive += 1
         if changed:
             sens_ct = sum(1 for f in fields if f.get("sensitive"))
             con.execute(
-                "UPDATE forms SET input_schema=?, sensitive_count=? "
-                "WHERE form_id=?",
-                (json.dumps(fields, ensure_ascii=False), sens_ct, fid))
+                "UPDATE forms SET input_schema=?, sensitive_count=? WHERE form_id=?",
+                (json.dumps(fields, ensure_ascii=False), sens_ct, fid),
+            )
             forms_updated += 1
     con.commit()
     con.close()
-    return {"scanned": len(rows), "formsUpdated": forms_updated,
-            "cellsGainedSemantic": cells_gained_sem,
-            "cellsGainedSensitive": cells_gained_sensitive}
+    return {
+        "scanned": len(rows),
+        "formsUpdated": forms_updated,
+        "cellsGainedSemantic": cells_gained_sem,
+        "cellsGainedSensitive": cells_gained_sensitive,
+    }
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--size-cap-mb", type=float, default=1.5)
-    ap.add_argument("--backfill-subject", action="store_true",
-                    help="저장된 스키마에 subject 만 보정 (재파싱 없음)")
-    ap.add_argument("--backfill-semantics", action="store_true",
-                    help="모든 입력칸에 의미·민감·주체 재계산 (재파싱 없음)")
+    ap.add_argument(
+        "--backfill-subject",
+        action="store_true",
+        help="저장된 스키마에 subject 만 보정 (재파싱 없음)",
+    )
+    ap.add_argument(
+        "--backfill-semantics",
+        action="store_true",
+        help="모든 입력칸에 의미·민감·주체 재계산 (재파싱 없음)",
+    )
     args = ap.parse_args()
     if args.backfill_semantics:
         r = backfill_semantics()
-        _log(f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "
-             f"의미획득 {r['cellsGainedSemantic']:,}칸 · "
-             f"민감획득 {r['cellsGainedSensitive']:,}칸")
+        _log(
+            f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "
+            f"의미획득 {r['cellsGainedSemantic']:,}칸 · "
+            f"민감획득 {r['cellsGainedSensitive']:,}칸"
+        )
         return
     if args.backfill_subject:
         r = backfill_subject()
-        _log(f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "
-             f"제3자칸 {r['thirdPartyFields']:,}")
+        _log(
+            f"[backfill] 스캔 {r['scanned']:,} · 갱신 {r['formsUpdated']:,} · "
+            f"제3자칸 {r['thirdPartyFields']:,}"
+        )
         return
     run(args.limit, args.size_cap_mb)
 

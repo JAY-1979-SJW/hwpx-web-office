@@ -7,6 +7,7 @@ id 해석(문서에 이미 있는지 찾기, 없으면 append)은 이 브리지�
 에서 담당한다 — 클라이언트가 임의 id 를 지정하게 하면 검증을 우회할
 수 있다.
 """
+
 from __future__ import annotations
 
 import sys
@@ -21,13 +22,13 @@ _HX = _PR / "scripts" / "hwpx"
 if str(_HX) not in sys.path:
     sys.path.insert(0, str(_HX))
 
-from scripts.hwpx.parser.style_parser import parse_char_pr_defs  # noqa: E402
-from scripts.hwpx.web_office.charpr_append import (  # noqa: E402
-    append_char_pr_with_overrides, find_matching_char_pr)
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-    import_hwpx_as_ro_view)
-from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-    run_para_edit_e2e, SCENARIO_APPLY_FORMAT)
+from scripts.hwpx.parser.style_parser import parse_char_pr_defs  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.charpr_append import (  # ruff: ignore[module-import-not-at-top-of-file]
+    append_char_pr_with_overrides,
+    find_matching_char_pr,
+)
+from scripts.hwpx.web_office.para_edit_e2e_pipeline import SCENARIO_APPLY_FORMAT, run_para_edit_e2e  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 
 def _current_char_pr_id(doc, paragraph_id: str, range_anchor: int) -> str | None:
@@ -46,7 +47,7 @@ def _current_char_pr_id(doc, paragraph_id: str, range_anchor: int) -> str | None
     return None
 
 
-def resolve_and_apply_format(
+def resolve_and_apply_format(  # ruff: ignore[too-many-arguments] (다른 파일에서 호출 — 시그니처 변경 보류)
     *,
     source_path: Path,
     output_path: Path,
@@ -65,8 +66,11 @@ def resolve_and_apply_format(
     doc = import_hwpx_as_ro_view(source_path)
     current_id = _current_char_pr_id(doc, paragraph_id, range_anchor)
     if current_id is None:
-        return {"verdict": "FAIL", "reason": "CURRENT_CHARPR_NOT_FOUND",
-                "paragraphId": paragraph_id}
+        return {
+            "verdict": "FAIL",
+            "reason": "CURRENT_CHARPR_NOT_FOUND",
+            "paragraphId": paragraph_id,
+        }
 
     with zipfile.ZipFile(source_path) as z:
         header_bytes = z.read("Contents/header.xml")
@@ -78,25 +82,24 @@ def resolve_and_apply_format(
     if matched is not None:
         target_id = matched
     else:
-        new_header, target_id = append_char_pr_with_overrides(
-            header_bytes, current_id, overrides)
+        new_header, target_id = append_char_pr_with_overrides(header_bytes, current_id, overrides)
         tmp_dir.mkdir(parents=True, exist_ok=True)
         patched = tmp_dir / f"__hdrpatch_{source_path.stem}.hwpx"
-        with zipfile.ZipFile(source_path) as z_in, \
-                zipfile.ZipFile(patched, "w") as z_out:
+        with zipfile.ZipFile(source_path) as z_in, zipfile.ZipFile(patched, "w") as z_out:
             for name in z_in.namelist():
                 info = z_in.getinfo(name)
-                data = new_header if name == "Contents/header.xml" \
-                    else z_in.read(name)
+                data = new_header if name == "Contents/header.xml" else z_in.read(name)
                 z_out.writestr(info, data)
         apply_source = patched
         char_pr_created = True
 
     result = run_para_edit_e2e(
-        source_path=apply_source, output_path=output_path,
+        source_path=apply_source,
+        output_path=output_path,
         scenario=SCENARIO_APPLY_FORMAT,
         paragraph_id=paragraph_id,
-        range_anchor=range_anchor, range_focus=range_focus,
+        range_anchor=range_anchor,
+        range_focus=range_focus,
         target_char_pr_id=target_id,
         allow_writer=True,
     )

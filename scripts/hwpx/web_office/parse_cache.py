@@ -32,6 +32,7 @@
 
 캐시는 `data/` 아래라 git 추적 대상이 아니다. 원본은 읽기만 한다.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,7 +50,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-CACHE_ROOT = (PROJECT_ROOT / "data" / "drafts" / "form_library" / "parse_cache")
+CACHE_ROOT = PROJECT_ROOT / "data" / "drafts" / "form_library" / "parse_cache"
 
 # 파싱 결과에 영향을 주는 소스. 하나라도 바뀌면 캐시 버전이 바뀐다.
 # ★ 파싱 경로에 모듈을 추가하면 여기에도 반드시 추가할 것 ★
@@ -154,13 +155,12 @@ def read_entry(digest: str, version: str | None = None) -> dict[str, Any] | None
         return None
 
 
-def write_entry(digest: str, payload: dict[str, Any],
-                version: str | None = None) -> int:
+def write_entry(digest: str, payload: dict[str, Any], version: str | None = None) -> int:
     p = entry_path(digest, version)
     p.parent.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     # 임시 파일에 쓰고 교체 — 도중에 끊겨도 반쪽 파일이 남지 않는다
-    tmp = p.with_suffix(p.suffix + f".tmp{id(payload) & 0xffff:04x}")
+    tmp = p.with_suffix(p.suffix + f".tmp{id(payload) & 0xFFFF:04x}")
     with gzip.open(tmp, "wb", compresslevel=6) as f:
         f.write(raw)
     tmp.replace(p)
@@ -191,8 +191,8 @@ def load_hwpx_cached(
             return _refresh_volatile(hit), True
 
     res = load_hwpx_for_editor(
-        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_rel},
-        project_root=project_root)
+        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": source_rel}, project_root=project_root
+    )
     if store and digest is not None and res.get("verdict") == "PASS":
         try:
             write_entry(digest, res)
@@ -202,6 +202,7 @@ def load_hwpx_cached(
 
 
 # ── 운영 ────────────────────────────────────────────────────────────
+
 
 def stats() -> dict[str, Any]:
     ver = parser_version()
@@ -213,11 +214,13 @@ def stats() -> dict[str, Any]:
             size += p.stat().st_size
     others = []
     if CACHE_ROOT.is_dir():
-        others = [d.name for d in CACHE_ROOT.iterdir()
-                  if d.is_dir() and d.name != ver]
-    return {"parserVersion": ver, "entries": n,
-            "sizeMB": round(size / 1024 / 1024, 1),
-            "staleVersions": others}
+        others = [d.name for d in CACHE_ROOT.iterdir() if d.is_dir() and d.name != ver]
+    return {
+        "parserVersion": ver,
+        "entries": n,
+        "sizeMB": round(size / 1024 / 1024, 1),
+        "staleVersions": others,
+    }
 
 
 def verify(sample: int = 25, seed: int = 0) -> dict[str, Any]:
@@ -247,26 +250,29 @@ def verify(sample: int = 25, seed: int = 0) -> dict[str, Any]:
             missing_src += 1
             continue
         fresh = load_hwpx_for_editor(
-            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
-            project_root=PROJECT_ROOT)
+            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel}, project_root=PROJECT_ROOT
+        )
         checked += 1
-        a = json.dumps(_without_volatile(cached), sort_keys=True,
-                       ensure_ascii=False)
-        b = json.dumps(_without_volatile(fresh), sort_keys=True,
-                       ensure_ascii=False)
+        a = json.dumps(_without_volatile(cached), sort_keys=True, ensure_ascii=False)
+        b = json.dumps(_without_volatile(fresh), sort_keys=True, ensure_ascii=False)
         if a != b:
             mismatch += 1
             if len(bad) < 5:
                 bad.append(rel)
-    return {"parserVersion": ver, "checked": checked, "mismatch": mismatch,
-            "sourceMissing": missing_src, "mismatchSamples": bad,
-            "verdict": "PASS" if mismatch == 0 and checked else
-                       ("FAIL" if mismatch else "EMPTY")}
+    return {
+        "parserVersion": ver,
+        "checked": checked,
+        "mismatch": mismatch,
+        "sourceMissing": missing_src,
+        "mismatchSamples": bad,
+        "verdict": "PASS" if mismatch == 0 and checked else ("FAIL" if mismatch else "EMPTY"),
+    }
 
 
 def prune() -> dict[str, Any]:
     """현재 파서 버전이 아닌 캐시를 지운다."""
     import shutil
+
     ver = parser_version()
     removed = []
     freed = 0
@@ -279,22 +285,7 @@ def prune() -> dict[str, Any]:
     return {"removed": removed, "freedMB": round(freed / 1024 / 1024, 1)}
 
 
-def build(shard: int = 0, shards: int = 1, limit: int = 0,
-          size_cap_mb: float = 1.5) -> None:
-    """카탈로그의 서식을 훑어 캐시를 채운다.
-
-    항목마다 별도 파일이라 샤드끼리 경합이 없다(DB 잠금 문제 없음).
-    """
-    import sqlite3
-    catalog = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
-    con = sqlite3.connect(f"file:{catalog}?mode=ro", uri=True)
-    rows = con.execute(
-        "SELECT form_id, source_path FROM forms "
-        "WHERE status='OK' AND source_path IS NOT NULL "
-        "ORDER BY form_id").fetchall()
-    con.close()
-
-    cap = size_cap_mb * 1024 * 1024
+def _select_targets(rows: list, shard: int, shards: int, cap: float) -> list[str]:
     targets: list[str] = []
     for fid, rel in rows:
         if shards > 1 and (fid % shards) != shard:
@@ -304,12 +295,32 @@ def build(shard: int = 0, shards: int = 1, limit: int = 0,
         p = PROJECT_ROOT / rel
         if p.is_file() and p.stat().st_size < cap:
             targets.append(rel)
+    return targets
+
+
+def build(shard: int = 0, shards: int = 1, limit: int = 0, size_cap_mb: float = 1.5) -> None:
+    """카탈로그의 서식을 훑어 캐시를 채운다.
+
+    항목마다 별도 파일이라 샤드끼리 경합이 없다(DB 잠금 문제 없음).
+    """
+    import sqlite3
+
+    catalog = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
+    con = sqlite3.connect(f"file:{catalog}?mode=ro", uri=True)
+    rows = con.execute(
+        "SELECT form_id, source_path FROM forms "
+        "WHERE status='OK' AND source_path IS NOT NULL "
+        "ORDER BY form_id"
+    ).fetchall()
+    con.close()
+
+    cap = size_cap_mb * 1024 * 1024
+    targets = _select_targets(rows, shard, shards, cap)
     if limit:
         targets = targets[:limit]
 
     tag = f"[shard {shard}/{shards}] " if shards > 1 else ""
-    print(f"{tag}[start] 캐시 대상 {len(targets):,}건 · 파서버전 {parser_version()}",
-          flush=True)
+    print(f"{tag}[start] 캐시 대상 {len(targets):,}건 · 파서버전 {parser_version()}", flush=True)
     t0 = time.time()
     hit = made = fail = 0
     written = 0
@@ -324,28 +335,32 @@ def build(shard: int = 0, shards: int = 1, limit: int = 0,
                 written += entry_path(source_digest(src)).stat().st_size
             else:
                 fail += 1
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             fail += 1
         if i % 500 == 0:
             el = time.time() - t0
             rate = i / el if el else 0
             eta = (len(targets) - i) / rate / 60 if rate else 0
-            print(f"{tag}  … {i:,}/{len(targets):,} 적중 {hit:,} 생성 {made:,} "
-                  f"실패 {fail} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
-                  f"{written/1024/1024:.0f}MB", flush=True)
+            print(
+                f"{tag}  … {i:,}/{len(targets):,} 적중 {hit:,} 생성 {made:,} "
+                f"실패 {fail} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
+                f"{written / 1024 / 1024:.0f}MB",
+                flush=True,
+            )
     el = time.time() - t0
-    print(f"{tag}[done] 적중 {hit:,} · 생성 {made:,} · 실패 {fail} · "
-          f"{el/60:.1f}분 · {written/1024/1024:.0f}MB", flush=True)
+    print(
+        f"{tag}[done] 적중 {hit:,} · 생성 {made:,} · 실패 {fail} · "
+        f"{el / 60:.1f}분 · {written / 1024 / 1024:.0f}MB",
+        flush=True,
+    )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--build", action="store_true", help="캐시 채우기")
     ap.add_argument("--stats", action="store_true")
-    ap.add_argument("--verify", action="store_true",
-                    help="표본 재파싱해 캐시와 대조 (낡음 검출)")
-    ap.add_argument("--prune", action="store_true",
-                    help="옛 파서 버전 캐시 삭제")
+    ap.add_argument("--verify", action="store_true", help="표본 재파싱해 캐시와 대조 (낡음 검출)")
+    ap.add_argument("--prune", action="store_true", help="옛 파서 버전 캐시 삭제")
     ap.add_argument("--sample", type=int, default=25)
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--shards", type=int, default=1)

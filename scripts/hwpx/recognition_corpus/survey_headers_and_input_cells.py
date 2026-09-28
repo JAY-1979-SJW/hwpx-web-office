@@ -12,6 +12,7 @@ HWPX 파일 전체를 read-only로 전수 조사하여
 - AI API / OCR 호출 없음
 - 절대경로 / 원본 파일명 / 셀 내 PII 값 보고서 저장 없음
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,27 +23,43 @@ import re
 import sys
 import traceback
 import unicodedata
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
 # ── namespaces ────────────────────────────────────────────────────────────────
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_OPF = "http://www.idpf.org/2007/opf/"
 
 # ── 입력셀 타입 ────────────────────────────────────────────────────────────────
-ITYPE_LABEL_ADJACENT = "label_adjacent"   # 2-col 표: 왼쪽 라벨, 오른쪽 빈 셀
-ITYPE_HEADER_COLUMN  = "header_column"    # 헤더 아래 데이터행 빈 셀
-ITYPE_FORM_FIELD     = "form_field"       # form_table 내 빈 값 셀
+ITYPE_LABEL_ADJACENT = "label_adjacent"  # 2-col 표: 왼쪽 라벨, 오른쪽 빈 셀
+ITYPE_HEADER_COLUMN = "header_column"  # 헤더 아래 데이터행 빈 셀
+ITYPE_FORM_FIELD = "form_field"  # form_table 내 빈 값 셀
 
 # ── 표 분류용 키워드 (profiler 공유) ──────────────────────────────────────────
 SCHEDULE_HEADER_KW = (
-    "공종", "작업명", "공사명", "시작일", "착수일", "종료일", "완료일", "준공일",
-    "기간", "공기", "진행률", "진도율", "예정", "실적", "task", "start", "end", "duration",
+    "공종",
+    "작업명",
+    "공사명",
+    "시작일",
+    "착수일",
+    "종료일",
+    "완료일",
+    "준공일",
+    "기간",
+    "공기",
+    "진행률",
+    "진도율",
+    "예정",
+    "실적",
+    "task",
+    "start",
+    "end",
+    "duration",
 )
 DATE_HEADER_RE = [
     re.compile(r"^\d{4}[-./]\d{1,2}[-./]\d{1,2}"),
@@ -54,32 +71,52 @@ DATE_HEADER_RE = [
     re.compile(r"^\d{4}년"),
 ]
 FORM_LABEL_KW = (
-    "공사명", "현장명", "사업명", "시공사", "감리자",
-    "접수번호", "접수일", "발신", "수신", "문서번호", "보고일",
-    "작성자", "작성일", "승인자", "검토자", "제출일", "수신처",
+    "공사명",
+    "현장명",
+    "사업명",
+    "시공사",
+    "감리자",
+    "접수번호",
+    "접수일",
+    "발신",
+    "수신",
+    "문서번호",
+    "보고일",
+    "작성자",
+    "작성일",
+    "승인자",
+    "검토자",
+    "제출일",
+    "수신처",
 )
 FIELD_HINTS: list[tuple[str, tuple[str, ...]]] = [
-    ("projectName",        ("공사명", "사업명", "프로젝트명")),
-    ("siteName",           ("현장명", "현장",)),
-    ("contractorName",     ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
-    ("reportDate",         ("작성일", "보고일", "제출일")),
-    ("receiptNumber",      ("접수번호", "접수번", "문서번호", "접수")),
-    ("number",             ("번호",)),
-    ("trade",              ("공종", "공정", "trade")),
-    ("taskName",           ("작업명", "task", "내용", "항목")),
-    ("startDate",          ("시작일", "착수일", "착공일", "start")),
-    ("endDate",            ("종료일", "완료일", "준공일", "end")),
-    ("durationDays",       ("기간", "공기", "duration")),
-    ("responsiblePerson",  ("담당자", "책임자", "성명", "지정자")),
-    ("progressRate",       ("진행률", "진도율", "달성률", "progress")),
-    ("materialStatus",     ("자재", "재료", "material")),
-    ("inspectionStatus",   ("검측", "검사", "inspection")),
-    ("remarks",            ("비고", "참고", "remark", "note")),
-    ("quantity",           ("수량", "량")),
-    ("unit",               ("단위", "unit")),
-    ("spec",               ("규격", "사양", "spec")),
-    ("amount",             ("금액", "단가", "amount", "price")),
-    ("location",           ("위치", "장소", "구간")),
+    ("projectName", ("공사명", "사업명", "프로젝트명")),
+    (
+        "siteName",
+        (
+            "현장명",
+            "현장",
+        ),
+    ),
+    ("contractorName", ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
+    ("reportDate", ("작성일", "보고일", "제출일")),
+    ("receiptNumber", ("접수번호", "접수번", "문서번호", "접수")),
+    ("number", ("번호",)),
+    ("trade", ("공종", "공정", "trade")),
+    ("taskName", ("작업명", "task", "내용", "항목")),
+    ("startDate", ("시작일", "착수일", "착공일", "start")),
+    ("endDate", ("종료일", "완료일", "준공일", "end")),
+    ("durationDays", ("기간", "공기", "duration")),
+    ("responsiblePerson", ("담당자", "책임자", "성명", "지정자")),
+    ("progressRate", ("진행률", "진도율", "달성률", "progress")),
+    ("materialStatus", ("자재", "재료", "material")),
+    ("inspectionStatus", ("검측", "검사", "inspection")),
+    ("remarks", ("비고", "참고", "remark", "note")),
+    ("quantity", ("수량", "량")),
+    ("unit", ("단위", "unit")),
+    ("spec", ("규격", "사양", "spec")),
+    ("amount", ("금액", "단가", "amount", "price")),
+    ("location", ("위치", "장소", "구간")),
 ]
 
 # ── PII 탐지 (셀 값 보고서 저장 차단용) ────────────────────────────────────
@@ -91,6 +128,7 @@ _PII_RE = [
 
 
 # ── 식별자 유틸 ───────────────────────────────────────────────────────────────
+
 
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8", errors="replace")).hexdigest()
@@ -113,6 +151,7 @@ def file_content_hash(path: Path) -> str:
 
 
 # ── 텍스트 정규화 ─────────────────────────────────────────────────────────────
+
 
 def normalize(text: str) -> str:
     if not text:
@@ -145,6 +184,7 @@ def _has_pii(text: str) -> bool:
 
 
 # ── XML 파싱 헬퍼 ─────────────────────────────────────────────────────────────
+
 
 def _cell_text(cell: ET.Element) -> str:
     parts = []
@@ -196,6 +236,7 @@ def _detect_header_rows(grid: list[list[ET.Element]]) -> list[int]:
 
 # ── 표 레이아웃 간이 분류 ─────────────────────────────────────────────────────
 
+
 def _classify_layout(
     grid: list[list[ET.Element]],
     header_texts: list[str],
@@ -219,7 +260,9 @@ def _classify_layout(
         return "horizontal_schedule"
 
     form_hits = sum(
-        1 for row in grid for c in row
+        1
+        for row in grid
+        for c in row
         if any(kw in normalize(_cell_text(c)) for kw in FORM_LABEL_KW)
     )
     if form_hits >= 2 and rows <= 8:
@@ -234,6 +277,7 @@ def _classify_layout(
 
 # ── 입력셀 탐지 ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class InputCell:
     maskedFileId: str
@@ -243,7 +287,7 @@ class InputCell:
     rowIndex: int
     colIndex: int
     inputCellType: str
-    adjacentLabel: str        # 라벨 텍스트 (필드명 수준, 값 아님)
+    adjacentLabel: str  # 라벨 텍스트 (필드명 수준, 값 아님)
     guessedField: str
     fieldConfidence: float
     colSpan: int
@@ -278,7 +322,6 @@ def _find_input_cells(
 ) -> list[InputCell]:
     results: list[InputCell] = []
     header_zone = set(header_row_idxs)
-    rows = len(grid)
     cols = max((len(r) for r in grid), default=0)
 
     for ri, row in enumerate(grid):
@@ -315,7 +358,8 @@ def _find_input_cells(
                 # 같은 행에 라벨 후보가 있으면 form_field
                 row_labels = [
                     normalize(_cell_text(c))
-                    for j, c in enumerate(row) if j != ci and normalize(_cell_text(c))
+                    for j, c in enumerate(row)
+                    if j != ci and normalize(_cell_text(c))
                 ]
                 if row_labels:
                     candidate_label = min(row_labels, key=len)
@@ -337,26 +381,29 @@ def _find_input_cells(
             if itype is None:
                 continue
 
-            results.append(InputCell(
-                maskedFileId=fid,
-                sectionIndex=sec_idx,
-                tableIndex=tbl_idx,
-                tableLayout=layout,
-                rowIndex=ri,
-                colIndex=ci,
-                inputCellType=itype,
-                adjacentLabel=label,
-                guessedField=gfield,
-                fieldConfidence=gconf,
-                colSpan=cs,
-                rowSpan=rs,
-                isInHeaderZone=(ri in header_zone),
-            ))
+            results.append(
+                InputCell(
+                    maskedFileId=fid,
+                    sectionIndex=sec_idx,
+                    tableIndex=tbl_idx,
+                    tableLayout=layout,
+                    rowIndex=ri,
+                    colIndex=ci,
+                    inputCellType=itype,
+                    adjacentLabel=label,
+                    guessedField=gfield,
+                    fieldConfidence=gconf,
+                    colSpan=cs,
+                    rowSpan=rs,
+                    isInHeaderZone=(ri in header_zone),
+                )
+            )
 
     return results
 
 
 # ── 헤더 레코드 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class HeaderRecord:
@@ -389,6 +436,7 @@ class HeaderRecord:
 
 
 # ── 파일별 처리 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class FileResult:
@@ -428,7 +476,6 @@ def _survey_file(
     path: Path,
     fid: str,
 ) -> tuple[FileResult, list[HeaderRecord], list[InputCell]]:
-    now = datetime.now(tz=timezone.utc).isoformat()
     warnings: list[str] = []
     headers: list[HeaderRecord] = []
     inputs: list[InputCell] = []
@@ -444,11 +491,11 @@ def _survey_file(
     # ZIP 열기
     try:
         zf_handle = zipfile.ZipFile(path)
-    except (zipfile.BadZipFile, Exception) as exc:
+    except (zipfile.BadZipFile, OSError) as exc:
         return (
-            FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {},
-                       "BROKEN_ZIP", [str(exc)]),
-            headers, inputs,
+            FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {}, "BROKEN_ZIP", [str(exc)]),
+            headers,
+            inputs,
         )
 
     section_count = 0
@@ -460,14 +507,26 @@ def _survey_file(
 
     with zf_handle as zf:
         names = zf.namelist()
-        section_files = sorted(
-            n for n in names if re.match(r"Contents/section\d+\.xml$", n)
-        )
+        section_files = sorted(n for n in names if re.match(r"Contents/section\d+\.xml$", n))
         if not section_files or "Contents/content.hpf" not in names:
             return (
-                FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {},
-                           "MISSING_XML", ["no section files or content.hpf"]),
-                headers, inputs,
+                FileResult(
+                    fid,
+                    fhash,
+                    size,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    {},
+                    {},
+                    "MISSING_XML",
+                    ["no section files or content.hpf"],
+                ),
+                headers,
+                inputs,
             )
 
         section_count = len(section_files)
@@ -479,7 +538,7 @@ def _survey_file(
             except ET.ParseError as exc:
                 warnings.append(f"{sec_name}: XML parse error: {exc}")
                 continue
-            except Exception as exc:
+            except (KeyError, UnicodeDecodeError, OSError) as exc:
                 warnings.append(f"{sec_name}: read error: {exc}")
                 continue
 
@@ -510,34 +569,37 @@ def _survey_file(
                         gf, gc = guess_field(norm)
                         hdr_texts.append(norm)
                         field_ctr[gf] += 1
-                        headers.append(HeaderRecord(
-                            maskedFileId=fid,
-                            sectionIndex=sec_idx,
-                            tableIndex=tbl_idx,
-                            tableLayout="",   # fill after layout classify
-                            rowIndex=hri,
-                            colIndex=ci,
-                            normalizedText=norm,
-                            guessedField=gf,
-                            fieldConfidence=gc,
-                            isDateLike=is_date_like(norm),
-                            colSpan=cs,
-                        ))
+                        headers.append(
+                            HeaderRecord(
+                                maskedFileId=fid,
+                                sectionIndex=sec_idx,
+                                tableIndex=tbl_idx,
+                                tableLayout="",  # fill after layout classify
+                                rowIndex=hri,
+                                colIndex=ci,
+                                normalizedText=norm,
+                                guessedField=gf,
+                                fieldConfidence=gc,
+                                isDateLike=is_date_like(norm),
+                                colSpan=cs,
+                            )
+                        )
 
                 layout = _classify_layout(grid, hdr_texts)
                 layout_ctr[layout] += 1
 
                 # layout을 header records에 역주입
                 for hr in headers:
-                    if (hr.maskedFileId == fid
-                            and hr.sectionIndex == sec_idx
-                            and hr.tableIndex == tbl_idx
-                            and not hr.tableLayout):
+                    if (
+                        hr.maskedFileId == fid
+                        and hr.sectionIndex == sec_idx
+                        and hr.tableIndex == tbl_idx
+                        and not hr.tableLayout
+                    ):
                         hr.tableLayout = layout
 
                 # 입력셀 탐지
-                icells = _find_input_cells(fid, sec_idx, tbl_idx, grid,
-                                           header_row_idxs, layout)
+                icells = _find_input_cells(fid, sec_idx, tbl_idx, grid, header_row_idxs, layout)
                 inputs.extend(icells)
                 for ic in icells:
                     if ic.guessedField != "unknown":
@@ -562,6 +624,7 @@ def _survey_file(
 
 
 # ── 집계 사전 ────────────────────────────────────────────────────────────────
+
 
 def _build_header_dict(
     all_headers: list[HeaderRecord],
@@ -610,7 +673,6 @@ def _build_input_cell_dict(
 ) -> list[dict[str, Any]]:
     label_map: dict[str, dict] = {}
     for ic in all_inputs:
-        key = (ic.adjacentLabel, ic.inputCellType)
         k = f"{ic.adjacentLabel}|{ic.inputCellType}"
         if k not in label_map:
             label_map[k] = {
@@ -628,7 +690,7 @@ def _build_input_cell_dict(
         e["layoutCounter"][ic.tableLayout] += 1
 
     rows = []
-    for k, e in label_map.items():
+    for e in label_map.values():
         rows.append({
             "adjacentLabel": e["adjacentLabel"],
             "inputCellType": e["inputCellType"],
@@ -643,6 +705,7 @@ def _build_input_cell_dict(
 
 
 # ── 보고서 출력 ───────────────────────────────────────────────────────────────
+
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as f:
@@ -719,7 +782,7 @@ def _build_summary_md(
     return "\n".join(lines) + "\n"
 
 
-def _write_reports(
+def _write_reports(  # ruff: ignore[too-many-arguments] (보고서 작성 전용 헬퍼, 인자 모두 필요 — 시그니처 변경 보류)
     output_dir: Path,
     file_results: list[FileResult],
     all_headers: list[HeaderRecord],
@@ -752,8 +815,14 @@ def _write_reports(
     paths["header_dict"] = p
 
     hdr_csv_fields = [
-        "normalizedText", "guessedField", "fieldConfidence", "isDateLike",
-        "fileCount", "tableCount", "totalOccurrences", "commonColIndexes",
+        "normalizedText",
+        "guessedField",
+        "fieldConfidence",
+        "isDateLike",
+        "fileCount",
+        "tableCount",
+        "totalOccurrences",
+        "commonColIndexes",
         "layoutDistribution",
     ]
     p = output_dir / "survey_header_dictionary.csv"
@@ -766,8 +835,13 @@ def _write_reports(
     paths["input_cell_dict"] = p
 
     icd_csv_fields = [
-        "adjacentLabel", "inputCellType", "guessedField", "fieldConfidence",
-        "fileCount", "occurrences", "layoutDistribution",
+        "adjacentLabel",
+        "inputCellType",
+        "guessedField",
+        "fieldConfidence",
+        "fileCount",
+        "occurrences",
+        "layoutDistribution",
     ]
     p = output_dir / "survey_input_cell_dictionary.csv"
     _write_csv(p, icd, icd_csv_fields)
@@ -789,14 +863,15 @@ def _write_reports(
 
 # ── 전수조사 메인 ─────────────────────────────────────────────────────────────
 
+
 def discover_hwpx(
     input_dir: Path,
     pattern: str = "*.hwpx",
     limit: int = 0,
 ) -> list[Path]:
     import fnmatch
-    files = [p for p in input_dir.rglob("*")
-             if fnmatch.fnmatch(p.name, pattern) and p.is_file()]
+
+    files = [p for p in input_dir.rglob("*") if fnmatch.fnmatch(p.name, pattern) and p.is_file()]
     files.sort()
     if limit and limit > 0:
         files = files[:limit]
@@ -820,13 +895,12 @@ def run_survey(
     for i, path in enumerate(files):
         fid = masked_file_id(path, i)
         if verbose:
-            print(f"[{i+1}/{len(files)}] {fid}", file=sys.stderr)
+            print(f"[{i + 1}/{len(files)}] {fid}", file=sys.stderr)
         try:
             fr, hdrs, ics = _survey_file(path, fid)
-        except Exception as exc:
+        except Exception as exc:  # ruff: ignore[blind-except] (배치 처리 — 파일 하나 실패해도 나머지 계속 진행)
             tb = traceback.format_exc(limit=2)
-            fr = FileResult(fid, "", 0, 0, 0, 0, 0, 0, 0, {}, {},
-                            "ERROR", [f"{exc}", tb[-200:]])
+            fr = FileResult(fid, "", 0, 0, 0, 0, 0, 0, 0, {}, {}, "ERROR", [f"{exc}", tb[-200:]])
         file_results.append(fr)
         all_headers.extend(hdrs)
         all_inputs.extend(ics)
@@ -848,7 +922,9 @@ def run_survey(
     summary: dict[str, Any] = {
         "totalFiles": len(files),
         "parsedOk": sum(1 for r in file_results if r.parseStatus in ("PASS", "PARTIAL")),
-        "parseErrors": sum(1 for r in file_results if r.parseStatus in ("BROKEN_ZIP", "MISSING_XML", "ERROR")),
+        "parseErrors": sum(
+            1 for r in file_results if r.parseStatus in ("BROKEN_ZIP", "MISSING_XML", "ERROR")
+        ),
         "totalTables": sum(r.tableCount for r in file_results),
         "totalCells": sum(r.totalCells for r in file_results),
         "totalEmptyCells": sum(r.emptyCells for r in file_results),
@@ -856,38 +932,38 @@ def run_survey(
         "totalInputCells": len(all_inputs),
         "uniqueHeaders": len(hdr_dict),
         "uniqueInputLabels": len(icd),
-        "inputCellTypeDistribution": dict(Counter(ic.inputCellType for ic in all_inputs).most_common()),
+        "inputCellTypeDistribution": dict(
+            Counter(ic.inputCellType for ic in all_inputs).most_common()
+        ),
         "layoutDistribution": dict(layout_dist.most_common()),
         "topFields": dict(field_dist.most_common(20)),
-        "profiledAt": datetime.now(tz=timezone.utc).isoformat(),
+        "profiledAt": datetime.now(tz=UTC).isoformat(),
     }
 
     if not dry_run:
-        _write_reports(output_dir, file_results, all_headers, all_inputs,
-                       hdr_dict, icd, summary)
+        _write_reports(output_dir, file_results, all_headers, all_inputs, hdr_dict, icd, summary)
 
     return summary
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="HWPX 헤더·입력셀 전수조사 (read-only)"
-    )
-    p.add_argument("--input-dir", required=True,
-                   help="스캔할 HWPX 루트 디렉터리")
-    p.add_argument("--output-dir", required=True,
-                   help="보고서 출력 디렉터리")
-    p.add_argument("--limit", type=int, default=0,
-                   help="최대 스캔 파일 수 (0=제한 없음)")
-    p.add_argument("--dry-run", action="store_true", default=False,
-                   help="스캔만 수행, 파일 미생성")
-    p.add_argument("--include-pattern", default="*.hwpx",
-                   help="파일 glob 패턴 (기본: *.hwpx)")
+    p = argparse.ArgumentParser(description="HWPX 헤더·입력셀 전수조사 (read-only)")
+    p.add_argument("--input-dir", required=True, help="스캔할 HWPX 루트 디렉터리")
+    p.add_argument("--output-dir", required=True, help="보고서 출력 디렉터리")
+    p.add_argument("--limit", type=int, default=0, help="최대 스캔 파일 수 (0=제한 없음)")
+    p.add_argument("--dry-run", action="store_true", default=False, help="스캔만 수행, 파일 미생성")
+    p.add_argument("--include-pattern", default="*.hwpx", help="파일 glob 패턴 (기본: *.hwpx)")
     p.add_argument("--verbose", action="store_true", default=False)
-    p.add_argument("--json", dest="output_json", action="store_true", default=False,
-                   help="요약 JSON을 stdout에 출력")
+    p.add_argument(
+        "--json",
+        dest="output_json",
+        action="store_true",
+        default=False,
+        help="요약 JSON을 stdout에 출력",
+    )
     return p.parse_args(argv)
 
 

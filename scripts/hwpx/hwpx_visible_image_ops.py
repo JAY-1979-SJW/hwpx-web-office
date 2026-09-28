@@ -11,8 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from hwpx_image_ops import add_bindata_image_data
 from hwpx_element_factory import append_generated_picture
+from hwpx_image_ops import add_bindata_image_data
 from hwpx_package import HwpxPackage
 from hwpx_picture_ops import clone_picture_object, picture_inventory
 
@@ -81,7 +81,7 @@ def insert_visible_image_from_template(
     }
 
 
-def insert_generated_png_picture(
+def insert_generated_png_picture(  # ruff: ignore[too-many-arguments] (locked 파일 포함 여러 호출부가 있어 시그니처 변경 보류)
     package: HwpxPackage,
     image_path: Path,
     image_entry: str = "BinData/generated_picture001.png",

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 SCHEMA_VERSION = "form_writer_final_export_gate_v1"
 
@@ -51,11 +51,11 @@ def _val_hash(value: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _expires_iso(days: int = _DEFAULT_EXPIRY_DAYS) -> str:
-    dt = datetime.now(timezone.utc) + timedelta(days=days)
+    dt = datetime.now(UTC) + timedelta(days=days)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -66,6 +66,7 @@ def _export_id(output_file_id: str, ts: str) -> str:
 # ---------------------------------------------------------------------------
 # Export eligibility check
 # ---------------------------------------------------------------------------
+
 
 def _check_export_eligible(
     download_review_payload: dict,
@@ -127,7 +128,8 @@ def _check_export_eligible(
 # Build final export payload
 # ---------------------------------------------------------------------------
 
-def build_final_export_payload(
+
+def build_final_export_payload(  # ruff: ignore[too-many-arguments] (여러 파일에서 호출 — 시그니처 변경 보류)
     download_review_payload: dict,
     decision_result: dict,
     form_id: str = "",
