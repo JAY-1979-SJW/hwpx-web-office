@@ -14,7 +14,9 @@ def write_hwpx(path: Path) -> None:
         zf.writestr("META-INF/container.xml", "<root/>")
 
 
-def test_native_batch_stages_ascii_input_and_restores_relative_output(monkeypatch, tmp_path: Path) -> None:
+def test_native_batch_stages_ascii_input_and_restores_relative_output(
+    monkeypatch, tmp_path: Path
+) -> None:
     input_dir = tmp_path / "input"
     source = input_dir / "nested" / "원본.hwp"
     source.parent.mkdir(parents=True)
@@ -46,20 +48,26 @@ def test_native_batch_stages_ascii_input_and_restores_relative_output(monkeypatc
     monkeypatch.setattr(
         native,
         "build_gate_report",
-        lambda *_args, **_kwargs: {"status": "WARN", "machine_ok": True, "visual_review": {"status": "USER_PRESENT_REQUIRED"}},
+        lambda *_args, **_kwargs: {
+            "status": "WARN",
+            "machine_ok": True,
+            "visual_review": {"status": "USER_PRESENT_REQUIRED"},
+        },
     )
 
     report = native.run_batch(
-        input_dir,
-        output_dir,
-        staging_dir=staging,
-        diag_dir=tmp_path / "diag",
-        report_json=tmp_path / "report.json",
-        audit_jsonl=tmp_path / "audit.jsonl",
-        pattern="*.hwp",
-        limit=0,
-        timeout_sec=1,
-        save_strategy="direct",
+        native.BatchConfig(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            staging_dir=staging,
+            diag_dir=tmp_path / "diag",
+            report_json=tmp_path / "report.json",
+            audit_jsonl=tmp_path / "audit.jsonl",
+            pattern="*.hwp",
+            limit=0,
+            timeout_sec=1,
+            save_strategy="direct",
+        )
     )
 
     assert report["status"] == "PASS"
@@ -85,18 +93,20 @@ def test_native_batch_skips_existing_outputs_and_writes_csv(monkeypatch, tmp_pat
     monkeypatch.setattr(native, "convert_one_with_strategy", should_not_convert)
 
     report = native.run_batch(
-        input_dir,
-        output_dir,
-        staging_dir=tmp_path / "staging",
-        diag_dir=tmp_path / "diag",
-        report_json=tmp_path / "report.json",
-        audit_jsonl=tmp_path / "audit.jsonl",
-        report_csv=tmp_path / "report.csv",
-        pattern="*.hwp",
-        limit=0,
-        timeout_sec=1,
-        save_strategy="direct",
-        existing_policy="skip",
+        native.BatchConfig(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            staging_dir=tmp_path / "staging",
+            diag_dir=tmp_path / "diag",
+            report_json=tmp_path / "report.json",
+            audit_jsonl=tmp_path / "audit.jsonl",
+            report_csv=tmp_path / "report.csv",
+            pattern="*.hwp",
+            limit=0,
+            timeout_sec=1,
+            save_strategy="direct",
+            existing_policy="skip",
+        )
     )
 
     assert report["status"] == "PASS"
@@ -120,17 +130,19 @@ def test_native_batch_dry_run_plans_without_converter(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(native, "convert_one_with_strategy", should_not_convert)
 
     report = native.run_batch(
-        input_dir,
-        tmp_path / "out",
-        staging_dir=tmp_path / "staging",
-        diag_dir=tmp_path / "diag",
-        report_json=tmp_path / "report.json",
-        audit_jsonl=None,
-        pattern="*.hwp",
-        limit=0,
-        timeout_sec=1,
-        save_strategy="direct",
-        dry_run=True,
+        native.BatchConfig(
+            input_dir=input_dir,
+            output_dir=tmp_path / "out",
+            staging_dir=tmp_path / "staging",
+            diag_dir=tmp_path / "diag",
+            report_json=tmp_path / "report.json",
+            audit_jsonl=None,
+            pattern="*.hwp",
+            limit=0,
+            timeout_sec=1,
+            save_strategy="direct",
+            dry_run=True,
+        )
     )
 
     assert report["status"] == "PASS"
