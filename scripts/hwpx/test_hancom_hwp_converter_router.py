@@ -1,6 +1,9 @@
 from argparse import Namespace
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import hancom_hwp_converter_router as router
 from hancom_hwp_converter_providers import ProviderStatus
