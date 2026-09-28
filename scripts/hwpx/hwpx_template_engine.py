@@ -48,7 +48,7 @@ def command_render(args: argparse.Namespace) -> int:
             bool(args.validate),
             bool(args.roundtrip),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -107,7 +107,9 @@ def command_audit(args: argparse.Namespace) -> int:
 
             write_csv(Path(args.out_csv), audit_csv_rows(report["results"]))
     else:
-        report = audit_hwpx_package(Path(args.input), expected_values=expected, strict=bool(args.strict))
+        report = audit_hwpx_package(
+            Path(args.input), expected_values=expected, strict=bool(args.strict)
+        )
         if args.out_csv:
             from hwpx_package import write_csv
 
@@ -122,7 +124,7 @@ def command_batch_render(args: argparse.Namespace) -> int:
     try:
         job_data = read_json(Path(args.job_json))
         jobs = job_data.get("jobs", [])
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         summary = {
             "status": "FAIL",
             "error_type": type(exc).__name__,
@@ -146,7 +148,7 @@ def command_batch_render(args: argparse.Namespace) -> int:
             template, output, mapping, tables = materialize_job_files(job, output_dir, index)
             validate_table_config(tables)
             result = render_one(template, output, mapping, tables, True, bool(args.roundtrip))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             result = {
                 "status": "FAIL",
                 "job_index": index,
@@ -157,7 +159,9 @@ def command_batch_render(args: argparse.Namespace) -> int:
         results.append(result)
 
     summary = {
-        "status": "PASS" if results and all(item["status"] in {"PASS", "WARN"} for item in results) else "FAIL",
+        "status": "PASS"
+        if results and all(item["status"] in {"PASS", "WARN"} for item in results)
+        else "FAIL",
         "job_count": len(jobs),
         "pass_count": sum(1 for item in results if item["status"] == "PASS"),
         "warn_count": sum(1 for item in results if item["status"] == "WARN"),
@@ -177,7 +181,7 @@ def command_compose(args: argparse.Namespace) -> int:
             Path(args.output) if args.output else None,
             Path(args.report_json) if args.report_json else None,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "status": "FAIL",
             "job_json": str(args.job_json),
@@ -201,7 +205,7 @@ def command_validate_job(args: argparse.Namespace) -> int:
             require_template_exists=bool(args.require_template_exists),
             require_external_files=bool(args.require_external_files),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "status": "FAIL",
             "job_json": str(args.job_json),
@@ -221,7 +225,7 @@ def command_examples(args: argparse.Namespace) -> int:
             str(args.template),
             include_experimental=bool(args.include_experimental),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "status": "FAIL",
             "out_dir": str(args.out_dir),
@@ -250,7 +254,7 @@ def command_schema_reference(args: argparse.Namespace) -> int:
             "out_md": str(args.out_md) if args.out_md else None,
             "result": reference,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "status": "FAIL",
             "out_json": str(args.out_json) if args.out_json else None,
@@ -291,7 +295,7 @@ def command_full_scenario(args: argparse.Namespace) -> int:
 def command_chart_png(args: argparse.Namespace) -> int:
     try:
         report = generate_bar_chart_png_from_json(Path(args.data_json), Path(args.output))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "status": "FAIL",
             "data_json": str(args.data_json),
@@ -332,7 +336,7 @@ def command_table_op(args: argparse.Namespace) -> int:
             "validation": validation,
             "warnings": op_report.get("warnings", []),
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -344,6 +348,44 @@ def command_table_op(args: argparse.Namespace) -> int:
         write_json(Path(args.report_json), report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["status"] in {"PASS", "WARN"} else 1
+
+
+def _perform_image_replace(args: argparse.Namespace, replacement: Path) -> dict[str, object]:
+    package = HwpxPackage(Path(args.template))
+    editor = HwpxEditor(package)
+    before_images = editor.list_images()
+    if args.image_entry is not None:
+        replace_result = editor.replace_image_by_entry(args.image_entry, replacement)
+    else:
+        replace_result = editor.replace_image(int(args.image_index), replacement)
+    status = "PASS" if replace_result.get("status") == "IMAGE_REPLACE_PASS" else "FAIL"
+    output = Path(args.output)
+    validation = {"enabled": False}
+    after_images = before_images
+    if replace_result.get("status") == "IMAGE_REPLACE_PASS":
+        package.write_package(output)
+        after_package = HwpxPackage(output)
+        after_images = HwpxEditor(after_package).list_images()
+        validation = validate_rendered(output) if args.validate else {"enabled": False}
+        if args.validate and (not validation.get("zip_ok") or not validation.get("xml_ok")):
+            status = "FAIL"
+        elif not replace_result.get("hash_changed") or not replace_result.get("xml_refs_preserved"):
+            status = "WARN"
+    report: dict[str, object] = {
+        "template": str(args.template),
+        "output": str(output),
+        "status": status,
+        "image_inventory_before": before_images,
+        "replace_result": replace_result,
+        "image_inventory_after": after_images,
+        "validation": validation,
+        "warnings": [],
+    }
+    if not before_images:
+        report["warnings"].append({"type": "IMAGE_NOT_FOUND"})
+    if replace_result.get("status") == "IMAGE_EXTENSION_MISMATCH":
+        report["warnings"].append({"type": "IMAGE_EXTENSION_MISMATCH"})
+    return report
 
 
 def command_image_replace(args: argparse.Namespace) -> int:
@@ -360,41 +402,8 @@ def command_image_replace(args: argparse.Namespace) -> int:
                 "replacement": str(replacement),
             }
         else:
-            package = HwpxPackage(Path(args.template))
-            editor = HwpxEditor(package)
-            before_images = editor.list_images()
-            if args.image_entry is not None:
-                replace_result = editor.replace_image_by_entry(args.image_entry, replacement)
-            else:
-                replace_result = editor.replace_image(int(args.image_index), replacement)
-            status = "PASS" if replace_result.get("status") == "IMAGE_REPLACE_PASS" else "FAIL"
-            output = Path(args.output)
-            validation = {"enabled": False}
-            after_images = before_images
-            if replace_result.get("status") == "IMAGE_REPLACE_PASS":
-                package.write_package(output)
-                after_package = HwpxPackage(output)
-                after_images = HwpxEditor(after_package).list_images()
-                validation = validate_rendered(output) if args.validate else {"enabled": False}
-                if args.validate and (not validation.get("zip_ok") or not validation.get("xml_ok")):
-                    status = "FAIL"
-                elif not replace_result.get("hash_changed") or not replace_result.get("xml_refs_preserved"):
-                    status = "WARN"
-            report = {
-                "template": str(args.template),
-                "output": str(output),
-                "status": status,
-                "image_inventory_before": before_images,
-                "replace_result": replace_result,
-                "image_inventory_after": after_images,
-                "validation": validation,
-                "warnings": [],
-            }
-            if not before_images:
-                report["warnings"].append({"type": "IMAGE_NOT_FOUND"})
-            if replace_result.get("status") == "IMAGE_EXTENSION_MISMATCH":
-                report["warnings"].append({"type": "IMAGE_EXTENSION_MISMATCH"})
-    except Exception as exc:  # noqa: BLE001
+            report = _perform_image_replace(args, replacement)
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -440,7 +449,7 @@ def command_image_seed(args: argparse.Namespace) -> int:
                 }
             ],
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -466,8 +475,10 @@ def command_picture_inspect(args: argparse.Namespace) -> int:
         }
         if report["picture_inventory"].get("status") == "PICTURE_OBJECT_NOT_FOUND":
             report["status"] = "WARN"
-            report["warning"] = "No visible picture/control object was found; BinData-only images are not displayed in body text."
-    except Exception as exc:  # noqa: BLE001
+            report["warning"] = (
+                "No visible picture/control object was found; BinData-only images are not displayed in body text."
+            )
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "input": str(args.input),
             "status": "FAIL",
@@ -504,7 +515,7 @@ def command_picture_rebind(args: argparse.Namespace) -> int:
             "rebind_result": rebind_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -542,7 +553,7 @@ def command_picture_clone_rebind(args: argparse.Namespace) -> int:
             "clone_result": clone_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -583,7 +594,7 @@ def command_visible_image_insert(args: argparse.Namespace) -> int:
             "insert_result": insert_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -611,7 +622,9 @@ def command_png_insert(args: argparse.Namespace) -> int:
         )
         output = Path(args.output)
         validation = {"enabled": False}
-        status = "PASS" if insert_result.get("status") == "GENERATED_PNG_PICTURE_INSERT_PASS" else "FAIL"
+        status = (
+            "PASS" if insert_result.get("status") == "GENERATED_PNG_PICTURE_INSERT_PASS" else "FAIL"
+        )
         if insert_result.get("status") == "GENERATED_PNG_PICTURE_INSERT_PASS":
             package.write_package(output)
             validation = validate_rendered(output) if args.validate else {"enabled": False}
@@ -624,7 +637,7 @@ def command_png_insert(args: argparse.Namespace) -> int:
             "insert_result": insert_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -649,7 +662,9 @@ def command_paragraph_add(args: argparse.Namespace) -> int:
         if add_result.get("status") == "GENERATED_PARAGRAPH_APPEND_PASS":
             package.write_package(output)
             expected = [args.text] if args.validate else []
-            validation = validate_rendered(output, expected) if args.validate else {"enabled": False}
+            validation = (
+                validate_rendered(output, expected) if args.validate else {"enabled": False}
+            )
             if args.validate and (not validation.get("zip_ok") or not validation.get("xml_ok")):
                 status = "FAIL"
             elif args.validate and validation.get("missing_expected_values"):
@@ -661,7 +676,7 @@ def command_paragraph_add(args: argparse.Namespace) -> int:
             "add_result": add_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -705,7 +720,9 @@ def command_table_create(args: argparse.Namespace) -> int:
         if add_result.get("status") == "GENERATED_TABLE_APPEND_PASS":
             package.write_package(output)
             expected = [cell for row in rows for cell in row] if args.validate else []
-            validation = validate_rendered(output, expected) if args.validate else {"enabled": False}
+            validation = (
+                validate_rendered(output, expected) if args.validate else {"enabled": False}
+            )
             if args.validate and (not validation.get("zip_ok") or not validation.get("xml_ok")):
                 status = "FAIL"
             elif args.validate and validation.get("missing_expected_values"):
@@ -717,7 +734,7 @@ def command_table_create(args: argparse.Namespace) -> int:
             "add_result": add_result,
             "validation": validation,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         report = {
             "template": str(args.template),
             "output": str(args.output),
@@ -866,7 +883,9 @@ def build_parser() -> argparse.ArgumentParser:
     schema_reference.add_argument("--out-md")
     schema_reference.set_defaults(func=command_schema_reference)
 
-    regression = sub.add_parser("regression-suite", help="Run golden HWPX compose regression profiles")
+    regression = sub.add_parser(
+        "regression-suite", help="Run golden HWPX compose regression profiles"
+    )
     regression.add_argument("--template", required=True)
     regression.add_argument("--out-dir", required=True)
     regression.add_argument("--strict", action="store_true")
@@ -874,7 +893,9 @@ def build_parser() -> argparse.ArgumentParser:
     regression.add_argument("--report-csv")
     regression.set_defaults(func=command_regression_suite)
 
-    full_scenario = sub.add_parser("full-scenario", help="Run full stable HWPX direct writer scenario")
+    full_scenario = sub.add_parser(
+        "full-scenario", help="Run full stable HWPX direct writer scenario"
+    )
     full_scenario.add_argument("--template", required=True)
     full_scenario.add_argument("--out-dir", required=True)
     full_scenario.add_argument("--include-experimental", action="store_true")
@@ -897,7 +918,9 @@ def build_parser() -> argparse.ArgumentParser:
     table_op.add_argument("--report-json")
     table_op.set_defaults(func=command_table_op)
 
-    image_replace = sub.add_parser("image-replace", help="Replace an existing BinData image in a HWPX template")
+    image_replace = sub.add_parser(
+        "image-replace", help="Replace an existing BinData image in a HWPX template"
+    )
     image_replace.add_argument("--template", required=True)
     image_replace.add_argument("--output", required=True)
     image_replace.add_argument("--image-index", type=int)
@@ -916,12 +939,16 @@ def build_parser() -> argparse.ArgumentParser:
     image_seed.add_argument("--report-json")
     image_seed.set_defaults(func=command_image_seed)
 
-    picture_inspect = sub.add_parser("picture-inspect", help="Inspect visible picture/control objects")
+    picture_inspect = sub.add_parser(
+        "picture-inspect", help="Inspect visible picture/control objects"
+    )
     picture_inspect.add_argument("--input", required=True)
     picture_inspect.add_argument("--report-json")
     picture_inspect.set_defaults(func=command_picture_inspect)
 
-    picture_rebind = sub.add_parser("picture-rebind", help="Rebind an existing visible picture object to a BinData entry")
+    picture_rebind = sub.add_parser(
+        "picture-rebind", help="Rebind an existing visible picture object to a BinData entry"
+    )
     picture_rebind.add_argument("--template", required=True)
     picture_rebind.add_argument("--output", required=True)
     picture_rebind.add_argument("--picture-index", type=int, required=True)
@@ -931,7 +958,10 @@ def build_parser() -> argparse.ArgumentParser:
     picture_rebind.add_argument("--report-json")
     picture_rebind.set_defaults(func=command_picture_rebind)
 
-    picture_clone = sub.add_parser("picture-clone-rebind", help="Clone an existing visible picture object and rebind it to a BinData entry")
+    picture_clone = sub.add_parser(
+        "picture-clone-rebind",
+        help="Clone an existing visible picture object and rebind it to a BinData entry",
+    )
     picture_clone.add_argument("--template", required=True)
     picture_clone.add_argument("--output", required=True)
     picture_clone.add_argument("--picture-index", type=int, required=True)
@@ -971,7 +1001,9 @@ def build_parser() -> argparse.ArgumentParser:
     png_insert.add_argument("--report-json")
     png_insert.set_defaults(func=command_png_insert)
 
-    paragraph_add = sub.add_parser("paragraph-add", help="Append a generated paragraph without cloning an existing paragraph")
+    paragraph_add = sub.add_parser(
+        "paragraph-add", help="Append a generated paragraph without cloning an existing paragraph"
+    )
     paragraph_add.add_argument("--template", required=True)
     paragraph_add.add_argument("--output", required=True)
     paragraph_add.add_argument("--text", required=True)
@@ -980,7 +1012,9 @@ def build_parser() -> argparse.ArgumentParser:
     paragraph_add.add_argument("--report-json")
     paragraph_add.set_defaults(func=command_paragraph_add)
 
-    table_create = sub.add_parser("table-create", help="Append a generated table without cloning an existing table")
+    table_create = sub.add_parser(
+        "table-create", help="Append a generated table without cloning an existing table"
+    )
     table_create.add_argument("--template", required=True)
     table_create.add_argument("--output", required=True)
     table_create.add_argument("--rows-json", required=True)
