@@ -6,6 +6,7 @@ Runs one real safe-HWPX paragraph replace scenario and validates:
 - readback PASS
 - verify7 PASS
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,12 +20,12 @@ PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
 
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-    import_hwpx_as_ro_view,
-)
-from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
+from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # ruff: ignore[module-import-not-at-top-of-file]
     SCENARIO_REPLACE,
     run_para_edit_e2e,
+)
+from scripts.hwpx.web_office.ro_view_importer import (  # ruff: ignore[module-import-not-at-top-of-file]
+    import_hwpx_as_ro_view,
 )
 
 TASK_NAME = "HWPX-BACKEND-PARAGRAPH-VERIFICATION-SCRIPT-39"
@@ -34,6 +35,57 @@ LOCAL_TMP_ROOT = Path(tempfile.gettempdir()) / "hwpx-web-office"
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _check_pipeline_result(res: dict) -> list[dict]:
+    findings: list[dict] = []
+    if res.get("verdict") != "PASS":
+        findings.append({
+            "code": "PIPELINE_NOT_PASS",
+            "level": "FAIL",
+            "detail": res.get("verdict"),
+        })
+    if res.get("outputCreated") is not True:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL"})
+    if res.get("sourceUnchanged") is not True:
+        findings.append({"code": "SOURCE_MUTATED_FLAG", "level": "FAIL"})
+
+    verify7 = res.get("verify7") or {}
+    if verify7.get("verdict") != "PASS":
+        findings.append({
+            "code": "VERIFY7_NOT_PASS",
+            "level": "FAIL",
+            "detail": verify7,
+        })
+
+    readback = res.get("readback") or {}
+    for gate in (
+        "V1_RANGE_POSITION_OK",
+        "V4_CHARPR_PRESERVED",
+        "V7_READBACK_MATCH",
+    ):
+        if readback.get(gate) != "PASS":
+            findings.append({
+                "code": f"{gate}_FAIL",
+                "level": "FAIL",
+                "detail": readback.get(gate),
+            })
+    return findings
+
+
+def _check_output_paragraph(out: Path, target_paragraph_id: str, after_text: str) -> list[dict]:
+    if not out.is_file():
+        return [{"code": "OUTPUT_FILE_MISSING", "level": "FAIL"}]
+    out_doc = import_hwpx_as_ro_view(out)
+    out_par = next(
+        (p for p in out_doc.paragraphs if p.paragraphId == target_paragraph_id),
+        None,
+    )
+    if out_par is None:
+        return [{"code": "OUTPUT_PARAGRAPH_MISSING", "level": "FAIL"}]
+    if not out_par.text.startswith(after_text):
+        return [{"code": "OUTPUT_TEXT_NOT_APPLIED", "level": "FAIL", "detail": out_par.text}]
+    return []
 
 
 def verify() -> dict:
@@ -78,57 +130,8 @@ def verify() -> dict:
         allow_writer=True,
     )
 
-    if res.get("verdict") != "PASS":
-        findings.append({
-            "code": "PIPELINE_NOT_PASS",
-            "level": "FAIL",
-            "detail": res.get("verdict"),
-        })
-    if res.get("outputCreated") is not True:
-        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL"})
-    if res.get("sourceUnchanged") is not True:
-        findings.append({"code": "SOURCE_MUTATED_FLAG", "level": "FAIL"})
-
-    verify7 = (res.get("verify7") or {})
-    if verify7.get("verdict") != "PASS":
-        findings.append({
-            "code": "VERIFY7_NOT_PASS",
-            "level": "FAIL",
-            "detail": verify7,
-        })
-
-    readback = res.get("readback") or {}
-    for gate in (
-        "V1_RANGE_POSITION_OK",
-        "V4_CHARPR_PRESERVED",
-        "V7_READBACK_MATCH",
-    ):
-        if readback.get(gate) != "PASS":
-            findings.append({
-                "code": f"{gate}_FAIL",
-                "level": "FAIL",
-                "detail": readback.get(gate),
-            })
-
-    if out.is_file():
-        out_doc = import_hwpx_as_ro_view(out)
-        out_par = next(
-            (p for p in out_doc.paragraphs if p.paragraphId == target.paragraphId),
-            None,
-        )
-        if out_par is None:
-            findings.append({
-                "code": "OUTPUT_PARAGRAPH_MISSING",
-                "level": "FAIL",
-            })
-        elif not out_par.text.startswith(after_text):
-            findings.append({
-                "code": "OUTPUT_TEXT_NOT_APPLIED",
-                "level": "FAIL",
-                "detail": out_par.text,
-            })
-    else:
-        findings.append({"code": "OUTPUT_FILE_MISSING", "level": "FAIL"})
+    findings.extend(_check_pipeline_result(res))
+    findings.extend(_check_output_paragraph(out, target.paragraphId, after_text))
 
     if _sha(SAFE_FIXTURE) != source_sha_before:
         findings.append({"code": "SOURCE_SHA_CHANGED", "level": "FAIL"})

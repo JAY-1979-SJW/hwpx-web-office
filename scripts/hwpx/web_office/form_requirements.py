@@ -99,13 +99,9 @@ def split_items(text: str) -> list[str]:
     return items or ([t] if len(t) >= 2 else [])
 
 
-def extract_requirements(doc_model: dict, render_payload: dict) -> dict[str, Any]:
-    """서식 1건에서 행정 요건을 구조화 추출."""
+def _scan_table_labels(render_payload: dict) -> tuple[dict[str, Any], list[str]]:
     attachments: list[str] = []
-    processing_time = fee = submit_to = ""
-    procedure = ""
-    laws: list[str] = []
-
+    processing_time = fee = procedure = ""
     all_text: list[str] = []
     for table in render_payload.get("tables", []):
         grid = _grid(table)
@@ -122,33 +118,53 @@ def extract_requirements(doc_model: dict, render_payload: dict) -> dict[str, Any
                 fee = _value_for(grid, cell, _L_FEE)
             elif _L_PROC.match(t) and not procedure:
                 procedure = _value_for(grid, cell, _L_PROC)
+    return {
+        "attachments": attachments,
+        "processingTime": processing_time,
+        "fee": fee,
+        "procedure": procedure,
+    }, all_text
 
-    for p in doc_model.get("paragraphs", []):
-        t = _norm("".join(r.get("text", "") for r in p.get("runs", [])))
-        if t:
-            all_text.append(t)
 
-    joined = " ".join(all_text)
+def _extract_laws(joined: str) -> list[str]:
+    laws: list[str] = []
     for m in _LAW.finditer(joined):
         law = m.group(1).strip()
         art = _norm(m.group(2) or "")
         entry = f"{law} {art}".strip()
         if entry not in laws:
             laws.append(entry)
+    return laws
 
+
+def _extract_submit_to(all_text: list[str]) -> str:
     for t in all_text:
         m = _SUBMIT.search(t)
         if m:
-            submit_to = _norm(m.group(1))
-            break
+            return _norm(m.group(1))
+    return ""
+
+
+def extract_requirements(doc_model: dict, render_payload: dict) -> dict[str, Any]:
+    """서식 1건에서 행정 요건을 구조화 추출."""
+    table_labels, all_text = _scan_table_labels(render_payload)
+
+    for p in doc_model.get("paragraphs", []):
+        t = _norm("".join(r.get("text", "") for r in p.get("runs", [])))
+        if t:
+            all_text.append(t)
+
+    laws = _extract_laws(" ".join(all_text))
+    submit_to = _extract_submit_to(all_text)
 
     fields = _input_fields(doc_model, render_payload)
+    attachments = table_labels["attachments"]
     return {
         "attachments": attachments,
         "attachmentCount": len(attachments),
-        "processingTime": processing_time,
-        "fee": fee,
-        "procedure": procedure,
+        "processingTime": table_labels["processingTime"],
+        "fee": table_labels["fee"],
+        "procedure": table_labels["procedure"],
         "legalBasis": laws[:5],
         "submitTo": submit_to,
         "inputFields": fields,

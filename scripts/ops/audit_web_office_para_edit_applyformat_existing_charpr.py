@@ -256,47 +256,45 @@ def _run_dynamic() -> dict[str, Any]:
     return out
 
 
+def _check_required_keys(name: str, section: dict, keys: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": f"{name}: {k}={section.get(k)}"}
+        for k in keys
+        if section.get(k) != "PASS"
+    ]
+
+
+def _check_dynamic_scope(scope_kind: str, sec: dict) -> list[dict]:
+    findings: list[dict] = []
+    if not sec.get("ok"):
+        findings.append({"code": "SCOPE_FIXTURE_MISSING", "level": "WARN", "detail": scope_kind})
+        return findings
+    name = f"{scope_kind}.APPLY_FORMAT"
+    if not sec["outputCreated"]:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
+        return findings
+    if not sec["outputInSandbox"]:
+        findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
+    if sec["rejectedCount"]:
+        findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
+    if not sec["headerUnchanged"]:
+        findings.append({"code": "HEADER_XML_CHANGED", "level": "FAIL", "detail": name})
+    findings.extend(_check_required_keys(name, sec["verify7"], REQUIRED_V7, "V7_NOT_PASS"))
+    findings.extend(_check_required_keys(name, sec["readback"], REQUIRED_RB, "READBACK_NOT_PASS"))
+    if sec.get("shaPreserved") is False:
+        findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
+    if sec.get("mtimePreserved") is False:
+        findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+    return findings
+
+
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
         findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN", "detail": "no fixture"})
         return findings
     for scope_kind, sec in dyn["byScope"].items():
-        if not sec.get("ok"):
-            findings.append({
-                "code": "SCOPE_FIXTURE_MISSING",
-                "level": "WARN",
-                "detail": scope_kind,
-            })
-            continue
-        name = f"{scope_kind}.APPLY_FORMAT"
-        if not sec["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
-            continue
-        if not sec["outputInSandbox"]:
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
-        if sec["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
-        if not sec["headerUnchanged"]:
-            findings.append({"code": "HEADER_XML_CHANGED", "level": "FAIL", "detail": name})
-        for k in REQUIRED_V7:
-            if sec["verify7"].get(k) != "PASS":
-                findings.append({
-                    "code": "V7_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={sec['verify7'].get(k)}",
-                })
-        for k in REQUIRED_RB:
-            if sec["readback"].get(k) != "PASS":
-                findings.append({
-                    "code": "READBACK_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={sec['readback'].get(k)}",
-                })
-        if sec.get("shaPreserved") is False:
-            findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
-        if sec.get("mtimePreserved") is False:
-            findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
+        findings.extend(_check_dynamic_scope(scope_kind, sec))
     return findings
 
 
