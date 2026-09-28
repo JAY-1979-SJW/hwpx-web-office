@@ -31,7 +31,9 @@ def _page_numbering_expected_values(spec: dict[str, Any]) -> list[str]:
 class DocumentBuilder:
     """Small fluent API for assembling HWPX compose jobs."""
 
-    def __init__(self, template: str | Path | None = None, output: str | Path | None = None) -> None:
+    def __init__(
+        self, template: str | Path | None = None, output: str | Path | None = None
+    ) -> None:
         self._job: dict[str, Any] = {
             "validate": True,
         }
@@ -40,40 +42,46 @@ class DocumentBuilder:
         if output is not None:
             self.output(output)
 
-    def template(self, path: str | Path) -> "DocumentBuilder":
+    def template(self, path: str | Path) -> DocumentBuilder:
         self._job["template"] = str(path)
         return self
 
-    def output(self, path: str | Path) -> "DocumentBuilder":
+    def output(self, path: str | Path) -> DocumentBuilder:
         self._job["output"] = str(path)
         return self
 
-    def validate(self, enabled: bool = True) -> "DocumentBuilder":
+    def validate(self, enabled: bool = True) -> DocumentBuilder:
         self._job["validate"] = bool(enabled)
         return self
 
-    def mapping(self, values: dict[str, Any]) -> "DocumentBuilder":
-        self._job.setdefault("mapping", {}).update({str(key): str(value) for key, value in values.items()})
+    def mapping(self, values: dict[str, Any]) -> DocumentBuilder:
+        self._job.setdefault("mapping", {}).update({
+            str(key): str(value) for key, value in values.items()
+        })
         return self
 
-    def metadata(self, **values: Any) -> "DocumentBuilder":
+    def metadata(self, **values: Any) -> DocumentBuilder:
         metadata = self._job.setdefault("document_metadata", {})
         for key, value in values.items():
             if value is not None:
                 metadata[str(key)] = value
         return self
 
-    def package_manifest(self, enabled: bool = True) -> "DocumentBuilder":
+    def package_manifest(self, enabled: bool = True) -> DocumentBuilder:
         self._job["package_manifest"] = {"enabled": bool(enabled)}
         return self
 
-    def write_audit_log(self, path: str | Path | None = None, enabled: bool = True) -> "DocumentBuilder":
+    def write_audit_log(
+        self, path: str | Path | None = None, enabled: bool = True
+    ) -> DocumentBuilder:
         self._job["write_audit_log"] = {"enabled": bool(enabled)}
         if path is not None:
             self._job["write_audit_log"]["path"] = str(path)
         return self
 
-    def preview_text(self, enabled: bool = True, include_metadata: bool = True, max_chars: int = 4000) -> "DocumentBuilder":
+    def preview_text(
+        self, enabled: bool = True, include_metadata: bool = True, max_chars: int = 4000
+    ) -> DocumentBuilder:
         self._job["preview_text"] = {
             "enabled": bool(enabled),
             "include_metadata": bool(include_metadata),
@@ -81,18 +89,18 @@ class DocumentBuilder:
         }
         return self
 
-    def sections(self, count: int, clear_body: bool = True) -> "DocumentBuilder":
+    def sections(self, count: int, clear_body: bool = True) -> DocumentBuilder:
         self._job["sections"] = {
             "count": int(count),
             "clear_body": bool(clear_body),
         }
         return self
 
-    def expect(self, *values: Any) -> "DocumentBuilder":
+    def expect(self, *values: Any) -> DocumentBuilder:
         self._job.setdefault("expected_values", []).extend(str(value) for value in values)
         return self
 
-    def style_definitions(self, definitions: dict[str, Any]) -> "DocumentBuilder":
+    def style_definitions(self, definitions: dict[str, Any]) -> DocumentBuilder:
         current = self._job.setdefault("style_definitions", {})
         for group, values in definitions.items():
             if isinstance(values, dict):
@@ -101,49 +109,49 @@ class DocumentBuilder:
                 current[group] = values
         return self
 
-    def char_style(self, name: str, **style: Any) -> "DocumentBuilder":
+    def char_style(self, name: str, **style: Any) -> DocumentBuilder:
         self._job.setdefault("style_definitions", {}).setdefault("char_styles", {})[name] = style
         return self
 
-    def paragraph_style(self, name: str, **style: Any) -> "DocumentBuilder":
+    def paragraph_style(self, name: str, **style: Any) -> DocumentBuilder:
         self._job.setdefault("style_definitions", {}).setdefault("para_styles", {})[name] = style
         return self
 
-    def border_fill(self, name: str, **style: Any) -> "DocumentBuilder":
+    def border_fill(self, name: str, **style: Any) -> DocumentBuilder:
         self._job.setdefault("style_definitions", {}).setdefault("border_fills", {})[name] = style
         return self
 
-    def list_style(self, name: str, **style: Any) -> "DocumentBuilder":
+    def list_style(self, name: str, **style: Any) -> DocumentBuilder:
         self._job.setdefault("style_definitions", {}).setdefault("list_styles", {})[name] = style
         return self
 
-    def page_layout(self, **layout: Any) -> "DocumentBuilder":
+    def page_layout(self, **layout: Any) -> DocumentBuilder:
         self._job["page_layout"] = layout
         return self
 
-    def section_page_layout(self, section_index: int, **layout: Any) -> "DocumentBuilder":
+    def section_page_layout(self, section_index: int, **layout: Any) -> DocumentBuilder:
         spec = dict(layout)
         spec["section_index"] = int(section_index)
         self._job.setdefault("page_layouts", []).append(spec)
         return self
 
-    def page_numbering(self, **numbering: Any) -> "DocumentBuilder":
+    def page_numbering(self, **numbering: Any) -> DocumentBuilder:
         self._job["page_numbering"] = numbering
         return self
 
-    def section_page_numbering(self, section_index: int, **numbering: Any) -> "DocumentBuilder":
+    def section_page_numbering(self, section_index: int, **numbering: Any) -> DocumentBuilder:
         spec = dict(numbering)
         spec["section_index"] = int(section_index)
         self._job.setdefault("page_numberings", []).append(spec)
         self.expect(*_page_numbering_expected_values(spec))
         return self
 
-    def page_number_mode(self, mode: str) -> "DocumentBuilder":
+    def page_number_mode(self, mode: str) -> DocumentBuilder:
         numbering = self._job.setdefault("page_numbering", {})
         numbering["page_number_mode"] = str(mode)
         return self
 
-    def native_dynamic_page_numbers(self) -> "DocumentBuilder":
+    def native_dynamic_page_numbers(self) -> DocumentBuilder:
         return self.page_number_mode("NATIVE_DYNAMIC")
 
     def visible_footer(
@@ -152,7 +160,7 @@ class DocumentBuilder:
         align: str = "CENTER",
         section_index: int = 0,
         start_page: int | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         numbering = self._job.setdefault("page_numbering", {})
         numbering["visible_footer"] = True
         numbering["footer_text"] = str(text)
@@ -170,7 +178,7 @@ class DocumentBuilder:
         text: str = "Page {page}",
         align: str = "CENTER",
         start_page: int | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         spec: dict[str, Any] = {
             "section_index": int(section_index),
             "visible_footer": True,
@@ -189,7 +197,7 @@ class DocumentBuilder:
         align: str = "CENTER",
         section_index: int = 0,
         start_page: int | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         numbering = self._job.setdefault("page_numbering", {})
         numbering["visible_header"] = True
         numbering["header_text"] = str(text)
@@ -207,7 +215,7 @@ class DocumentBuilder:
         text: str,
         align: str = "CENTER",
         start_page: int | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         spec: dict[str, Any] = {
             "section_index": int(section_index),
             "visible_header": True,
@@ -220,7 +228,9 @@ class DocumentBuilder:
         self.expect(*_page_numbering_expected_values(spec))
         return self
 
-    def paragraph(self, text: str, style: dict[str, Any] | None = None, section_index: int = 0) -> "DocumentBuilder":
+    def paragraph(
+        self, text: str, style: dict[str, Any] | None = None, section_index: int = 0
+    ) -> DocumentBuilder:
         item: dict[str, Any] = {
             "text": str(text),
             "section_index": int(section_index),
@@ -236,7 +246,7 @@ class DocumentBuilder:
         rows: list[list[Any]],
         style: dict[str, Any] | None = None,
         section_index: int = 0,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         item: dict[str, Any] = {
             "rows": [[str(cell) for cell in row] for row in rows],
             "section_index": int(section_index),
@@ -247,7 +257,7 @@ class DocumentBuilder:
         self.expect(*(cell for row in item["rows"] for cell in row))
         return self
 
-    def table_operation(self, operation: dict[str, Any]) -> "DocumentBuilder":
+    def table_operation(self, operation: dict[str, Any]) -> DocumentBuilder:
         self._job.setdefault("table_operations", []).append(operation)
         return self
 
@@ -262,7 +272,7 @@ class DocumentBuilder:
         prefer_visible: bool = False,
         picture_index: int = 0,
         mode: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         image: dict[str, Any] = {
             "mode": normalize_image_mode(mode, prefer_visible=prefer_visible, chart=False),
             "path": str(path),
@@ -289,7 +299,7 @@ class DocumentBuilder:
         picture_index: int = 0,
         image_entry: str | None = None,
         manifest_id: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         return self.image_png(
             path,
             width=width,
@@ -308,7 +318,7 @@ class DocumentBuilder:
         section_index: int = 0,
         image_entry: str | None = None,
         manifest_id: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         return self.image_png(
             path,
             width=width,
@@ -331,7 +341,7 @@ class DocumentBuilder:
         prefer_visible: bool = False,
         picture_index: int = 0,
         mode: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         image: dict[str, Any] = {
             "mode": normalize_image_mode(mode, prefer_visible=prefer_visible, chart=True),
             "chart": chart,
@@ -352,7 +362,7 @@ class DocumentBuilder:
         self._job.setdefault("images", []).append(image)
         return self
 
-    def visible_chart_png(
+    def visible_chart_png(  # ruff: ignore[too-many-arguments] -- chart_png()와 파라미터를 그대로 거울처럼 맞춘 fluent builder, 외부 호출부 있어 변경 보류
         self,
         chart: dict[str, Any],
         width: int | None = None,
@@ -361,7 +371,7 @@ class DocumentBuilder:
         image_entry: str | None = None,
         chart_output: str | Path | None = None,
         manifest_id: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         return self.chart_png(
             chart,
             width=width,
@@ -373,7 +383,7 @@ class DocumentBuilder:
             picture_index=picture_index,
         )
 
-    def synthetic_chart_png(
+    def synthetic_chart_png(  # ruff: ignore[too-many-arguments] -- chart_png()와 파라미터를 그대로 거울처럼 맞춘 fluent builder, 외부 호출부 있어 변경 보류
         self,
         chart: dict[str, Any],
         width: int | None = None,
@@ -382,7 +392,7 @@ class DocumentBuilder:
         image_entry: str | None = None,
         chart_output: str | Path | None = None,
         manifest_id: str | None = None,
-    ) -> "DocumentBuilder":
+    ) -> DocumentBuilder:
         return self.chart_png(
             chart,
             width=width,
@@ -402,14 +412,18 @@ class DocumentBuilder:
         write_json(Path(path), job)
         return job
 
-    def compose(self, output: str | Path | None = None, report_json: str | Path | None = None) -> dict[str, Any]:
+    def compose(
+        self, output: str | Path | None = None, report_json: str | Path | None = None
+    ) -> dict[str, Any]:
         result = compose_hwpx(self.to_job(), Path(output) if output else None)
         if report_json:
             write_json(Path(report_json), result)
         return result
 
 
-def document(template: str | Path | None = None, output: str | Path | None = None) -> DocumentBuilder:
+def document(
+    template: str | Path | None = None, output: str | Path | None = None
+) -> DocumentBuilder:
     """Return a new HWPX document builder."""
     return DocumentBuilder(template, output)
 

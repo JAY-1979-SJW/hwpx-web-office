@@ -244,7 +244,7 @@ def validate_response(resp: dict) -> dict:
 # ── client-side builder ────────────────────────────────────────────────────
 
 
-def build_command(
+def build_command(  # ruff: ignore[too-many-arguments] -- API contract 빌더, 시그니처가 공개 계약이라 변경 보류
     *,
     command_type: str,
     artifact_id: str,

@@ -545,6 +545,23 @@ def set_table_visual_cell_text(
     }
 
 
+def _build_cell_font_info(
+    package: HwpxPackage, cell: ET.Element, source_char_pr_id: str
+) -> dict[str, Any]:
+    cell_info: dict[str, Any] = {
+        "cell_width": _int_attr(_first_direct_child(cell, "cellSz"), "width", 0),
+        "cell_margin": _direct_child_attrs(cell, "cellMargin"),
+        "sublist": _first_descendant_attrs(cell, "subList"),
+        "font_height": 1000,
+    }
+    header = _header_root(package)
+    if header is not None:
+        source_char = _find_char_pr(header[1], str(source_char_pr_id))
+        if source_char is not None:
+            cell_info["font_height"] = int(source_char.attrib.get("height", "1000") or 1000)
+    return cell_info
+
+
 def shrink_table_visual_cell_text_to_fit(
     package: HwpxPackage,
     table_index: int,
@@ -577,17 +594,7 @@ def shrink_table_visual_cell_text_to_fit(
             "visual_col": visual_col,
         }
 
-    cell_info = {
-        "cell_width": _int_attr(_first_direct_child(cell, "cellSz"), "width", 0),
-        "cell_margin": _direct_child_attrs(cell, "cellMargin"),
-        "sublist": _first_descendant_attrs(cell, "subList"),
-        "font_height": 1000,
-    }
-    header = _header_root(package)
-    if header is not None:
-        source_char = _find_char_pr(header[1], str(source_char_pr_id))
-        if source_char is not None:
-            cell_info["font_height"] = int(source_char.attrib.get("height", "1000") or 1000)
+    cell_info = _build_cell_font_info(package, cell, source_char_pr_id)
     before_fit = estimate_text_fit(value, cell_info)
     if before_fit.get("status") == "PASS":
         return {"status": "FONT_SHRINK_NOT_NEEDED", "fit_check": before_fit}

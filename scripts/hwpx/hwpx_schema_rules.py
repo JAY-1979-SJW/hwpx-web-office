@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 VISIBLE_IMAGE_MODES = {"visible_png_insert", "visible_chart_png"}
 SYNTHETIC_IMAGE_MODES = {"png_insert", "chart_png"}
 SUPPORTED_IMAGE_MODES = SYNTHETIC_IMAGE_MODES | VISIBLE_IMAGE_MODES
@@ -46,19 +45,28 @@ TABLE_REF_KEYS = {
 }
 
 
-def _positive_int(value: Any, field: str, warnings: list[dict[str, Any]], min_value: int = 1) -> str | None:
+def _positive_int(
+    value: Any, field: str, warnings: list[dict[str, Any]], min_value: int = 1
+) -> str | None:
     try:
         number = int(value)
     except (TypeError, ValueError):
         warnings.append({"type": "STYLE_VALUE_IGNORED", "field": field, "value": value})
         return None
     if number < min_value:
-        warnings.append({"type": "STYLE_VALUE_IGNORED", "field": field, "value": value, "min": min_value})
+        warnings.append({
+            "type": "STYLE_VALUE_IGNORED",
+            "field": field,
+            "value": value,
+            "min": min_value,
+        })
         return None
     return str(number)
 
 
-def normalize_paragraph_style(style: dict[str, Any] | None) -> tuple[dict[str, str], list[dict[str, Any]]]:
+def normalize_paragraph_style(
+    style: dict[str, Any] | None,
+) -> tuple[dict[str, str], list[dict[str, Any]]]:
     if not style:
         return {}, []
     result: dict[str, str] = {}
@@ -71,26 +79,17 @@ def normalize_paragraph_style(style: dict[str, Any] | None) -> tuple[dict[str, s
     supported_names = {"char_style", "para_style", "list_style", "list_level", "level"}
     unsupported = sorted(set(style) - set(PARAGRAPH_REF_KEYS) - supported_names)
     for key in unsupported:
-        warnings.append(
-            {
-                "type": "STYLE_ATTRIBUTE_REQUIRES_HEADER_DEFINITION",
-                "field": key,
-                "message": "Direct writer currently applies existing style references only.",
-            }
-        )
+        warnings.append({
+            "type": "STYLE_ATTRIBUTE_REQUIRES_HEADER_DEFINITION",
+            "field": key,
+            "message": "Direct writer currently applies existing style references only.",
+        })
     return result, warnings
 
 
-def normalize_table_style(style: dict[str, Any] | None) -> tuple[dict[str, str], list[dict[str, Any]]]:
-    if not style:
-        return {}, []
-    result: dict[str, str] = {}
-    warnings: list[dict[str, Any]] = []
-    for key, target in TABLE_REF_KEYS.items():
-        if key in style:
-            normalized = _positive_int(style[key], key, warnings, 0)
-            if normalized is not None:
-                result[target] = normalized
+def _apply_simple_table_style_fields(
+    style: dict[str, Any], result: dict[str, str], warnings: list[dict[str, Any]]
+) -> None:
     if "width" in style:
         normalized = _positive_int(style["width"], "width", warnings, 1000)
         if normalized is not None:
@@ -101,6 +100,21 @@ def normalize_table_style(style: dict[str, Any] | None) -> tuple[dict[str, str],
             result["rowHeight"] = normalized
     if "repeat_header" in style:
         result["repeatHeader"] = "1" if bool(style["repeat_header"]) else "0"
+
+
+def normalize_table_style(
+    style: dict[str, Any] | None,
+) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    if not style:
+        return {}, []
+    result: dict[str, str] = {}
+    warnings: list[dict[str, Any]] = []
+    for key, target in TABLE_REF_KEYS.items():
+        if key in style:
+            normalized = _positive_int(style[key], key, warnings, 0)
+            if normalized is not None:
+                result[target] = normalized
+    _apply_simple_table_style_fields(style, result, warnings)
     supported_names = {
         "width",
         "row_height",
@@ -128,13 +142,11 @@ def normalize_table_style(style: dict[str, Any] | None) -> tuple[dict[str, str],
     }
     unsupported = sorted(set(style) - set(TABLE_REF_KEYS) - supported_names)
     for key in unsupported:
-        warnings.append(
-            {
-                "type": "TABLE_STYLE_ATTRIBUTE_PENDING",
-                "field": key,
-                "message": "Complex table styling requires header/style definition support.",
-            }
-        )
+        warnings.append({
+            "type": "TABLE_STYLE_ATTRIBUTE_PENDING",
+            "field": key,
+            "message": "Complex table styling requires header/style definition support.",
+        })
     return result, warnings
 
 

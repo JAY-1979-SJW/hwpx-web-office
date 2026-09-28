@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from typing import Any
 
 from hwpx_package import HwpxPackage, local_name, text_nodes
 
@@ -14,7 +15,7 @@ def _table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Elem
     for entry in package.section_entries():
         try:
             root = package.read_xml(entry)
-        except Exception:
+        except Exception:  # ruff: ignore[blind-except] -- 이 section만 건너뛰고 계속
             continue
         for elem in root.iter():
             name = local_name(elem.tag).lower()
@@ -23,7 +24,9 @@ def _table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Elem
     return tables
 
 
-def _find_table(package: HwpxPackage, table_index: int) -> tuple[str, ET.Element, ET.Element] | None:
+def _find_table(
+    package: HwpxPackage, table_index: int
+) -> tuple[str, ET.Element, ET.Element] | None:
     tables = _table_elements(package)
     if table_index < 0 or table_index >= len(tables):
         return None
@@ -31,11 +34,21 @@ def _find_table(package: HwpxPackage, table_index: int) -> tuple[str, ET.Element
 
 
 def _row_elements(table: ET.Element) -> list[ET.Element]:
-    return [elem for elem in table.iter() if local_name(elem.tag).lower() in {"tr", "row"} or local_name(elem.tag).lower().endswith("tr")]
+    return [
+        elem
+        for elem in table.iter()
+        if local_name(elem.tag).lower() in {"tr", "row"}
+        or local_name(elem.tag).lower().endswith("tr")
+    ]
 
 
 def _cell_elements(row: ET.Element) -> list[ET.Element]:
-    return [elem for elem in list(row) if local_name(elem.tag).lower() in {"tc", "cell"} or local_name(elem.tag).lower().endswith("tc")]
+    return [
+        elem
+        for elem in list(row)
+        if local_name(elem.tag).lower() in {"tc", "cell"}
+        or local_name(elem.tag).lower().endswith("tc")
+    ]
 
 
 def _child_by_name(elem: ET.Element, name: str) -> ET.Element | None:
@@ -54,7 +67,9 @@ def _cell_by_addr(rows: list[ET.Element], row_index: int, col_index: int) -> ET.
         if addr is None:
             continue
         saw_addr = True
-        if addr.attrib.get("rowAddr") == str(row_index) and addr.attrib.get("colAddr") == str(col_index):
+        if addr.attrib.get("rowAddr") == str(row_index) and addr.attrib.get("colAddr") == str(
+            col_index
+        ):
             return cell
     if saw_addr:
         return None
@@ -119,7 +134,9 @@ def _cell_col_index(cell: ET.Element) -> int:
 def _insert_cell_sorted(row: ET.Element, cell: ET.Element) -> None:
     target_col = _cell_col_index(cell)
     for index, existing in enumerate(list(row)):
-        if local_name(existing.tag).lower() not in {"tc", "cell"} and not local_name(existing.tag).lower().endswith("tc"):
+        if local_name(existing.tag).lower() not in {"tc", "cell"} and not local_name(
+            existing.tag
+        ).lower().endswith("tc"):
             continue
         if _cell_col_index(existing) > target_col:
             row.insert(index, cell)
@@ -138,18 +155,33 @@ def merge_table_cells(
     if row_span < 1 or col_span < 1:
         return {"status": "MERGE_SPAN_INVALID", "row_span": row_span, "col_span": col_span}
     if row_span == 1 and col_span == 1:
-        return {"status": "MERGE_SPAN_NOOP", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "MERGE_SPAN_NOOP",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     found = _find_table(package, table_index)
     if not found:
         return {"status": "TABLE_NOT_FOUND", "table_index": table_index}
     entry, root, table = found
     rows = _row_elements(table)
     if row_index < 0 or row_index + row_span > len(rows):
-        return {"status": "ROW_NOT_FOUND", "table_index": table_index, "row_index": row_index, "row_count": len(rows)}
+        return {
+            "status": "ROW_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "row_count": len(rows),
+        }
 
     anchor = _cell_by_addr(rows, row_index, col_index)
     if anchor is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     covered: list[dict[str, int]] = []
     total_width = 0
     total_height = 0
@@ -160,7 +192,12 @@ def merge_table_cells(
         for c in range(col_index, col_index + col_span):
             cell = _cell_by_addr(rows, r, c)
             if cell is None:
-                return {"status": "CELL_NOT_FOUND", "table_index": table_index, "row_index": r, "col_index": c}
+                return {
+                    "status": "CELL_NOT_FOUND",
+                    "table_index": table_index,
+                    "row_index": r,
+                    "col_index": c,
+                }
             width, height = _cell_size(cell)
             row_width += width
             row_height = max(row_height, height)
@@ -190,6 +227,44 @@ def merge_table_cells(
     }
 
 
+@dataclass
+class _UnmergeGeometry:
+    row_index: int
+    col_index: int
+    row_span: int
+    col_span: int
+    unit_width: int
+    unit_height: int
+
+
+def _create_unmerged_covered_cells(
+    rows: list[ET.Element],
+    anchor: ET.Element,
+    geom: _UnmergeGeometry,
+    clear_generated_cells: bool,
+) -> list[dict[str, int]]:
+    created = []
+    for r in range(geom.row_index, geom.row_index + geom.row_span):
+        if r < 0 or r >= len(rows):
+            continue
+        row = rows[r]
+        for c in range(geom.col_index, geom.col_index + geom.col_span):
+            if r == geom.row_index and c == geom.col_index:
+                continue
+            existing = _cell_by_addr(rows, r, c)
+            if existing is not None:
+                continue
+            clone = copy.deepcopy(anchor)
+            _set_cell_addr(clone, r, c)
+            _set_cell_span(clone, 1, 1)
+            _set_cell_size(clone, geom.unit_width, geom.unit_height)
+            if clear_generated_cells:
+                _clear_cell_text(clone)
+            _insert_cell_sorted(row, clone)
+            created.append({"row": r, "col": c})
+    return created
+
+
 def unmerge_table_cell(
     package: HwpxPackage,
     table_index: int,
@@ -204,39 +279,44 @@ def unmerge_table_cell(
     rows = _row_elements(table)
     anchor = _cell_by_addr(rows, row_index, col_index)
     if anchor is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     span = _child_by_name(anchor, "cellSpan")
     if span is None:
-        return {"status": "CELL_SPAN_NOT_FOUND", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "CELL_SPAN_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     row_span = int(span.attrib.get("rowSpan", "1"))
     col_span = int(span.attrib.get("colSpan", "1"))
     if row_span == 1 and col_span == 1:
-        return {"status": "UNMERGE_NOOP", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "UNMERGE_NOOP",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     width, height = _cell_size(anchor)
     unit_width = width // col_span if col_span else width
     unit_height = height // row_span if row_span else height
     _set_cell_span(anchor, 1, 1)
     _set_cell_size(anchor, unit_width, unit_height)
 
-    created = []
-    for r in range(row_index, row_index + row_span):
-        if r < 0 or r >= len(rows):
-            continue
-        row = rows[r]
-        for c in range(col_index, col_index + col_span):
-            if r == row_index and c == col_index:
-                continue
-            existing = _cell_by_addr(rows, r, c)
-            if existing is not None:
-                continue
-            clone = copy.deepcopy(anchor)
-            _set_cell_addr(clone, r, c)
-            _set_cell_span(clone, 1, 1)
-            _set_cell_size(clone, unit_width, unit_height)
-            if clear_generated_cells:
-                _clear_cell_text(clone)
-            _insert_cell_sorted(row, clone)
-            created.append({"row": r, "col": c})
+    geom = _UnmergeGeometry(
+        row_index=row_index,
+        col_index=col_index,
+        row_span=row_span,
+        col_span=col_span,
+        unit_width=unit_width,
+        unit_height=unit_height,
+    )
+    created = _create_unmerged_covered_cells(rows, anchor, geom, clear_generated_cells)
     package.write_xml(entry, root)
     return {
         "status": "UNMERGE_CELL_PASS",

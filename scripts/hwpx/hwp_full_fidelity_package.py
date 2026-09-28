@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
 import olefile
 
@@ -25,7 +25,6 @@ from hwp_full_fidelity_section_updates import (
     build_table_layout_section_updates,
 )
 from hwpx_element_factory import create_picture_paragraph
-
 
 OPF_NS = "http://www.idpf.org/2007/opf/"
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -52,7 +51,9 @@ def _opf(tag: str) -> str:
 
 
 def _xml_string(root: ET.Element) -> str:
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="unicode", short_empty_elements=True)
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
+        root, encoding="unicode", short_empty_elements=True
+    )
 
 
 def _xml_local_name(tag: str) -> str:
@@ -99,7 +100,11 @@ def _ensure_manifest_item(manifest: ET.Element, entry: str) -> dict[str, Any]:
         if child.tag.endswith("}item") or child.tag == "item":
             if child.attrib.get("href") == href or child.attrib.get("id") == item_id:
                 child.attrib.setdefault("media-type", _manifest_media_type(entry))
-                return {"status": "EXISTS", "id": child.attrib.get("id"), "href": child.attrib.get("href")}
+                return {
+                    "status": "EXISTS",
+                    "id": child.attrib.get("id"),
+                    "href": child.attrib.get("href"),
+                }
     existing_ids = {
         child.attrib.get("id", "")
         for child in list(manifest)
@@ -110,15 +115,20 @@ def _ensure_manifest_item(manifest: ET.Element, entry: str) -> dict[str, Any]:
     while item_id in existing_ids:
         index += 1
         item_id = f"{base_id}_{index}"
-    ET.SubElement(manifest, _opf("item"), {"id": item_id, "href": href, "media-type": _manifest_media_type(entry)})
-    return {"status": "ADDED", "id": item_id, "href": href, "media_type": _manifest_media_type(entry)}
+    ET.SubElement(
+        manifest,
+        _opf("item"),
+        {"id": item_id, "href": href, "media-type": _manifest_media_type(entry)},
+    )
+    return {
+        "status": "ADDED",
+        "id": item_id,
+        "href": href,
+        "media_type": _manifest_media_type(entry),
+    }
 
 
-def _content_hpf_with_entries(xml_text: str, entries: list[str]) -> str:
-    try:
-        root = ET.fromstring(xml_text.encode("utf-8"))
-    except ET.ParseError:
-        return xml_text
+def _find_manifest_and_spine(root: ET.Element) -> tuple[ET.Element | None, ET.Element | None]:
     manifest = None
     spine = None
     for elem in root.iter():
@@ -126,27 +136,12 @@ def _content_hpf_with_entries(xml_text: str, entries: list[str]) -> str:
             manifest = elem
         elif elem.tag == _opf("spine") or elem.tag.endswith("}spine") or elem.tag == "spine":
             spine = elem
-    if manifest is None:
-        manifest = ET.SubElement(root, _opf("manifest"))
-    normalized_entries = [entry.replace("\\", "/") for entry in entries]
-    section_entries = sorted(
-        {
-            entry
-            for entry in normalized_entries
-            if entry.lower().startswith("contents/section") and entry.lower().endswith(".xml")
-        }
-    )
-    required_entries = ["Contents/header.xml"] + section_entries + [
-        "settings.xml",
-        "Preview/PrvText.txt",
-    ] + [
-        entry
-        for entry in normalized_entries
-        if entry.startswith("BinData/")
-    ]
-    manifest_results = [_ensure_manifest_item(manifest, entry) for entry in sorted(set(required_entries))]
-    if spine is None:
-        spine = ET.SubElement(root, _opf("spine"))
+    return manifest, spine
+
+
+def _rebuild_spine_itemrefs(
+    spine: ET.Element, required_entries: list[str], section_entries: list[str]
+) -> None:
     for child in list(spine):
         if child.tag.endswith("}itemref") or child.tag == "itemref":
             spine.remove(child)
@@ -155,7 +150,40 @@ def _content_hpf_with_entries(xml_text: str, entries: list[str]) -> str:
     for entry in section_entries:
         section_id = _manifest_id(entry)
         ET.SubElement(spine, _opf("itemref"), {"idref": section_id})
-    root.attrib["_manifest_update_count"] = str(sum(1 for row in manifest_results if row.get("status") == "ADDED"))
+
+
+def _content_hpf_with_entries(xml_text: str, entries: list[str]) -> str:
+    try:
+        root = ET.fromstring(xml_text.encode("utf-8"))
+    except ET.ParseError:
+        return xml_text
+    manifest, spine = _find_manifest_and_spine(root)
+    if manifest is None:
+        manifest = ET.SubElement(root, _opf("manifest"))
+    normalized_entries = [entry.replace("\\", "/") for entry in entries]
+    section_entries = sorted({
+        entry
+        for entry in normalized_entries
+        if entry.lower().startswith("contents/section") and entry.lower().endswith(".xml")
+    })
+    required_entries = (
+        ["Contents/header.xml"]
+        + section_entries
+        + [
+            "settings.xml",
+            "Preview/PrvText.txt",
+        ]
+        + [entry for entry in normalized_entries if entry.startswith("BinData/")]
+    )
+    manifest_results = [
+        _ensure_manifest_item(manifest, entry) for entry in sorted(set(required_entries))
+    ]
+    if spine is None:
+        spine = ET.SubElement(root, _opf("spine"))
+    _rebuild_spine_itemrefs(spine, required_entries, section_entries)
+    root.attrib["_manifest_update_count"] = str(
+        sum(1 for row in manifest_results if row.get("status") == "ADDED")
+    )
     root.attrib.pop("_manifest_update_count", None)
     return _xml_string(root)
 
@@ -164,7 +192,9 @@ def _content_hpf_with_header(xml_text: str) -> str:
     return _content_hpf_with_entries(xml_text, ["Contents/header.xml"])
 
 
-def _copy_bindata_from_source(input_path: Path | None, decoded_docinfo: dict[str, Any] | None = None) -> tuple[dict[str, bytes], dict[str, Any]]:
+def _copy_bindata_from_source(
+    input_path: Path | None, decoded_docinfo: dict[str, Any] | None = None
+) -> tuple[dict[str, bytes], dict[str, Any]]:
     if not input_path:
         return {}, {"status": "SKIPPED", "reason": "INPUT_NOT_AVAILABLE"}
     source = Path(input_path).expanduser().resolve()
@@ -172,8 +202,13 @@ def _copy_bindata_from_source(input_path: Path | None, decoded_docinfo: dict[str
         return {}, {"status": "FAIL", "reason": "INPUT_NOT_FOUND", "input": str(source)}
     try:
         ole = olefile.OleFileIO(str(source))
-    except Exception as exc:  # noqa: BLE001
-        return {}, {"status": "FAIL", "reason": "OLE_OPEN_FAILED", "input": str(source), "error": str(exc)}
+    except Exception as exc:  # ruff: ignore[blind-except]
+        return {}, {
+            "status": "FAIL",
+            "reason": "OLE_OPEN_FAILED",
+            "input": str(source),
+            "error": str(exc),
+        }
     updates: dict[str, bytes] = {}
     items: list[dict[str, Any]] = []
     records = _bindata_records(decoded_docinfo)
@@ -212,17 +247,17 @@ def _copy_bindata_from_source(input_path: Path | None, decoded_docinfo: dict[str
     for record in records:
         stream_name = str(record.get("stream_name") or "").replace("\\", "/")
         if stream_name and stream_name.lower() not in copied_names:
-            missing_records.append(
-                {
-                    "index": record.get("index"),
-                    "data_type": record.get("data_type"),
-                    "storage_id": record.get("storage_id"),
-                    "extension": record.get("extension"),
-                    "stream_name": stream_name,
-                }
-            )
+            missing_records.append({
+                "index": record.get("index"),
+                "data_type": record.get("data_type"),
+                "storage_id": record.get("storage_id"),
+                "extension": record.get("extension"),
+                "stream_name": stream_name,
+            })
     return updates, {
-        "status": "PASS" if items and not missing_records else ("NO_BINDATA_STREAMS" if not items else "PARTIAL_RECORD_STREAM_MISMATCH"),
+        "status": "PASS"
+        if items and not missing_records
+        else ("NO_BINDATA_STREAMS" if not items else "PARTIAL_RECORD_STREAM_MISMATCH"),
         "input": str(source),
         "bindata_count": len(items),
         "docinfo_binary_data_count": len(records),
@@ -268,7 +303,9 @@ def _image_bindata_items(bindata_report: dict[str, Any]) -> list[dict[str, Any]]
 
 
 def _body_record_tag_count(analysis: dict[str, Any], tag_ids: set[int]) -> int:
-    record_counts = analysis.get("record_counts") if isinstance(analysis.get("record_counts"), dict) else {}
+    record_counts = (
+        analysis.get("record_counts") if isinstance(analysis.get("record_counts"), dict) else {}
+    )
     total = 0
     for tag_id in tag_ids:
         total += int(record_counts.get(str(tag_id)) or record_counts.get(tag_id) or 0)
@@ -288,11 +325,17 @@ def _safe_positive_int(value: Any, default: int, *, maximum: int = 200000) -> in
 
 
 def _shape_layout_rectangles(analysis: dict[str, Any]) -> list[dict[str, Any]]:
-    shape_layout = analysis.get("shape_layout") if isinstance(analysis.get("shape_layout"), dict) else {}
-    sections = shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    shape_layout = (
+        analysis.get("shape_layout") if isinstance(analysis.get("shape_layout"), dict) else {}
+    )
+    sections = (
+        shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    )
     rectangles = []
     for section in sections:
-        section_rectangles = section.get("rectangles") if isinstance(section.get("rectangles"), list) else []
+        section_rectangles = (
+            section.get("rectangles") if isinstance(section.get("rectangles"), list) else []
+        )
         for row in section_rectangles:
             if isinstance(row, dict):
                 rectangles.append(row)
@@ -300,11 +343,17 @@ def _shape_layout_rectangles(analysis: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _shape_layout_pictures(analysis: dict[str, Any]) -> list[dict[str, Any]]:
-    shape_layout = analysis.get("shape_layout") if isinstance(analysis.get("shape_layout"), dict) else {}
-    sections = shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    shape_layout = (
+        analysis.get("shape_layout") if isinstance(analysis.get("shape_layout"), dict) else {}
+    )
+    sections = (
+        shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    )
     pictures = []
     for section in sections:
-        section_pictures = section.get("pictures") if isinstance(section.get("pictures"), list) else []
+        section_pictures = (
+            section.get("pictures") if isinstance(section.get("pictures"), list) else []
+        )
         for row in section_pictures:
             if isinstance(row, dict):
                 pictures.append(row)
@@ -312,10 +361,24 @@ def _shape_layout_pictures(analysis: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _rectangle_geometry(rectangle_row: dict[str, Any] | None) -> dict[str, Any]:
-    rectangle = rectangle_row.get("rectangle") if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("rectangle"), dict) else {}
-    component = rectangle_row.get("component") if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("component"), dict) else {}
-    control = rectangle_row.get("control") if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("control"), dict) else {}
-    control_mapped = isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("control"), dict)
+    rectangle = (
+        rectangle_row.get("rectangle")
+        if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("rectangle"), dict)
+        else {}
+    )
+    component = (
+        rectangle_row.get("component")
+        if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("component"), dict)
+        else {}
+    )
+    control = (
+        rectangle_row.get("control")
+        if isinstance(rectangle_row, dict) and isinstance(rectangle_row.get("control"), dict)
+        else {}
+    )
+    control_mapped = isinstance(rectangle_row, dict) and isinstance(
+        rectangle_row.get("control"), dict
+    )
     bbox = rectangle.get("bbox") if isinstance(rectangle.get("bbox"), dict) else {}
     width = _safe_positive_int(bbox.get("width"), 12000)
     height = _safe_positive_int(bbox.get("height"), 5000)
@@ -326,17 +389,19 @@ def _rectangle_geometry(rectangle_row: dict[str, Any] | None) -> dict[str, Any]:
     for point in raw_points[:4]:
         if not isinstance(point, dict):
             continue
-        points.append(
-            {
-                "x": max(0, int(point.get("x") or 0) - left),
-                "y": max(0, int(point.get("y") or 0) - top),
-            }
-        )
+        points.append({
+            "x": max(0, int(point.get("x") or 0) - left),
+            "y": max(0, int(point.get("y") or 0) - top),
+        })
     while len(points) < 4:
         fallback = [(0, 0), (width, 0), (width, height), (0, height)][len(points)]
         points.append({"x": fallback[0], "y": fallback[1]})
     offset = component.get("offset") if isinstance(component.get("offset"), dict) else {}
-    rotation_center = component.get("rotation_center") if isinstance(component.get("rotation_center"), dict) else {}
+    rotation_center = (
+        component.get("rotation_center")
+        if isinstance(component.get("rotation_center"), dict)
+        else {}
+    )
     return {
         "width": width,
         "height": height,
@@ -351,9 +416,15 @@ def _rectangle_geometry(rectangle_row: dict[str, Any] | None) -> dict[str, Any]:
             "x": int(rotation_center.get("x") or width // 2),
             "y": int(rotation_center.get("y") or height // 2),
         },
-        "source_record_index": rectangle_row.get("record_index") if isinstance(rectangle_row, dict) else None,
-        "component_record_index": rectangle_row.get("component_record_index") if isinstance(rectangle_row, dict) else None,
-        "control_record_index": rectangle_row.get("control_record_index") if isinstance(rectangle_row, dict) else None,
+        "source_record_index": rectangle_row.get("record_index")
+        if isinstance(rectangle_row, dict)
+        else None,
+        "component_record_index": rectangle_row.get("component_record_index")
+        if isinstance(rectangle_row, dict)
+        else None,
+        "control_record_index": rectangle_row.get("control_record_index")
+        if isinstance(rectangle_row, dict)
+        else None,
     }
 
 
@@ -430,24 +501,51 @@ def _shape_margin_attrs(position: dict[str, Any]) -> dict[str, str]:
 
 
 def _picture_geometry(picture_row: dict[str, Any] | None) -> dict[str, Any]:
-    picture = picture_row.get("picture") if isinstance(picture_row, dict) and isinstance(picture_row.get("picture"), dict) else {}
-    component = picture_row.get("component") if isinstance(picture_row, dict) and isinstance(picture_row.get("component"), dict) else {}
-    control = picture_row.get("control") if isinstance(picture_row, dict) and isinstance(picture_row.get("control"), dict) else {}
+    picture = (
+        picture_row.get("picture")
+        if isinstance(picture_row, dict) and isinstance(picture_row.get("picture"), dict)
+        else {}
+    )
+    component = (
+        picture_row.get("component")
+        if isinstance(picture_row, dict) and isinstance(picture_row.get("component"), dict)
+        else {}
+    )
+    control = (
+        picture_row.get("control")
+        if isinstance(picture_row, dict) and isinstance(picture_row.get("control"), dict)
+        else {}
+    )
     bbox = picture.get("bbox") if isinstance(picture.get("bbox"), dict) else {}
-    component_size = component.get("current_size_normalized") if isinstance(component.get("current_size_normalized"), dict) else {}
+    component_size = (
+        component.get("current_size_normalized")
+        if isinstance(component.get("current_size_normalized"), dict)
+        else {}
+    )
     control_position = _control_position(control)
-    width = _safe_positive_int(bbox.get("width"), _safe_positive_int(component_size.get("width"), 12000))
-    height = _safe_positive_int(bbox.get("height"), _safe_positive_int(component_size.get("height"), 9000))
+    width = _safe_positive_int(
+        bbox.get("width"), _safe_positive_int(component_size.get("width"), 12000)
+    )
+    height = _safe_positive_int(
+        bbox.get("height"), _safe_positive_int(component_size.get("height"), 9000)
+    )
     return {
         "width": width,
         "height": height,
         "position": control_position,
         "binary_data_id": picture.get("binary_data_id"),
-        "source_record_index": picture_row.get("record_index") if isinstance(picture_row, dict) else None,
-        "component_record_index": picture_row.get("component_record_index") if isinstance(picture_row, dict) else None,
-        "control_record_index": picture_row.get("control_record_index") if isinstance(picture_row, dict) else None,
+        "source_record_index": picture_row.get("record_index")
+        if isinstance(picture_row, dict)
+        else None,
+        "component_record_index": picture_row.get("component_record_index")
+        if isinstance(picture_row, dict)
+        else None,
+        "control_record_index": picture_row.get("control_record_index")
+        if isinstance(picture_row, dict)
+        else None,
         "geometry_mapped": isinstance(picture_row, dict) and bool(width and height),
-        "position_mapped": isinstance(picture_row, dict) and isinstance(picture_row.get("control"), dict),
+        "position_mapped": isinstance(picture_row, dict)
+        and isinstance(picture_row.get("control"), dict),
         "layout_policy_mapped": isinstance(control.get("layout"), dict),
     }
 
@@ -467,7 +565,11 @@ def _bindata_numeric_id(entry: str) -> int | None:
 def _bindata_records(decoded_docinfo: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(decoded_docinfo, dict):
         return []
-    rows = decoded_docinfo.get("binary_data") if isinstance(decoded_docinfo.get("binary_data"), list) else []
+    rows = (
+        decoded_docinfo.get("binary_data")
+        if isinstance(decoded_docinfo.get("binary_data"), list)
+        else []
+    )
     return [row for row in rows if isinstance(row, dict)]
 
 
@@ -494,7 +596,9 @@ def _record_for_bindata_entry(entry: str, records: list[dict[str, Any]]) -> dict
     return None
 
 
-def _image_item_for_picture(image_items: list[dict[str, Any]], picture_geometry: dict[str, Any], fallback_index: int) -> tuple[dict[str, Any], bool]:
+def _image_item_for_picture(
+    image_items: list[dict[str, Any]], picture_geometry: dict[str, Any], fallback_index: int
+) -> tuple[dict[str, Any], bool]:
     binary_data_id = picture_geometry.get("binary_data_id")
     try:
         wanted = int(binary_data_id)
@@ -513,22 +617,26 @@ def _create_rectangle_shape(shape_id: int, geometry: dict[str, Any] | None = Non
     height = _safe_positive_int(geometry.get("height"), 5000)
     offset = geometry.get("offset") if isinstance(geometry.get("offset"), dict) else {}
     position = geometry.get("position") if isinstance(geometry.get("position"), dict) else {}
-    rotation_center = geometry.get("rotation_center") if isinstance(geometry.get("rotation_center"), dict) else {}
+    rotation_center = (
+        geometry.get("rotation_center") if isinstance(geometry.get("rotation_center"), dict) else {}
+    )
     points = geometry.get("points") if isinstance(geometry.get("points"), list) else []
     rect = ET.Element(
         _hp("rect"),
         _shape_object_attrs(
             shape_id,
             position,
-            **{
-                "href": "",
-                "groupLevel": "0",
-                "instid": str(shape_id),
-                "ratio": str(int(geometry.get("round_ratio") or 0)),
-            },
+            href="",
+            groupLevel="0",
+            instid=str(shape_id),
+            ratio=str(int(geometry.get("round_ratio") or 0)),
         ),
     )
-    ET.SubElement(rect, _hp("offset"), {"x": str(int(offset.get("x") or 0)), "y": str(int(offset.get("y") or 0))})
+    ET.SubElement(
+        rect,
+        _hp("offset"),
+        {"x": str(int(offset.get("x") or 0)), "y": str(int(offset.get("y") or 0))},
+    )
     ET.SubElement(rect, _hp("orgSz"), {"width": str(width), "height": str(height)})
     ET.SubElement(rect, _hp("curSz"), {"width": str(width), "height": str(height)})
     ET.SubElement(rect, _hp("flip"), {"horizontal": "0", "vertical": "0"})
@@ -544,7 +652,9 @@ def _create_rectangle_shape(shape_id: int, geometry: dict[str, Any] | None = Non
     )
     rendering = ET.SubElement(rect, _hp("renderingInfo"))
     for name in ("transMatrix", "scaMatrix", "rotMatrix"):
-        ET.SubElement(rendering, _hc(name), {"e1": "1", "e2": "0", "e3": "0", "e4": "0", "e5": "1", "e6": "0"})
+        ET.SubElement(
+            rendering, _hc(name), {"e1": "1", "e2": "0", "e3": "0", "e4": "0", "e5": "1", "e6": "0"}
+        )
     ET.SubElement(
         rect,
         _hp("lineShape"),
@@ -564,10 +674,34 @@ def _create_rectangle_shape(shape_id: int, geometry: dict[str, Any] | None = Non
         },
     )
     brush = ET.SubElement(rect, _hc("fillBrush"))
-    ET.SubElement(brush, _hc("winBrush"), {"faceColor": "#FFFFFF", "hatchColor": "#000000", "alpha": "0"})
-    for index, point in enumerate(points[:4] or [{"x": 0, "y": 0}, {"x": width, "y": 0}, {"x": width, "y": height}, {"x": 0, "y": height}]):
-        ET.SubElement(rect, _hc(f"pt{index}"), {"x": str(int(point.get("x") or 0)), "y": str(int(point.get("y") or 0))})
-    ET.SubElement(rect, _hp("sz"), {"width": str(width), "widthRelTo": "ABSOLUTE", "height": str(height), "heightRelTo": "ABSOLUTE", "protect": "0"})
+    ET.SubElement(
+        brush, _hc("winBrush"), {"faceColor": "#FFFFFF", "hatchColor": "#000000", "alpha": "0"}
+    )
+    for index, point in enumerate(
+        points[:4]
+        or [
+            {"x": 0, "y": 0},
+            {"x": width, "y": 0},
+            {"x": width, "y": height},
+            {"x": 0, "y": height},
+        ]
+    ):
+        ET.SubElement(
+            rect,
+            _hc(f"pt{index}"),
+            {"x": str(int(point.get("x") or 0)), "y": str(int(point.get("y") or 0))},
+        )
+    ET.SubElement(
+        rect,
+        _hp("sz"),
+        {
+            "width": str(width),
+            "widthRelTo": "ABSOLUTE",
+            "height": str(height),
+            "heightRelTo": "ABSOLUTE",
+            "protect": "0",
+        },
+    )
     ET.SubElement(
         rect,
         _hp("pos"),
@@ -577,7 +711,9 @@ def _create_rectangle_shape(shape_id: int, geometry: dict[str, Any] | None = Non
     return rect
 
 
-def _create_rectangle_paragraph(paragraph_id: str, shape_id: int, geometry: dict[str, Any] | None = None) -> ET.Element:
+def _create_rectangle_paragraph(
+    paragraph_id: str, shape_id: int, geometry: dict[str, Any] | None = None
+) -> ET.Element:
     paragraph = ET.Element(
         _hp("p"),
         {
@@ -601,7 +737,12 @@ def build_visual_section_updates(
 ) -> tuple[dict[str, bytes], dict[str, Any]]:
     image_items = _image_bindata_items(bindata_report)
     section_entries = sorted(
-        [name for name in existing_entries if name.replace("\\", "/").lower().startswith("contents/section") and name.lower().endswith(".xml")],
+        [
+            name
+            for name in existing_entries
+            if name.replace("\\", "/").lower().startswith("contents/section")
+            and name.lower().endswith(".xml")
+        ],
         key=_section_sort_key,
     )
     picture_record_count = _body_record_tag_count(analysis, {85})
@@ -668,7 +809,11 @@ def build_visual_section_updates(
     appended = []
     target_picture_count = max(len(image_items), picture_record_count)
     for index in range(target_picture_count):
-        picture_geometry = _picture_geometry(picture_rows[index]) if index < len(picture_rows) else _picture_geometry(None)
+        picture_geometry = (
+            _picture_geometry(picture_rows[index])
+            if index < len(picture_rows)
+            else _picture_geometry(None)
+        )
         item, bindata_id_mapped = _image_item_for_picture(image_items, picture_geometry, index)
         image_entry = str(item["entry"])
         paragraph = create_picture_paragraph(
@@ -678,57 +823,64 @@ def build_visual_section_updates(
             _manifest_id(image_entry),
             width=int(picture_geometry.get("width") or 12000),
             height=int(picture_geometry.get("height") or 9000),
-            position=picture_geometry.get("position") if isinstance(picture_geometry.get("position"), dict) else None,
+            position=picture_geometry.get("position")
+            if isinstance(picture_geometry.get("position"), dict)
+            else None,
         )
         root.append(paragraph)
-        appended.append(
-            {
-                "entry": image_entry,
-                "manifest_id": _manifest_id(image_entry),
-                "section_entry": entry,
-                "paragraph_id": paragraph.attrib.get("id"),
-                "source_index": index,
-                "size": item.get("size"),
-                "sha256": item.get("sha256"),
-                "media_type": item.get("media_type"),
-                "reused_bindata": index >= len(image_items),
-                "binary_data_id": picture_geometry.get("binary_data_id"),
-                "bindata_id_mapped": bindata_id_mapped,
-                "geometry_mapped": picture_geometry.get("geometry_mapped"),
-                "width": picture_geometry.get("width"),
-                "height": picture_geometry.get("height"),
-                "source_record_index": picture_geometry.get("source_record_index"),
-                "component_record_index": picture_geometry.get("component_record_index"),
-                "control_record_index": picture_geometry.get("control_record_index"),
-                "position_mapped": picture_geometry.get("position_mapped"),
-                "layout_policy_mapped": picture_geometry.get("layout_policy_mapped"),
-                "position": picture_geometry.get("position"),
-            }
-        )
+        appended.append({
+            "entry": image_entry,
+            "manifest_id": _manifest_id(image_entry),
+            "section_entry": entry,
+            "paragraph_id": paragraph.attrib.get("id"),
+            "source_index": index,
+            "size": item.get("size"),
+            "sha256": item.get("sha256"),
+            "media_type": item.get("media_type"),
+            "reused_bindata": index >= len(image_items),
+            "binary_data_id": picture_geometry.get("binary_data_id"),
+            "bindata_id_mapped": bindata_id_mapped,
+            "geometry_mapped": picture_geometry.get("geometry_mapped"),
+            "width": picture_geometry.get("width"),
+            "height": picture_geometry.get("height"),
+            "source_record_index": picture_geometry.get("source_record_index"),
+            "component_record_index": picture_geometry.get("component_record_index"),
+            "control_record_index": picture_geometry.get("control_record_index"),
+            "position_mapped": picture_geometry.get("position_mapped"),
+            "layout_policy_mapped": picture_geometry.get("layout_policy_mapped"),
+            "position": picture_geometry.get("position"),
+        })
     visible_vector_shapes = []
     for index in range(vector_shape_count):
         shape_id = 900000000 + index
-        geometry = _rectangle_geometry(rectangle_rows[index]) if index < len(rectangle_rows) else _rectangle_geometry(None)
+        geometry = (
+            _rectangle_geometry(rectangle_rows[index])
+            if index < len(rectangle_rows)
+            else _rectangle_geometry(None)
+        )
         paragraph = _create_rectangle_paragraph(_next_paragraph_id(root), shape_id, geometry)
         root.append(paragraph)
-        visible_vector_shapes.append(
-            {
-                "shape_id": shape_id,
-                "section_entry": entry,
-                "paragraph_id": paragraph.attrib.get("id"),
-                "shape_type": "rect",
-                "geometry_mapped": index < len(rectangle_rows),
-                "width": geometry.get("width"),
-                "height": geometry.get("height"),
-                "source_record_index": geometry.get("source_record_index"),
-                "component_record_index": geometry.get("component_record_index"),
-                "control_record_index": geometry.get("control_record_index"),
-                "position_mapped": geometry.get("position_mapped"),
-                "layout_policy_mapped": geometry.get("layout_policy_mapped"),
-                "position": geometry.get("position"),
-            }
-        )
-    status = "PASS" if len(appended) >= target_picture_count and len(visible_vector_shapes) == vector_shape_count else "PARTIAL_VECTOR_SHAPES_UNMAPPED"
+        visible_vector_shapes.append({
+            "shape_id": shape_id,
+            "section_entry": entry,
+            "paragraph_id": paragraph.attrib.get("id"),
+            "shape_type": "rect",
+            "geometry_mapped": index < len(rectangle_rows),
+            "width": geometry.get("width"),
+            "height": geometry.get("height"),
+            "source_record_index": geometry.get("source_record_index"),
+            "component_record_index": geometry.get("component_record_index"),
+            "control_record_index": geometry.get("control_record_index"),
+            "position_mapped": geometry.get("position_mapped"),
+            "layout_policy_mapped": geometry.get("layout_policy_mapped"),
+            "position": geometry.get("position"),
+        })
+    status = (
+        "PASS"
+        if len(appended) >= target_picture_count
+        and len(visible_vector_shapes) == vector_shape_count
+        else "PARTIAL_VECTOR_SHAPES_UNMAPPED"
+    )
     return {entry: _xml_string(root).encode("utf-8")}, {
         "status": status,
         "section_entry": entry,
@@ -737,15 +889,27 @@ def build_visual_section_updates(
         "visible_picture_count": len(appended),
         "picture_record_count": picture_record_count,
         "picture_geometry_mapped_count": sum(1 for row in appended if row.get("geometry_mapped")),
-        "picture_bindata_id_mapped_count": sum(1 for row in appended if row.get("bindata_id_mapped")),
+        "picture_bindata_id_mapped_count": sum(
+            1 for row in appended if row.get("bindata_id_mapped")
+        ),
         "picture_position_mapped_count": sum(1 for row in appended if row.get("position_mapped")),
-        "picture_layout_policy_mapped_count": sum(1 for row in appended if row.get("layout_policy_mapped")),
+        "picture_layout_policy_mapped_count": sum(
+            1 for row in appended if row.get("layout_policy_mapped")
+        ),
         "vector_shape_record_count": vector_shape_count,
         "visible_vector_shape_count": len(visible_vector_shapes),
-        "geometry_mapped_vector_shape_count": sum(1 for row in visible_vector_shapes if row.get("geometry_mapped")),
-        "position_mapped_vector_shape_count": sum(1 for row in visible_vector_shapes if row.get("position_mapped")),
-        "layout_policy_mapped_vector_shape_count": sum(1 for row in visible_vector_shapes if row.get("layout_policy_mapped")),
-        "unmapped_vector_shape_record_count": max(0, vector_shape_count - len(visible_vector_shapes)),
+        "geometry_mapped_vector_shape_count": sum(
+            1 for row in visible_vector_shapes if row.get("geometry_mapped")
+        ),
+        "position_mapped_vector_shape_count": sum(
+            1 for row in visible_vector_shapes if row.get("position_mapped")
+        ),
+        "layout_policy_mapped_vector_shape_count": sum(
+            1 for row in visible_vector_shapes if row.get("layout_policy_mapped")
+        ),
+        "unmapped_vector_shape_record_count": max(
+            0, vector_shape_count - len(visible_vector_shapes)
+        ),
         "items": appended,
         "vector_shapes": visible_vector_shapes,
         "full_fidelity": status == "PASS",
@@ -754,7 +918,9 @@ def build_visual_section_updates(
 
 
 def build_equation_mapping(analysis: dict[str, Any]) -> dict[str, Any]:
-    layout = analysis.get("equation_layout") if isinstance(analysis.get("equation_layout"), dict) else {}
+    layout = (
+        analysis.get("equation_layout") if isinstance(analysis.get("equation_layout"), dict) else {}
+    )
     sections = layout.get("sections") if isinstance(layout.get("sections"), list) else []
     equations = []
     for section in sections:
@@ -763,26 +929,26 @@ def build_equation_mapping(analysis: dict[str, Any]) -> dict[str, Any]:
         for row in section.get("equations") or []:
             if not isinstance(row, dict):
                 continue
-            equations.append(
-                {
-                    "section_index": section.get("section_index"),
-                    "section_name": section.get("name"),
-                    "equation_index": row.get("equation_index"),
-                    "record_index": row.get("record_index"),
-                    "level": row.get("level"),
-                    "formula": row.get("formula"),
-                    "formula_length": row.get("formula_length"),
-                    "version": row.get("version"),
-                    "application": row.get("application"),
-                    "payload_size": row.get("payload_size"),
-                    "payload_prefix_hex": row.get("payload_prefix_hex"),
-                    "options_hex": row.get("options_hex"),
-                    "decode_error": row.get("decode_error"),
-                }
-            )
+            equations.append({
+                "section_index": section.get("section_index"),
+                "section_name": section.get("name"),
+                "equation_index": row.get("equation_index"),
+                "record_index": row.get("record_index"),
+                "level": row.get("level"),
+                "formula": row.get("formula"),
+                "formula_length": row.get("formula_length"),
+                "version": row.get("version"),
+                "application": row.get("application"),
+                "payload_size": row.get("payload_size"),
+                "payload_prefix_hex": row.get("payload_prefix_hex"),
+                "options_hex": row.get("options_hex"),
+                "decode_error": row.get("decode_error"),
+            })
     missing_formula = [row for row in equations if not str(row.get("formula") or "").strip()]
     return {
-        "status": "PASS" if equations and not missing_formula else ("NO_EQUATIONS" if not equations else "PARTIAL_EQUATION_MAPPING"),
+        "status": "PASS"
+        if equations and not missing_formula
+        else ("NO_EQUATIONS" if not equations else "PARTIAL_EQUATION_MAPPING"),
         "equation_count": len(equations),
         "missing_formula_count": len(missing_formula),
         "equations": equations,
@@ -794,7 +960,10 @@ def build_equation_mapping(analysis: dict[str, Any]) -> dict[str, Any]:
 def _rewrite_zip_entries(path: Path, updates: dict[str, bytes]) -> list[str]:
     temp_path = path.with_name(f"{path.stem}.rewrite.tmp{path.suffix}")
     written = []
-    with zipfile.ZipFile(path, "r") as src, zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(path, "r") as src,
+        zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as dst,
+    ):
         updated_names = {name.replace("\\", "/") for name in updates}
         for info in src.infolist():
             normalized = info.filename.replace("\\", "/")
@@ -825,14 +994,28 @@ def inject_analysis_entries(output_path: Path, analysis: dict[str, Any]) -> dict
     path = Path(output_path)
     if not path.exists():
         return {"status": "SKIP", "reason": "OUTPUT_NOT_FOUND", "output": str(path)}
-    decoded_docinfo = analysis.get("decoded_docinfo") if isinstance(analysis.get("decoded_docinfo"), dict) else {}
-    body_layout = analysis.get("body_layout") if isinstance(analysis.get("body_layout"), dict) else {}
-    page_layout = analysis.get("page_layout") if isinstance(analysis.get("page_layout"), dict) else {}
-    table_layout = analysis.get("table_layout") if isinstance(analysis.get("table_layout"), dict) else {}
+    decoded_docinfo = (
+        analysis.get("decoded_docinfo") if isinstance(analysis.get("decoded_docinfo"), dict) else {}
+    )
+    body_layout = (
+        analysis.get("body_layout") if isinstance(analysis.get("body_layout"), dict) else {}
+    )
+    page_layout = (
+        analysis.get("page_layout") if isinstance(analysis.get("page_layout"), dict) else {}
+    )
+    table_layout = (
+        analysis.get("table_layout") if isinstance(analysis.get("table_layout"), dict) else {}
+    )
     coverage = analysis.get("coverage") if isinstance(analysis.get("coverage"), dict) else {}
-    ole_metadata = analysis.get("ole_metadata") if isinstance(analysis.get("ole_metadata"), dict) else {}
-    record_audit = analysis.get("record_audit") if isinstance(analysis.get("record_audit"), dict) else {}
-    source_manifest = analysis.get("source_manifest") if isinstance(analysis.get("source_manifest"), dict) else {}
+    ole_metadata = (
+        analysis.get("ole_metadata") if isinstance(analysis.get("ole_metadata"), dict) else {}
+    )
+    record_audit = (
+        analysis.get("record_audit") if isinstance(analysis.get("record_audit"), dict) else {}
+    )
+    source_manifest = (
+        analysis.get("source_manifest") if isinstance(analysis.get("source_manifest"), dict) else {}
+    )
     source_input = Path(str(analysis.get("input"))) if analysis.get("input") else None
     fontface_report = build_fontface_mapping(decoded_docinfo)
     list_style_report = build_list_style_mapping(decoded_docinfo)
@@ -840,52 +1023,103 @@ def inject_analysis_entries(output_path: Path, analysis: dict[str, Any]) -> dict
     original_integrity: dict[str, Any] = {"status": "SKIPPED", "reason": "PACKAGE_NOT_READ"}
     bindata_updates, bindata_report = _copy_bindata_from_source(source_input, decoded_docinfo)
     updates: dict[str, bytes] = {
-        "Preview/DecodedDocInfo.json": json.dumps(decoded_docinfo, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/DocumentMetadata.json": json.dumps(ole_metadata, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/FullFidelityCoverage.json": json.dumps(coverage, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/RecordAudit.json": json.dumps(record_audit, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/SourceManifest.json": json.dumps(source_manifest, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/FontFaceMapping.json": json.dumps(fontface_report, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/ListStyleMapping.json": json.dumps(list_style_report, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/EquationMapping.json": json.dumps(equation_report, ensure_ascii=False, indent=2).encode("utf-8"),
-        "Preview/BinDataPreservation.json": json.dumps(bindata_report, ensure_ascii=False, indent=2).encode("utf-8"),
+        "Preview/DecodedDocInfo.json": json.dumps(
+            decoded_docinfo, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/DocumentMetadata.json": json.dumps(
+            ole_metadata, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/FullFidelityCoverage.json": json.dumps(
+            coverage, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/RecordAudit.json": json.dumps(record_audit, ensure_ascii=False, indent=2).encode(
+            "utf-8"
+        ),
+        "Preview/SourceManifest.json": json.dumps(
+            source_manifest, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/FontFaceMapping.json": json.dumps(
+            fontface_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/ListStyleMapping.json": json.dumps(
+            list_style_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/EquationMapping.json": json.dumps(
+            equation_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/BinDataPreservation.json": json.dumps(
+            bindata_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
         "Contents/header.xml": build_decoded_header_xml(decoded_docinfo).encode("utf-8"),
     }
     updates.update(bindata_updates)
     body_style_report: dict[str, Any] = {"status": "SKIPPED", "reason": "BODY_LAYOUT_NOT_AVAILABLE"}
-    page_layout_report: dict[str, Any] = {"status": "SKIPPED", "reason": "PAGE_LAYOUT_NOT_AVAILABLE"}
-    table_layout_report: dict[str, Any] = {"status": "SKIPPED", "reason": "TABLE_LAYOUT_NOT_AVAILABLE"}
-    visual_object_report: dict[str, Any] = {"status": "SKIPPED", "reason": "VISUAL_MAPPING_NOT_AVAILABLE"}
+    page_layout_report: dict[str, Any] = {
+        "status": "SKIPPED",
+        "reason": "PAGE_LAYOUT_NOT_AVAILABLE",
+    }
+    table_layout_report: dict[str, Any] = {
+        "status": "SKIPPED",
+        "reason": "TABLE_LAYOUT_NOT_AVAILABLE",
+    }
+    visual_object_report: dict[str, Any] = {
+        "status": "SKIPPED",
+        "reason": "VISUAL_MAPPING_NOT_AVAILABLE",
+    }
     with zipfile.ZipFile(path, "r") as zf:
         existing = {name.replace("\\", "/"): name for name in zf.namelist()}
         if "Contents/content.hpf" in existing:
-            content_text = zf.read(existing["Contents/content.hpf"]).decode("utf-8", errors="replace")
+            content_text = zf.read(existing["Contents/content.hpf"]).decode(
+                "utf-8", errors="replace"
+            )
             known_entries = list(existing) + list(updates)
-            updates["Contents/content.hpf"] = _content_hpf_with_entries(content_text, known_entries).encode("utf-8")
+            updates["Contents/content.hpf"] = _content_hpf_with_entries(
+                content_text, known_entries
+            ).encode("utf-8")
         entries = {name: zf.read(name) for name in zf.namelist()}
         original_integrity = build_original_integrity(path, entries, source_manifest)
-        updates["Preview/OriginalIntegrity.json"] = json.dumps(original_integrity, ensure_ascii=False, indent=2).encode("utf-8")
-        body_updates, body_style_report = build_body_style_section_updates(entries, body_layout, decoded_docinfo)
+        updates["Preview/OriginalIntegrity.json"] = json.dumps(
+            original_integrity, ensure_ascii=False, indent=2
+        ).encode("utf-8")
+        body_updates, body_style_report = build_body_style_section_updates(
+            entries, body_layout, decoded_docinfo
+        )
         updates.update(body_updates)
         effective_entries = dict(entries)
         effective_entries.update(body_updates)
-        page_updates, page_layout_report = build_page_layout_section_updates(effective_entries, page_layout, decoded_docinfo)
+        page_updates, page_layout_report = build_page_layout_section_updates(
+            effective_entries, page_layout, decoded_docinfo
+        )
         updates.update(page_updates)
         effective_entries.update(page_updates)
-        table_updates, table_layout_report = build_table_layout_section_updates(effective_entries, table_layout, decoded_docinfo)
+        table_updates, table_layout_report = build_table_layout_section_updates(
+            effective_entries, table_layout, decoded_docinfo
+        )
         updates.update(table_updates)
         effective_entries.update(table_updates)
-        visual_updates, visual_object_report = build_visual_section_updates(effective_entries, bindata_report, analysis)
+        visual_updates, visual_object_report = build_visual_section_updates(
+            effective_entries, bindata_report, analysis
+        )
         updates.update(visual_updates)
         final_entries = dict(entries)
         final_entries.update(updates)
         if "Contents/content.hpf" in final_entries:
             content_text = final_entries["Contents/content.hpf"].decode("utf-8", errors="replace")
-            updates["Contents/content.hpf"] = _content_hpf_with_entries(content_text, list(final_entries)).encode("utf-8")
-        updates["Preview/BodyStyleMapping.json"] = json.dumps(body_style_report, ensure_ascii=False, indent=2).encode("utf-8")
-        updates["Preview/PageLayoutMapping.json"] = json.dumps(page_layout_report, ensure_ascii=False, indent=2).encode("utf-8")
-        updates["Preview/TableLayoutMapping.json"] = json.dumps(table_layout_report, ensure_ascii=False, indent=2).encode("utf-8")
-        updates["Preview/VisualObjectMapping.json"] = json.dumps(visual_object_report, ensure_ascii=False, indent=2).encode("utf-8")
+            updates["Contents/content.hpf"] = _content_hpf_with_entries(
+                content_text, list(final_entries)
+            ).encode("utf-8")
+        updates["Preview/BodyStyleMapping.json"] = json.dumps(
+            body_style_report, ensure_ascii=False, indent=2
+        ).encode("utf-8")
+        updates["Preview/PageLayoutMapping.json"] = json.dumps(
+            page_layout_report, ensure_ascii=False, indent=2
+        ).encode("utf-8")
+        updates["Preview/TableLayoutMapping.json"] = json.dumps(
+            table_layout_report, ensure_ascii=False, indent=2
+        ).encode("utf-8")
+        updates["Preview/VisualObjectMapping.json"] = json.dumps(
+            visual_object_report, ensure_ascii=False, indent=2
+        ).encode("utf-8")
     written = _rewrite_zip_entries(path, updates)
     return {
         "status": "PASS",
@@ -916,7 +1150,9 @@ def inject_analysis_entries(output_path: Path, analysis: dict[str, Any]) -> dict
         "original_integrity": {
             "status": original_integrity.get("status", "SKIPPED"),
             "entry_name": original_integrity.get("entry_name", "Original/original.hwp"),
-            "byte_exact_original_embedded": original_integrity.get("byte_exact_original_embedded", False),
+            "byte_exact_original_embedded": original_integrity.get(
+                "byte_exact_original_embedded", False
+            ),
             "sha256_match": original_integrity.get("sha256_match", False),
             "size_match": original_integrity.get("size_match", False),
             "file_name_changed": original_integrity.get("file_name_changed", False),

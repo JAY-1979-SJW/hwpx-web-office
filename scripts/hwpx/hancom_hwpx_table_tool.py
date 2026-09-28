@@ -14,7 +14,6 @@ from hwpx_special_text import sanitize_hwpx_text
 from hwpx_table_ops import apply_table_operations
 from hwpx_writer_adapter import HwpxEditor
 
-
 TEXT_KEYS = {"value", "values"}
 
 
@@ -25,7 +24,42 @@ def load_operations(path: Path) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
-def sanitize_operation_text(operation: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _sanitize_values_list(values_in: list, warnings: list[dict[str, Any]]) -> list:
+    values = []
+    for index, value in enumerate(values_in):
+        sanitized = sanitize_hwpx_text(value)
+        values.append(sanitized["text"])
+        if sanitized["changed"]:
+            warnings.append({
+                "field": "values",
+                "index": index,
+                "replacements": sanitized["replacements"],
+            })
+    return values
+
+
+def _sanitize_updates_list(updates_in: list, warnings: list[dict[str, Any]]) -> list:
+    updates = []
+    for update_index, update in enumerate(updates_in):
+        if not isinstance(update, dict):
+            continue
+        updated = dict(update)
+        if "value" in updated:
+            sanitized = sanitize_hwpx_text(updated["value"])
+            updated["value"] = sanitized["text"]
+            if sanitized["changed"]:
+                warnings.append({
+                    "field": "updates.value",
+                    "index": update_index,
+                    "replacements": sanitized["replacements"],
+                })
+        updates.append(updated)
+    return updates
+
+
+def sanitize_operation_text(
+    operation: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     result = dict(operation)
     warnings: list[dict[str, Any]] = []
     if "value" in result:
@@ -34,30 +68,15 @@ def sanitize_operation_text(operation: dict[str, Any]) -> tuple[dict[str, Any], 
         if sanitized["changed"]:
             warnings.append({"field": "value", "replacements": sanitized["replacements"]})
     if "values" in result and isinstance(result["values"], list):
-        values = []
-        for index, value in enumerate(result["values"]):
-            sanitized = sanitize_hwpx_text(value)
-            values.append(sanitized["text"])
-            if sanitized["changed"]:
-                warnings.append({"field": "values", "index": index, "replacements": sanitized["replacements"]})
-        result["values"] = values
+        result["values"] = _sanitize_values_list(result["values"], warnings)
     if "updates" in result and isinstance(result["updates"], list):
-        updates = []
-        for update_index, update in enumerate(result["updates"]):
-            if not isinstance(update, dict):
-                continue
-            updated = dict(update)
-            if "value" in updated:
-                sanitized = sanitize_hwpx_text(updated["value"])
-                updated["value"] = sanitized["text"]
-                if sanitized["changed"]:
-                    warnings.append({"field": "updates.value", "index": update_index, "replacements": sanitized["replacements"]})
-            updates.append(updated)
-        result["updates"] = updates
+        result["updates"] = _sanitize_updates_list(result["updates"], warnings)
     return result, warnings
 
 
-def run_table_tool(input_path: Path, output_path: Path | None, ops_json: Path | None) -> dict[str, Any]:
+def run_table_tool(
+    input_path: Path, output_path: Path | None, ops_json: Path | None
+) -> dict[str, Any]:
     package = HwpxPackage(input_path)
     operation_report = {"status": "SKIPPED", "operations": [], "warnings": []}
     if ops_json:
@@ -80,7 +99,9 @@ def run_table_tool(input_path: Path, output_path: Path | None, ops_json: Path | 
     integrity = audit_tables(target)
     return {
         "status": "PASS"
-        if validation.get("xml_ok") and integrity.get("status") in {"PASS", "WARN"} and operation_report.get("status") in {"PASS", "SKIPPED"}
+        if validation.get("xml_ok")
+        and integrity.get("status") in {"PASS", "WARN"}
+        and operation_report.get("status") in {"PASS", "SKIPPED"}
         else "WARN",
         "input": str(input_path),
         "output": str(target),
@@ -108,7 +129,9 @@ def main() -> int:
     report = run_table_tool(args.input, args.output, args.ops_json)
     if args.report_json:
         args.report_json.parent.mkdir(parents=True, exist_ok=True)
-        args.report_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.report_json.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["status"] in {"PASS", "WARN"} else 1
 

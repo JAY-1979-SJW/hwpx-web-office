@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from hwpx_image_ops import add_bindata_image_data
 from hwpx_package import HwpxPackage, local_name
@@ -48,7 +48,9 @@ def infer_paragraph_defaults(root: ET.Element) -> dict[str, str]:
     return defaults
 
 
-def create_text_paragraph(text: str, paragraph_id: str, defaults: dict[str, str] | None = None) -> ET.Element:
+def create_text_paragraph(
+    text: str, paragraph_id: str, defaults: dict[str, str] | None = None
+) -> ET.Element:
     defaults = defaults or {}
     paragraph = ET.Element(
         hp("p"),
@@ -100,7 +102,9 @@ def _line_seg(horzsize: str = "48188") -> ET.Element:
     )
 
 
-def create_cell_paragraph(text: str, defaults: dict[str, str] | None = None, horzsize: str = "12000") -> ET.Element:
+def create_cell_paragraph(
+    text: str, defaults: dict[str, str] | None = None, horzsize: str = "12000"
+) -> ET.Element:
     defaults = defaults or {}
     paragraph = ET.Element(
         hp("p"),
@@ -147,7 +151,9 @@ def create_table_cell(
     vert_align = defaults.get("cellVertAlign", "CENTER")
     text_direction = defaults.get("cellTextDirection", "HORIZONTAL")
     line_wrap = defaults.get("cellLineWrap", "BREAK")
-    cell_margin = defaults.get("cellMargin", {"left": "510", "right": "510", "top": "141", "bottom": "141"})
+    cell_margin = defaults.get(
+        "cellMargin", {"left": "510", "right": "510", "top": "141", "bottom": "141"}
+    )
     if isinstance(vert_align_map, dict) and vert_align_map.get(cell_key):
         vert_align = vert_align_map[cell_key]
     if isinstance(text_direction_map, dict) and text_direction_map.get(cell_key):
@@ -210,7 +216,32 @@ def create_table_cell(
     return cell
 
 
-def create_generated_table(rows: list[list[str]], defaults: dict[str, str] | None = None) -> ET.Element:
+def _resolve_column_widths(defaults: dict[str, str], col_count: int) -> list[int]:
+    column_widths = defaults.get("columnWidths")
+    if isinstance(column_widths, list) and column_widths:
+        normalized_widths = [int(width) for width in column_widths[:col_count]]
+        if len(normalized_widths) < col_count:
+            fallback_width = int(defaults.get("columnWidth", "12000"))
+            normalized_widths.extend([fallback_width] * (col_count - len(normalized_widths)))
+        return normalized_widths
+    total_width = int(defaults.get("tableWidth", "47904"))
+    return [max(total_width // col_count, 1)] * col_count
+
+
+def _resolve_row_heights(defaults: dict[str, str], row_count: int) -> list[int]:
+    row_heights = defaults.get("rowHeights")
+    if isinstance(row_heights, list) and row_heights:
+        normalized_heights = [int(height) for height in row_heights[:row_count]]
+        if len(normalized_heights) < row_count:
+            fallback_height = int(defaults.get("rowHeight", "2814"))
+            normalized_heights.extend([fallback_height] * (row_count - len(normalized_heights)))
+        return normalized_heights
+    return [int(defaults.get("rowHeight", "2814"))] * row_count
+
+
+def create_generated_table(
+    rows: list[list[str]], defaults: dict[str, str] | None = None
+) -> ET.Element:
     defaults = defaults or {}
     normalized_rows = [[str(cell) for cell in row] for row in rows]
     row_count = len(normalized_rows)
@@ -218,24 +249,9 @@ def create_generated_table(rows: list[list[str]], defaults: dict[str, str] | Non
     if row_count == 0 or col_count == 0:
         raise ValueError("table rows must include at least one row and one cell")
 
-    column_widths = defaults.get("columnWidths")
-    if isinstance(column_widths, list) and column_widths:
-        normalized_widths = [int(width) for width in column_widths[:col_count]]
-        if len(normalized_widths) < col_count:
-            fallback_width = int(defaults.get("columnWidth", "12000"))
-            normalized_widths.extend([fallback_width] * (col_count - len(normalized_widths)))
-    else:
-        total_width = int(defaults.get("tableWidth", "47904"))
-        normalized_widths = [max(total_width // col_count, 1)] * col_count
+    normalized_widths = _resolve_column_widths(defaults, col_count)
     total_width = sum(normalized_widths)
-    row_heights = defaults.get("rowHeights")
-    if isinstance(row_heights, list) and row_heights:
-        normalized_heights = [int(height) for height in row_heights[:row_count]]
-        if len(normalized_heights) < row_count:
-            fallback_height = int(defaults.get("rowHeight", "2814"))
-            normalized_heights.extend([fallback_height] * (row_count - len(normalized_heights)))
-    else:
-        normalized_heights = [int(defaults.get("rowHeight", "2814"))] * row_count
+    normalized_heights = _resolve_row_heights(defaults, row_count)
     table_height = sum(normalized_heights)
     table = ET.Element(
         hp("tbl"),
@@ -256,14 +272,48 @@ def create_generated_table(rows: list[list[str]], defaults: dict[str, str] | Non
             "noAdjust": "0",
         },
     )
-    ET.SubElement(table, hp("sz"), {"width": str(total_width), "widthRelTo": "ABSOLUTE", "height": str(table_height), "heightRelTo": "ABSOLUTE", "protect": "0"})
-    ET.SubElement(table, hp("pos"), {"treatAsChar": "1", "affectLSpacing": "0", "flowWithText": "1", "allowOverlap": "0", "holdAnchorAndSO": "0", "vertRelTo": "PARA", "horzRelTo": "PARA", "vertAlign": "TOP", "horzAlign": "LEFT", "vertOffset": "0", "horzOffset": "0"})
-    ET.SubElement(table, hp("outMargin"), {"left": "141", "right": "141", "top": "141", "bottom": "141"})
-    ET.SubElement(table, hp("inMargin"), {"left": "510", "right": "510", "top": "141", "bottom": "141"})
+    ET.SubElement(
+        table,
+        hp("sz"),
+        {
+            "width": str(total_width),
+            "widthRelTo": "ABSOLUTE",
+            "height": str(table_height),
+            "heightRelTo": "ABSOLUTE",
+            "protect": "0",
+        },
+    )
+    ET.SubElement(
+        table,
+        hp("pos"),
+        {
+            "treatAsChar": "1",
+            "affectLSpacing": "0",
+            "flowWithText": "1",
+            "allowOverlap": "0",
+            "holdAnchorAndSO": "0",
+            "vertRelTo": "PARA",
+            "horzRelTo": "PARA",
+            "vertAlign": "TOP",
+            "horzAlign": "LEFT",
+            "vertOffset": "0",
+            "horzOffset": "0",
+        },
+    )
+    ET.SubElement(
+        table, hp("outMargin"), {"left": "141", "right": "141", "top": "141", "bottom": "141"}
+    )
+    ET.SubElement(
+        table, hp("inMargin"), {"left": "510", "right": "510", "top": "141", "bottom": "141"}
+    )
     merged_cells = defaults.get("mergedCells", {})
     if not isinstance(merged_cells, dict):
         merged_cells = {}
-    covered_cells = set(defaults.get("coveredCells", [])) if isinstance(defaults.get("coveredCells", []), list) else set()
+    covered_cells = (
+        set(defaults.get("coveredCells", []))
+        if isinstance(defaults.get("coveredCells", []), list)
+        else set()
+    )
 
     for row_index, row in enumerate(normalized_rows):
         tr = ET.SubElement(table, hp("tr"))
@@ -280,11 +330,17 @@ def create_generated_table(rows: list[list[str]], defaults: dict[str, str] | Non
             text = row[col_index] if col_index < len(row) else ""
             col_width = sum(normalized_widths[col_index : min(col_index + col_span, col_count)])
             row_height = sum(normalized_heights[row_index : min(row_index + row_span, row_count)])
-            tr.append(create_table_cell(text, row_index, col_index, col_width, row_height, defaults, col_span, row_span))
+            tr.append(
+                create_table_cell(
+                    text, row_index, col_index, col_width, row_height, defaults, col_span, row_span
+                )
+            )
     return table
 
 
-def create_table_paragraph(rows: list[list[str]], paragraph_id: str, defaults: dict[str, str] | None = None) -> ET.Element:
+def create_table_paragraph(
+    rows: list[list[str]], paragraph_id: str, defaults: dict[str, str] | None = None
+) -> ET.Element:
     defaults = defaults or {}
     paragraph = ET.Element(
         hp("p"),
@@ -380,7 +436,7 @@ def create_picture_object(
     return picture
 
 
-def create_picture_paragraph(
+def create_picture_paragraph(  # ruff: ignore[too-many-arguments] -- 다른 파일에서도 호출하는 factory, 시그니처 변경 보류
     image_entry: str,
     paragraph_id: str,
     defaults: dict[str, str] | None = None,
@@ -416,11 +472,15 @@ def append_generated_paragraph(
 ) -> dict[str, Any]:
     sections = package.section_entries()
     if section_index < 0 or section_index >= len(sections):
-        return {"status": "SECTION_NOT_FOUND", "section_index": section_index, "section_count": len(sections)}
+        return {
+            "status": "SECTION_NOT_FOUND",
+            "section_index": section_index,
+            "section_count": len(sections),
+        }
     entry = sections[section_index]
     try:
         root = package.read_xml(entry)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         return {"status": "XML_PARSE_ERROR", "entry": entry, "error": str(exc)}
     defaults = infer_paragraph_defaults(root)
     defaults.update(style_refs or {})
@@ -444,11 +504,15 @@ def append_generated_table(
 ) -> dict[str, Any]:
     sections = package.section_entries()
     if section_index < 0 or section_index >= len(sections):
-        return {"status": "SECTION_NOT_FOUND", "section_index": section_index, "section_count": len(sections)}
+        return {
+            "status": "SECTION_NOT_FOUND",
+            "section_index": section_index,
+            "section_count": len(sections),
+        }
     entry = sections[section_index]
     try:
         root = package.read_xml(entry)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         return {"status": "XML_PARSE_ERROR", "entry": entry, "error": str(exc)}
     if not rows or not any(rows):
         return {"status": "EMPTY_TABLE_DATA", "entry": entry}
@@ -467,7 +531,7 @@ def append_generated_table(
     }
 
 
-def append_generated_picture(
+def append_generated_picture(  # ruff: ignore[too-many-arguments] -- 다른 파일에서도 호출하는 factory, 시그니처 변경 보류
     package: HwpxPackage,
     image_path: str | Any,
     image_entry: str = "BinData/generated_picture001.png",
@@ -478,7 +542,11 @@ def append_generated_picture(
 ) -> dict[str, Any]:
     sections = package.section_entries()
     if section_index < 0 or section_index >= len(sections):
-        return {"status": "SECTION_NOT_FOUND", "section_index": section_index, "section_count": len(sections)}
+        return {
+            "status": "SECTION_NOT_FOUND",
+            "section_index": section_index,
+            "section_count": len(sections),
+        }
     entry = sections[section_index]
     add_result = add_bindata_image_data(package.entries, image_path, image_entry)
     if add_result.get("status") != "IMAGE_BINDATA_ADD_PASS":
@@ -491,8 +559,13 @@ def append_generated_picture(
     manifest_id = manifest_id or add_result.get("manifest", {}).get("id")
     try:
         root = package.read_xml(entry)
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "XML_PARSE_ERROR", "entry": entry, "error": str(exc), "add_result": add_result}
+    except Exception as exc:  # ruff: ignore[blind-except]
+        return {
+            "status": "XML_PARSE_ERROR",
+            "entry": entry,
+            "error": str(exc),
+            "add_result": add_result,
+        }
     defaults = infer_paragraph_defaults(root)
     paragraph = create_picture_paragraph(
         image_entry,
