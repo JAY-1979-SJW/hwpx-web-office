@@ -352,6 +352,18 @@ def _writer_ui_result(writer_dict: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _determine_preflight_status(structure, security_block, target_block, approved_block) -> str:
+    if not structure["sectionXmlValid"]:
+        return BLOCKED_MISSING_SECTION_XML
+    if security_block:
+        return security_block
+    if target_block:
+        return target_block
+    if approved_block:
+        return approved_block
+    return READY_FOR_SANDBOX_WRITE
+
+
 def run_real_file_preflight(
     sample_path: Path,
     target_map: list[TargetMapEntry] | list[dict[str, Any]] | None,
@@ -396,16 +408,7 @@ def run_real_file_preflight(
     target_summary, target_block = _target_map_summary(inp.target_map)
     approved_block = _approved_summary(inp.approved_fields)
 
-    if not structure["sectionXmlValid"]:
-        status = BLOCKED_MISSING_SECTION_XML
-    elif security_block:
-        status = security_block
-    elif target_block:
-        status = target_block
-    elif approved_block:
-        status = approved_block
-    else:
-        status = READY_FOR_SANDBOX_WRITE
+    status = _determine_preflight_status(structure, security_block, target_block, approved_block)
 
     if status != READY_FOR_SANDBOX_WRITE:
         after_hash = _sha16(inp.sample_path)

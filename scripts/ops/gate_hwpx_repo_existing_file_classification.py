@@ -11,8 +11,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from scripts.ops import classify_hwpx_repo_inventory as inventory  # noqa: E402
-from scripts.ops import gate_hwpx_repo_new_file_classification as new_file_gate  # noqa: E402
+from scripts.ops import classify_hwpx_repo_inventory as inventory  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.ops import gate_hwpx_repo_new_file_classification as new_file_gate  # ruff: ignore[module-import-not-at-top-of-file]
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_existing_file_classification"
 
@@ -60,17 +60,22 @@ def _needs_zone(path: str) -> bool:
 def _needs_module_assignment(path: str, category: str, zone: str) -> bool:
     if zone not in new_file_gate.RELEASE_ZONES:
         return False
-    if category not in {"ACTIVE_AUTOFILL", "FRONTEND_VIEWER", "AUDIT_GATE", "TEST_ONLY", "TEST_FIXTURE"}:
+    if category not in {
+        "ACTIVE_AUTOFILL",
+        "FRONTEND_VIEWER",
+        "AUDIT_GATE",
+        "TEST_ONLY",
+        "TEST_FIXTURE",
+    }:
         return False
     return _governed_scope(path)
 
 
-def _infer_module_id(path: str, zone: str) -> str | None:
-    lower = path.lower()
-    if zone == "input_parse":
-        if any(
-            token in lower
-            for token in (
+_MODULE_ID_RULES: dict[str, list[tuple[str, tuple[str, ...]]]] = {
+    "input_parse": [
+        (
+            "field_mapping",
+            (
                 "field_mapping",
                 "field_mapper",
                 "field_catalog",
@@ -80,40 +85,38 @@ def _infer_module_id(path: str, zone: str) -> str | None:
                 "parser",
                 "preflight",
                 "upload_document",
-            )
-        ):
-            return "field_mapping"
-    if zone == "review_approval":
-        if "approval" in lower or "human_approval" in lower:
-            return "approval_gate"
-        if "review" in lower:
-            return "review_panel"
-    if zone == "writer_readback":
-        if "writer_sandbox" in lower or "write_sandbox" in lower:
-            return "writer_sandbox"
-        if "readback" in lower:
-            return "readback_hardening"
-    if zone == "download_export":
-        if "final_export" in lower:
-            return "final_export_gate"
-        if "download_review" in lower:
-            return "download_review"
-    if zone == "batch_api_browser":
-        if any(token in lower for token in ("api_route", "api_batch", "batch_api_route", "module_communication")):
-            return "api_batch"
-        if any(
-            token in lower
-            for token in (
-                "browser",
-                "frontend_contract",
-                "ui_connect",
-                "real_like",
-                "e2e_smoke",
-            )
-        ):
-            return "api_browser_e2e"
+            ),
+        )
+    ],
+    "review_approval": [
+        ("approval_gate", ("approval", "human_approval")),
+        ("review_panel", ("review",)),
+    ],
+    "writer_readback": [
+        ("writer_sandbox", ("writer_sandbox", "write_sandbox")),
+        ("readback_hardening", ("readback",)),
+    ],
+    "download_export": [
+        ("final_export_gate", ("final_export",)),
+        ("download_review", ("download_review",)),
+    ],
+    "batch_api_browser": [
+        ("api_batch", ("api_route", "api_batch", "batch_api_route", "module_communication")),
+        (
+            "api_browser_e2e",
+            ("browser", "frontend_contract", "ui_connect", "real_like", "e2e_smoke"),
+        ),
+    ],
+}
+
+
+def _infer_module_id(path: str, zone: str) -> str | None:
     if zone == "closeout_security":
         return "user_flow_closeout"
+    lower = path.lower()
+    for module_id, tokens in _MODULE_ID_RULES.get(zone, []):
+        if any(token in lower for token in tokens):
+            return module_id
     return None
 
 
@@ -123,14 +126,22 @@ def evaluate_existing_files(
 ) -> dict[str, Any]:
     manifest = module_manifest or new_file_gate._load_module_manifest()
     declared_map = _declared_module_map(manifest)
-    governed = [path.replace("\\", "/") for path in tracked_files if _governed_scope(path.replace("\\", "/"))]
+    governed = [
+        path.replace("\\", "/")
+        for path in tracked_files
+        if _governed_scope(path.replace("\\", "/"))
+    ]
     results: list[dict[str, Any]] = []
     failures: set[str] = set()
     for path in sorted(dict.fromkeys(governed)):
         category, zone, separation_plan = inventory.classify_path(path)
         declared_module = declared_map.get(path)
         resolved_module = declared_module or _infer_module_id(path, zone)
-        resolution_source = "manifestDeclaration" if declared_module else ("stablePathMapping" if resolved_module else None)
+        resolution_source = (
+            "manifestDeclaration"
+            if declared_module
+            else ("stablePathMapping" if resolved_module else None)
+        )
         file_failures: list[str] = []
         if category == "UNKNOWN_REVIEW_REQUIRED":
             file_failures.append(new_file_gate.FAIL_NEW_FILE_UNKNOWN_CLASSIFICATION)
@@ -139,19 +150,17 @@ def evaluate_existing_files(
         if _needs_module_assignment(path, category, zone) and not resolved_module:
             file_failures.append(FAIL_EXISTING_FILE_MODULE_UNRESOLVED)
         failures.update(file_failures)
-        results.append(
-            {
-                "safePath": inventory.safe_path(path),
-                "category": category,
-                "zone": zone,
-                "separationPlan": separation_plan,
-                "moduleDeclared": bool(declared_module),
-                "moduleId": resolved_module,
-                "resolutionSource": resolution_source,
-                "status": "PASS" if not file_failures else "FAIL",
-                "failures": sorted(set(file_failures)),
-            }
-        )
+        results.append({
+            "safePath": inventory.safe_path(path),
+            "category": category,
+            "zone": zone,
+            "separationPlan": separation_plan,
+            "moduleDeclared": bool(declared_module),
+            "moduleId": resolved_module,
+            "resolutionSource": resolution_source,
+            "status": "PASS" if not file_failures else "FAIL",
+            "failures": sorted(set(file_failures)),
+        })
     return {
         "schemaVersion": "hwpx_repo_existing_file_classification_gate_v1",
         "verdict": PASS_VERDICT if not failures else FAIL_VERDICT,
@@ -204,7 +213,9 @@ def _safe_write(path: Path, payload: Any) -> None:
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
     _safe_write(report_dir / "existing_file_classification_summary.json", payload)
-    _safe_write(report_dir / "existing_file_classification_results.json", payload["existingFileResults"])
+    _safe_write(
+        report_dir / "existing_file_classification_results.json", payload["existingFileResults"]
+    )
     lines = [
         "# HWPX Repo Existing File Classification Gate",
         "",

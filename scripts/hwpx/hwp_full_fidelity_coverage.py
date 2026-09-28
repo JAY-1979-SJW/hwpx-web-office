@@ -79,7 +79,62 @@ def coverage_catalog() -> dict[str, Any]:
     }
 
 
-def build_coverage(
+def _build_family_rows(
+    counts: Counter[int],
+    present_tags: set[int],
+    coverage_evidence: dict[str, Any],
+    covered_tags: set[int],
+    blockers: list[str],
+) -> list[dict[str, Any]]:
+    family_rows = []
+    for name, spec in REQUIRED_RECORD_FAMILIES.items():
+        tags = set(spec["tags"])
+        present = sorted(tags & present_tags)
+        audit_decision = _family_audit_decision(name, present, coverage_evidence)
+        if not present:
+            family_status = "NOT_PRESENT"
+        elif audit_decision["status"] == "AUDITED":
+            family_status = "AUDITED"
+            covered_tags.update(present)
+        elif spec["status"] == "supported":
+            family_status = "SUPPORTED"
+            covered_tags.update(present)
+        elif spec["status"] == "partial":
+            family_status = "PARTIAL"
+            blockers.append(f"PARTIAL:{name}")
+        else:
+            family_status = "UNSUPPORTED"
+            blockers.append(f"UNSUPPORTED:{name}")
+        family_rows.append({
+            "family": name,
+            "status": family_status,
+            "present_tags": [
+                {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]}
+                for tag in present
+            ],
+            "reason": spec["reason"],
+            "audit_evidence": audit_decision["evidence"],
+        })
+    return family_rows
+
+
+def _summarize_tag_counts(counts: Counter[int], covered_tags: set[int]) -> tuple[int, int, int]:
+    present_count = sum(counts.values())
+    covered_count = sum(count for tag, count in counts.items() if tag in covered_tags)
+    decoded_count = sum(
+        count
+        for tag, count in counts.items()
+        if tag in DECODED_DOCINFO_TAGS
+        or tag in DECODED_BODY_LAYOUT_TAGS
+        or tag in DECODED_PAGE_LAYOUT_TAGS
+        or tag in DECODED_TABLE_LAYOUT_TAGS
+        or tag in DECODED_SHAPE_LAYOUT_TAGS
+        or tag in FULL_SUPPORTED_TAGS
+    )
+    return present_count, covered_count, decoded_count
+
+
+def build_coverage(  # ruff: ignore[too-many-arguments] -- 28곳 이상 위치 인자 호출부(테스트 포함), 시그니처 변경 보류
     counts: Counter[int],
     bindata_streams: list[str],
     extraction: dict[str, Any],
@@ -136,34 +191,9 @@ def build_coverage(
         "equation_coverage": equation_coverage,
     }
 
-    for name, spec in REQUIRED_RECORD_FAMILIES.items():
-        tags = set(spec["tags"])
-        present = sorted(tags & present_tags)
-        audit_decision = _family_audit_decision(name, present, coverage_evidence)
-        if not present:
-            family_status = "NOT_PRESENT"
-        elif audit_decision["status"] == "AUDITED":
-            family_status = "AUDITED"
-            covered_tags.update(present)
-        elif spec["status"] == "supported":
-            family_status = "SUPPORTED"
-            covered_tags.update(present)
-        elif spec["status"] == "partial":
-            family_status = "PARTIAL"
-            blockers.append(f"PARTIAL:{name}")
-        else:
-            family_status = "UNSUPPORTED"
-            blockers.append(f"UNSUPPORTED:{name}")
-        family_rows.append({
-            "family": name,
-            "status": family_status,
-            "present_tags": [
-                {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]}
-                for tag in present
-            ],
-            "reason": spec["reason"],
-            "audit_evidence": audit_decision["evidence"],
-        })
+    family_rows.extend(
+        _build_family_rows(counts, present_tags, coverage_evidence, covered_tags, blockers)
+    )
 
     unknown_tags = sorted(tag for tag in present_tags if tag not in HWP_RECORD_TAGS)
     if unknown_tags:
@@ -181,18 +211,7 @@ def build_coverage(
     if not blockers and risk_tags:
         warnings.append("RISK_TAGS_PRESENT_BUT_NOT_BLOCKING")
 
-    present_count = sum(counts.values())
-    covered_count = sum(count for tag, count in counts.items() if tag in covered_tags)
-    decoded_count = sum(
-        count
-        for tag, count in counts.items()
-        if tag in DECODED_DOCINFO_TAGS
-        or tag in DECODED_BODY_LAYOUT_TAGS
-        or tag in DECODED_PAGE_LAYOUT_TAGS
-        or tag in DECODED_TABLE_LAYOUT_TAGS
-        or tag in DECODED_SHAPE_LAYOUT_TAGS
-        or tag in FULL_SUPPORTED_TAGS
-    )
+    present_count, covered_count, decoded_count = _summarize_tag_counts(counts, covered_tags)
     return {
         "status": "PASS" if not blockers else "FAIL",
         "full_fidelity_ready": not blockers,
@@ -232,17 +251,19 @@ def build_coverage(
         "next_decoder_targets": next_decoder_targets(
             counts,
             bindata_streams,
+            {
+                16: document_properties_coverage,
+                17: id_mappings_coverage,
+                19: fontface_coverage,
+                20: border_fill_coverage,
+                21: char_shape_coverage,
+                23: numbering_coverage,
+                25: para_shape_coverage,
+                77: table_coverage,
+                85: picture_coverage,
+                88: equation_coverage,
+            },
             bindata_coverage,
-            document_properties_coverage,
-            id_mappings_coverage,
-            fontface_coverage,
-            border_fill_coverage,
-            char_shape_coverage,
-            para_shape_coverage,
-            table_coverage,
-            numbering_coverage,
-            equation_coverage,
-            picture_coverage,
         ),
     }
 
@@ -1819,43 +1840,12 @@ def _bindata_numeric_id(stream_name: str) -> int | None:
     return int(digits)
 
 
-def next_decoder_targets(
-    counts: Counter[int],
-    bindata_streams: list[str],
-    bindata_coverage: dict[str, Any] | None = None,
-    document_properties_coverage: dict[str, Any] | None = None,
-    id_mappings_coverage: dict[str, Any] | None = None,
-    fontface_coverage: dict[str, Any] | None = None,
-    border_fill_coverage: dict[str, Any] | None = None,
-    char_shape_coverage: dict[str, Any] | None = None,
-    para_shape_coverage: dict[str, Any] | None = None,
-    table_coverage: dict[str, Any] | None = None,
-    numbering_coverage: dict[str, Any] | None = None,
-    equation_coverage: dict[str, Any] | None = None,
-    picture_coverage: dict[str, Any] | None = None,
+def _priority_tag_targets(
+    counts: Counter[int], coverage_by_tag: dict[int, dict[str, Any] | None]
 ) -> list[dict[str, Any]]:
-    priority_tags = [16, 17, 19, 20, 21, 23, 24, 25, 77, 85, 88]
     targets = []
-    for tag in priority_tags:
-        if tag == 16 and (document_properties_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 17 and (id_mappings_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 19 and (fontface_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 20 and (border_fill_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 21 and (char_shape_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 23 and (numbering_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 25 and (para_shape_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 77 and (table_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 85 and (picture_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 88 and (equation_coverage or {}).get("status") == "PASS":
+    for tag in (16, 17, 19, 20, 21, 23, 24, 25, 77, 85, 88):
+        if (coverage_by_tag.get(tag) or {}).get("status") == "PASS":
             continue
         count = counts.get(tag, 0)
         if count:
@@ -1865,6 +1855,16 @@ def next_decoder_targets(
                 "count": count,
                 "action": decoder_action(tag),
             })
+    return targets
+
+
+def next_decoder_targets(
+    counts: Counter[int],
+    bindata_streams: list[str],
+    coverage_by_tag: dict[int, dict[str, Any] | None],
+    bindata_coverage: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    targets = _priority_tag_targets(counts, coverage_by_tag)
     if bindata_streams and (bindata_coverage or {}).get("status") != "PASS":
         targets.append({
             "tag_id": 18,

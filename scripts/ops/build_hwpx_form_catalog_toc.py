@@ -9,6 +9,7 @@
 
 사용: python scripts/ops/build_hwpx_form_catalog_toc.py
 """
+
 from __future__ import annotations
 
 import json
@@ -46,22 +47,7 @@ def _group_counts(rows: list[sqlite3.Row], key: str) -> list[tuple[str, int]]:
     return sorted(counts.items(), key=lambda x: -x[1])
 
 
-def build() -> dict:
-    if not DB_PATH.exists():
-        raise SystemExit(f"카탈로그 DB 없음: {DB_PATH}")
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    with _conn() as c:
-        rows = _fetch_rows(c)
-
-    by_inst = _group_counts(rows, "institution")
-    by_doc = _group_counts(rows, "doc_type")
-    by_kind = _group_counts(rows, "form_kind")
-    fillable_n = sum(1 for r in rows if r["fillable"])
-
-    # ── xlsx: 요약 시트 + 상세 시트 ──────────────────────────────────────
-    wb = openpyxl.Workbook()
-    ws_sum = wb.active
+def _build_summary_sheet(ws_sum, rows, fillable_n, by_inst, by_doc, by_kind) -> None:
     ws_sum.title = "요약"
     ws_sum.append(["구분", "값"])
     ws_sum["A1"].font = ws_sum["B1"].font = Font(bold=True)
@@ -86,27 +72,8 @@ def build() -> dict:
     ws_sum.column_dimensions["A"].width = 40
     ws_sum.column_dimensions["B"].width = 12
 
-    ws_detail = wb.create_sheet("전체 목차")
-    header = ["form_id", "서식명", "발행기관", "문서유형", "서식종류", "입력가능", "입력칸수", "법적근거"]
-    ws_detail.append(header)
-    for cell in ws_detail[1]:
-        cell.font = Font(bold=True)
-    for r in rows:
-        ws_detail.append([
-            r["form_id"], r["clean_name"] or r["name"], r["institution"] or "",
-            r["doc_type"] or "", r["form_kind"] or "",
-            "Y" if r["fillable"] else "N", r["input_count"] or 0,
-            (r["legal_basis"] or "")[:200],
-        ])
-    widths = {"A": 10, "B": 52, "C": 16, "D": 12, "E": 12, "F": 10, "G": 10, "H": 40}
-    for col, w in widths.items():
-        ws_detail.column_dimensions[col].width = w
-    ws_detail.freeze_panes = "A2"
 
-    xlsx_path = OUT_DIR / "hwpx_form_catalog_toc.xlsx"
-    wb.save(xlsx_path)
-
-    # ── 요약 md(사람이 채팅창 밖에서 훑어볼 것) ─────────────────────────
+def _write_toc_summary_md(out_path, rows, fillable_n, by_inst, by_doc, by_kind) -> None:
     md_lines = [
         "# HWPX 서식 카탈로그 목차 요약",
         "",
@@ -124,16 +91,72 @@ def build() -> dict:
     md_lines.append("## 서식종류(form_kind)")
     for k, n in by_kind:
         md_lines.append(f"- {k}: {n}건")
-    (OUT_DIR / "toc_summary.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    out_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+
+def build() -> dict:
+    if not DB_PATH.exists():
+        raise SystemExit(f"카탈로그 DB 없음: {DB_PATH}")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    with _conn() as c:
+        rows = _fetch_rows(c)
+
+    by_inst = _group_counts(rows, "institution")
+    by_doc = _group_counts(rows, "doc_type")
+    by_kind = _group_counts(rows, "form_kind")
+    fillable_n = sum(1 for r in rows if r["fillable"])
+
+    # ── xlsx: 요약 시트 + 상세 시트 ──────────────────────────────────────
+    wb = openpyxl.Workbook()
+    _build_summary_sheet(wb.active, rows, fillable_n, by_inst, by_doc, by_kind)
+
+    ws_detail = wb.create_sheet("전체 목차")
+    header = [
+        "form_id",
+        "서식명",
+        "발행기관",
+        "문서유형",
+        "서식종류",
+        "입력가능",
+        "입력칸수",
+        "법적근거",
+    ]
+    ws_detail.append(header)
+    for cell in ws_detail[1]:
+        cell.font = Font(bold=True)
+    for r in rows:
+        ws_detail.append([
+            r["form_id"],
+            r["clean_name"] or r["name"],
+            r["institution"] or "",
+            r["doc_type"] or "",
+            r["form_kind"] or "",
+            "Y" if r["fillable"] else "N",
+            r["input_count"] or 0,
+            (r["legal_basis"] or "")[:200],
+        ])
+    widths = {"A": 10, "B": 52, "C": 16, "D": 12, "E": 12, "F": 10, "G": 10, "H": 40}
+    for col, w in widths.items():
+        ws_detail.column_dimensions[col].width = w
+    ws_detail.freeze_panes = "A2"
+
+    xlsx_path = OUT_DIR / "hwpx_form_catalog_toc.xlsx"
+    wb.save(xlsx_path)
+
+    # ── 요약 md(사람이 채팅창 밖에서 훑어볼 것) ─────────────────────────
+    _write_toc_summary_md(OUT_DIR / "toc_summary.md", rows, fillable_n, by_inst, by_doc, by_kind)
 
     # ── 사이드 메뉴 뷰어(html, JSON 인라인 - 서버 없이 바로 열림) ─────────
     items = [
         {
-            "id": r["form_id"], "name": r["clean_name"] or r["name"],
+            "id": r["form_id"],
+            "name": r["clean_name"] or r["name"],
             "inst": (r["institution"] or "(미분류)").strip() or "(미분류)",
             "doc": (r["doc_type"] or "(미분류)").strip() or "(미분류)",
             "kind": (r["form_kind"] or "(미분류)").strip() or "(미분류)",
-            "fillable": bool(r["fillable"]), "inputCount": r["input_count"] or 0,
+            "fillable": bool(r["fillable"]),
+            "inputCount": r["input_count"] or 0,
             "sourcePath": r["source_path"] or "",
         }
         for r in rows
@@ -142,14 +165,23 @@ def build() -> dict:
     viewer_path = OUT_DIR / "catalog_toc_viewer.html"
     viewer_path.write_text(viewer_html, encoding="utf-8")
 
-    return {"total": len(rows), "fillable": fillable_n, "xlsx": str(xlsx_path),
-            "viewer": str(viewer_path), "by_inst_top5": by_inst[:5], "by_doc": by_doc}
+    return {
+        "total": len(rows),
+        "fillable": fillable_n,
+        "xlsx": str(xlsx_path),
+        "viewer": str(viewer_path),
+        "by_inst_top5": by_inst[:5],
+        "by_doc": by_doc,
+    }
 
 
 def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> str:
     data_json = json.dumps(items, ensure_ascii=False)
-    groups_json = json.dumps({"발행기관": by_inst, "문서유형": by_doc, "서식종류": by_kind}, ensure_ascii=False)
-    return """<!DOCTYPE html>
+    groups_json = json.dumps(
+        {"발행기관": by_inst, "문서유형": by_doc, "서식종류": by_kind}, ensure_ascii=False
+    )
+    return (
+        """<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HWPX 서식 카탈로그 목차</title>
@@ -547,9 +579,14 @@ renderSidebar();
 renderTable();
 </script>
 </body></html>
-""".replace("__DATA_JSON__", data_json).replace("__GROUPS_JSON__", groups_json) \
-   .replace("__TOTAL__", str(total)).replace("__FILLABLE__", str(fillable_n)) \
-   .replace("__TOTAL_FMT__", f"{total:,}").replace("__FILLABLE_FMT__", f"{fillable_n:,}")
+"""
+        .replace("__DATA_JSON__", data_json)
+        .replace("__GROUPS_JSON__", groups_json)
+        .replace("__TOTAL__", str(total))
+        .replace("__FILLABLE__", str(fillable_n))
+        .replace("__TOTAL_FMT__", f"{total:,}")
+        .replace("__FILLABLE_FMT__", f"{fillable_n:,}")
+    )
 
 
 if __name__ == "__main__":

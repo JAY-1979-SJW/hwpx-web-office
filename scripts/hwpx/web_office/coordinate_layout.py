@@ -168,10 +168,7 @@ def _extract_section(path, secname, row_scale=1.0):
                 file=sys.stderr,
             )
 
-    def emit_para(p, block_idx=None):
-        txt, spans = own_runs(p)
-        segs = direct_linesegs(p)
-        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
+    def _container_object_heights(p):
         # 인라인 개체(이미지 container 등, pos.treatAsChar=1) 앵커 lineseg
         # 검출 — 텍스트는 없지만(own_runs 는 개체를 문자로 안 셈) 한컴이
         # 그 개체 높이를 vertsize 에 그대로 기록해 둔다(실측: curSz.height
@@ -193,6 +190,33 @@ def _extract_section(path, secname, row_scale=1.0):
                     _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
                 except (TypeError, ValueError):
                     pass
+        return _obj_heights
+
+    def _resolve_row_flow_overflow_y(st, page_h, m_top, vpos, h, y):
+        if vpos < 1.0:
+            # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
+            # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
+            # 뜻)인 경우가 흔하다 — 작은(한 페이지짜리) 표 바로
+            # 뒤에 오는 제목 문단이 전부 이 패턴이라, 페이지를
+            # 통째로 건너뛰면(과거 동작) 표마다 빈 페이지가
+            # 하나씩 낭비된다(실사례: 표 6개 문서가 6쪽 → 실제로
+            # 필요 없는 빈 페이지로 부풀려짐). 앵커처럼 흐름
+            # 위치에 그대로 붙인다(페이지 전진 없음).
+            return st["flow_y"]
+        # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
+        # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
+        _guard = 0
+        while y < st["flow_y"] - max(h * 1.5, 20.0) and _guard < 6:
+            st["page_idx"] += 1
+            y = (st["page_idx"] * page_h) + m_top + vpos * HU
+            _guard += 1
+        return y
+
+    def emit_para(p, block_idx=None):
+        txt, spans = own_runs(p)
+        segs = direct_linesegs(p)
+        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
+        _obj_heights = _container_object_heights(p)
         for i, s in enumerate(segs):
             vpos = float(s.get("vertpos", "0"))
             a = int(s.get("textpos", "0") or "0")
@@ -222,24 +246,7 @@ def _extract_section(path, secname, row_scale=1.0):
             # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
             # 증가), 1.5줄 이상 실침범 시에만 발동.
             if i == 0 and page_h > 0 and line_txt.strip() and y < st["flow_y"] - max(h * 1.5, 20.0):
-                if vpos < 1.0:
-                    # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
-                    # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
-                    # 뜻)인 경우가 흔하다 — 작은(한 페이지짜리) 표 바로
-                    # 뒤에 오는 제목 문단이 전부 이 패턴이라, 페이지를
-                    # 통째로 건너뛰면(과거 동작) 표마다 빈 페이지가
-                    # 하나씩 낭비된다(실사례: 표 6개 문서가 6쪽 → 실제로
-                    # 필요 없는 빈 페이지로 부풀려짐). 앵커처럼 흐름
-                    # 위치에 그대로 붙인다(페이지 전진 없음).
-                    y = st["flow_y"]
-                else:
-                    # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
-                    # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
-                    _guard = 0
-                    while y < st["flow_y"] - max(h * 1.5, 20.0) and _guard < 6:
-                        st["page_idx"] += 1
-                        y = (st["page_idx"] * page_h) + m_top + vpos * HU
-                        _guard += 1
+                y = _resolve_row_flow_overflow_y(st, page_h, m_top, vpos, h, y)
             line = {
                 "text": line_txt,
                 "segments": slice_segments(txt, spans, a, b),
@@ -644,6 +651,22 @@ def _extract_section(path, secname, row_scale=1.0):
         st["prev_vpos"] = vpos
         return (st["page_idx"] * page_h) + m_top + vpos * HU
 
+    def _lookahead_anchor_vpos(el, child):
+        # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
+        # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
+        # 신호로 마지막 표에 전달한다.
+        seen = False
+        for sib in el:
+            if seen and ln(sib.tag) == "p":
+                if any(ln(t.tag) == "tbl" for t in sib.iter()):
+                    break  # 다음 표 그룹 — 앵커 아님
+                sgs = direct_linesegs(sib)
+                if sgs and own_text(sib).strip():
+                    return float(sgs[0].get("vertpos", "0")) * HU
+            if sib is child:
+                seen = True
+        return None
+
     def walk(el):
         block_idx = 0
         for child in el:
@@ -678,21 +701,7 @@ def _extract_section(path, secname, row_scale=1.0):
                     emit_para(child, this_block_idx)
                 else:
                     _anchor_top = _para_top_y(child)
-                # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
-                # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
-                # 신호로 마지막 표에 전달한다.
-                anchor_vpos = None
-                seen = False
-                for sib in el:
-                    if seen and ln(sib.tag) == "p":
-                        if any(ln(t.tag) == "tbl" for t in sib.iter()):
-                            break  # 다음 표 그룹 — 앵커 아님
-                        sgs = direct_linesegs(sib)
-                        if sgs and own_text(sib).strip():
-                            anchor_vpos = float(sgs[0].get("vertpos", "0")) * HU
-                            break
-                    if sib is child:
-                        seen = True
+                anchor_vpos = _lookahead_anchor_vpos(el, child)
                 # 안전장치 — 다중 표 문서에서 뒤쪽 표의 호스트 문단 앵커가
                 # (page_idx 갱신 어긋남 등으로) 이전 표보다 앞선 y 를 내면
                 # 표끼리 겹쳐 쪽수가 왜곡되는 회귀가 실사례로 확인됨(마커
@@ -954,7 +963,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
             try:
                 orig_tbls = _table_id_sequence(str(cand))
                 norm_tbls = _table_id_sequence(str(norm))
-            except Exception as exc:  # noqa: BLE001 — fail-safe(아래 설명), 원인은 로그에 남김
+            except Exception as exc:  # ruff: ignore[blind-except] — fail-safe(아래 설명), 원인은 로그에 남김
                 # 표 소실 확인 로직 자체가 실패하면 "확인 안 됐으니 정규화본을
                 # 믿는다"가 아니라 fail-safe — 원본 유지 + 로그(대표님 지적,
                 # 아래 count 기반 폐기와 같은 원칙: 무음이면 원인추적 불가).
@@ -972,7 +981,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
                 else:
                     extract_from = norm
                     normalized = True
-    except Exception as exc:  # noqa: BLE001 — fail-safe: extract_from 은 이미 cand(원본)
+    except Exception as exc:  # ruff: ignore[blind-except] — fail-safe: extract_from 은 이미 cand(원본)
         # 이 블록(모듈 import·normalize_for_layout 호출) 전체가 실패해도
         # 위와 같은 원칙으로 로그를 남긴다(무음이면 원인추적 불가).
         normalization_discarded = {"reason": "normalize_block_failed", "error": str(exc)}
@@ -981,7 +990,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         from .hancom_layout_refresh import get_row_scale
 
         _rs = get_row_scale(cand, project_root=root)
-    except Exception:  # noqa: BLE001 — 캘리브레이션 실패 시 배율 없음(1.0)으로 안전 폴백
+    except Exception:  # ruff: ignore[blind-except] — 캘리브레이션 실패 시 배율 없음(1.0)으로 안전 폴백
         _rs = 1.0
     layout = extract(str(extract_from), row_scale=_rs)
     if abs(_rs - 1.0) > 1e-3:
@@ -1000,7 +1009,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
             layout["cellIdRemapped"] = _remap_cell_ids_to_source(
                 layout, str(cand), str(extract_from)
             )
-        except Exception as exc:  # noqa: BLE001 — fail-safe: 재매핑 확인 실패 시 정규화 폐기
+        except Exception as exc:  # ruff: ignore[blind-except] — fail-safe: 재매핑 확인 실패 시 정규화 폐기
             # 재매핑 실패를 모른 채 넘어가면 뒤쪽 표들의 입력칸·편집 연결이
             # 통째로 끊길 수 있다(위 docstring 참고) — 정규화를 버리고 원본
             # 레이아웃으로 재추출한다(무음이면 원인추적 불가 원칙은 동일).
@@ -1054,7 +1063,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         _dig = _hl.sha256(cand.read_bytes()).hexdigest()[:16]
         _done = _truth_dir(root) / _dig / "DONE"
         layout["hancomPages"] = int(_done.read_text(encoding="ascii")) if _done.is_file() else None
-    except Exception:  # noqa: BLE001 — 배경 정합은 표시 품질 보조 기능, 실패 시 안전 기본값
+    except Exception:  # ruff: ignore[blind-except] — 배경 정합은 표시 품질 보조 기능, 실패 시 안전 기본값
         layout["truthAligned"] = False
         layout["hancomPages"] = None
     return layout

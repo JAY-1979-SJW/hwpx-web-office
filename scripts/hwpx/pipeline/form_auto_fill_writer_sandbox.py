@@ -150,6 +150,18 @@ class SandboxWriteResult:
 # ── 타겟 위치 탐색 ────────────────────────────────────────────────────────────
 
 
+def _label_match_confidence(txt: str, af, clf) -> float:
+    if _norm(txt) == _norm(af.label):
+        return 0.95
+    if clf.semanticField and clf.semanticField == af.fieldKey:
+        return 0.90
+    if len(_norm(af.label)) >= 2 and (
+        _norm(af.label) in _norm(txt) or _norm(txt) in _norm(af.label)
+    ):
+        return 0.70  # 부분 일치 (TARGET_CONF_MIN 미만)
+    return 0.0
+
+
 def _resolve_targets(template_path: Path, approved_fields: list) -> dict:
     """
     HWPX template에서 각 approved_field의 쓰기 위치를 탐색.
@@ -179,15 +191,7 @@ def _resolve_targets(template_path: Path, approved_fields: list) -> dict:
                                 continue
                             clf = classify_label(txt)
                             for af in approved_fields:
-                                conf = 0.0
-                                if _norm(txt) == _norm(af.label):
-                                    conf = 0.95
-                                elif clf.semanticField and clf.semanticField == af.fieldKey:
-                                    conf = 0.90
-                                elif len(_norm(af.label)) >= 2 and (
-                                    _norm(af.label) in _norm(txt) or _norm(txt) in _norm(af.label)
-                                ):
-                                    conf = 0.70  # 부분 일치 (TARGET_CONF_MIN 미만)
+                                conf = _label_match_confidence(txt, af, clf)
                                 if conf > 0:
                                     candidates.setdefault(af.fieldKey, []).append(
                                         WriteTarget(sec_name, ti, ri, ci + 1, txt, conf)
@@ -195,28 +199,22 @@ def _resolve_targets(template_path: Path, approved_fields: list) -> dict:
     except (zipfile.BadZipFile, OSError):
         pass
 
-    results: dict = {}
-    for af in approved_fields:
-        cands = candidates.get(af.fieldKey, [])
-        if not cands:
-            results[af.fieldKey] = (BLOCKED_NO_TARGET_LOCATION, "label not found in template")
-        else:
-            unique_locs = {(c.section_name, c.table_idx, c.row_idx, c.col_idx) for c in cands}
-            if len(unique_locs) > 1:
-                results[af.fieldKey] = (
-                    BLOCKED_AMBIGUOUS_TARGET,
-                    f"{len(unique_locs)} distinct locations",
-                )
-            else:
-                best = max(cands, key=lambda c: c.confidence)
-                if best.confidence < TARGET_CONF_MIN:
-                    results[af.fieldKey] = (
-                        BLOCKED_LOW_TARGET_CONFIDENCE,
-                        f"conf={best.confidence:.2f} < {TARGET_CONF_MIN}",
-                    )
-                else:
-                    results[af.fieldKey] = best
-    return results
+    return {
+        af.fieldKey: _resolve_field_target(candidates.get(af.fieldKey, []))
+        for af in approved_fields
+    }
+
+
+def _resolve_field_target(cands: list[WriteTarget]):
+    if not cands:
+        return (BLOCKED_NO_TARGET_LOCATION, "label not found in template")
+    unique_locs = {(c.section_name, c.table_idx, c.row_idx, c.col_idx) for c in cands}
+    if len(unique_locs) > 1:
+        return (BLOCKED_AMBIGUOUS_TARGET, f"{len(unique_locs)} distinct locations")
+    best = max(cands, key=lambda c: c.confidence)
+    if best.confidence < TARGET_CONF_MIN:
+        return (BLOCKED_LOW_TARGET_CONFIDENCE, f"conf={best.confidence:.2f} < {TARGET_CONF_MIN}")
+    return best
 
 
 # ── 쓰기 실행 ─────────────────────────────────────────────────────────────────
@@ -367,6 +365,51 @@ def _readback_verify(
 # ── 메인 진입점 ───────────────────────────────────────────────────────────────
 
 
+def _append_pre_write_blocked_fields(result, approval_result, action_hold) -> None:
+    for af in approval_result.approvedFields:
+        if not af.writerEligible:
+            result.blockedFields.append({
+                "fieldKey": af.fieldKey,
+                "label": af.label,
+                "blockedReason": BLOCKED_NOT_APPROVED,
+                "decisionAction": af.action,
+            })
+        elif not af.value:
+            result.blockedFields.append({
+                "fieldKey": af.fieldKey,
+                "label": af.label,
+                "blockedReason": BLOCKED_NO_VALUE,
+                "decisionAction": af.action,
+            })
+    for pf in approval_result.pendingFields:
+        reason = BLOCKED_HOLD if pf.action == action_hold else BLOCKED_ATTACHMENT_REQUIRED
+        result.blockedFields.append({
+            "fieldKey": pf.fieldKey,
+            "label": pf.label,
+            "blockedReason": reason,
+            "decisionAction": pf.action,
+        })
+
+
+def _split_writable_fields(approved: list, targets: dict, result) -> list:
+    writable = []
+    for af in approved:
+        target = targets.get(af.fieldKey)
+        if isinstance(target, WriteTarget):
+            writable.append(af)
+        else:
+            reason, _detail = (
+                target if isinstance(target, tuple) else (BLOCKED_NO_TARGET_LOCATION, "")
+            )
+            result.blockedFields.append({
+                "fieldKey": af.fieldKey,
+                "label": af.label,
+                "blockedReason": reason,
+                "decisionAction": af.action,
+            })
+    return writable
+
+
 def run_sandbox_write(
     approval_result,
     template_path: Path,
@@ -401,30 +444,7 @@ def run_sandbox_write(
         if af.writerEligible and af.action not in (ACTION_HOLD, ACTION_ATTACHMENT) and af.value
     ]
 
-    # 차단 목록 구성
-    for af in approval_result.approvedFields:
-        if not af.writerEligible:
-            result.blockedFields.append({
-                "fieldKey": af.fieldKey,
-                "label": af.label,
-                "blockedReason": BLOCKED_NOT_APPROVED,
-                "decisionAction": af.action,
-            })
-        elif not af.value:
-            result.blockedFields.append({
-                "fieldKey": af.fieldKey,
-                "label": af.label,
-                "blockedReason": BLOCKED_NO_VALUE,
-                "decisionAction": af.action,
-            })
-    for pf in approval_result.pendingFields:
-        reason = BLOCKED_HOLD if pf.action == ACTION_HOLD else BLOCKED_ATTACHMENT_REQUIRED
-        result.blockedFields.append({
-            "fieldKey": pf.fieldKey,
-            "label": pf.label,
-            "blockedReason": reason,
-            "decisionAction": pf.action,
-        })
+    _append_pre_write_blocked_fields(result, approval_result, ACTION_HOLD)
 
     targets = _resolve_targets(template_path, approved)
 
@@ -463,21 +483,7 @@ def run_sandbox_write(
         return result
 
     # 타겟 있는 필드만 쓰기, 없는 필드는 차단
-    writable = []
-    for af in approved:
-        target = targets.get(af.fieldKey)
-        if isinstance(target, WriteTarget):
-            writable.append(af)
-        else:
-            reason, detail = (
-                target if isinstance(target, tuple) else (BLOCKED_NO_TARGET_LOCATION, "")
-            )
-            result.blockedFields.append({
-                "fieldKey": af.fieldKey,
-                "label": af.label,
-                "blockedReason": reason,
-                "decisionAction": af.action,
-            })
+    writable = _split_writable_fields(approved, targets, result)
 
     write_results = _do_write(template_path, output_path, targets, writable)
     write_results = _readback_verify(output_path, targets, writable, write_results)

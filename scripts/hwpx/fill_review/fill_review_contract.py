@@ -290,7 +290,7 @@ def _find_value_cell_for_label(cells: list[dict], label_cell: dict) -> dict | No
 # ── public API ──────────────────────────────────────────────────────────────
 
 
-def make_document_recognition_result(
+def make_document_recognition_result(  # ruff: ignore[too-many-arguments] -- 38곳 키워드 인자 호출부(테스트 보조 빌더), 시그니처 변경 보류
     *,
     documentId: str = "",
     sourceDocumentHash: str = "",

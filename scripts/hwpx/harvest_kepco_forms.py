@@ -106,16 +106,9 @@ def fetch(fid: int, retries: int = 3):
     return None, "", ""
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--max-id", type=int, default=1000)
-    ap.add_argument("--delay", type=float, default=0.3)
-    args = ap.parse_args()
-
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    done = load_done()
+def _load_seen_hashes() -> set[str]:
+    """기존 인덱스의 해시도 로드(중복제거)."""
     seen_hash: set[str] = set()
-    # 기존 인덱스의 해시도 로드(중복제거)
     if INDEX.exists():
         for line in INDEX.read_text(encoding="utf-8", errors="ignore").splitlines():
             try:
@@ -124,6 +117,24 @@ def main():
                     seen_hash.add(r["sha256"])
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass
+    return seen_hash
+
+
+def _classify_extension(name: str, data: bytes) -> str:
+    return Path(name).suffix.lower().lstrip(".") or (
+        "hwp" if data[:8] == HWP_OLE else "hwpx" if data[:2] == b"PK" else "bin"
+    )
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--max-id", type=int, default=1000)
+    ap.add_argument("--delay", type=float, default=0.3)
+    args = ap.parse_args()
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    done = load_done()
+    seen_hash = _load_seen_hashes()
 
     _log(f"[start] ID 1..{args.max_id} 스캔 · 이미처리 {len(done)}")
     t0 = time.time()
@@ -147,9 +158,7 @@ def main():
                 time.sleep(args.delay)
                 continue
             name = _filename_from_cd(cd) or f"kepco_{fid}"
-            ext = Path(name).suffix.lower().lstrip(".") or (
-                "hwp" if data[:8] == HWP_OLE else "hwpx" if data[:2] == b"PK" else "bin"
-            )
+            ext = _classify_extension(name, data)
             if ext == "hwp":
                 hwp += 1
             elif ext == "hwpx":

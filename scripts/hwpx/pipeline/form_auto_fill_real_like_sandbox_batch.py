@@ -13,9 +13,10 @@ import argparse
 import hashlib
 import json
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 try:
     from hwpx.pipeline import form_auto_fill_real_file_preflight as pf
@@ -63,18 +64,22 @@ class BatchOptions:
     accept_output: bool = True
 
 
-PreflightRunner = Callable[[Path, list[pf.TargetMapEntry] | None, list[Any], Path, str, bool], dict[str, Any]]
+PreflightRunner = Callable[
+    [Path, list[pf.TargetMapEntry] | None, list[Any], Path, str, bool], dict[str, Any]
+]
 
 
 def _sample_id(index: int, sample_path: Path) -> str:
-    digest = hashlib.sha256(f"{index}:{sample_path.name}".encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha256(f"{index}:{sample_path.name}".encode()).hexdigest()[:10]
     return f"real_like_{index:03d}_{digest}"
 
 
 def _list_candidates(input_dir: Path, limit: int) -> list[Path]:
     if not input_dir.is_dir() or limit <= 0:
         return []
-    return sorted(path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() == ".hwpx")[:limit]
+    return sorted(
+        path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() == ".hwpx"
+    )[:limit]
 
 
 def _security_counts(result: dict[str, Any]) -> dict[str, int]:
@@ -107,7 +112,8 @@ def _file_result(preflight_result: dict[str, Any], status: str) -> dict[str, Any
     return {
         "sampleId": preflight_result.get("sampleId", ""),
         "status": status,
-        "sourceHashChanged": preflight_result.get("sourceHashBefore") != preflight_result.get("sourceHashAfter"),
+        "sourceHashChanged": preflight_result.get("sourceHashBefore")
+        != preflight_result.get("sourceHashAfter"),
         "sourceMtimeChanged": bool(preflight_result.get("sourceMtimeChanged")),
         "writtenFields": int(sandbox.get("writtenFields", 0)),
         "readbackPass": int(sandbox.get("readbackPass", 0)),
@@ -161,7 +167,7 @@ def _verdict(summary: dict[str, int], blocked_files: int, sandbox_only: bool) ->
     return PASS_REAL_LIKE_SANDBOX_BATCH
 
 
-def run_real_like_sandbox_batch(
+def run_real_like_sandbox_batch(  # ruff: ignore[too-many-arguments] -- 여러 곳(테스트·ops·API 라우트)에서 키워드 인자로 호출, 시그니처 변경 보류
     input_dir: Path,
     output_dir: Path,
     limit: int,
@@ -203,7 +209,9 @@ def run_real_like_sandbox_batch(
     for index, sample_path in enumerate(candidates, start=1):
         sample_id = _sample_id(index, sample_path)
         target_map = target_map_by_sample.get(sample_id, pf.default_real_like_target_map())
-        approved_fields = approved_fields_by_sample.get(sample_id, pf.default_real_like_approved_fields())
+        approved_fields = approved_fields_by_sample.get(
+            sample_id, pf.default_real_like_approved_fields()
+        )
         sample_output_dir = options.output_dir / "sandbox_outputs" / sample_id
         preflight = preflight_runner(
             sample_path,
@@ -322,7 +330,9 @@ def _write_safe_json(path: Path, payload: Any) -> None:
 
 
 def _contains_report_leak(text: str) -> bool:
-    return bool(pf.ABS_PATH_RE.search(text) or pf.RAW_FILENAME_RE.search(text) or pf.PII_RE.search(text))
+    return bool(
+        pf.ABS_PATH_RE.search(text) or pf.RAW_FILENAME_RE.search(text) or pf.PII_RE.search(text)
+    )
 
 
 def create_batch_fixture_dir(directory: Path, count: int) -> Path:
@@ -357,9 +367,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     write_batch_reports(batch, Path(args.output_dir))
     print(json.dumps(batch, ensure_ascii=False, indent=2))
-    return 0 if batch["overallVerdict"] in {PASS_REAL_LIKE_SANDBOX_BATCH, WARN_SOME_FILES_BLOCKED} else 1
+    return (
+        0
+        if batch["overallVerdict"] in {PASS_REAL_LIKE_SANDBOX_BATCH, WARN_SOME_FILES_BLOCKED}
+        else 1
+    )
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
