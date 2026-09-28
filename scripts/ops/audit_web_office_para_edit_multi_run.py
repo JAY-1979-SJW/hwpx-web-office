@@ -78,34 +78,48 @@ FORBIDDEN_WRITER_SYMBOLS = [
 ]
 
 
+def _pattern_findings(
+    src: str,
+    required: list[str],
+    required_code: str,
+    forbidden: tuple[str, ...] = (),
+    forbidden_code: str = "",
+) -> list[dict]:
+    findings: list[dict] = []
+    for pat in required:
+        if not re.search(pat, src):
+            findings.append({"code": required_code, "level": "FAIL", "detail": pat})
+    for pat in forbidden:
+        if re.search(pat, src):
+            findings.append({"code": forbidden_code, "level": "FAIL", "detail": pat})
+    return findings
+
+
 def _check_static() -> list[dict]:
     findings: list[dict] = []
     if not OPS.is_file():
         findings.append({"code": "OPS_MISSING", "level": "FAIL", "detail": str(OPS)})
         return findings
     ops_src = OPS.read_text(encoding="utf-8")
-    for pat in REQUIRED_OPS_PATTERNS:
-        if not re.search(pat, ops_src):
-            findings.append({"code": "OPS_PATTERN_MISSING", "level": "FAIL", "detail": pat})
+    findings.extend(_pattern_findings(ops_src, REQUIRED_OPS_PATTERNS, "OPS_PATTERN_MISSING"))
     if not ADAPTER.is_file():
         findings.append({"code": "ADAPTER_MISSING", "level": "FAIL", "detail": str(ADAPTER)})
         return findings
     ad_src = ADAPTER.read_text(encoding="utf-8")
-    for pat in REQUIRED_ADAPTER_PATTERNS:
-        if not re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_ADAPTER_PATTERNS:
-        if re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_FORBIDDEN_FEATURE", "level": "FAIL", "detail": pat})
+    findings.extend(
+        _pattern_findings(
+            ad_src,
+            REQUIRED_ADAPTER_PATTERNS,
+            "ADAPTER_PATTERN_MISSING",
+            FORBIDDEN_ADAPTER_PATTERNS,
+            "ADAPTER_FORBIDDEN_FEATURE",
+        )
+    )
     if SAVE_PIPELINE.is_file():
         sp_src = SAVE_PIPELINE.read_text(encoding="utf-8")
-        for pat in REQUIRED_PIPELINE_PATTERNS:
-            if not re.search(pat, sp_src):
-                findings.append({
-                    "code": "PIPELINE_PATTERN_MISSING",
-                    "level": "FAIL",
-                    "detail": pat,
-                })
+        findings.extend(
+            _pattern_findings(sp_src, REQUIRED_PIPELINE_PATTERNS, "PIPELINE_PATTERN_MISSING")
+        )
     return findings
 
 

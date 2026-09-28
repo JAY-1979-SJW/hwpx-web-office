@@ -285,6 +285,89 @@ def classify_bar_type(table, row: int, date_col_set: set[int]) -> tuple[str, lis
     return "empty_template", ["no_bar_content"]
 
 
+def _scan_bar_segments(
+    cells, row_i: int, bar_type: str, evidence, sorted_date_cols: list[int]
+) -> list[BarRangeInfo]:
+    row_ranges: list[BarRangeInfo] = []
+
+    # 연속 구간 탐지
+    start_col: int | None = None
+    end_col: int | None = None
+    seg_texts: list[str] = []
+    seg_colors: list[str] = []
+
+    def flush(sc, ec, texts, colors):
+        if sc is None:
+            return None
+        bt = bar_type
+        fc = colors[0] if colors else ""
+        txt = " ".join(texts) if texts else ""
+        conf = (
+            0.85 if bt in ("text_full", "color_bar") else (0.75 if bt == "text_partial" else 0.60)
+        )
+        return BarRangeInfo(
+            row=row_i,
+            colStart=sc,
+            colEnd=ec,
+            barType=bt,
+            text=txt[:40],
+            fillColor=fc,
+            confidence=conf,
+            evidence=evidence,
+        )
+
+    for col_i in sorted_date_cols:
+        c = cells.get((row_i, col_i))
+        text = (getattr(c, "normalizedText", "") or "").strip() if c else ""
+        color = (getattr(c, "fillColor", "") or "") if c else ""
+        is_marked_color = bool(color and color.lower() not in ("ffffff", "none", ""))
+        has_content = bool(text) or is_marked_color
+
+        if has_content:
+            if start_col is None:
+                start_col = col_i
+            end_col = col_i
+            if text:
+                seg_texts.append(text)
+            if is_marked_color:
+                seg_colors.append(color)
+        else:
+            r = flush(start_col, end_col, seg_texts, seg_colors)
+            if r:
+                row_ranges.append(r)
+            start_col = None
+            end_col = None
+            seg_texts = []
+            seg_colors = []
+
+    r = flush(start_col, end_col, seg_texts, seg_colors)
+    if r:
+        row_ranges.append(r)
+    return row_ranges
+
+
+def _detect_bar_ranges_for_row(
+    cells, row_i: int, bar_type: str, evidence, sorted_date_cols: list[int]
+) -> list[BarRangeInfo]:
+    row_ranges = _scan_bar_segments(cells, row_i, bar_type, evidence, sorted_date_cols)
+
+    # empty_template은 명시적으로 1개의 범위로 기록
+    if bar_type == "empty_template" and not any(br.row == row_i for br in row_ranges):
+        row_ranges.append(
+            BarRangeInfo(
+                row=row_i,
+                colStart=sorted_date_cols[0],
+                colEnd=sorted_date_cols[-1],
+                barType="empty_template",
+                text="",
+                fillColor="",
+                confidence=0.60,
+                evidence=evidence,
+            )
+        )
+    return row_ranges
+
+
 def detect_bar_ranges(
     table, axis: TimeAxisInfo, task_rows: list[TaskRowInfo]
 ) -> list[BarRangeInfo]:
@@ -299,78 +382,9 @@ def detect_bar_ranges(
     for tr in task_rows:
         row_i = tr.row
         bar_type, evidence = classify_bar_type(table, row_i, date_col_set)
-
-        # 연속 구간 탐지
-        start_col: int | None = None
-        end_col: int | None = None
-        seg_texts: list[str] = []
-        seg_colors: list[str] = []
-
-        def flush(  # ruff: ignore[too-many-arguments] (중첩 헬퍼, 외부 호출 불가 — 루프 변수 바인딩용 기본값)
-            sc, ec, texts, colors, bar_type=bar_type, row_i=row_i, evidence=evidence
-        ):
-            if sc is None:
-                return None
-            bt = bar_type
-            fc = colors[0] if colors else ""
-            txt = " ".join(texts) if texts else ""
-            conf = (
-                0.85
-                if bt in ("text_full", "color_bar")
-                else (0.75 if bt == "text_partial" else 0.60)
-            )
-            return BarRangeInfo(
-                row=row_i,
-                colStart=sc,
-                colEnd=ec,
-                barType=bt,
-                text=txt[:40],
-                fillColor=fc,
-                confidence=conf,
-                evidence=evidence,
-            )
-
-        for col_i in sorted_date_cols:
-            c = cells.get((row_i, col_i))
-            text = (getattr(c, "normalizedText", "") or "").strip() if c else ""
-            color = (getattr(c, "fillColor", "") or "") if c else ""
-            has_content = bool(text) or bool(color and color.lower() not in ("ffffff", "none", ""))
-
-            if has_content:
-                if start_col is None:
-                    start_col = col_i
-                end_col = col_i
-                if text:
-                    seg_texts.append(text)
-                if color and color.lower() not in ("ffffff", "none", ""):
-                    seg_colors.append(color)
-            else:
-                r = flush(start_col, end_col, seg_texts, seg_colors)
-                if r:
-                    ranges.append(r)
-                start_col = None
-                end_col = None
-                seg_texts = []
-                seg_colors = []
-
-        r = flush(start_col, end_col, seg_texts, seg_colors)
-        if r:
-            ranges.append(r)
-
-        # empty_template은 명시적으로 1개의 범위로 기록
-        if bar_type == "empty_template" and not any(br.row == row_i for br in ranges):
-            ranges.append(
-                BarRangeInfo(
-                    row=row_i,
-                    colStart=sorted_date_cols[0],
-                    colEnd=sorted_date_cols[-1],
-                    barType="empty_template",
-                    text="",
-                    fillColor="",
-                    confidence=0.60,
-                    evidence=evidence,
-                )
-            )
+        ranges.extend(
+            _detect_bar_ranges_for_row(cells, row_i, bar_type, evidence, sorted_date_cols)
+        )
 
     return ranges
 
@@ -641,6 +655,33 @@ def map_date_range_to_columns(
 # ── STEP 4: task row 매칭 ─────────────────────────────────────────────────────
 
 
+def _find_task_row_by_contains(
+    task_rows: list[TaskRowInfo], task_name: str
+) -> tuple[TaskRowInfo, float, list[str], str | None] | None:
+    candidates = [tr for tr in task_rows if task_name in tr.taskName or tr.taskName in task_name]
+    if len(candidates) == 1:
+        return candidates[0], 0.80, [f"contains_match={task_name!r}"], None
+    if len(candidates) > 1:
+        # 가장 짧은 것 (가장 구체적)
+        best = min(candidates, key=lambda t: len(t.taskName))
+        return (
+            best,
+            0.65,
+            [f"multi_contains_match={task_name!r}", f"selected={best.taskName!r}"],
+            f"multiple matches for {task_name!r}",
+        )
+    return None
+
+
+def _find_task_row_by_trade(
+    task_rows: list[TaskRowInfo], trade: str
+) -> tuple[TaskRowInfo, float, list[str], str | None] | None:
+    for tr in task_rows:
+        if trade in (tr.trade or "") or trade in " ".join(tr.leftText or []):
+            return tr, 0.60, [f"trade_match={trade!r}"], "matched via trade only"
+    return None
+
+
 def find_task_row(
     task_rows: list[TaskRowInfo],
     task_name: str | None = None,
@@ -665,24 +706,15 @@ def find_task_row(
             return tr, 0.95, [f"exact_match={task_name!r}"], None
 
     # 우선순위 3: contains match
-    candidates = [tr for tr in task_rows if task_name in tr.taskName or tr.taskName in task_name]
-    if len(candidates) == 1:
-        return candidates[0], 0.80, [f"contains_match={task_name!r}"], None
-    if len(candidates) > 1:
-        # 가장 짧은 것 (가장 구체적)
-        best = min(candidates, key=lambda t: len(t.taskName))
-        return (
-            best,
-            0.65,
-            [f"multi_contains_match={task_name!r}", f"selected={best.taskName!r}"],
-            f"multiple matches for {task_name!r}",
-        )
+    contains_result = _find_task_row_by_contains(task_rows, task_name)
+    if contains_result is not None:
+        return contains_result
 
     # 우선순위 4: trade + taskName
     if trade:
-        for tr in task_rows:
-            if trade in (tr.trade or "") or trade in " ".join(tr.leftText or []):
-                return tr, 0.60, [f"trade_match={trade!r}"], "matched via trade only"
+        trade_result = _find_task_row_by_trade(task_rows, trade)
+        if trade_result is not None:
+            return trade_result
 
     return None, 0.0, [f"no_match_for={task_name!r}"], f"task not found: {task_name!r}"
 

@@ -13,6 +13,7 @@ FillReviewItem / MissingMaterialRequest / ApprovedEditPlan을
 공식 paragraph 전체 교체 operation 이름은 setParagraphText로 고정한다.
 setCellParagraphText는 금지된 이름이다.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,17 +22,19 @@ from dataclasses import dataclass, field
 from .fill_review_contract import (
     ALLOWED_DECISIONS,
     DECISION_APPROVE,
-    DECISION_HOLD,
     DECISION_EDIT_VALUE,
+    DECISION_HOLD,
     DECISION_REQUEST_MATERIAL,
-    SCHEMA_VERSION as CONTRACT_SCHEMA_VERSION,
-    OFFICIAL_PARAGRAPH_FULL_REPLACE_OP,
     FORBIDDEN_PARAGRAPH_OP_NAMES,
+    OFFICIAL_PARAGRAPH_FULL_REPLACE_OP,
+    RISK_HIGH,
+    RISK_LOW,
     STATUS_MATCHED,
     STATUS_NEEDS_USER_INPUT,
     STATUS_READY_FOR_REVIEW,
-    RISK_LOW,
-    RISK_HIGH,
+)
+from .fill_review_contract import (
+    SCHEMA_VERSION as CONTRACT_SCHEMA_VERSION,
 )
 
 UI_SCHEMA_VERSION = "fill_review_ui_v1"
@@ -83,6 +86,7 @@ class DecisionValidationResult:
 
 
 # ── target display & highlight ───────────────────────────────────────────────
+
 
 def _parse_cell_key(cell_key: str | None):
     """t_s{section}_{table:03d}:r{row}:c{col} → (section, table, row, col)."""
@@ -221,91 +225,60 @@ def _section_title_for(section_idx: int | None) -> str:
 
 # ── main builder ─────────────────────────────────────────────────────────────
 
-def build_fill_review_page_payload(recognition_result: dict,
-                                          review_items: list[dict],
-                                          missing_requests: list[dict],
-                                          evidence_sources: list[dict] | None = None) -> dict:
-    """브라우저 검수 화면 payload 생성."""
-    evidence_index: dict[str, dict] = {}
-    for ev in (evidence_sources or []):
-        if isinstance(ev, dict) and ev.get("evidenceId"):
-            evidence_index[ev["evidenceId"]] = ev
 
-    requests_by_req: dict[str, list[dict]] = {}
-    for r in (missing_requests or []):
-        requests_by_req.setdefault(r.get("requirementId", ""), []).append(r)
+def _review_item_flags(item_status: str | None, risk_level: str | None) -> tuple[bool, bool, bool]:
+    is_missing = item_status == STATUS_NEEDS_USER_INPUT
+    is_ready = item_status in (STATUS_READY_FOR_REVIEW, STATUS_MATCHED)
+    is_high_risk = risk_level == RISK_HIGH
+    return is_missing, is_ready, is_high_risk
 
-    # ReviewItemPayload[] 생성 + section 분류
-    sections_map: dict[int, dict] = {}
-    high_risk_count = 0
-    ready_count = 0
-    missing_count_items = 0
 
-    for item in review_items:
-        target = item.get("target") or {}
-        highlight = build_highlight(target)
-        target_display = build_target_display(target)
-        evidence_badges = _evidence_badges_for_item(item, evidence_index)
+def _build_review_item_payload(
+    item: dict,
+    item_status: str | None,
+    related_requests: list[dict],
+    evidence_index: dict[str, dict],
+) -> dict:
+    highlight = build_highlight(item.get("target") or {})
+    target_display = build_target_display(item.get("target") or {})
+    evidence_badges = _evidence_badges_for_item(item, evidence_index)
 
-        item_status = item.get("status")
-        if item_status == STATUS_NEEDS_USER_INPUT:
-            missing_count_items += 1
-        if item_status in (STATUS_READY_FOR_REVIEW, STATUS_MATCHED):
-            ready_count += 1
-        if item.get("riskLevel") == RISK_HIGH:
-            high_risk_count += 1
+    allowed_actions = [a for a in (item.get("allowedDecisions") or []) if a in ALLOWED_DECISIONS]
+    if not related_requests and DECISION_REQUEST_MATERIAL in allowed_actions:
+        allowed_actions = [a for a in allowed_actions if a != DECISION_REQUEST_MATERIAL]
 
-        # allowedActions: REQUEST_MATERIAL은 관련 request가 있을 때만 활성
-        related_requests = requests_by_req.get(item.get("requirementId", ""), [])
-        allowed_actions = [a for a in (item.get("allowedDecisions") or [])
-                                if a in ALLOWED_DECISIONS]
-        if not related_requests and DECISION_REQUEST_MATERIAL in allowed_actions:
-            allowed_actions = [a for a in allowed_actions
-                                  if a != DECISION_REQUEST_MATERIAL]
+    blocking_reason = None
+    if item_status == STATUS_NEEDS_USER_INPUT and related_requests:
+        blocking_reason = "missing_material_required"
+    elif item.get("riskLevel") == RISK_HIGH:
+        blocking_reason = "high_risk_review_required"
 
-        blocking_reason = None
-        if item_status == STATUS_NEEDS_USER_INPUT and related_requests:
-            blocking_reason = "missing_material_required"
-        elif item.get("riskLevel") == RISK_HIGH:
-            blocking_reason = "high_risk_review_required"
+    return {
+        "reviewItemId": item.get("reviewItemId"),
+        "requirementId": item.get("requirementId"),
+        "label": item.get("label", item.get("requirementId", "")),
+        "semanticType": item.get("semanticType"),
+        "target": dict(item.get("target") or {}),
+        "targetDisplay": target_display,
+        "currentValue": item.get("currentValue", ""),
+        "proposedValue": item.get("proposedValue"),
+        "beforePreview": item.get("beforePreview", ""),
+        "afterPreview": item.get("afterPreview", ""),
+        "evidenceBadges": evidence_badges,
+        "riskLevel": item.get("riskLevel", RISK_LOW),
+        "status": item_status,
+        "allowedActions": allowed_actions,
+        "defaultAction": _default_action_for({**item, "allowedDecisions": allowed_actions}),
+        "blockingReason": blocking_reason,
+        "highlight": highlight,
+    }
 
-        payload_item = {
-            "reviewItemId": item.get("reviewItemId"),
-            "requirementId": item.get("requirementId"),
-            "label": item.get("label", item.get("requirementId", "")),
-            "semanticType": item.get("semanticType"),
-            "target": dict(target),
-            "targetDisplay": target_display,
-            "currentValue": item.get("currentValue", ""),
-            "proposedValue": item.get("proposedValue"),
-            "beforePreview": item.get("beforePreview", ""),
-            "afterPreview": item.get("afterPreview", ""),
-            "evidenceBadges": evidence_badges,
-            "riskLevel": item.get("riskLevel", RISK_LOW),
-            "status": item_status,
-            "allowedActions": allowed_actions,
-            "defaultAction": _default_action_for({**item, "allowedDecisions": allowed_actions}),
-            "blockingReason": blocking_reason,
-            "highlight": highlight,
-        }
 
-        sec_idx = highlight.get("sectionIndex")
-        sec_key = sec_idx if sec_idx is not None else -1
-        section = sections_map.setdefault(sec_key, {
-            "sectionId": f"sec_{sec_key:03d}" if sec_key >= 0 else "sec_unknown",
-            "sectionTitle": _section_title_for(sec_idx),
-            "sectionIndex": sec_idx,
-            "items": [],
-        })
-        section["items"].append(payload_item)
-
-    review_sections = [sections_map[k] for k in sorted(sections_map.keys())]
-
-    # missingMaterialPanel
+def _build_missing_material_panel(missing_requests: list[dict]) -> tuple[list[dict], int, int]:
     panel_requests = []
     blocking_count = 0
     optional_count = 0
-    for r in (missing_requests or []):
+    for r in missing_requests or []:
         material = r.get("requestedMaterialType", "UNKNOWN")
         is_blocking = bool(r.get("blocking", True))
         if is_blocking:
@@ -320,13 +293,71 @@ def build_fill_review_page_payload(recognition_result: dict,
             "reason": r.get("reason", ""),
             "blocking": is_blocking,
             "suggestedUploadLabel": _UPLOAD_LABEL_BY_MATERIAL.get(
-                material, _UPLOAD_LABEL_BY_MATERIAL["UNKNOWN"],
+                material,
+                _UPLOAD_LABEL_BY_MATERIAL["UNKNOWN"],
             ),
-            "acceptedFileTypes": list(_ACCEPTED_FILE_TYPES.get(
-                material, _ACCEPTED_FILE_TYPES["UNKNOWN"],
-            )),
+            "acceptedFileTypes": list(
+                _ACCEPTED_FILE_TYPES.get(
+                    material,
+                    _ACCEPTED_FILE_TYPES["UNKNOWN"],
+                )
+            ),
         })
+    return panel_requests, blocking_count, optional_count
 
+
+def build_fill_review_page_payload(
+    recognition_result: dict,
+    review_items: list[dict],
+    missing_requests: list[dict],
+    evidence_sources: list[dict] | None = None,
+) -> dict:
+    """브라우저 검수 화면 payload 생성."""
+    evidence_index: dict[str, dict] = {}
+    for ev in evidence_sources or []:
+        if isinstance(ev, dict) and ev.get("evidenceId"):
+            evidence_index[ev["evidenceId"]] = ev
+
+    requests_by_req: dict[str, list[dict]] = {}
+    for r in missing_requests or []:
+        requests_by_req.setdefault(r.get("requirementId", ""), []).append(r)
+
+    # ReviewItemPayload[] 생성 + section 분류
+    sections_map: dict[int, dict] = {}
+    high_risk_count = 0
+    ready_count = 0
+    missing_count_items = 0
+
+    for item in review_items:
+        item_status = item.get("status")
+        is_missing, is_ready, is_high_risk = _review_item_flags(item_status, item.get("riskLevel"))
+        missing_count_items += is_missing
+        ready_count += is_ready
+        high_risk_count += is_high_risk
+
+        # allowedActions: REQUEST_MATERIAL은 관련 request가 있을 때만 활성
+        related_requests = requests_by_req.get(item.get("requirementId", ""), [])
+        payload_item = _build_review_item_payload(
+            item, item_status, related_requests, evidence_index
+        )
+
+        sec_idx = payload_item["highlight"].get("sectionIndex")
+        sec_key = sec_idx if sec_idx is not None else -1
+        section = sections_map.setdefault(
+            sec_key,
+            {
+                "sectionId": f"sec_{sec_key:03d}" if sec_key >= 0 else "sec_unknown",
+                "sectionTitle": _section_title_for(sec_idx),
+                "sectionIndex": sec_idx,
+                "items": [],
+            },
+        )
+        section["items"].append(payload_item)
+
+    review_sections = [sections_map[k] for k in sorted(sections_map.keys())]
+
+    # missingMaterialPanel
+    panel_requests, blocking_count, optional_count = _build_missing_material_panel(missing_requests)
     missing_material_panel = {
         "requests": panel_requests,
         "blockingCount": blocking_count,
@@ -366,15 +397,18 @@ def build_fill_review_page_payload(recognition_result: dict,
 
 # ── decision payload validation ──────────────────────────────────────────────
 
+
 def _decision_value_invalid(d: dict) -> bool:
     return d.get("decision") not in ALLOWED_DECISIONS
 
 
-def validate_decision_payload(decision_payload: dict,
-                                   review_items: list[dict],
-                                   missing_requests: list[dict] | None = None,
-                                   *, expected_source_hash: str | None = None,
-                                   ) -> DecisionValidationResult:
+def validate_decision_payload(
+    decision_payload: dict,
+    review_items: list[dict],
+    missing_requests: list[dict] | None = None,
+    *,
+    expected_source_hash: str | None = None,
+) -> DecisionValidationResult:
     """브라우저에서 돌려보낸 decision payload 검증.
 
     writer plan을 만들지 않는다. fill_review_contract.build_approved_edit_plan에
@@ -383,8 +417,10 @@ def validate_decision_payload(decision_payload: dict,
     result = DecisionValidationResult()
 
     if not isinstance(decision_payload, dict):
-        result.errors.append({"code": "PAYLOAD_NOT_OBJECT",
-                                "detail": "decision payload must be a dict"})
+        result.errors.append({
+            "code": "PAYLOAD_NOT_OBJECT",
+            "detail": "decision payload must be a dict",
+        })
         result.valid = False
         result.blockedDecisionCount = 0
         return result
@@ -402,8 +438,7 @@ def validate_decision_payload(decision_payload: dict,
 
     decisions = decision_payload.get("decisions") or []
     if not isinstance(decisions, list):
-        result.errors.append({"code": "DECISIONS_NOT_LIST",
-                                "detail": "decisions must be a list"})
+        result.errors.append({"code": "DECISIONS_NOT_LIST", "detail": "decisions must be a list"})
         decisions = []
 
     seen_item_ids: set[str] = set()
@@ -463,8 +498,7 @@ def validate_decision_payload(decision_payload: dict,
         if decision_val not in allowed_actions:
             result.errors.append({
                 "code": "DECISION_NOT_ALLOWED_FOR_ITEM",
-                "detail": (f"decision={decision_val!r} not in allowedActions="
-                              f"{allowed_actions}"),
+                "detail": (f"decision={decision_val!r} not in allowedActions={allowed_actions}"),
                 "reviewItemId": item_id,
             })
             blocked += 1
@@ -487,8 +521,10 @@ def validate_decision_payload(decision_payload: dict,
             if req_id not in items_with_missing:
                 result.errors.append({
                     "code": "REQUEST_MATERIAL_NOT_AVAILABLE",
-                    "detail": (f"REQUEST_MATERIAL for reviewItemId={item_id!r} "
-                                  "but no missing material request"),
+                    "detail": (
+                        f"REQUEST_MATERIAL for reviewItemId={item_id!r} "
+                        "but no missing material request"
+                    ),
                     "reviewItemId": item_id,
                 })
                 blocked += 1
@@ -508,8 +544,9 @@ def validate_decision_payload(decision_payload: dict,
             if d.get(k) in FORBIDDEN_PARAGRAPH_OP_NAMES:
                 result.errors.append({
                     "code": "FORBIDDEN_OPERATION_NAME",
-                    "detail": (f"{k}={d.get(k)!r} is forbidden; "
-                                  f"use {OFFICIAL_PARAGRAPH_FULL_REPLACE_OP}"),
+                    "detail": (
+                        f"{k}={d.get(k)!r} is forbidden; use {OFFICIAL_PARAGRAPH_FULL_REPLACE_OP}"
+                    ),
                     "reviewItemId": item_id,
                 })
                 blocked += 1
@@ -525,6 +562,7 @@ def validate_decision_payload(decision_payload: dict,
 
 
 # ── operation naming reaffirmation (UI 측에서도 잠금) ────────────────────────
+
 
 def is_official_paragraph_full_replace(op_type: str) -> bool:
     return op_type == OFFICIAL_PARAGRAPH_FULL_REPLACE_OP

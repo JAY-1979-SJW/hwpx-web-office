@@ -81,7 +81,9 @@ def _run_git_ls_files() -> list[str]:
         ["git", "ls-files"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
         check=True,
     )
@@ -222,80 +224,68 @@ def classify_path(path: str) -> tuple[str, str, str]:
     return "UNKNOWN_REVIEW_REQUIRED", "unassigned", "manual_review_required"
 
 
-def _infer_zone(path: str) -> str:
-    lower = path.lower()
-    if "web_office" in lower:
-        return "test_support"
-    if any(
-        token in lower
-        for token in (
+_ZONE_TOKEN_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("test_support", ("web_office",)),
+    (
+        "closeout_security",
+        (
             "repo_separation",
             "repo_inventory",
             "detailed_separation",
             "new_file_classification",
             "app_structure_drift",
             "monitor_structure_drift",
-        )
-    ):
-        return "closeout_security"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    (
+        "closeout_security",
+        (
             "existing_file_classification",
             "module_log_contract",
             "module_audits",
             "persistent_gates",
             "fail_fast",
             "zone_gates",
-        )
-    ):
-        return "closeout_security"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    (
+        "batch_api_browser",
+        (
             "api_route",
             "frontend_contract",
             "browser_smoke",
             "browser_batch",
             "ui_connect",
             "module_communication",
-        )
-    ):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")
-    ):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")
-    ):
-        return "input_parse"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    ("batch_api_browser", ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")),
+    ("input_parse", ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")),
+    (
+        "input_parse",
+        (
             "field_catalog",
             "index_and_recommend",
             "type_classification",
             "construction_work_design",
-        )
-    ):
-        return "input_parse"
-    if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):
-        return "review_approval"
-    if any(
-        token in lower
-        for token in ("writer_sandbox", "readback", "write_sandbox", "rwedit", "backend_rwedit")
-    ):
-        return "writer_readback"
-    if any(token in lower for token in ("download_review", "final_export")):
-        return "download_export"
-    if any(token in lower for token in ("api_batch", "browser_batch", "api_browser", "real_like")):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    ("review_approval", ("review_panel", "approval_gate", "human_approval")),
+    (
+        "writer_readback",
+        (
+            "writer_sandbox",
+            "readback",
+            "write_sandbox",
+            "rwedit",
+            "backend_rwedit",
+        ),
+    ),
+    ("download_export", ("download_review", "final_export")),
+    ("batch_api_browser", ("api_batch", "browser_batch", "api_browser", "real_like")),
+    (
+        "closeout_security",
+        (
             "closeout",
             "security",
             "audit",
@@ -304,9 +294,16 @@ def _infer_zone(path: str) -> str:
             "history",
             "deploy_verifier",
             "server_deploy",
-        )
-    ):
-        return "closeout_security"
+        ),
+    ),
+]
+
+
+def _infer_zone(path: str) -> str:
+    lower = path.lower()
+    for zone, tokens in _ZONE_TOKEN_RULES:
+        if any(token in lower for token in tokens):
+            return zone
     return "unassigned"
 
 
@@ -429,7 +426,9 @@ def _git_head() -> str:
         ["git", "rev-parse", "--short", "HEAD"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
         check=True,
     )

@@ -33,10 +33,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse
     from pydantic import BaseModel
+
     _FASTAPI_AVAILABLE = True
 except ImportError:
     _FASTAPI_AVAILABLE = False
@@ -104,6 +104,7 @@ def _sanitize(obj: Any, depth: int = 0) -> Any:
 # ---------------------------------------------------------------------------
 
 if _FASTAPI_AVAILABLE:
+
     class WriteSandboxRequest(BaseModel):
         approvalResultDict: dict = {}
         formId: str = ""
@@ -123,7 +124,8 @@ if _FASTAPI_AVAILABLE:
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-def create_app() -> Any:
+
+def create_app() -> Any:  # ruff: ignore[complex-structure] -- FastAPI 라우트 팩토리, 중첩 핸들러 10개를 분리하면 app 클로저 재배선 위험 있어 보류
     if not _FASTAPI_AVAILABLE:
         return None
 
@@ -142,31 +144,46 @@ def create_app() -> Any:
             "sourceMutationAllowed": False,
             "pipelineReady": True,
             "stages": [
-                "recommend", "catalog", "uploadParser", "mapping",
-                "reviewPanel", "humanApproval", "sandboxWriter",
-                "readbackHardening", "downloadReview", "finalExportGate",
+                "recommend",
+                "catalog",
+                "uploadParser",
+                "mapping",
+                "reviewPanel",
+                "humanApproval",
+                "sandboxWriter",
+                "readbackHardening",
+                "downloadReview",
+                "finalExportGate",
             ],
         })
 
     @app.post("/api/hwpx/form-autofill/e2e-smoke")
     def e2e_smoke():
         from hwpx.pipeline.form_auto_fill_e2e_smoke import run_e2e_smoke
+
         try:
             with tempfile.TemporaryDirectory() as td:
                 result = run_e2e_smoke(Path(td))
             safe = _sanitize(result)
             if safe.get("overallVerdict") == "PASS_E2E_SMOKE":
-                return _success(safe, warnings=["WARN_SYNTHETIC_SCENARIO_ONLY", "WARN_SANDBOX_ONLY"])
+                return _success(
+                    safe, warnings=["WARN_SYNTHETIC_SCENARIO_ONLY", "WARN_SANDBOX_ONLY"]
+                )
             else:
-                return _failed([{"code": "E2E_SMOKE_FAILED", "message": safe.get("overallVerdict", "")}])
-        except Exception as e:
+                return _failed([
+                    {"code": "E2E_SMOKE_FAILED", "message": safe.get("overallVerdict", "")}
+                ])
+        except Exception as e:  # ruff: ignore[blind-except] -- API 엔드포인트, 원인 무관하게 오류 응답으로 변환
             return _failed([{"code": "INTERNAL_ERROR", "message": str(e)}])
 
     @app.post("/api/hwpx/form-autofill/write-sandbox")
     def write_sandbox(req: WriteSandboxRequest):
         from hwpx.pipeline.form_writer_ui_connect import (
-            build_ui_connect_payload, _derive_approval_status, STATUS_READY,
+            STATUS_READY,
+            _derive_approval_status,
+            build_ui_connect_payload,
         )
+
         approval_dict = req.approvalResultDict
 
         # READY_FOR_WRITER gate 검증
@@ -181,6 +198,7 @@ def create_app() -> Any:
 
         # dry_run 모드로 sandbox 실행
         from hwpx.pipeline.approval_gate import ApprovedField
+
         # approval_dict에서 ApprovalResult 재구성
         approved = [
             ApprovedField(
@@ -212,16 +230,18 @@ def create_app() -> Any:
     @app.post("/api/hwpx/form-autofill/download-review")
     def download_review(req: DownloadReviewRequest):
         from hwpx.pipeline.form_writer_download_review import build_download_payload
+
         try:
             payload = build_download_payload(req.writerResultDict, form_id=req.formId)
             safe = _sanitize(payload)
             return _success(safe, warnings=["WARN_SANDBOX_ONLY"])
-        except Exception as e:
+        except Exception as e:  # ruff: ignore[blind-except] -- API 엔드포인트, 원인 무관하게 오류 응답으로 변환
             return _failed([{"code": "DOWNLOAD_REVIEW_ERROR", "message": str(e)}])
 
     @app.post("/api/hwpx/form-autofill/final-export")
     def final_export(req: FinalExportRequest):
         from hwpx.pipeline.form_writer_final_export_gate import build_final_export_payload
+
         try:
             payload = build_final_export_payload(
                 req.downloadPayloadDict,
@@ -232,14 +252,15 @@ def create_app() -> Any:
             safe = _sanitize(payload)
             status = "SUCCESS" if payload.get("finalExportEnabled") else "FAILED"
             if status == "SUCCESS":
-                return _success(safe, warnings=["WARN_SANDBOX_ONLY", "WARN_FINAL_EXPORT_DOES_NOT_DEPLOY"])
+                return _success(
+                    safe, warnings=["WARN_SANDBOX_ONLY", "WARN_FINAL_EXPORT_DOES_NOT_DEPLOY"]
+                )
             else:
                 return _failed(
-                    [{"code": "FINAL_EXPORT_BLOCKED",
-                      "message": payload.get("exportStatus", "")}],
+                    [{"code": "FINAL_EXPORT_BLOCKED", "message": payload.get("exportStatus", "")}],
                     warnings=["WARN_SANDBOX_ONLY"],
                 )
-        except Exception as e:
+        except Exception as e:  # ruff: ignore[blind-except] -- API 엔드포인트, 원인 무관하게 오류 응답으로 변환
             return _failed([{"code": "INTERNAL_ERROR", "message": str(e)}])
 
     return app
@@ -252,6 +273,7 @@ app = create_app()
 # Pure-Python API contract (FastAPI 없을 때도 테스트 가능)
 # ---------------------------------------------------------------------------
 
+
 def call_health() -> dict:
     """FastAPI 없이 health 응답 생성."""
     return _success({
@@ -263,6 +285,7 @@ def call_health() -> dict:
 
 def call_e2e_smoke() -> dict:
     from hwpx.pipeline.form_auto_fill_e2e_smoke import run_e2e_smoke
+
     with tempfile.TemporaryDirectory() as td:
         result = run_e2e_smoke(Path(td))
     safe = _sanitize(result)
@@ -273,8 +296,11 @@ def call_e2e_smoke() -> dict:
 
 def call_write_sandbox(approval_dict: dict, form_id: str = "") -> dict:
     from hwpx.pipeline.form_writer_ui_connect import (
-        build_ui_connect_payload, _derive_approval_status, STATUS_READY,
+        STATUS_READY,
+        _derive_approval_status,
+        build_ui_connect_payload,
     )
+
     status = _derive_approval_status(approval_dict)
     if status != STATUS_READY:
         return _failed(
@@ -291,15 +317,19 @@ def call_write_sandbox(approval_dict: dict, form_id: str = "") -> dict:
 
 def call_download_review(writer_result: dict, form_id: str = "") -> dict:
     from hwpx.pipeline.form_writer_download_review import build_download_payload
+
     payload = build_download_payload(writer_result, form_id=form_id)
     return _success(_sanitize(payload), warnings=["WARN_SANDBOX_ONLY"])
 
 
-def call_final_export(dl_payload: dict, decision: dict,
-                      form_id: str = "", form_title: str = "") -> dict:
+def call_final_export(
+    dl_payload: dict, decision: dict, form_id: str = "", form_title: str = ""
+) -> dict:
     from hwpx.pipeline.form_writer_final_export_gate import build_final_export_payload
-    payload = build_final_export_payload(dl_payload, decision,
-                                         form_id=form_id, form_title=form_title)
+
+    payload = build_final_export_payload(
+        dl_payload, decision, form_id=form_id, form_title=form_title
+    )
     safe = _sanitize(payload)
     if payload.get("finalExportEnabled"):
         return _success(safe, warnings=["WARN_SANDBOX_ONLY", "WARN_FINAL_EXPORT_DOES_NOT_DEPLOY"])

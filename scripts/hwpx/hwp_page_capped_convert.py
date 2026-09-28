@@ -12,9 +12,10 @@ import argparse
 import json
 import shutil
 import sys
-import zipfile
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+import zipfile
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +23,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from hwp_hwpx_pixel_audit import run_render  # noqa: E402
-from hwp_to_hwpx_standalone import convert_hwp_to_hwpx, file_snapshot  # noqa: E402
-
+from hwp_hwpx_pixel_audit import run_render  # ruff: ignore[module-import-not-at-top-of-file]
+from hwp_to_hwpx_standalone import convert_hwp_to_hwpx, file_snapshot  # ruff: ignore[module-import-not-at-top-of-file]
 
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 HS_NS = "http://www.hancom.co.kr/hwpml/2011/section"
@@ -33,7 +33,7 @@ ET.register_namespace("hs", HS_NS)
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def rendered_page_count(path: Path, probe_dir: Path, *, resolution: int) -> dict[str, Any]:
@@ -49,7 +49,10 @@ def write_delivery_hwpx(candidate: Path, output: Path) -> dict[str, Any]:
     output.parent.mkdir(parents=True, exist_ok=True)
     removed: list[str] = []
     kept: list[str] = []
-    with zipfile.ZipFile(candidate) as src, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(candidate) as src,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst,
+    ):
         for info in src.infolist():
             name = info.filename.replace("\\", "/")
             if name.startswith("Preview/") or name.startswith("Original/"):
@@ -86,7 +89,9 @@ def _ultra_compact_section_xml(text: str) -> bytes:
     run = ET.SubElement(paragraph, f"{{{HP_NS}}}run")
     t = ET.SubElement(run, f"{{{HP_NS}}}t")
     t.text = text
-    return ('<?xml version="1.0" encoding="UTF-8"?>' + ET.tostring(sec, encoding="unicode")).encode("utf-8")
+    return ('<?xml version="1.0" encoding="UTF-8"?>' + ET.tostring(sec, encoding="unicode")).encode(
+        "utf-8"
+    )
 
 
 def write_ultra_compact_delivery_hwpx(candidate: Path, output: Path) -> dict[str, Any]:
@@ -94,7 +99,10 @@ def write_ultra_compact_delivery_hwpx(candidate: Path, output: Path) -> dict[str
     removed: list[str] = []
     kept: list[str] = []
     compacted_sections: list[str] = []
-    with zipfile.ZipFile(candidate) as src, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(candidate) as src,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst,
+    ):
         for info in src.infolist():
             name = info.filename.replace("\\", "/")
             if name.startswith("Preview/") or name.startswith("Original/"):
@@ -107,21 +115,30 @@ def write_ultra_compact_delivery_hwpx(candidate: Path, output: Path) -> dict[str
             compress_type = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
             dst.writestr(info.filename, data, compress_type=compress_type)
             kept.append(info.filename)
-    return {"status": "PASS", "kept": kept, "removed": removed, "compacted_sections": compacted_sections}
+    return {
+        "status": "PASS",
+        "kept": kept,
+        "removed": removed,
+        "compacted_sections": compacted_sections,
+    }
+
+
+@dataclass(frozen=True)
+class ConversionAttemptSpec:
+    variant: str
+    decoded_style_bridge: bool
+    target_pages: int
+    resolution: int
+    ultra_compact: bool = False
 
 
 def attempt_conversion(
     source: Path,
     output: Path,
     work_dir: Path,
-    *,
-    variant: str,
-    decoded_style_bridge: bool,
-    target_pages: int,
-    resolution: int,
-    ultra_compact: bool = False,
+    spec: ConversionAttemptSpec,
 ) -> dict[str, Any]:
-    variant_dir = work_dir / variant
+    variant_dir = work_dir / spec.variant
     variant_dir.mkdir(parents=True, exist_ok=True)
     raw_hwpx = variant_dir / "raw.hwpx"
     delivery_hwpx = variant_dir / "delivery.hwpx"
@@ -131,7 +148,7 @@ def attempt_conversion(
         fidelity_policy="audit",
         existing_policy="overwrite",
         embed_original=False,
-        decoded_style_bridge=decoded_style_bridge,
+        decoded_style_bridge=spec.decoded_style_bridge,
     )
     delivery = {"status": "SKIPPED"}
     page_probe = {"ok": False, "page_count": None}
@@ -139,32 +156,38 @@ def attempt_conversion(
     if conversion.get("status") == "PASS" and raw_hwpx.exists():
         delivery = (
             write_ultra_compact_delivery_hwpx(raw_hwpx, delivery_hwpx)
-            if ultra_compact
+            if spec.ultra_compact
             else write_delivery_hwpx(raw_hwpx, delivery_hwpx)
         )
-        page_probe = rendered_page_count(delivery_hwpx, variant_dir / "render_probe", resolution=resolution)
-        accepted = bool(page_probe.get("ok") and int(page_probe.get("page_count") or 0) <= target_pages)
+        page_probe = rendered_page_count(
+            delivery_hwpx, variant_dir / "render_probe", resolution=spec.resolution
+        )
+        accepted = bool(
+            page_probe.get("ok") and int(page_probe.get("page_count") or 0) <= spec.target_pages
+        )
         if accepted:
             shutil.copy2(delivery_hwpx, output)
     return {
-        "variant": variant,
-        "decoded_style_bridge": decoded_style_bridge,
-        "ultra_compact": ultra_compact,
+        "variant": spec.variant,
+        "decoded_style_bridge": spec.decoded_style_bridge,
+        "ultra_compact": spec.ultra_compact,
         "raw_hwpx": str(raw_hwpx),
         "delivery_hwpx": str(delivery_hwpx),
         "conversion_status": conversion.get("status"),
         "conversion": conversion,
         "delivery_filter": delivery,
         "page_probe": page_probe,
-        "target_pages": target_pages,
+        "target_pages": spec.target_pages,
         "accepted": accepted,
-        "overflow_pages": max(0, int(page_probe.get("page_count") or 0) - target_pages)
+        "overflow_pages": max(0, int(page_probe.get("page_count") or 0) - spec.target_pages)
         if page_probe.get("page_count") is not None
         else None,
     }
 
 
-def page_capped_convert(source: Path, output: Path, report_json: Path, work_dir: Path, *, resolution: int) -> dict[str, Any]:
+def page_capped_convert(
+    source: Path, output: Path, report_json: Path, work_dir: Path, *, resolution: int
+) -> dict[str, Any]:
     source = source.expanduser().resolve()
     output = output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -175,7 +198,9 @@ def page_capped_convert(source: Path, output: Path, report_json: Path, work_dir:
     staged_source.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, staged_source)
 
-    source_pages = rendered_page_count(staged_source, work_dir / "source_render_probe", resolution=resolution)
+    source_pages = rendered_page_count(
+        staged_source, work_dir / "source_render_probe", resolution=resolution
+    )
     target_pages = int(source_pages.get("page_count") or 0)
     attempts: list[dict[str, Any]] = []
     if target_pages > 0:
@@ -184,10 +209,12 @@ def page_capped_convert(source: Path, output: Path, report_json: Path, work_dir:
                 staged_source,
                 output,
                 work_dir,
-                variant="style_bridge_delivery",
-                decoded_style_bridge=True,
-                target_pages=target_pages,
-                resolution=resolution,
+                ConversionAttemptSpec(
+                    variant="style_bridge_delivery",
+                    decoded_style_bridge=True,
+                    target_pages=target_pages,
+                    resolution=resolution,
+                ),
             )
         )
         if not attempts[-1].get("accepted"):
@@ -196,10 +223,12 @@ def page_capped_convert(source: Path, output: Path, report_json: Path, work_dir:
                     staged_source,
                     output,
                     work_dir,
-                    variant="compact_text_delivery",
-                    decoded_style_bridge=False,
-                    target_pages=target_pages,
-                    resolution=resolution,
+                    ConversionAttemptSpec(
+                        variant="compact_text_delivery",
+                        decoded_style_bridge=False,
+                        target_pages=target_pages,
+                        resolution=resolution,
+                    ),
                 )
             )
         if not attempts[-1].get("accepted"):
@@ -208,11 +237,13 @@ def page_capped_convert(source: Path, output: Path, report_json: Path, work_dir:
                     staged_source,
                     output,
                     work_dir,
-                    variant="ultra_compact_text_delivery",
-                    decoded_style_bridge=False,
-                    target_pages=target_pages,
-                    resolution=resolution,
-                    ultra_compact=True,
+                    ConversionAttemptSpec(
+                        variant="ultra_compact_text_delivery",
+                        decoded_style_bridge=False,
+                        target_pages=target_pages,
+                        resolution=resolution,
+                        ultra_compact=True,
+                    ),
                 )
             )
 
@@ -260,8 +291,12 @@ def main() -> int:
     args = parser.parse_args()
 
     output = Path(args.output)
-    report_json = Path(args.report_json) if args.report_json else output.with_suffix(".page_cap_report.json")
-    result = page_capped_convert(Path(args.input), output, report_json, Path(args.work_dir), resolution=args.resolution)
+    report_json = (
+        Path(args.report_json) if args.report_json else output.with_suffix(".page_cap_report.json")
+    )
+    result = page_capped_convert(
+        Path(args.input), output, report_json, Path(args.work_dir), resolution=args.resolution
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("status") == "PASS" else 2
 

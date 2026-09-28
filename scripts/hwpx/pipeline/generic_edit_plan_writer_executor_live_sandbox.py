@@ -366,6 +366,15 @@ def _modify_paragraph_text_in_section_xml(
     return new_bytes, True, None
 
 
+def _find_single_text_run_with(ts, find_str: str) -> ET.Element | None:
+    for t in ts:
+        if t.text and (find_str in t.text):
+            if t.text.count(find_str) == 1:
+                return t
+            return None
+    return None
+
+
 def _replace_text_run_in_section_xml(
     section_xml: bytes, paragraph_idx: int, find_str: str, replace_str: str, expected_before
 ) -> tuple[bytes, bool, str | None]:
@@ -391,12 +400,7 @@ def _replace_text_run_in_section_xml(
         return section_xml, False, "ambiguous_text_run"
     # 정확히 1회 occurrence — 어느 단일 <hp:t> 안에 있는지 확인
     ts = _paragraph_text_run_elements(target_p)
-    target_t = None
-    for t in ts:
-        if t.text and (find_str in t.text):
-            if t.text.count(find_str) == 1:
-                target_t = t
-            break
+    target_t = _find_single_text_run_with(ts, find_str)
     if target_t is None:
         # find가 run 경계에 걸쳐 단일 t 내부에 없음
         return section_xml, False, "run_boundary_unsupported"

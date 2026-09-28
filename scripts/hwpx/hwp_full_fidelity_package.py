@@ -990,6 +990,28 @@ def _rewrite_zip_entries(path: Path, updates: dict[str, bytes]) -> list[str]:
     return written
 
 
+def _layout_mapping_preview_entries(
+    body_style_report: dict[str, Any],
+    page_layout_report: dict[str, Any],
+    table_layout_report: dict[str, Any],
+    visual_object_report: dict[str, Any],
+) -> dict[str, bytes]:
+    return {
+        "Preview/BodyStyleMapping.json": json.dumps(
+            body_style_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/PageLayoutMapping.json": json.dumps(
+            page_layout_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/TableLayoutMapping.json": json.dumps(
+            table_layout_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+        "Preview/VisualObjectMapping.json": json.dumps(
+            visual_object_report, ensure_ascii=False, indent=2
+        ).encode("utf-8"),
+    }
+
+
 def inject_analysis_entries(output_path: Path, analysis: dict[str, Any]) -> dict[str, Any]:
     path = Path(output_path)
     if not path.exists():
@@ -1108,18 +1130,11 @@ def inject_analysis_entries(output_path: Path, analysis: dict[str, Any]) -> dict
             updates["Contents/content.hpf"] = _content_hpf_with_entries(
                 content_text, list(final_entries)
             ).encode("utf-8")
-        updates["Preview/BodyStyleMapping.json"] = json.dumps(
-            body_style_report, ensure_ascii=False, indent=2
-        ).encode("utf-8")
-        updates["Preview/PageLayoutMapping.json"] = json.dumps(
-            page_layout_report, ensure_ascii=False, indent=2
-        ).encode("utf-8")
-        updates["Preview/TableLayoutMapping.json"] = json.dumps(
-            table_layout_report, ensure_ascii=False, indent=2
-        ).encode("utf-8")
-        updates["Preview/VisualObjectMapping.json"] = json.dumps(
-            visual_object_report, ensure_ascii=False, indent=2
-        ).encode("utf-8")
+        updates.update(
+            _layout_mapping_preview_entries(
+                body_style_report, page_layout_report, table_layout_report, visual_object_report
+            )
+        )
     written = _rewrite_zip_entries(path, updates)
     return {
         "status": "PASS",

@@ -18,12 +18,12 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx.pipeline.approval_gate import ACTION_CONFIRM, ApprovedField, ApprovalResult
+from hwpx.pipeline.approval_gate import ACTION_CONFIRM, ApprovalResult, ApprovedField
 from hwpx.pipeline.form_auto_fill_writer_sandbox import run_sandbox_write
 from hwpx.pipeline.form_writer_download_review import (
     ACTION_ACCEPT,
-    build_download_payload,
     apply_review_decision_from_dict,
+    build_download_payload,
 )
 from hwpx.pipeline.form_writer_final_export_gate import build_final_export_payload
 from hwpx.pipeline.form_writer_readback_hardening import verify_readback
@@ -131,7 +131,9 @@ def _sample_id_from_path(path: Path) -> str:
     return "sample_" + hashlib.sha256(path.name.encode("utf-8")).hexdigest()[:12]
 
 
-def _safe_security(pii: bool = False, raw_path: bool = False, raw_filename: bool = False) -> dict[str, Any]:
+def _safe_security(
+    pii: bool = False, raw_path: bool = False, raw_filename: bool = False
+) -> dict[str, Any]:
     return {
         "piiLeak": pii,
         "rawPathLeak": raw_path,
@@ -142,28 +144,32 @@ def _safe_security(pii: bool = False, raw_path: bool = False, raw_filename: bool
     }
 
 
+@dataclass
+class BlockedResultDetails:
+    source_hash_before: str = ""
+    source_hash_after: str = ""
+    mtime_changed: bool = False
+    structure: dict[str, Any] | None = None
+    target_map: dict[str, Any] | None = None
+    security: dict[str, Any] | None = None
+    warnings: list[str] | None = None
+
+
 def _blocked_result(
-    inp: PreflightInput,
-    status: str,
-    source_hash_before: str = "",
-    source_hash_after: str = "",
-    mtime_changed: bool = False,
-    structure: dict[str, Any] | None = None,
-    target_map: dict[str, Any] | None = None,
-    security: dict[str, Any] | None = None,
-    warnings: list[str] | None = None,
+    inp: PreflightInput, status: str, details: BlockedResultDetails | None = None
 ) -> RealFilePreflightResult:
+    d = details or BlockedResultDetails()
     return RealFilePreflightResult(
         sampleId=inp.sample_id or _sample_id_from_path(inp.sample_path),
         preflightStatus=status,
-        sourceHashBefore=source_hash_before,
-        sourceHashAfter=source_hash_after or source_hash_before,
-        sourceMtimeChanged=mtime_changed,
-        structure=structure or _empty_structure(),
-        targetMap=target_map or _empty_target_map(),
+        sourceHashBefore=d.source_hash_before,
+        sourceHashAfter=d.source_hash_after or d.source_hash_before,
+        sourceMtimeChanged=d.mtime_changed,
+        structure=d.structure or _empty_structure(),
+        targetMap=d.target_map or _empty_target_map(),
         sandboxResult=_empty_sandbox_result(),
-        security=security or _safe_security(),
-        warnings=warnings or ["WARN_SANDBOX_ONLY"],
+        security=d.security or _safe_security(),
+        warnings=d.warnings or ["WARN_SANDBOX_ONLY"],
     )
 
 
@@ -256,7 +262,7 @@ def inspect_hwpx_structure(path: Path) -> dict[str, Any]:
             for name in section_names:
                 try:
                     root = ET.fromstring(archive.read(name).decode("utf-8"))
-                except Exception:
+                except (ET.ParseError, UnicodeDecodeError, KeyError):
                     section_xml_valid = False
                     continue
                 table_count += len(root.findall(f".//{{{NS_HP}}}tbl"))
@@ -311,9 +317,13 @@ def _approved_summary(approved_fields: list[ApprovedField]) -> str:
 def _writer_ui_result(writer_dict: dict[str, Any]) -> dict[str, Any]:
     summary = writer_dict.get("summary", {})
     readback_fail = summary.get("readbackFail", 0)
-    source_mutated = bool(writer_dict.get("sourceMutated", False))
+    source_mutated = bool(writer_dict.get("sourceMutated"))
     output_hash = writer_dict.get("outputHash", "")
-    writer_status = "SUCCESS" if readback_fail == 0 and not source_mutated and output_hash else "FAILED_READBACK"
+    writer_status = (
+        "SUCCESS"
+        if readback_fail == 0 and not source_mutated and output_hash
+        else "FAILED_READBACK"
+    )
     return {
         "schemaVersion": "form_writer_ui_result_v1",
         "writerStatus": writer_status,
@@ -325,7 +335,9 @@ def _writer_ui_result(writer_dict: dict[str, Any]) -> dict[str, Any]:
             "sourceMutated": source_mutated,
         },
         "output": {
-            "outputFileId": "out_" + hashlib.sha256(output_hash.encode("utf-8")).hexdigest()[:12] if output_hash else "",
+            "outputFileId": "out_" + hashlib.sha256(output_hash.encode("utf-8")).hexdigest()[:12]
+            if output_hash
+            else "",
             "outputHash": output_hash[:16],
             "downloadEnabled": writer_status == "SUCCESS",
         },
@@ -370,11 +382,13 @@ def run_real_file_preflight(
         return _blocked_result(
             inp,
             BLOCKED_INVALID_HWPX,
-            before_hash,
-            after_hash,
-            after_mtime != before_mtime,
-            security=_safe_security(),
-            warnings=["WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY", "WARN_SANDBOX_ONLY"],
+            BlockedResultDetails(
+                source_hash_before=before_hash,
+                source_hash_after=after_hash,
+                mtime_changed=after_mtime != before_mtime,
+                security=_safe_security(),
+                warnings=["WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY", "WARN_SANDBOX_ONLY"],
+            ),
         ).to_dict()
 
     structure = inspect_hwpx_structure(inp.sample_path)
@@ -399,13 +413,15 @@ def run_real_file_preflight(
         return _blocked_result(
             inp,
             status,
-            before_hash,
-            after_hash,
-            after_mtime != before_mtime,
-            structure=structure,
-            target_map=target_summary,
-            security=security,
-            warnings=["WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY", "WARN_SANDBOX_ONLY"],
+            BlockedResultDetails(
+                source_hash_before=before_hash,
+                source_hash_after=after_hash,
+                mtime_changed=after_mtime != before_mtime,
+                structure=structure,
+                target_map=target_summary,
+                security=security,
+                warnings=["WARN_REAL_LIKE_SANITIZED_SAMPLE_ONLY", "WARN_SANDBOX_ONLY"],
+            ),
         ).to_dict()
 
     approval = ApprovalResult(
@@ -428,7 +444,11 @@ def run_real_file_preflight(
 
     readback_summary = readback.summary
     final_export_enabled = False
-    if readback_summary["readbackFail"] == 0 and readback_summary["unexpectedMutation"] == 0 and not source_mutated:
+    if (
+        readback_summary["readbackFail"] == 0
+        and readback_summary["unexpectedMutation"] == 0
+        and not source_mutated
+    ):
         ui_result = _writer_ui_result(writer_dict)
         download_payload = build_download_payload(
             ui_result,
@@ -540,7 +560,9 @@ def normalize_approved_fields(
     return normalized
 
 
-def write_report(report: dict[str, Any], output_dir: Path, name: str = "real_file_preflight_summary.json") -> Path:
+def write_report(
+    report: dict[str, Any], output_dir: Path, name: str = "real_file_preflight_summary.json"
+) -> Path:
     """Write a PII-safe report. The caller controls the report directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(report, ensure_ascii=False, indent=2)
@@ -563,8 +585,7 @@ def create_real_like_sanitized_hwpx(path: Path) -> Path:
         ["Attachment", "masked-ready"],
     ]
     cells_xml = lambda cells: "".join(
-        f'<hp:tc><hp:p><hp:run><hp:t>{cell}</hp:t></hp:run></hp:p></hp:tc>'
-        for cell in cells
+        f"<hp:tc><hp:p><hp:run><hp:t>{cell}</hp:t></hp:run></hp:p></hp:tc>" for cell in cells
     )
     rows_xml = "".join(f"<hp:tr>{cells_xml(row)}</hp:tr>" for row in rows)
     section_xml = (
@@ -590,9 +611,27 @@ def default_real_like_target_map() -> list[TargetMapEntry]:
 
 def default_real_like_approved_fields() -> list[ApprovedField]:
     return [
-        ApprovedField("contractorName", "Contractor", "MASKED_CO", "", ACTION_CONFIRM, "realLikeSanitized", 0.95),
-        ApprovedField("projectCode", "Project Code", "PRJ_MASKED", "", ACTION_CONFIRM, "realLikeSanitized", 0.92),
-        ApprovedField("reviewerName", "Reviewer", "MASKED_USER", "", ACTION_CONFIRM, "realLikeSanitized", 0.90),
+        ApprovedField(
+            "contractorName",
+            "Contractor",
+            "MASKED_CO",
+            "",
+            ACTION_CONFIRM,
+            "realLikeSanitized",
+            0.95,
+        ),
+        ApprovedField(
+            "projectCode",
+            "Project Code",
+            "PRJ_MASKED",
+            "",
+            ACTION_CONFIRM,
+            "realLikeSanitized",
+            0.92,
+        ),
+        ApprovedField(
+            "reviewerName", "Reviewer", "MASKED_USER", "", ACTION_CONFIRM, "realLikeSanitized", 0.90
+        ),
     ]
 
 

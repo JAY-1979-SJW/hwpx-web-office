@@ -217,6 +217,49 @@ def discover_hwpx(root: Path, include_hidden: bool, max_files: int) -> list[Path
 # ── package structure inspection ───────────────────────────────────────────────
 
 
+def _inspect_package_xml_health(
+    zf: zipfile.ZipFile, names: list[str], has_content_hpf: bool, has_header: bool
+) -> tuple[dict[str, int], list[str], bool]:
+    counts = {
+        "manifest_count": 0,
+        "spine_count": 0,
+        "char_pr_count": 0,
+        "para_pr_count": 0,
+        "border_fill_count": 0,
+    }
+    warnings: list[str] = []
+    xml_decode_ok = True
+
+    if has_content_hpf:
+        try:
+            opf = ET.fromstring(zf.read("Contents/content.hpf"))
+            counts["manifest_count"] = len(opf.findall(f".//{{{NS_OPF}}}item"))
+            counts["spine_count"] = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
+        except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
+            warnings.append(f"content.hpf parse failed: {exc}")
+            xml_decode_ok = False
+
+    if has_header:
+        try:
+            header = ET.fromstring(zf.read("Contents/header.xml"))
+            counts["char_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
+            counts["para_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
+            counts["border_fill_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
+        except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
+            warnings.append(f"header.xml parse failed: {exc}")
+            xml_decode_ok = False
+
+    for n in names:
+        if n.endswith((".xml", ".hpf", ".rdf")):
+            try:
+                zf.read(n).decode("utf-8")
+            except UnicodeDecodeError:
+                warnings.append(f"non-utf8 entry: {n}")
+                xml_decode_ok = False
+
+    return counts, warnings, xml_decode_ok
+
+
 def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
     names = zf.namelist()
     has_mimetype = "mimetype" in names
@@ -233,40 +276,14 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
     has_header = "Contents/header.xml" in names
     section_files = [n for n in names if re.match(r"Contents/section\d+\.xml$", n)]
 
-    manifest_count = 0
-    spine_count = 0
-    char_pr_count = 0
-    para_pr_count = 0
-    border_fill_count = 0
-    xml_decode_ok = True
-    warnings: list[str] = []
-
-    if has_content_hpf:
-        try:
-            opf = ET.fromstring(zf.read("Contents/content.hpf"))
-            manifest_count = len(opf.findall(f".//{{{NS_OPF}}}item"))
-            spine_count = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
-        except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
-            warnings.append(f"content.hpf parse failed: {exc}")
-            xml_decode_ok = False
-
-    if has_header:
-        try:
-            header = ET.fromstring(zf.read("Contents/header.xml"))
-            char_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
-            para_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
-            border_fill_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
-        except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
-            warnings.append(f"header.xml parse failed: {exc}")
-            xml_decode_ok = False
-
-    for n in names:
-        if n.endswith((".xml", ".hpf", ".rdf")):
-            try:
-                zf.read(n).decode("utf-8")
-            except UnicodeDecodeError:
-                warnings.append(f"non-utf8 entry: {n}")
-                xml_decode_ok = False
+    counts, warnings, xml_decode_ok = _inspect_package_xml_health(
+        zf, names, has_content_hpf, has_header
+    )
+    manifest_count = counts["manifest_count"]
+    spine_count = counts["spine_count"]
+    char_pr_count = counts["char_pr_count"]
+    para_pr_count = counts["para_pr_count"]
+    border_fill_count = counts["border_fill_count"]
 
     if has_mimetype and mt_compress != 0:
         warnings.append(f"mimetype not ZIP_STORED (compress_type={mt_compress})")
@@ -739,7 +756,7 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
             try:
                 _parse_and_catalog(ctx, file_id, path.name, zf, pkg)
                 record["status"] = "PASS"
-            except Exception as exc:  # noqa: BLE001 — 원인 상세(traceback) 기록 후 다음 파일 계속
+            except Exception as exc:  # ruff: ignore[blind-except] — 원인 상세(traceback) 기록 후 다음 파일 계속
                 tb = traceback.format_exc(limit=3)
                 ctx.failure_records.append({
                     "fileId": file_id,

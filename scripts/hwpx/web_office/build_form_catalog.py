@@ -10,6 +10,7 @@
 - 고유 서식 종류(정규화 파일명)당 대표 1개만 파싱.
 - 진행 상황을 stdout에 실시간 출력.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,32 +22,35 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
-from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
+from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # ruff: ignore[module-import-not-at-top-of-file]
 
 LIB = PROJECT_ROOT / "data" / "drafts" / "form_library"
-LIB_REL = "data/drafts/form_library"   # 브릿지는 project-relative sourcePath 요구
+LIB_REL = "data/drafts/form_library"  # 브릿지는 project-relative sourcePath 요구
 MANIFEST = LIB / "manifest.json"
 CATALOG = LIB / "catalog.sqlite"
-SIZE_CAP = 3 * 1024 * 1024   # 3MB 초과 = 거대 문서 사전 제외 (1.5MB→3MB, 2026-08-04: 실측상
-                              # 116건 스킵 중 49건이 1.5~3MB 경계선이라 무근거 예방컷을 완화)
+SIZE_CAP = 3 * 1024 * 1024  # 3MB 초과 = 거대 문서 사전 제외 (1.5MB→3MB, 2026-08-04: 실측상
+# 116건 스킵 중 49건이 1.5~3MB 경계선이라 무근거 예방컷을 완화)
 
 
-def _log(m): print(m, flush=True)
+def _log(m):
+    print(m, flush=True)
 
 
 def form_type(name: str) -> str:
     n = re.sub(r"\.hwpx?$", "", name, flags=re.I)
-    n = re.sub(r"^[0-9a-f]{10}_", "", n)       # 수집 해시 접두
-    n = re.sub(r"^\d{3,6}_\d{1,4}_", "", n)     # 데모 번호 접두
-    n = re.sub(r"__(A|B|filled)$", "", n)       # 변형 접미
-    n = re.sub(r"\(\d+\)", "", n)               # 번호 괄호
+    n = re.sub(r"^[0-9a-f]{10}_", "", n)  # 수집 해시 접두
+    n = re.sub(r"^\d{3,6}_\d{1,4}_", "", n)  # 데모 번호 접두
+    n = re.sub(r"__(A|B|filled)$", "", n)  # 변형 접미
+    n = re.sub(r"\(\d+\)", "", n)  # 번호 괄호
     return n.strip()
 
 
 _BEONJI = re.compile(r"별지[\s_]*제?[\s_]*(\d+)호(?:의[\s_]*\d+)?[\s_]*서식")
 _BEOLPYO = re.compile(r"별표[\s_]*(\d+)")
+
+
 def statute_no(name: str) -> str:
-    n = name.replace("_", " ")   # 언더스코어 → 공백 정규화
+    n = name.replace("_", " ")  # 언더스코어 → 공백 정규화
     m = _BEONJI.search(n)
     if m:
         return "별지 제" + m.group(0).split("제", 1)[-1].strip()
@@ -113,6 +117,73 @@ def init_db(con):
     """)
 
 
+def _process_one_form_record(con: sqlite3.Connection, r: dict) -> str:
+    """레코드 하나를 파싱해 DB에 저장하고 상태('OK'/'SKIPPED_LARGE'/'PARSE_FAIL'/'ERROR')를 반환."""
+    src = LIB / (r.get("collectedAs") or "")
+    ft = form_type(r["name"])
+    sn = statute_no(r["name"])
+    if r["sizeBytes"] > SIZE_CAP or not src.exists():
+        con.execute(
+            "INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
+            " VALUES(?,?,?,?,?,?,?)",
+            (ft, sn, r["name"], r["sha256"], r["sizeBytes"], "SKIPPED_LARGE", r["sourcePath"]),
+        )
+        return "SKIPPED_LARGE"
+    try:
+        rel_src = f"{LIB_REL}/{r['collectedAs']}"  # project-relative
+        res = load_hwpx_for_editor(
+            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel_src}, project_root=PROJECT_ROOT
+        )
+        if res.get("verdict") != "PASS":
+            con.execute(
+                "INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
+                " VALUES(?,?,?,?,?,?,?)",
+                (ft, sn, r["name"], r["sha256"], r["sizeBytes"], "PARSE_FAIL", r["sourcePath"]),
+            )
+            return "PARSE_FAIL"
+        dm = res.get("documentModel", {})
+        rp = res.get("renderPayload", {})
+        sm = res.get("summary", {})
+        labels = extract_fields(dm, rp)
+        cur = con.execute(
+            "INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,table_count,cell_count,"
+            "field_count,fingerprint,source_path,status) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                ft,
+                sn,
+                r["name"],
+                r["sha256"],
+                r["sizeBytes"],
+                sm.get("tables", 0),
+                sm.get("cells", 0),
+                len(labels),
+                dm.get("sourceDocumentHash", ""),
+                r["sourcePath"],
+                "OK",
+            ),
+        )
+        fid = cur.lastrowid
+        con.executemany(
+            "INSERT INTO fields(form_id,label) VALUES(?,?)", [(fid, lab) for lab in labels]
+        )
+        return "OK"
+    except Exception as e:  # ruff: ignore[blind-except] -- 서식 수천 종 배치 파싱, 1건 실패로 전체 중단 방지
+        con.execute(
+            "INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
+            " VALUES(?,?,?,?,?,?,?)",
+            (
+                ft,
+                sn,
+                r["name"],
+                r["sha256"],
+                r["sizeBytes"],
+                "ERROR:" + str(e)[:60],
+                r["sourcePath"],
+            ),
+        )
+        return "ERROR"
+
+
 def main():
     limit = int(sys.argv[sys.argv.index("--limit") + 1]) if "--limit" in sys.argv else 0
     mani = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -136,55 +207,28 @@ def main():
     t0 = time.time()
     ok = skipped_big = failed = 0
     for i, r in enumerate(targets, 1):
-        src = LIB / (r.get("collectedAs") or "")
-        ft = form_type(r["name"])
-        sn = statute_no(r["name"])
-        if r["sizeBytes"] > SIZE_CAP or not src.exists():
-            skipped_big += 1
-            con.execute("INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
-                        " VALUES(?,?,?,?,?,?,?)",
-                        (ft, sn, r["name"], r["sha256"], r["sizeBytes"], "SKIPPED_LARGE", r["sourcePath"]))
-            continue
-        try:
-            rel_src = f"{LIB_REL}/{r['collectedAs']}"   # project-relative
-            res = load_hwpx_for_editor({"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel_src},
-                                       project_root=PROJECT_ROOT)
-            if res.get("verdict") != "PASS":
-                failed += 1
-                con.execute("INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
-                            " VALUES(?,?,?,?,?,?,?)",
-                            (ft, sn, r["name"], r["sha256"], r["sizeBytes"], "PARSE_FAIL", r["sourcePath"]))
-                continue
-            dm = res.get("documentModel", {})
-            rp = res.get("renderPayload", {})
-            sm = res.get("summary", {})
-            labels = extract_fields(dm, rp)
-            cur = con.execute(
-                "INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,table_count,cell_count,"
-                "field_count,fingerprint,source_path,status) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (ft, sn, r["name"], r["sha256"], r["sizeBytes"], sm.get("tables", 0),
-                 sm.get("cells", 0), len(labels), dm.get("sourceDocumentHash", ""),
-                 r["sourcePath"], "OK"))
-            fid = cur.lastrowid
-            con.executemany("INSERT INTO fields(form_id,label) VALUES(?,?)",
-                            [(fid, lab) for lab in labels])
+        status = _process_one_form_record(con, r)
+        if status == "OK":
             ok += 1
-        except Exception as e:
+        elif status == "SKIPPED_LARGE":
+            skipped_big += 1
+        else:
             failed += 1
-            con.execute("INSERT INTO forms(form_type,statute_no,name,sha256,size_bytes,status,source_path)"
-                        " VALUES(?,?,?,?,?,?,?)",
-                        (ft, sn, r["name"], r["sha256"], r["sizeBytes"], "ERROR:" + str(e)[:60], r["sourcePath"]))
         if i % 100 == 0:
             con.commit()
             el = time.time() - t0
             rate = i / el if el else 0
             eta = (len(targets) - i) / rate / 60 if rate else 0
-            _log(f"  … {i}/{len(targets)} (OK {ok}, 실패 {failed}, 대형 {skipped_big}) "
-                 f"[{el:.0f}s, ~{rate:.1f}/s, 남은 {eta:.0f}분]")
+            _log(
+                f"  … {i}/{len(targets)} (OK {ok}, 실패 {failed}, 대형 {skipped_big}) "
+                f"[{el:.0f}s, ~{rate:.1f}/s, 남은 {eta:.0f}분]"
+            )
     con.commit()
     con.close()
     el = time.time() - t0
-    _log(f"[done] 총 {len(targets)}개 · OK {ok} · 실패 {failed} · 대형제외 {skipped_big} · {el/60:.1f}분")
+    _log(
+        f"[done] 총 {len(targets)}개 · OK {ok} · 실패 {failed} · 대형제외 {skipped_big} · {el / 60:.1f}분"
+    )
     _log(f"[catalog] {CATALOG}")
 
 

@@ -297,6 +297,35 @@ def _run_dynamic_e2e(fixture: Path) -> dict[str, Any]:
     return out
 
 
+def _check_one_dynamic_scenario(sc: dict) -> list[dict]:
+    findings: list[dict] = []
+    name = sc["scenario"]
+    if not sc["outputCreated"]:
+        findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
+        return findings
+    if not sc.get("outputInSandbox"):
+        findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
+    if sc["rejectedCount"]:
+        findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
+    v7 = sc["verify7"]
+    for k in REQUIRED_V7:
+        if v7.get(k) != "PASS":
+            findings.append({
+                "code": "V7_NOT_PASS",
+                "level": "FAIL",
+                "detail": f"{name}: {k}={v7.get(k)}",
+            })
+    rb = sc["readback"]
+    for k in REQUIRED_RB:
+        if rb.get(k) != "PASS":
+            findings.append({
+                "code": "READBACK_NOT_PASS",
+                "level": "FAIL",
+                "detail": f"{name}: {k}={rb.get(k)}",
+            })
+    return findings
+
+
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
@@ -315,30 +344,7 @@ def _check_dynamic(dyn: dict) -> list[dict]:
             "detail": f"actual={sorted(actual)}",
         })
     for sc in dyn["scenarios"]:
-        name = sc["scenario"]
-        if not sc["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
-            continue
-        if not sc.get("outputInSandbox"):
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
-        if sc["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
-        v7 = sc["verify7"]
-        for k in REQUIRED_V7:
-            if v7.get(k) != "PASS":
-                findings.append({
-                    "code": "V7_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={v7.get(k)}",
-                })
-        rb = sc["readback"]
-        for k in REQUIRED_RB:
-            if rb.get(k) != "PASS":
-                findings.append({
-                    "code": "READBACK_NOT_PASS",
-                    "level": "FAIL",
-                    "detail": f"{name}: {k}={rb.get(k)}",
-                })
+        findings.extend(_check_one_dynamic_scenario(sc))
     if dyn.get("shaPreserved") is False:
         findings.append({
             "code": "SOURCE_SHA_TOUCHED",

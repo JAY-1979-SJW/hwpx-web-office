@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import Any
 
 from hwpx_image_ops import add_bindata_image_data
@@ -125,25 +126,30 @@ def create_cell_paragraph(
     return paragraph
 
 
-def create_table_cell(
-    text: str,
-    row_index: int,
-    col_index: int,
-    col_width: int,
-    row_height: int,
-    defaults: dict[str, str],
-    col_span: int = 1,
-    row_span: int = 1,
-) -> ET.Element:
-    border_fill_id = defaults.get("borderFillIDRef", "2")
+@dataclass(frozen=True)
+class TableCellGeometry:
+    row_index: int
+    col_index: int
+    col_width: int
+    row_height: int
+    col_span: int = 1
+    row_span: int = 1
+
+
+def _resolve_cell_border_fill_id(defaults: dict[str, str], cell_key: str, row_index: int) -> str:
     cell_map = defaults.get("cellBorderFillIDRefMap", {})
-    cell_key = f"{row_index},{col_index}"
     if isinstance(cell_map, dict) and cell_map.get(cell_key):
-        border_fill_id = cell_map[cell_key]
-    elif row_index == 0 and defaults.get("headerBorderFillIDRef"):
-        border_fill_id = defaults["headerBorderFillIDRef"]
-    elif row_index > 0 and defaults.get("bodyBorderFillIDRef"):
-        border_fill_id = defaults["bodyBorderFillIDRef"]
+        return cell_map[cell_key]
+    if row_index == 0 and defaults.get("headerBorderFillIDRef"):
+        return defaults["headerBorderFillIDRef"]
+    if row_index > 0 and defaults.get("bodyBorderFillIDRef"):
+        return defaults["bodyBorderFillIDRef"]
+    return defaults.get("borderFillIDRef", "2")
+
+
+def _resolve_cell_style_overrides(
+    defaults: dict[str, str], cell_key: str
+) -> tuple[str, str, str, dict]:
     vert_align_map = defaults.get("cellVertAlignMap", {})
     text_direction_map = defaults.get("cellTextDirectionMap", {})
     line_wrap_map = defaults.get("cellLineWrapMap", {})
@@ -164,6 +170,10 @@ def create_table_cell(
         cell_margin = margin_map[cell_key]
     if not isinstance(cell_margin, dict):
         cell_margin = {"left": "510", "right": "510", "top": "141", "bottom": "141"}
+    return vert_align, text_direction, line_wrap, cell_margin
+
+
+def _resolve_cell_pr_overrides(defaults: dict[str, str], cell_key: str) -> dict[str, str]:
     cell_defaults = dict(defaults)
     char_pr_map = defaults.get("cellCharPrIDRefMap", {})
     para_pr_map = defaults.get("cellParaPrIDRefMap", {})
@@ -171,6 +181,20 @@ def create_table_cell(
         cell_defaults["charPrIDRef"] = str(char_pr_map[cell_key])
     if isinstance(para_pr_map, dict) and para_pr_map.get(cell_key):
         cell_defaults["paraPrIDRef"] = str(para_pr_map[cell_key])
+    return cell_defaults
+
+
+def create_table_cell(
+    text: str, defaults: dict[str, str], geometry: TableCellGeometry
+) -> ET.Element:
+    row_index, col_index = geometry.row_index, geometry.col_index
+    col_width, row_height = geometry.col_width, geometry.row_height
+    cell_key = f"{row_index},{col_index}"
+    border_fill_id = _resolve_cell_border_fill_id(defaults, cell_key, row_index)
+    vert_align, text_direction, line_wrap, cell_margin = _resolve_cell_style_overrides(
+        defaults, cell_key
+    )
+    cell_defaults = _resolve_cell_pr_overrides(defaults, cell_key)
     cell = ET.Element(
         hp("tc"),
         {
@@ -201,7 +225,11 @@ def create_table_cell(
     )
     sublist.append(create_cell_paragraph(text, cell_defaults, str(max(col_width - 1020, 1000))))
     ET.SubElement(cell, hp("cellAddr"), {"colAddr": str(col_index), "rowAddr": str(row_index)})
-    ET.SubElement(cell, hp("cellSpan"), {"colSpan": str(col_span), "rowSpan": str(row_span)})
+    ET.SubElement(
+        cell,
+        hp("cellSpan"),
+        {"colSpan": str(geometry.col_span), "rowSpan": str(geometry.row_span)},
+    )
     ET.SubElement(cell, hp("cellSz"), {"width": str(col_width), "height": str(row_height)})
     ET.SubElement(
         cell,
@@ -332,7 +360,16 @@ def create_generated_table(
             row_height = sum(normalized_heights[row_index : min(row_index + row_span, row_count)])
             tr.append(
                 create_table_cell(
-                    text, row_index, col_index, col_width, row_height, defaults, col_span, row_span
+                    text,
+                    defaults,
+                    TableCellGeometry(
+                        row_index=row_index,
+                        col_index=col_index,
+                        col_width=col_width,
+                        row_height=row_height,
+                        col_span=col_span,
+                        row_span=row_span,
+                    ),
                 )
             )
     return table

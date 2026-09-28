@@ -24,6 +24,7 @@ interpretations`(1차 원문)가 이미 저장돼 있다. 이 둘을 다시 합�
 값은 저장하지 않는다(§4 개인정보 원칙 불변) — 저장하는 것은 라벨의
 의미(isInput·filledBy·semantic·profileKey·question)뿐이다.
 """
+
 from __future__ import annotations
 
 import json
@@ -92,11 +93,55 @@ def _connect() -> sqlite3.Connection:
     return con
 
 
+def _accumulate_verified_row(
+    acc: dict[str, dict[str, Any]],
+    form_id: Any,
+    verdicts_json: str,
+    interp_json: str,
+    doc_type: str,
+) -> None:
+    from scripts.hwpx.web_office.ai_field_verification import agreement
+
+    verdicts = json.loads(verdicts_json)
+    interp = json.loads(interp_json)
+    ag = agreement(interp, verdicts)
+    agreed_keys = set(ag["authorAgreed"]) | set(ag["notInputAgreed"]) | set(ag["otherAgreed"])
+    by_key = {i["key"]: i for i in interp}
+    for key in agreed_keys:
+        i = by_key.get(key)
+        if not i:
+            continue
+        label = i.get("label") or ""
+        if not label:
+            continue
+        v = verdicts.get(key)  # self|other|none — 2차(독립) 판정
+        ck = cache_key(label, doc_type)
+        slot = acc.setdefault(
+            ck,
+            {
+                "label": label,
+                "doc_type": doc_type,
+                "verdict_counts": {},
+                "semantic": {},
+                "profile_key": {},
+                "question": {},
+                "form_ids": [],
+            },
+        )
+        slot["verdict_counts"][v] = slot["verdict_counts"].get(v, 0) + 1
+        if i.get("semantic"):
+            slot["semantic"][i["semantic"]] = slot["semantic"].get(i["semantic"], 0) + 1
+        if i.get("profileKey"):
+            slot["profile_key"][i["profileKey"]] = slot["profile_key"].get(i["profileKey"], 0) + 1
+        if i.get("question"):
+            slot["question"][i["question"]] = slot["question"].get(i["question"], 0) + 1
+        if len(slot["form_ids"]) < 5:
+            slot["form_ids"].append(form_id)
+
+
 def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
     """검증 통과 기록에서 새 AI 호출 없이 라벨 기준서를 채운다."""
-    from scripts.hwpx.web_office.ai_field_verification import agreement
-    from scripts.hwpx.web_office.build_ai_interpretation_cache import (
-        STAGING, VERIFY_TABLE)
+    from scripts.hwpx.web_office.build_ai_interpretation_cache import STAGING, VERIFY_TABLE
 
     con = _connect()
     con.execute(DDL)
@@ -105,45 +150,15 @@ def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, An
         f" COALESCE(f.doc_type,'') FROM {VERIFY_TABLE} v"
         f" JOIN {STAGING} s ON s.form_id=v.form_id"
         f" JOIN forms f ON f.form_id=v.form_id"
-        f" WHERE v.status='OK' AND v.verdicts IS NOT NULL").fetchall()
+        f" WHERE v.status='OK' AND v.verdicts IS NOT NULL"
+    ).fetchall()
 
     # (key) -> {verdict별 등장수, semantic/profileKey/question 표본, form_ids}
     acc: dict[str, dict[str, Any]] = {}
     forms_seen = 0
     for form_id, verdicts_json, interp_json, doc_type in rows:
         forms_seen += 1
-        verdicts = json.loads(verdicts_json)
-        interp = json.loads(interp_json)
-        ag = agreement(interp, verdicts)
-        agreed_keys = (set(ag["authorAgreed"]) | set(ag["notInputAgreed"])
-                      | set(ag["otherAgreed"]))
-        by_key = {i["key"]: i for i in interp}
-        for key in agreed_keys:
-            i = by_key.get(key)
-            if not i:
-                continue
-            label = i.get("label") or ""
-            if not label:
-                continue
-            v = verdicts.get(key)  # self|other|none — 2차(독립) 판정
-            ck = cache_key(label, doc_type)
-            slot = acc.setdefault(ck, {
-                "label": label, "doc_type": doc_type,
-                "verdict_counts": {}, "semantic": {}, "profile_key": {},
-                "question": {}, "form_ids": [],
-            })
-            slot["verdict_counts"][v] = slot["verdict_counts"].get(v, 0) + 1
-            if i.get("semantic"):
-                slot["semantic"][i["semantic"]] = \
-                    slot["semantic"].get(i["semantic"], 0) + 1
-            if i.get("profileKey"):
-                slot["profile_key"][i["profileKey"]] = \
-                    slot["profile_key"].get(i["profileKey"], 0) + 1
-            if i.get("question"):
-                slot["question"][i["question"]] = \
-                    slot["question"].get(i["question"], 0) + 1
-            if len(slot["form_ids"]) < 5:
-                slot["form_ids"].append(form_id)
+        _accumulate_verified_row(acc, form_id, verdicts_json, interp_json, doc_type)
 
     def _majority(counter: dict) -> str:
         return max(counter.items(), key=lambda kv: kv[1])[0] if counter else ""
@@ -161,17 +176,26 @@ def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, An
         else:
             inconsistent_n += 1
         payload.append((
-            ck, slot["label"], slot["doc_type"], top_v,
-            _majority(slot["semantic"]), _majority(slot["profile_key"]),
-            _majority(slot["question"]), total, conflict, consistent,
+            ck,
+            slot["label"],
+            slot["doc_type"],
+            top_v,
+            _majority(slot["semantic"]),
+            _majority(slot["profile_key"]),
+            _majority(slot["question"]),
+            total,
+            conflict,
+            consistent,
             json.dumps(slot["form_ids"], ensure_ascii=False),
         ))
 
-    con.execute(f"DELETE FROM {TABLE}")   # 백필은 전량 재계산(재현 가능)
+    con.execute(f"DELETE FROM {TABLE}")  # 백필은 전량 재계산(재현 가능)
     con.executemany(
         f"INSERT INTO {TABLE}(cache_key,label,doc_type,verdict,semantic,"
         f"profile_key,question,sample_count,conflict_count,consistent,"
-        f"source_form_ids) VALUES(?,?,?,?,?,?,?,?,?,?,?)", payload)
+        f"source_form_ids) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        payload,
+    )
     con.commit()
     con.close()
 
@@ -184,34 +208,42 @@ def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, An
     }
 
 
-def lookup(con: sqlite3.Connection, label: str,
-          doc_type: str) -> dict[str, Any] | None:
+def lookup(con: sqlite3.Connection, label: str, doc_type: str) -> dict[str, Any] | None:
     """신뢰 가능한(consistent) 기준서 항목만 돌려준다. 없으면 None."""
     row = con.execute(
         f"SELECT verdict, semantic, profile_key, question, sample_count"
         f" FROM {TABLE} WHERE cache_key=? AND consistent=1",
-        (cache_key(label, doc_type),)).fetchone()
+        (cache_key(label, doc_type),),
+    ).fetchone()
     if not row:
         return None
-    return {"verdict": row[0], "semantic": row[1], "profileKey": row[2],
-            "question": row[3], "sampleCount": row[4]}
+    return {
+        "verdict": row[0],
+        "semantic": row[1],
+        "profileKey": row[2],
+        "question": row[3],
+        "sampleCount": row[4],
+    }
 
 
 def status() -> dict[str, Any]:
     con = _connect()
     con.execute(DDL)
     total = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
-    consistent = con.execute(
-        f"SELECT COUNT(*) FROM {TABLE} WHERE consistent=1").fetchone()[0]
-    covered = con.execute(
-        f"SELECT SUM(sample_count) FROM {TABLE}").fetchone()[0] or 0
+    consistent = con.execute(f"SELECT COUNT(*) FROM {TABLE} WHERE consistent=1").fetchone()[0]
+    covered = con.execute(f"SELECT SUM(sample_count) FROM {TABLE}").fetchone()[0] or 0
     con.close()
-    return {"entries": total, "consistent": consistent,
-            "inconsistent": total - consistent, "fieldOccurrencesCovered": covered}
+    return {
+        "entries": total,
+        "consistent": consistent,
+        "inconsistent": total - consistent,
+        "fieldOccurrencesCovered": covered,
+    }
 
 
 def main() -> None:
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", action="store_true")
     ap.add_argument("--status", action="store_true")

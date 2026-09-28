@@ -13,10 +13,10 @@ import json
 import os
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TARGET_SUFFIXES = {".hwp", ".hwpx"}
@@ -37,7 +37,7 @@ DEFAULT_SKIP_DIR_NAMES = {
 
 
 def iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def default_roots() -> list[Path]:
@@ -76,7 +76,11 @@ def minimize_roots(roots: Iterable[Path]) -> list[Path]:
     minimized: list[Path] = []
     for root in sorted(resolved_roots, key=lambda p: len(str(p))):
         root_key = os.path.normcase(str(root))
-        if any(root_key == os.path.normcase(str(existing)) or root_key.startswith(os.path.normcase(str(existing)) + os.sep) for existing in minimized):
+        if any(
+            root_key == os.path.normcase(str(existing))
+            or root_key.startswith(os.path.normcase(str(existing)) + os.sep)
+            for existing in minimized
+        ):
             continue
         minimized.append(root)
     return minimized
@@ -94,6 +98,28 @@ def should_skip_dir(path: Path, skip_names: set[str]) -> bool:
     if path.name.lower() in skip_names:
         return True
     return is_reparse_point(path)
+
+
+def _scan_directory_entries(current: Path, skip_names: set[str]) -> tuple[list[Path], list[Path]]:
+    child_dirs: list[Path] = []
+    target_files: list[Path] = []
+    try:
+        with os.scandir(current) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        child = Path(entry.path)
+                        if not should_skip_dir(child, skip_names):
+                            child_dirs.append(child)
+                    elif entry.is_file(follow_symlinks=False):
+                        path = Path(entry.path)
+                        if path.suffix.lower() in TARGET_SUFFIXES:
+                            target_files.append(path)
+                except OSError:
+                    continue
+    except OSError:
+        pass
+    return child_dirs, target_files
 
 
 def iter_target_files(
@@ -116,22 +142,11 @@ def iter_target_files(
         if max_seconds > 0 and time.monotonic() - started >= max_seconds:
             return
         root, current = stack.pop()
-        try:
-            with os.scandir(current) as entries:
-                for entry in entries:
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            child = Path(entry.path)
-                            if not should_skip_dir(child, skip_names):
-                                stack.append((root, child))
-                        elif entry.is_file(follow_symlinks=False):
-                            path = Path(entry.path)
-                            if path.suffix.lower() in TARGET_SUFFIXES:
-                                yield root, path
-                    except OSError:
-                        continue
-        except OSError:
-            continue
+        child_dirs, target_files = _scan_directory_entries(current, skip_names)
+        for child in child_dirs:
+            stack.append((root, child))
+        for path in target_files:
+            yield root, path
 
 
 def file_record(root: Path, path: Path) -> dict[str, Any]:
@@ -148,7 +163,7 @@ def file_record(root: Path, path: Path) -> dict[str, Any]:
         "extension": path.suffix.lower(),
         "size": stat.st_size,
         "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-        "modified_at_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        "modified_at_utc": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
     }
 
 
@@ -170,13 +185,25 @@ def run_inventory(
     csv_path = out_dir / "local_hwp_hwpx_inventory.csv"
     jsonl_path = out_dir / "local_hwp_hwpx_inventory.jsonl"
     summary_path = out_dir / "local_hwp_hwpx_summary.json"
-    fieldnames = ["root", "relative", "path", "name", "extension", "size", "modified_at", "modified_at_utc"]
+    fieldnames = [
+        "root",
+        "relative",
+        "path",
+        "name",
+        "extension",
+        "size",
+        "modified_at",
+        "modified_at_utc",
+    ]
     counts: Counter[str] = Counter()
     by_root: Counter[str] = Counter()
     total_size = 0
     seen: set[str] = set()
 
-    with csv_path.open("w", encoding="utf-8-sig", newline="") as csv_fh, jsonl_path.open("w", encoding="utf-8") as jsonl_fh:
+    with (
+        csv_path.open("w", encoding="utf-8-sig", newline="") as csv_fh,
+        jsonl_path.open("w", encoding="utf-8") as jsonl_fh,
+    ):
         writer = csv.DictWriter(csv_fh, fieldnames=fieldnames)
         writer.writeheader()
         for root, path in iter_target_files(roots, skip_names=skip_names, max_seconds=max_seconds):
@@ -199,7 +226,12 @@ def run_inventory(
                 jsonl_fh.flush()
                 print(
                     json.dumps(
-                        {"event": "progress", "total": total, "hwp": counts[".hwp"], "hwpx": counts[".hwpx"]},
+                        {
+                            "event": "progress",
+                            "total": total,
+                            "hwp": counts[".hwp"],
+                            "hwpx": counts[".hwpx"],
+                        },
                         ensure_ascii=False,
                     ),
                     flush=True,
@@ -228,12 +260,24 @@ def run_inventory(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", action="append", type=Path, help="Root folder to scan. Can be repeated.")
-    parser.add_argument("--out-dir", type=Path, default=REPO_ROOT / "reports" / "runtime" / "local_hwp_hwpx_inventory")
-    parser.add_argument("--max-seconds", type=int, default=0, help="Stop after N seconds; 0 means no time limit.")
+    parser.add_argument(
+        "--root", action="append", type=Path, help="Root folder to scan. Can be repeated."
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=REPO_ROOT / "reports" / "runtime" / "local_hwp_hwpx_inventory",
+    )
+    parser.add_argument(
+        "--max-seconds", type=int, default=0, help="Stop after N seconds; 0 means no time limit."
+    )
     parser.add_argument("--progress-every", type=int, default=100)
-    parser.add_argument("--include-appdata", action="store_true", help="Do not skip AppData by default.")
-    parser.add_argument("--skip-dir-name", action="append", default=[], help="Extra directory name to skip.")
+    parser.add_argument(
+        "--include-appdata", action="store_true", help="Do not skip AppData by default."
+    )
+    parser.add_argument(
+        "--skip-dir-name", action="append", default=[], help="Extra directory name to skip."
+    )
     return parser.parse_args()
 
 
