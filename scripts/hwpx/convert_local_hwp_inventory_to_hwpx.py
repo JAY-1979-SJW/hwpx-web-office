@@ -14,7 +14,7 @@ import subprocess
 import time
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +28,14 @@ from hwp_native_com_batch import (
     write_csv_report,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INVENTORY = REPO_ROOT / "reports" / "runtime" / "local_hwp_hwpx_inventory_default" / "local_hwp_hwpx_inventory.csv"
+DEFAULT_INVENTORY = (
+    REPO_ROOT
+    / "reports"
+    / "runtime"
+    / "local_hwp_hwpx_inventory_default"
+    / "local_hwp_hwpx_inventory.csv"
+)
 PERSISTENT_WORKER = REPO_ROOT / "scripts" / "hwp-worker" / "Convert-HwpToHwpx-PersistentBatch.ps1"
 
 
@@ -94,7 +99,9 @@ def inventory_hwpx_peers(rows: list[dict[str, str]]) -> set[str]:
     return peers
 
 
-def skipped_result(index: int, source: Path, root: Path, output: Path, reason: str, peer: Path | None = None) -> dict[str, Any]:
+def skipped_result(
+    index: int, source: Path, root: Path, output: Path, reason: str, peer: Path | None = None
+) -> dict[str, Any]:
     return {
         "status": "SKIP",
         "index": index,
@@ -125,22 +132,15 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def run_persistent_worker(
+def _stage_targets(
     targets: list[tuple[int, dict[str, str], Path, Path, Path]],
-    *,
-    output_dir: Path,
-    staging_dir: Path,
-    diag_dir: Path,
-    timeout_sec: int,
-    save_strategy: str,
-) -> list[dict[str, Any]]:
-    batch_id = uuid.uuid4().hex[:8]
-    batch_staging = staging_dir / f"persistent_{batch_id}"
-    staged_output_dir = batch_staging / "converted"
-    batch_staging.mkdir(parents=True, exist_ok=True)
-    staged_output_dir.mkdir(parents=True, exist_ok=True)
-    diag_dir.mkdir(parents=True, exist_ok=True)
-
+    batch_staging: Path,
+    staged_output_dir: Path,
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, tuple[int, dict[str, str], Path, Path, Path, Path]],
+    list[dict[str, Any]],
+]:
     manifest_items: list[dict[str, Any]] = []
     target_map: dict[str, tuple[int, dict[str, str], Path, Path, Path, Path]] = {}
     pre_results: list[dict[str, Any]] = []
@@ -174,15 +174,23 @@ def run_persistent_worker(
                 },
             })
             continue
-        manifest_items.append({"itemId": item_id, "inputPath": str(staged_input), "outputPath": str(staged_output)})
+        manifest_items.append({
+            "itemId": item_id,
+            "inputPath": str(staged_input),
+            "outputPath": str(staged_output),
+        })
         target_map[item_id] = (local_index, row, source, root, target, staged_output)
+    return manifest_items, target_map, pre_results
 
-    if not manifest_items:
-        return pre_results
 
-    manifest_path = batch_staging / "manifest.json"
-    result_path = batch_staging / "result.json"
-    write_json(manifest_path, {"batchId": batch_id, "items": manifest_items})
+def _run_worker_subprocess(
+    manifest_path: Path,
+    result_path: Path,
+    diag_dir: Path,
+    save_strategy: str,
+    timeout_sec: int,
+    targets: list[tuple[int, dict[str, str], Path, Path, Path]],
+) -> tuple[subprocess.CompletedProcess | None, list[dict[str, Any]] | None]:
     strategy = "direct" if save_strategy == "auto" else save_strategy
     cmd = [
         str(HANCOM_32BIT_POWERSHELL),
@@ -212,7 +220,7 @@ def run_persistent_worker(
             timeout=subprocess_timeout,
         )
     except subprocess.TimeoutExpired as exc:
-        return [
+        timeout_results = [
             {
                 "status": "FAIL",
                 "index": local_index,
@@ -225,9 +233,21 @@ def run_persistent_worker(
                 "stdout_tail": (exc.stdout if isinstance(exc.stdout, str) else "")[-1000:],
                 "stderr_tail": (exc.stderr if isinstance(exc.stderr, str) else "")[-1000:],
             }
-            for local_index, row, source, root, target in [(x[0], x[1], x[2], x[3], x[4]) for x in targets]
+            for local_index, row, source, root, target in [
+                (x[0], x[1], x[2], x[3], x[4]) for x in targets
+            ]
         ]
+        return None, timeout_results
+    return proc, None
 
+
+def _finalize_worker_results(
+    pre_results: list[dict[str, Any]],
+    target_map: dict[str, tuple[int, dict[str, str], Path, Path, Path, Path]],
+    result_path: Path,
+    proc: subprocess.CompletedProcess,
+    batch_staging: Path,
+) -> list[dict[str, Any]]:
     parsed: dict[str, Any] = {}
     if result_path.exists():
         try:
@@ -235,7 +255,9 @@ def run_persistent_worker(
         except json.JSONDecodeError:
             parsed = {}
     worker_results = parsed.get("results") if isinstance(parsed.get("results"), list) else []
-    by_item_id = {str(item.get("itemId")): item for item in worker_results if isinstance(item, dict)}
+    by_item_id = {
+        str(item.get("itemId")): item for item in worker_results if isinstance(item, dict)
+    }
     results: list[dict[str, Any]] = list(pre_results)
     for item_id, (local_index, row, source, root, target, staged_output) in target_map.items():
         worker = by_item_id.get(item_id, {})
@@ -272,6 +294,42 @@ def run_persistent_worker(
             },
         })
     return results
+
+
+def run_persistent_worker(
+    targets: list[tuple[int, dict[str, str], Path, Path, Path]],
+    *,
+    output_dir: Path,
+    staging_dir: Path,
+    diag_dir: Path,
+    timeout_sec: int,
+    save_strategy: str,
+) -> list[dict[str, Any]]:
+    batch_id = uuid.uuid4().hex[:8]
+    batch_staging = staging_dir / f"persistent_{batch_id}"
+    staged_output_dir = batch_staging / "converted"
+    batch_staging.mkdir(parents=True, exist_ok=True)
+    staged_output_dir.mkdir(parents=True, exist_ok=True)
+    diag_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_items, target_map, pre_results = _stage_targets(
+        targets, batch_staging, staged_output_dir
+    )
+
+    if not manifest_items:
+        return pre_results
+
+    manifest_path = batch_staging / "manifest.json"
+    result_path = batch_staging / "result.json"
+    write_json(manifest_path, {"batchId": batch_id, "items": manifest_items})
+
+    proc, timeout_results = _run_worker_subprocess(
+        manifest_path, result_path, diag_dir, save_strategy, timeout_sec, targets
+    )
+    if timeout_results is not None:
+        return timeout_results
+
+    return _finalize_worker_results(pre_results, target_map, result_path, proc, batch_staging)
 
 
 def run_conversion(
@@ -329,7 +387,9 @@ def run_conversion(
             if dry_run:
                 result = planned_result(index, source, root, target)
             elif skip_inventory_peer and peer_key in peers:
-                result = skipped_result(index, source, root, target, "INVENTORY_HWPX_PEER_EXISTS", peer)
+                result = skipped_result(
+                    index, source, root, target, "INVENTORY_HWPX_PEER_EXISTS", peer
+                )
             elif target.exists() and existing_policy == "skip":
                 result = skipped_result(index, source, root, target, "OUTPUT_EXISTS")
             elif target.exists() and existing_policy == "fail":
@@ -361,7 +421,18 @@ def run_conversion(
             if audit_jsonl:
                 audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
                 with audit_jsonl.open("a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"event": "local_hwp_inventory_conversion_item", "logged_at": iso_now(), "result": result}, ensure_ascii=False, sort_keys=True) + "\n")
+                    fh.write(
+                        json.dumps(
+                            {
+                                "event": "local_hwp_inventory_conversion_item",
+                                "logged_at": iso_now(),
+                                "result": result,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
             if fail_fast and result.get("status") == "FAIL":
                 break
         if pending_persistent:
@@ -378,7 +449,18 @@ def run_conversion(
                 if audit_jsonl:
                     audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
                     with audit_jsonl.open("a", encoding="utf-8") as fh:
-                        fh.write(json.dumps({"event": "local_hwp_inventory_conversion_item", "logged_at": iso_now(), "result": result}, ensure_ascii=False, sort_keys=True) + "\n")
+                        fh.write(
+                            json.dumps(
+                                {
+                                    "event": "local_hwp_inventory_conversion_item",
+                                    "logged_at": iso_now(),
+                                    "result": result,
+                                },
+                                ensure_ascii=False,
+                                sort_keys=True,
+                            )
+                            + "\n"
+                        )
                 if fail_fast and result.get("status") == "FAIL":
                     break
 
@@ -386,7 +468,7 @@ def run_conversion(
         "status": "PASS" if counts["FAIL"] == 0 else "FAIL",
         "mode": "local_hwp_inventory_to_hwpx",
         "started_at": started,
-        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": datetime.now(UTC).isoformat(),
         "inventory_csv": str(inventory_csv),
         "output_dir": str(output_dir),
         "staging_dir": str(staging_dir),
@@ -418,14 +500,32 @@ def run_conversion(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inventory-csv", type=Path, default=DEFAULT_INVENTORY)
-    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "deliverables" / "local_hwp_hwpx_converted")
+    parser.add_argument(
+        "--output-dir", type=Path, default=REPO_ROOT / "deliverables" / "local_hwp_hwpx_converted"
+    )
     parser.add_argument("--staging-dir", type=Path, default=DEFAULT_WORK_ROOT / "inventory_staging")
     parser.add_argument("--diag-dir", type=Path, default=DEFAULT_WORK_ROOT / "inventory_diag")
-    parser.add_argument("--report-json", type=Path, default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_report.json")
-    parser.add_argument("--report-csv", type=Path, default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_report.csv")
-    parser.add_argument("--audit-jsonl", type=Path, default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_audit.jsonl")
-    parser.add_argument("--offset", type=int, default=0, help="Skip this many HWP rows before processing.")
-    parser.add_argument("--limit", type=int, default=1, help="Maximum HWP files to process; 0 means all")
+    parser.add_argument(
+        "--report-json",
+        type=Path,
+        default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_report.json",
+    )
+    parser.add_argument(
+        "--report-csv",
+        type=Path,
+        default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_report.csv",
+    )
+    parser.add_argument(
+        "--audit-jsonl",
+        type=Path,
+        default=REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_audit.jsonl",
+    )
+    parser.add_argument(
+        "--offset", type=int, default=0, help="Skip this many HWP rows before processing."
+    )
+    parser.add_argument(
+        "--limit", type=int, default=1, help="Maximum HWP files to process; 0 means all"
+    )
     parser.add_argument("--timeout-sec", type=int, default=90)
     parser.add_argument("--save-strategy", choices=["direct", "haction", "auto"], default="auto")
     parser.add_argument("--existing-policy", choices=["skip", "overwrite", "fail"], default="skip")
@@ -433,7 +533,11 @@ def main() -> int:
     parser.add_argument("--root-contains", default="")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
-    parser.add_argument("--lock-file", type=Path, default=DEFAULT_LOCK_FILE.with_name("local_hwp_inventory_to_hwpx.lock"))
+    parser.add_argument(
+        "--lock-file",
+        type=Path,
+        default=DEFAULT_LOCK_FILE.with_name("local_hwp_inventory_to_hwpx.lock"),
+    )
     parser.add_argument("--engine", choices=["single", "persistent"], default="persistent")
     args = parser.parse_args()
     report = run_conversion(
@@ -456,7 +560,25 @@ def main() -> int:
         lock_file=args.lock_file,
         engine=str(args.engine),
     )
-    print(json.dumps({key: report[key] for key in ["status", "target_count", "ok_count", "skip_count", "plan_count", "fail_count", "report_json", "report_csv"]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                key: report[key]
+                for key in [
+                    "status",
+                    "target_count",
+                    "ok_count",
+                    "skip_count",
+                    "plan_count",
+                    "fail_count",
+                    "report_json",
+                    "report_csv",
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0 if report.get("status") == "PASS" else 1
 
 

@@ -188,7 +188,7 @@ def validate_no_sensitive_raw_values(record: dict) -> None:
 # ── builders ────────────────────────────────────────────────────────────────
 
 
-def build_fill_review_session_log(
+def build_fill_review_session_log(  # ruff: ignore[too-many-arguments] -- DB 레코드 계약 API, 필드 각각 명시 필요
     *,
     session_id: str,
     document_id: str,
