@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    # Windows 콘솔 기본 코드페이지(cp949)에서 findings 안의 '—' 등을
+    # 못 찍어서 UnicodeEncodeError 로 죽는 것 방지.
+    sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
 HTTP_DIR = ROOT / "src/main/java/com/haehan/engine/http"
