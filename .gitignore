@@ -15,6 +15,11 @@ data/
 !data/cache/
 reports/
 
+# recognition_corpus DB/내보내기 (위 data/ 규칙으로 이미 제외되지만,
+# HWPX-RECOGNITION-CORPUS-DB-SCHEMA-CONTRACT-01 이 명시적 항목을 요구함)
+data/recognition_corpus/*.sqlite3
+data/recognition_corpus/exports/
+
 # 분석/테스트 스크립트 (일회성)
 ai_validate_field_mapping.py
 analyze_form_structure.py

@@ -3,6 +3,7 @@
 in-memory SQLite 기반. 실제 corpus.sqlite3 또는 9,377건 ingest 없음.
 writer 미호출, output HWPX 미생성, 원본 무수정, secret 미출력.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -18,6 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 @pytest.fixture
 def conn():
     from hwpx.recognition_corpus import corpus_schema as cs
+
     c = sqlite3.connect(":memory:")
     c.execute("PRAGMA foreign_keys = ON")
     cs.init_db(c)
@@ -28,25 +30,24 @@ def conn():
 @pytest.fixture
 def cs_mod():
     from hwpx.recognition_corpus import corpus_schema as m
+
     return m
 
 
 # T01: init_db ───────────────────────────────────────────────────────────────
 
+
 def test_t01_init_db_succeeds(conn):
     assert conn is not None
-    tables = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )}
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert len(tables) >= 8
 
 
 # T02: 8개 required tables ─────────────────────────────────────────────────
 
+
 def test_t02_required_tables_exist(conn, cs_mod):
-    tables = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )}
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     for t in cs_mod.REQUIRED_TABLES:
         assert t in tables, f"missing table: {t}"
 
@@ -55,41 +56,89 @@ def test_t02_required_tables_exist(conn, cs_mod):
 
 _EXPECTED_COLUMNS: dict[str, set[str]] = {
     "hwpx_documents": {
-        "document_id", "source_path", "source_kind", "file_size",
-        "mtime", "detected_type", "inventory_status", "sha256",
-        "first_seen_at", "last_audited_at", "notes",
+        "document_id",
+        "source_path",
+        "source_kind",
+        "file_size",
+        "mtime",
+        "detected_type",
+        "inventory_status",
+        "sha256",
+        "first_seen_at",
+        "last_audited_at",
+        "notes",
     },
     "document_classifications": {
-        "classification_id", "document_id", "classifier_version",
-        "document_type", "confidence", "evidence_json", "classified_at",
+        "classification_id",
+        "document_id",
+        "classifier_version",
+        "document_type",
+        "confidence",
+        "evidence_json",
+        "classified_at",
     },
     "label_occurrences": {
-        "occurrence_id", "document_id", "section_index", "table_id",
-        "cell_key", "paragraph_key", "label_text", "normalized_label",
-        "neighbor_text", "right_neighbor_empty", "row_index",
-        "cell_index", "occurrence_context_json", "audited_at",
+        "occurrence_id",
+        "document_id",
+        "section_index",
+        "table_id",
+        "cell_key",
+        "paragraph_key",
+        "label_text",
+        "normalized_label",
+        "neighbor_text",
+        "right_neighbor_empty",
+        "row_index",
+        "cell_index",
+        "occurrence_context_json",
+        "audited_at",
     },
     "human_label_decisions": {
-        "decision_id", "normalized_label", "semantic_type",
-        "decision_status", "decided_by", "reason", "decided_at",
+        "decision_id",
+        "normalized_label",
+        "semantic_type",
+        "decision_status",
+        "decided_by",
+        "reason",
+        "decided_at",
     },
     "label_promotion_candidates": {
-        "candidate_id", "normalized_label", "proposed_semantic",
-        "occurrence_count", "document_count", "evidence_score",
-        "status", "conflict_count", "evidence_json",
-        "approved_at", "promotion_version",
+        "candidate_id",
+        "normalized_label",
+        "proposed_semantic",
+        "occurrence_count",
+        "document_count",
+        "evidence_score",
+        "status",
+        "conflict_count",
+        "evidence_json",
+        "approved_at",
+        "promotion_version",
     },
     "label_dictionary_versions": {
-        "version", "built_at", "entry_count",
-        "source_corpus_sha", "approved_by", "notes",
+        "version",
+        "built_at",
+        "entry_count",
+        "source_corpus_sha",
+        "approved_by",
+        "notes",
     },
     "label_dictionary_entries": {
-        "version", "normalized_label", "semantic_type",
+        "version",
+        "normalized_label",
+        "semantic_type",
         "source_evidence_json",
     },
     "accuracy_audits": {
-        "audit_id", "dictionary_version", "classifier_version",
-        "audit_at", "sample_size", "precision", "recall", "f1", "notes",
+        "audit_id",
+        "dictionary_version",
+        "classifier_version",
+        "audit_at",
+        "sample_size",
+        "precision",
+        "recall",
+        "f1",
+        "notes",
     },
 }
 
@@ -102,6 +151,7 @@ def test_t03_required_columns(conn, table, expected_cols):
 
 
 # T04: foreign key enforcement ────────────────────────────────────────────
+
 
 def test_t04_foreign_keys_enabled(conn):
     fk = conn.execute("PRAGMA foreign_keys").fetchone()
@@ -120,6 +170,7 @@ def test_t04b_foreign_key_violation_blocks_classification(conn):
 
 # T05: document_id duplicate 차단 ─────────────────────────────────────────
 
+
 def _insert_doc(conn, doc_id="doc1", sha=None):
     conn.execute(
         "INSERT INTO hwpx_documents "
@@ -137,6 +188,7 @@ def test_t05_document_id_duplicate_blocked(conn):
 
 
 # T06: UNIQUE(document_id, classifier_version) ────────────────────────────
+
 
 def test_t06_classification_unique(conn):
     _insert_doc(conn, "d1")
@@ -161,6 +213,7 @@ def test_t06_classification_unique(conn):
 
 # T07: confidence 범위 ───────────────────────────────────────────────────
 
+
 def test_t07_confidence_out_of_range_blocked(conn):
     _insert_doc(conn, "d1")
     with pytest.raises(sqlite3.IntegrityError):
@@ -179,6 +232,7 @@ def test_t07_confidence_out_of_range_blocked(conn):
 
 # T08: allowed document_type ─────────────────────────────────────────────
 
+
 def test_t08_document_type_check_blocks_invalid(conn):
     _insert_doc(conn, "d1")
     with pytest.raises(sqlite3.IntegrityError):
@@ -191,14 +245,14 @@ def test_t08_document_type_check_blocks_invalid(conn):
 
 # T09: normalized_label 인덱스 ────────────────────────────────────────────
 
+
 def test_t09_label_occurrence_norm_index(conn):
-    idx = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='index'"
-    )}
+    idx = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
     assert "idx_label_occurrences_norm" in idx
 
 
 # T10: human_label_decisions allowed semantic ────────────────────────────
+
 
 def test_t10_human_decision_semantic_allowed(conn, cs_mod):
     conn.execute(
@@ -216,6 +270,7 @@ def test_t10_human_decision_semantic_allowed(conn, cs_mod):
 
 # T11: decision_status allowed ───────────────────────────────────────────
 
+
 def test_t11_decision_status_allowed(conn):
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
@@ -226,6 +281,7 @@ def test_t11_decision_status_allowed(conn):
 
 
 # T12: promotion candidate status allowed ─────────────────────────────────
+
 
 def test_t12_promotion_status_allowed(conn):
     with pytest.raises(sqlite3.IntegrityError):
@@ -238,6 +294,7 @@ def test_t12_promotion_status_allowed(conn):
 
 
 # T13: UNKNOWN dictionary entry 차단 ─────────────────────────────────────
+
 
 def test_t13_unknown_dictionary_entry_blocked(conn, cs_mod):
     conn.execute(
@@ -256,10 +313,9 @@ def test_t13_unknown_dictionary_entry_blocked(conn, cs_mod):
 
 # T14: human approval 없는 promotion 차단 helper ─────────────────────────
 
+
 def test_t14_promotion_blocked_without_human_approval(conn, cs_mod):
-    allowed, reason = cs_mod.can_promote_to_dictionary(
-        conn, "신규라벨", "PROJECT_NAME"
-    )
+    allowed, reason = cs_mod.can_promote_to_dictionary(conn, "신규라벨", "PROJECT_NAME")
     assert allowed is False
     assert reason == "BLOCKED_NO_HUMAN_APPROVAL"
 
@@ -270,14 +326,13 @@ def test_t14b_promotion_allowed_with_human_approval(conn, cs_mod):
         "(normalized_label, semantic_type, decision_status, decided_by, decided_at) "
         "VALUES ('공사명', 'PROJECT_NAME', 'APPROVED', 'alice', 'now')"
     )
-    allowed, reason = cs_mod.can_promote_to_dictionary(
-        conn, "공사명", "PROJECT_NAME"
-    )
+    allowed, reason = cs_mod.can_promote_to_dictionary(conn, "공사명", "PROJECT_NAME")
     assert allowed is True
     assert reason == "OK"
 
 
 # T15: conflicting semantic decisions 감지 ────────────────────────────────
+
 
 def test_t15_conflicting_semantics_detected(conn, cs_mod):
     conn.execute(
@@ -292,14 +347,13 @@ def test_t15_conflicting_semantics_detected(conn, cs_mod):
     )
     conflicts = cs_mod.detect_semantic_conflicts(conn, "이름")
     assert len(conflicts) == 2
-    allowed, reason = cs_mod.can_promote_to_dictionary(
-        conn, "이름", "PROJECT_NAME"
-    )
+    allowed, reason = cs_mod.can_promote_to_dictionary(conn, "이름", "PROJECT_NAME")
     assert allowed is False
     assert reason == "BLOCKED_CONFLICT"
 
 
 # T16: dictionary version + entries insert ──────────────────────────────
+
 
 def test_t16_dictionary_version_and_entries(conn):
     conn.execute(
@@ -325,6 +379,7 @@ def test_t16_dictionary_version_and_entries(conn):
 
 # T17: accuracy precision/recall/f1 범위 ────────────────────────────────
 
+
 def test_t17_accuracy_metric_range(conn):
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
@@ -335,6 +390,7 @@ def test_t17_accuracy_metric_range(conn):
 
 
 # T18: labels_by_frequency view ─────────────────────────────────────────
+
 
 def test_t18_labels_by_frequency_view(conn):
     _insert_doc(conn, "d1")
@@ -356,10 +412,11 @@ def test_t18_labels_by_frequency_view(conn):
     assert rows
     assert rows[0][0] == "공사명"
     assert rows[0][1] == 4
-    assert rows[0][2] == 2   # 2 distinct documents
+    assert rows[0][2] == 2  # 2 distinct documents
 
 
 # T19: pending_promotion_candidates view ────────────────────────────────
+
 
 def test_t19_pending_promotion_view(conn):
     conn.execute(
@@ -380,6 +437,7 @@ def test_t19_pending_promotion_view(conn):
 
 # T20: classification_disagreements view ────────────────────────────────
 
+
 def test_t20_classification_disagreements(conn):
     _insert_doc(conn, "d1")
     conn.execute(
@@ -398,6 +456,7 @@ def test_t20_classification_disagreements(conn):
 
 # T21: schema init idempotent ───────────────────────────────────────────
 
+
 def test_t21_init_idempotent(conn, cs_mod):
     cs_mod.init_db(conn)
     cs_mod.init_db(conn)  # 두 번 호출해도 crash 없음
@@ -406,6 +465,7 @@ def test_t21_init_idempotent(conn, cs_mod):
 
 
 # T22: migration checksum ────────────────────────────────────────────────
+
 
 def test_t22_migration_checksum(cs_mod):
     info = cs_mod.migration_checksum()
@@ -417,12 +477,14 @@ def test_t22_migration_checksum(cs_mod):
 
 # T23: gitignore for corpus ─────────────────────────────────────────────
 
+
 def test_t23_gitignore_blocks_corpus_files(cs_mod):
     r = cs_mod.audit_gitignore_for_corpus()
     assert r["ok"] is True, r
 
 
 # T24: production module DB import 금지 ────────────────────────────────
+
 
 def test_t24_production_isolation(cs_mod):
     r = cs_mod.audit_production_isolation()
@@ -432,16 +494,18 @@ def test_t24_production_isolation(cs_mod):
 
 # T25: no secret / DB URL ─────────────────────────────────────────────
 
+
 def test_t25_no_secret_in_schema_file():
-    p = (PROJECT_ROOT
-          / "data/recognition_corpus/schema/001_init.sql").read_text(
+    # corpus_schema.py 가 실제로 읽는 경로(SCHEMA_DIR)와 일치시킨다 —
+    # data/recognition_corpus/ 는 gitignore 대상이라 스키마 DDL이 살 곳이
+    # 아니다(2026-09-28 완성도 감사에서 경로 오타 확인, 실제 파일은
+    # 한 번도 존재한 적 없었음).
+    p = (PROJECT_ROOT / "scripts/hwpx/recognition_corpus/schema/001_init.sql").read_text(
         encoding="utf-8"
     )
-    for forbidden in ("sk-", "Bearer ", "DATABASE_URL=", "ANTHROPIC_API_KEY",
-                          "OPENAI_API_KEY"):
+    for forbidden in ("sk-", "Bearer ", "DATABASE_URL=", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         assert forbidden not in p
-    src = (PROJECT_ROOT
-            / "scripts/hwpx/recognition_corpus/corpus_schema.py").read_text(
+    src = (PROJECT_ROOT / "scripts/hwpx/recognition_corpus/corpus_schema.py").read_text(
         encoding="utf-8"
     )
     for forbidden in ("sk-", "Bearer ", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
@@ -450,14 +514,19 @@ def test_t25_no_secret_in_schema_file():
 
 # T26: writer 미호출 ─────────────────────────────────────────────────────
 
+
 def test_t26_writer_not_invoked_during_schema(monkeypatch):
     from hwpx.pipeline import generic_edit_plan_writer_executor_live_sandbox as live
+
     call_log: list = []
-    monkeypatch.setattr(live, "execute_writer_call_plan_live_sandbox",
-                          lambda *a, **k: call_log.append("live"))
+    monkeypatch.setattr(
+        live, "execute_writer_call_plan_live_sandbox", lambda *a, **k: call_log.append("live")
+    )
     # schema 모듈 import + init 자체로 writer가 호출되지 않음
     import importlib
+
     import hwpx.recognition_corpus.corpus_schema as cs
+
     importlib.reload(cs)
     c = sqlite3.connect(":memory:")
     cs.init_db(c)
@@ -468,8 +537,8 @@ def test_t26_writer_not_invoked_during_schema(monkeypatch):
 
 # T27: output HWPX 미생성 ──────────────────────────────────────────────
 
+
 def test_t27_no_output_hwpx(tmp_path, cs_mod):
-    before = sorted(p.name for p in tmp_path.iterdir())
     db = tmp_path / "corpus.sqlite3"
     conn = cs_mod.open_corpus_db(db)
     conn.close()
@@ -480,8 +549,10 @@ def test_t27_no_output_hwpx(tmp_path, cs_mod):
 
 # T28-T30: 기존 회귀 모듈 import 가능성 smoke ─────────────────────────────
 
+
 def test_t28_collected_audit_imports_clean():
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(
         "audit_collected_hwpx_inventory",
         PROJECT_ROOT / "scripts/ops/audit_collected_hwpx_inventory.py",
@@ -493,6 +564,7 @@ def test_t28_collected_audit_imports_clean():
 
 def test_t29_full_coverage_audit_imports_clean():
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(
         "audit_hwpx_recognition_full_coverage",
         PROJECT_ROOT / "scripts/ops/audit_hwpx_recognition_full_coverage.py",
@@ -504,4 +576,5 @@ def test_t29_full_coverage_audit_imports_clean():
 
 def test_t30_live_pipeline_imports_clean():
     from hwpx.fill_review import fill_review_live_pipeline
+
     assert callable(fill_review_live_pipeline.run_fill_review_live_pipeline_sandbox)
