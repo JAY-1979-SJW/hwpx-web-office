@@ -111,7 +111,7 @@ def _static_writer_unchanged(findings: list[dict]) -> None:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE, "--", rel],
-                cwd=PR, capture_output=True, text=True,
+                cwd=PR, capture_output=True, text=True, encoding="utf-8", errors="replace",
                 check=False, timeout=20)
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({"code": "GIT_DIFF_FAIL",

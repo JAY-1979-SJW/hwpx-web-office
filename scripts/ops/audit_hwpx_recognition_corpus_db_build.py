@@ -66,7 +66,7 @@ def audit() -> dict:
         env["HWPX_RECOGNITION_CORPUS_DB"] = str(dry_db)
         r = subprocess.run(
             [sys.executable, str(BUILD_SCRIPT), "--dry-run"],
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env,
         )
         checks.append(_check("A05_dry_run_no_db_created", not dry_db.exists(),
                              f"returncode={r.returncode}"))
@@ -78,7 +78,7 @@ def audit() -> dict:
         env["HWPX_RECOGNITION_CORPUS_DB"] = str(fx_db)
         r = subprocess.run(
             [sys.executable, str(BUILD_SCRIPT), "--fixture-minimal"],
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env,
         )
         db_created = fx_db.is_file()
         checks.append(_check("A06_fixture_minimal_creates_db", db_created,
@@ -124,7 +124,7 @@ def audit() -> dict:
     try:
         r = subprocess.run(
             ["git", "diff", "--cached", "--name-only"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT),
         )
         staged = r.stdout
         sqlite_staged = any("sqlite3" in line or ".db" in line for line in staged.splitlines())
@@ -137,7 +137,7 @@ def audit() -> dict:
     try:
         r = subprocess.run(
             ["git", "diff", "--name-only"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT),
         )
         hwpx_changed = [l for l in r.stdout.splitlines() if l.endswith(".hwpx")]
         checks.append(_check("A11_original_hwpx_unchanged", not hwpx_changed,
@@ -167,7 +167,7 @@ def audit() -> dict:
             [sys.executable, "-m", "pytest",
              "tests/test_hwpx_recognition_corpus_db_build.py",
              "-q", "--tb=no"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT),
         )
         tests_ok = r.returncode == 0
         checks.append(_check("A15_tests_pass", tests_ok,
@@ -184,7 +184,7 @@ def audit() -> dict:
             [sys.executable, "-m", "pytest",
              "tests/test_web_office_cell_save_hwpx_verify7.py::test_audit_script_returns_pass",
              "-v", "--tb=short"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT), env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT), env=env,
         )
         skip_ok = "skipped" in r.stdout.lower() or r.returncode == 0
         checks.append(_check("A16_no_db_means_skip_not_fail", skip_ok,

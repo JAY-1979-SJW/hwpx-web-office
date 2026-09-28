@@ -386,7 +386,7 @@ def test_T23_readback_hardening_tests_pass():
     import subprocess, sys
     r = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/test_hwpx_form_writer_readback_hardening.py", "-q"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -400,7 +400,7 @@ def test_T24_sandbox_writer_tests_pass():
     import subprocess, sys
     r = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/test_hwpx_form_auto_fill_writer_sandbox.py", "-q"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -418,7 +418,7 @@ def test_T25_upstream_tests_pass():
          "tests/test_hwpx_review_panel.py",
          "tests/test_hwpx_form_field_mapping.py",
          "-q"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr

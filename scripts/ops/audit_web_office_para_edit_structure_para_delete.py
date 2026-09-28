@@ -100,7 +100,7 @@ def audit() -> dict:
     for rel in LOCKED_FILES_VS_BASELINE:
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, cwd=str(PR), timeout=20)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
         if r.returncode != 0 or r.stdout.strip():
             findings.append({"code": "LOCKED_FILE_CHANGED",
                             "detail": rel, "level": "FAIL"})
@@ -108,7 +108,7 @@ def audit() -> dict:
     # 8. JS smoke PASS
     smoke = PR / "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
     r = subprocess.run(["node", str(smoke)],
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     try:
         out = json.loads(r.stdout.strip().split("\n")[-1])
         if out.get("verdict") != "PASS":
@@ -123,7 +123,7 @@ def audit() -> dict:
         [sys.executable, "-m", "pytest",
          "tests/test_web_office_para_edit_structure_para_delete.py",
          "-q", "--tb=short"],
-        capture_output=True, text=True, cwd=str(PR), timeout=120)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=120)
     if r.returncode != 0:
         findings.append({"code": "PYTHON_TESTS_FAIL",
                         "detail": r.stdout[-2000:], "level": "FAIL"})

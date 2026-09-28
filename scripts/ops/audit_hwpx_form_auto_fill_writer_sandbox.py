@@ -325,7 +325,7 @@ def run_audit() -> int:
         [sys.executable, "-m", "pytest",
          str(APPROVAL_TEST), str(PANEL_TEST), str(MAPPING_TEST),
          "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar_obj.check("A27", "approval/review/mapping tests pass",
                  r27.returncode == 0, r27.stdout[-150:])
@@ -333,7 +333,7 @@ def run_audit() -> int:
     # A28. writer sandbox 테스트
     r28 = subprocess.run(
         [sys.executable, "-m", "pytest", str(WRITER_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar_obj.check("A28", "writer sandbox tests pass",
                  r28.returncode == 0, r28.stdout[-150:])

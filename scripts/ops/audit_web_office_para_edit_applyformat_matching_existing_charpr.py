@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-MATCHING-EXISTING-CHARPR-01 준공.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-MATCHING-EXISTING-CHARPR-01 준공.
 
 existing charPr matcher + Format Toolbar 의 정적·동적 검증.
 """
@@ -131,7 +131,7 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
+                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
                               "detail": f"{rel}: {e}"})
@@ -159,7 +159,7 @@ def _check_audit_no_writer_calls() -> list[dict]:
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

@@ -81,7 +81,7 @@ def _run_git_ls_files() -> list[str]:
         ["git", "ls-files"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=60,
         check=True,
     )
@@ -429,7 +429,7 @@ def _git_head() -> str:
         ["git", "rev-parse", "--short", "HEAD"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
         check=True,
     )

@@ -33,7 +33,7 @@ def make_proposal(recognition_result: dict,
     # subprocess 호출 — 실 가동 시 활성화. test에서는 env unset이므로 도달 안 함.
     proc = subprocess.run(
         ["claude", "-p", prompt],
-        capture_output=True, text=True, check=False, timeout=120,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=120,
     )
     if proc.returncode != 0:
         return []

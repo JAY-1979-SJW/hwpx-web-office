@@ -59,7 +59,7 @@ CRITICAL_IMPORTS = {
 def check_git_hooks_path() -> dict:
     proc = subprocess.run(
         ["git", "config", "--get", "core.hooksPath"],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     configured = proc.stdout.strip()
     if configured != ".githooks":
@@ -113,7 +113,7 @@ def check_critical_imports() -> dict:
     for module, why in CRITICAL_IMPORTS.items():
         proc = subprocess.run(
             [sys.executable, "-c", f"import {module}"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         if proc.returncode != 0:
             missing.append({"module": module, "why": why})
@@ -145,7 +145,7 @@ def check_requirements_file() -> dict:
 def check_pytest_collect_deep() -> dict:
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q"],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     tail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
     if "error" in tail.lower() and not tail.strip().endswith("0 errors"):

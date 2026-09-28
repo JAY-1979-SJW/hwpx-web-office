@@ -188,7 +188,7 @@ def _conflicts(paths: list[str], session: str) -> list[dict[str, Any]]:
 def _staged_files() -> list[str]:
     try:
         r = subprocess.run(["git", "diff", "--cached", "--name-only"],
-                           capture_output=True, text=True, cwd=str(ROOT),
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
                            timeout=20)
         if r.returncode != 0:
             return []

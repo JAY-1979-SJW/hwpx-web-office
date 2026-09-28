@@ -88,7 +88,7 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True,
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
                 cwd=str(PR), timeout=20)
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({

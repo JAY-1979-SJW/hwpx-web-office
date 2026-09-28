@@ -7,7 +7,6 @@ containerScope 전사 + paragraph_edit_plan target.containerScope 우선 분기
 from __future__ import annotations
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -289,7 +288,7 @@ def test_audit_script_pass():
 def _node_available() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

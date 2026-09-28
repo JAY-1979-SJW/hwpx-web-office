@@ -194,7 +194,7 @@ def test_js_smoke_exists():
 def test_js_smoke_passes():
     r = subprocess.run(
         ["node", str(JS_SMOKE)],
-        capture_output=True, text=True, timeout=30)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     out_text = r.stdout.strip()
     assert r.returncode == 0, r.stderr
     assert out_text, "smoke 출력 없음"

@@ -46,7 +46,7 @@ def _grep_for_set_cell_paragraph_text() -> list[str]:
     try:
         ls = subprocess.run(
             ["git", "ls-files"], cwd=str(PROJECT_ROOT),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         hits: list[str] = []
         for path in ls.stdout.splitlines():

@@ -98,7 +98,7 @@ for wf in WRITER_FILES:
         continue
     r = subprocess.run(
         ["git", "diff", "--name-only", str(wf)],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     if wf.name in r.stdout:
         modified_writers.append(wf.name)

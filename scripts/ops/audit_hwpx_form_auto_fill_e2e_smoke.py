@@ -166,7 +166,7 @@ _check("A28", "Hancom not required", ok)
 r = subprocess.run(
     [sys.executable, "-m", "pytest",
      "tests/test_hwpx_form_writer_final_export_gate.py", "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"
@@ -183,7 +183,7 @@ r = subprocess.run(
      "tests/test_hwpx_review_panel.py",
      "tests/test_hwpx_form_field_mapping.py",
      "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"
@@ -193,7 +193,7 @@ _check("A30", f"previous download/UI/readback/sandbox/approval/review/mapping te
 r = subprocess.run(
     [sys.executable, "-m", "pytest",
      "tests/test_hwpx_form_auto_fill_e2e_smoke.py", "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"

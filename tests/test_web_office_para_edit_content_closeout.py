@@ -175,7 +175,7 @@ def test_locked_sources_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )

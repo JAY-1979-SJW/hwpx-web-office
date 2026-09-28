@@ -236,7 +236,7 @@ def run_audit() -> int:
     # A19. previous profiling tests pass
     r19 = subprocess.run(
         [sys.executable, "-m", "pytest", str(PREFLIGHT_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("A19", "profiling preflight 테스트 유지 (14/14)",
              r19.returncode == 0, r19.stdout[-200:])
@@ -244,7 +244,7 @@ def run_audit() -> int:
     # A20. previous DB build tests pass
     r20 = subprocess.run(
         [sys.executable, "-m", "pytest", str(DB_BUILD_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("A20", "corpus DB build 테스트 유지 (17/17)",
              r20.returncode == 0, r20.stdout[-200:])

@@ -52,7 +52,7 @@ def _run_lines(command: list[str]) -> list[str]:
         command,
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=60,
         check=True,
     )

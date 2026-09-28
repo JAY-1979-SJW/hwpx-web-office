@@ -91,7 +91,7 @@ def ocr_page(img_path: Path, prompt: str) -> list[dict]:
                 "--dangerously-skip-permissions",
                 "--output-format", "text",
             ],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         )
         text = result.stdout.strip()
         m = re.search(r"\{.*\}", text, re.DOTALL)

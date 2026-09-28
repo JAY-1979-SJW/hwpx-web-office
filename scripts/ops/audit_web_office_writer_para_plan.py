@@ -84,7 +84,7 @@ def audit() -> dict:
         try:
             out = subprocess.run(
                 ["git", "diff", _BASELINE, "--", rel],
-                cwd=_PR, capture_output=True, text=True, check=False)
+                cwd=_PR, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
             if out.stdout.strip():
                 findings.append({"code": "LOCKED_FILE_TOUCHED",
                                   "path": rel,

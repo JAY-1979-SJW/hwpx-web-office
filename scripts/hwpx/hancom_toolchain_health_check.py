@@ -48,7 +48,7 @@ def run_command(command: list[str], timeout: int = 120) -> dict[str, Any]:
         proc = subprocess.run(
             command,
             cwd=REPO_ROOT,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             capture_output=True,
             timeout=timeout,
             check=False,

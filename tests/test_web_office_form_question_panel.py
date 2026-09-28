@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -89,6 +88,6 @@ def test_empty_value_not_filled_logic_present():
 @pytest.mark.skipif(shutil.which("node") is None, reason="node 없음")
 def test_node_self_test_passes():
     r = subprocess.run(["node", str(SELFTEST)], capture_output=True,
-                       text=True, timeout=60, cwd=str(FE))
+                       text=True, encoding="utf-8", errors="replace", timeout=60, cwd=str(FE))
     assert r.returncode == 0, r.stdout + r.stderr
     assert "ALL PASS" in r.stdout

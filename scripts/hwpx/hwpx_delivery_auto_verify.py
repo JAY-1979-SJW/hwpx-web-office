@@ -88,7 +88,7 @@ def hancom_render_check(hwpx_path: Path, work_dir: Path, page: int, resolution: 
         completed = subprocess.run(
             command,
             cwd=REPO_ROOT,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             capture_output=True,
             timeout=timeout_sec,
         )

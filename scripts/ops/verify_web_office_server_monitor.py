@@ -150,7 +150,7 @@ def _check_structure_drift(project_root: Path) -> dict[str, Any]:
         [sys.executable, str(script)],
         cwd=str(project_root),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
         check=False,
     )

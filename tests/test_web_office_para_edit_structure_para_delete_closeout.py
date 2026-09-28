@@ -152,7 +152,7 @@ def test_locked_files_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )
@@ -166,7 +166,7 @@ def test_hwpx_staged_zero():
     r = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=10,
     )
@@ -192,7 +192,7 @@ def test_hwpx_staged_zero():
 
 def test_git_diff_check_clean():
     r = subprocess.run(
-        ["git", "diff", "--check"], capture_output=True, text=True, cwd=str(PR), timeout=10
+        ["git", "diff", "--check"], capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=10
     )
     assert r.returncode == 0, r.stdout
 
@@ -203,7 +203,7 @@ def test_git_diff_check_clean():
 def test_js_structure_smoke_pass():
     smoke = PR / "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
     assert smoke.exists(), "smoke file missing"
-    r = subprocess.run(["node", str(smoke)], capture_output=True, text=True, timeout=30)
+    r = subprocess.run(["node", str(smoke)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     out = json.loads(r.stdout.strip().split("\n")[-1])
     assert out.get("verdict") == "PASS", out
 
@@ -222,7 +222,7 @@ def test_para_delete_regression():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=60,
     )
@@ -243,7 +243,7 @@ def test_para_insert_regression():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=60,
     )
@@ -265,7 +265,7 @@ def test_applyformat_regression_sample():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=120,
     )
@@ -296,7 +296,7 @@ def test_audit_script_pass():
             "scripts/ops/audit_web_office_para_edit_structure_para_delete_closeout.py",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=120,
     )

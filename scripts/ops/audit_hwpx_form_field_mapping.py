@@ -203,7 +203,7 @@ def run_audit() -> int:
     # A19. parser tests
     r19 = subprocess.run(
         [sys.executable, "-m", "pytest", str(PARSER_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("A19", "upload parser 테스트 유지", r19.returncode == 0, r19.stdout[-150:])
 
@@ -211,7 +211,7 @@ def run_audit() -> int:
     r20 = subprocess.run(
         [sys.executable, "-m", "pytest", str(CATALOG_TEST), str(RECOMMEND_TEST),
          "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("A20", "catalog/recommend 테스트 유지", r20.returncode == 0, r20.stdout[-150:])
 

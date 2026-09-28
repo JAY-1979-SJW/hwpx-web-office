@@ -114,7 +114,7 @@ def _static_checks(findings: list[dict]) -> None:
         diff = subprocess.run(
             ["git", "diff", BASELINE, "--",
               "scripts/hwpx/web_office/document_model.py"],
-            cwd=PR, capture_output=True, text=True, check=False, timeout=20)
+            cwd=PR, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=20)
         added = [ln for ln in diff.stdout.splitlines()
                       if ln.startswith("+") and not ln.startswith("+++")]
         added_non_blank = [ln for ln in added if ln.strip(" +")]
@@ -133,7 +133,7 @@ def _static_checks(findings: list[dict]) -> None:
         try:
             out = subprocess.run(
                 ["git", "diff", BASELINE, "--", f],
-                cwd=PR, capture_output=True, text=True, check=False, timeout=20)
+                cwd=PR, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=20)
             if out.stdout.strip():
                 findings.append({
                     "code": "PROTECTED_FILE_MODIFIED",

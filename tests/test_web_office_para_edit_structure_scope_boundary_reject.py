@@ -120,7 +120,7 @@ def test_merge_para_uses_scope_helper():
 
 def test_js_smoke_scope_boundary_pass():
     smoke = PR / "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
-    r = subprocess.run(["node", str(smoke)], capture_output=True, text=True, timeout=30)
+    r = subprocess.run(["node", str(smoke)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     out = json.loads(r.stdout.strip().split("\n")[-1])
     assert out.get("verdict") == "PASS", out
     checks = out.get("checks", {})
@@ -173,7 +173,7 @@ def test_locked_files_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )
@@ -187,7 +187,7 @@ def test_hwpx_staged_zero():
     r = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=10,
     )
@@ -222,7 +222,7 @@ def test_para_insert_regression():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=60,
     )
@@ -240,7 +240,7 @@ def test_para_delete_regression():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=60,
     )
@@ -257,7 +257,7 @@ def test_audit_script_pass():
             "scripts/ops/audit_web_office_para_edit_structure_scope_boundary_reject.py",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
         timeout=120,
     )

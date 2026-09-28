@@ -7,7 +7,7 @@ def test_hwpx_engine_boundary_audit_runs_and_writes_json(tmp_path):
     output = tmp_path / "hwpx_engine_boundary.json"
     proc = subprocess.run(
         [sys.executable, "scripts/audit_hwpx_engine_boundaries.py", "--json", str(output)],
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         capture_output=True,
         check=False,
     )

@@ -151,14 +151,14 @@ def run_audit() -> int:
     # B12. panel 테스트
     r12 = subprocess.run(
         [sys.executable, "-m", "pytest", str(PANEL_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("B12", "review_panel 테스트 통과", r12.returncode == 0, r12.stdout[-150:])
 
     # B13. mapping 테스트 회귀
     r13 = subprocess.run(
         [sys.executable, "-m", "pytest", str(MAPPING_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("B13", "mapping 테스트 회귀 없음", r13.returncode == 0, r13.stdout[-150:])
 

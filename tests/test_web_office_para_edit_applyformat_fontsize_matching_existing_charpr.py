@@ -27,7 +27,7 @@ BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 
 
 def _node_ok() -> bool:
     try:
-        r = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=10)
+        r = subprocess.run(["node", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -230,7 +230,7 @@ def test_locked_files_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )

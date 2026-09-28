@@ -277,7 +277,7 @@ def run_audit() -> int:
     # A16. previous DB build tests still pass
     result = subprocess.run(
         [sys.executable, "-m", "pytest", str(DB_BUILD_TEST), "-v", "--tb=short", "-q"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     passed_17 = "17 passed" in result.stdout or result.returncode == 0
     ar.check("A16", "previous build_corpus_db tests still pass (17/17)",

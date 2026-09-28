@@ -220,7 +220,7 @@ def audit_module(
 
 def _dirty_baseline() -> dict[str, Any]:
     result = subprocess.run(
-        ["git", "status", "--short"], cwd=str(ROOT), capture_output=True, text=True, timeout=30
+        ["git", "status", "--short"], cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     return {

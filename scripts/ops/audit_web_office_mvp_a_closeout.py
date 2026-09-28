@@ -89,7 +89,7 @@ def _commit_is_reachable(sha: str) -> bool:
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--verify", sha + "^{commit}"],
-            capture_output=True, text=True, timeout=10, cwd=str(PR))
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=str(PR))
         return r.returncode == 0
     except Exception:
         return False

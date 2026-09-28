@@ -253,7 +253,7 @@ else:
 r = subprocess.run(
     [sys.executable, "-m", "pytest",
      "tests/test_hwpx_form_writer_download_review.py", "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"
@@ -269,7 +269,7 @@ r = subprocess.run(
      "tests/test_hwpx_review_panel.py",
      "tests/test_hwpx_form_field_mapping.py",
      "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"
@@ -279,7 +279,7 @@ _check("A25", f"previous UI/readback/sandbox/approval/review/mapping tests pass 
 r = subprocess.run(
     [sys.executable, "-m", "pytest",
      "tests/test_hwpx_form_writer_final_export_gate.py", "-q", "--tb=no"],
-    capture_output=True, text=True, cwd=str(ROOT),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
 )
 ok = r.returncode == 0
 desc = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"

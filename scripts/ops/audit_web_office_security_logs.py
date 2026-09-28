@@ -70,7 +70,7 @@ def _journal_tail(unit: str | None, lines: int) -> dict[str, Any]:
         result = subprocess.run(
             command,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=15,
             check=False,
         )

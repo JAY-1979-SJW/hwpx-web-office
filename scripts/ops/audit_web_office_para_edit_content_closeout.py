@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-CONTENT-CLOSEOUT-01 준공검사.
+"""WEB-OFFICE-PARA-EDIT-CONTENT-CLOSEOUT-01 준공검사.
 
 PARA-EDIT 내용 편집 3종 (TYPE_TEXT / REPLACE_TEXT_RANGE /
 DELETE_TEXT_RANGE) × (cell / body) × (single-run / multi-run) 전 범위
@@ -168,7 +168,7 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
+                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
                               "detail": f"{rel}: {e}"})

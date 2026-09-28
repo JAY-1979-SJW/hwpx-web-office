@@ -319,14 +319,14 @@ def run_audit() -> int:
     # A26. hardening 테스트
     r26 = subprocess.run(
         [sys.executable, "-m", "pytest", str(HARDENING_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar_obj.check("A26", "hardening tests pass", r26.returncode == 0, r26.stdout[-150:])
 
     # A27. sandbox writer + approval 테스트
     r27 = subprocess.run(
         [sys.executable, "-m", "pytest", str(WRITER_TEST), str(APPROVAL_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar_obj.check("A27", "sandbox writer / approval tests pass",
                  r27.returncode == 0, r27.stdout[-150:])
@@ -336,7 +336,7 @@ def run_audit() -> int:
         [sys.executable, "-m", "pytest",
          str(PANEL_TEST), str(MAPPING_TEST),
          "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar_obj.check("A28", "panel/mapping/parser/catalog/recommend tests pass",
                  r28.returncode == 0, r28.stdout[-150:])

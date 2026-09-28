@@ -51,7 +51,7 @@ def main(argv: list[str]) -> int:
 
     cmd = [sys.executable, *argv] if argv[0].endswith(".py") else argv
 
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     stdout = proc.stdout or ""
 
     log_dir = Path("data") / "reports" / "gate_concise_logs"

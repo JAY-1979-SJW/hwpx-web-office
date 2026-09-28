@@ -181,21 +181,21 @@ def run_audit() -> int:
     # C16. gate 테스트
     r16 = subprocess.run(
         [sys.executable, "-m", "pytest", str(GATE_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("C16", "approval_gate 테스트 통과", r16.returncode == 0, r16.stdout[-150:])
 
     # C17. panel 테스트 회귀
     r17 = subprocess.run(
         [sys.executable, "-m", "pytest", str(PANEL_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("C17", "review_panel 테스트 회귀 없음", r17.returncode == 0, r17.stdout[-150:])
 
     # C18. mapping 테스트 회귀
     r18 = subprocess.run(
         [sys.executable, "-m", "pytest", str(MAPPING_TEST), "-q", "--tb=no"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT)
     )
     ar.check("C18", "mapping 테스트 회귀 없음", r18.returncode == 0, r18.stdout[-150:])
 
