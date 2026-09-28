@@ -1,9 +1,11 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-MATCHING-EXISTING-CHARPR-CLOSEOUT-01.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-MATCHING-EXISTING-CHARPR-CLOSEOUT-01.
 
 bold/underline/italic existing charPr matching 부분 준공 동결 — 시방서
 + audit + 회귀 자재 목록 + 3777e9d baseline 잠금 확인. 신규 시공 없음.
 """
+
 from __future__ import annotations
+
 import json
 import subprocess
 import sys
@@ -12,12 +14,14 @@ from pathlib import Path
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
-CLOSEOUT_DOC = (PR / "docs/architecture/"
-                   "web_office_para_edit_applyformat_matching_existing_charpr_closeout.md")
+CLOSEOUT_DOC = (
+    PR / "docs/architecture/web_office_para_edit_applyformat_matching_existing_charpr_closeout.md"
+)
 BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────────
+
 
 def test_closeout_doc_exists():
     assert CLOSEOUT_DOC.is_file(), CLOSEOUT_DOC
@@ -30,24 +34,31 @@ def test_closeout_doc_lists_baseline_commit():
 
 # ── 2. 공식 완료 범위 명시 ─────────────────────────────────
 
+
 def test_closeout_doc_lists_completed_scopes():
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
     for phrase in (
         "format_charpr_matcher.mjs",
-        "matchToggle", "matchAllToggles",
+        "matchToggle",
+        "matchAllToggles",
         "MATCH_DIMENSIONS",
         "WebOfficeFormatToolbar.tsx",
-        "bold", "underline", "italic",
+        "bold",
+        "underline",
+        "italic",
         "enableApplyCommand",
         "onApplyCharPr",
         "현재 문서에 매칭되는 기존 스타일이 없습니다",
         "applyFormatToSelection",
-        "53.3", "30.0", "0.0",
+        "53.3",
+        "30.0",
+        "0.0",
     ):
         assert phrase in src, phrase
 
 
 # ── 3. 공식 차단 범위 명시 ─────────────────────────────────
+
 
 def test_closeout_doc_lists_blocked_scopes():
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
@@ -72,6 +83,7 @@ def test_closeout_doc_lists_blocked_scopes():
 
 
 # ── 4. 다음 공정 후보 명시 ─────────────────────────────────
+
 
 def test_closeout_doc_lists_next_processes():
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
@@ -105,14 +117,14 @@ REQUIRED_JS_SMOKES = [
 
 
 def test_all_required_tests_exist():
-    missing = [n for n in REQUIRED_TESTS
-                  if not (PR / "tests" / n).is_file()]
+    missing = [n for n in REQUIRED_TESTS if not (PR / "tests" / n).is_file()]
     assert not missing, missing
 
 
 def test_all_required_js_smokes_exist():
-    missing = [n for n in REQUIRED_JS_SMOKES
-                  if not (PR / "frontend/web_office_viewer" / n).is_file()]
+    missing = [
+        n for n in REQUIRED_JS_SMOKES if not (PR / "frontend/web_office_viewer" / n).is_file()
+    ]
     assert not missing, missing
 
 
@@ -145,22 +157,36 @@ LOCKED_VS_BASELINE = [
 
 
 def test_locked_files_unchanged_vs_baseline():
+    if (
+        subprocess.run(["git", "cat-file", "-e", BASELINE_COMMIT], capture_output=True).returncode
+        != 0
+    ):
+        import pytest
+
+        pytest.skip(
+            f"baseline commit {BASELINE_COMMIT} not reachable in this branch's history (extracted branch)"
+        )
     for rel in LOCKED_VS_BASELINE:
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, cwd=str(PR), timeout=20)
+            capture_output=True,
+            text=True,
+            cwd=str(PR),
+            timeout=20,
+        )
         assert r.returncode == 0, (rel, r.stderr)
-        assert not r.stdout.strip(), (
-            f"{rel} changed vs {BASELINE_COMMIT}")
+        assert not r.stdout.strip(), f"{rel} changed vs {BASELINE_COMMIT}"
 
 
 # ── 7. audit verdict PASS ──────────────────────────────────
 
+
 def test_audit_script_pass():
     from scripts.ops.audit_web_office_para_edit_applyformat_matching_existing_charpr_closeout import (
-        audit)
+        audit,
+    )
+
     rep = audit()
-    fails = [f for f in rep["findings"]
-              if f.get("level") == "FAIL"]
+    fails = [f for f in rep["findings"] if f.get("level") == "FAIL"]
     assert not fails, json.dumps(rep, ensure_ascii=False, indent=2)
     assert rep["verdict"] in ("PASS", "WARN"), rep
