@@ -15,6 +15,7 @@ import os
 import shutil
 import socket
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -323,74 +324,112 @@ def planned_result(
     }
 
 
-def run_batch(
-    input_dir: Path,
-    output_dir: Path,
-    *,
-    staging_dir: Path,
-    diag_dir: Path,
-    report_json: Path,
-    audit_jsonl: Path | None,
-    pattern: str,
-    limit: int,
-    timeout_sec: int,
-    save_strategy: str,
-    existing_policy: str = "overwrite",
-    report_csv: Path | None = None,
-    lock_file: Path | None = None,
-    fail_fast: bool = False,
-    dry_run: bool = False,
-) -> dict[str, Any]:
-    if existing_policy not in {"skip", "overwrite", "fail"}:
-        raise ValueError(f"unsupported existing_policy: {existing_policy}")
+@dataclass
+class BatchConfig:
+    """Bundled args for `run_batch` (was 15 positional/keyword params)."""
+
+    input_dir: Path
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+    report_json: Path
+    audit_jsonl: Path | None
+    pattern: str
+    limit: int
+    timeout_sec: int
+    save_strategy: str
+    existing_policy: str = "overwrite"
+    report_csv: Path | None = None
+    lock_file: Path | None = None
+    fail_fast: bool = False
+    dry_run: bool = False
+
+
+@dataclass
+class _ResolvedBatchPaths:
+    """Resolved, ready-to-use subset of `BatchConfig` needed per source file."""
+
+    input_dir: Path
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+    timeout_sec: int
+    save_strategy: str
+    existing_policy: str
+    dry_run: bool
+
+
+def _result_for_source(source: Path, paths: _ResolvedBatchPaths, index: int) -> dict[str, Any]:
+    target_output = output_path_for(source, paths.input_dir, paths.output_dir)
+    if paths.dry_run:
+        return planned_result(
+            source, input_root=paths.input_dir, output_root=paths.output_dir, index=index
+        )
+    if target_output.exists() and paths.existing_policy == "skip":
+        return skipped_existing_result(
+            source, input_root=paths.input_dir, output_root=paths.output_dir, index=index
+        )
+    if target_output.exists() and paths.existing_policy == "fail":
+        return {
+            "status": "FAIL",
+            "index": index,
+            "input": str(source),
+            "relative": str(source.relative_to(paths.input_dir)),
+            "output": str(target_output),
+            "copied": False,
+            "skipped": False,
+            "error_code": "OUTPUT_EXISTS",
+            "error_message": "Output already exists and existing_policy=fail",
+            "output_info": file_snapshot(target_output),
+        }
+    return convert_one_native(
+        source,
+        input_root=paths.input_dir,
+        output_root=paths.output_dir,
+        staging_root=paths.staging_dir,
+        diag_dir=paths.diag_dir,
+        timeout_sec=paths.timeout_sec,
+        save_strategy=paths.save_strategy,
+        index=index,
+    )
+
+
+def run_batch(config: BatchConfig) -> dict[str, Any]:
+    if config.existing_policy not in {"skip", "overwrite", "fail"}:
+        raise ValueError(f"unsupported existing_policy: {config.existing_policy}")
     started = iso_now()
-    input_dir = Path(input_dir).expanduser().resolve()
-    output_dir = Path(output_dir).expanduser().resolve()
-    staging_dir = Path(staging_dir).expanduser().resolve()
-    diag_dir = Path(diag_dir).expanduser().resolve()
-    report_json = Path(report_json).expanduser().resolve()
-    audit_jsonl = Path(audit_jsonl).expanduser().resolve() if audit_jsonl else None
-    report_csv = Path(report_csv).expanduser().resolve() if report_csv else None
-    lock_file = Path(lock_file).expanduser().resolve() if lock_file else None
+    input_dir = Path(config.input_dir).expanduser().resolve()
+    output_dir = Path(config.output_dir).expanduser().resolve()
+    staging_dir = Path(config.staging_dir).expanduser().resolve()
+    diag_dir = Path(config.diag_dir).expanduser().resolve()
+    report_json = Path(config.report_json).expanduser().resolve()
+    audit_jsonl = Path(config.audit_jsonl).expanduser().resolve() if config.audit_jsonl else None
+    report_csv = Path(config.report_csv).expanduser().resolve() if config.report_csv else None
+    lock_file = Path(config.lock_file).expanduser().resolve() if config.lock_file else None
+    pattern = config.pattern
+    limit = config.limit
+    timeout_sec = config.timeout_sec
+    save_strategy = config.save_strategy
+    existing_policy = config.existing_policy
+    fail_fast = config.fail_fast
+    dry_run = config.dry_run
+    resolved_paths = _ResolvedBatchPaths(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        staging_dir=staging_dir,
+        diag_dir=diag_dir,
+        timeout_sec=timeout_sec,
+        save_strategy=save_strategy,
+        existing_policy=existing_policy,
+        dry_run=dry_run,
+    )
     with BatchLock(lock_file):
         targets = sorted(path for path in input_dir.rglob(pattern) if path.is_file())
         if limit > 0:
             targets = targets[:limit]
         results: list[dict[str, Any]] = []
         for index, source in enumerate(targets, 1):
-            target_output = output_path_for(source, input_dir, output_dir)
-            if dry_run:
-                result = planned_result(
-                    source, input_root=input_dir, output_root=output_dir, index=index
-                )
-            elif target_output.exists() and existing_policy == "skip":
-                result = skipped_existing_result(
-                    source, input_root=input_dir, output_root=output_dir, index=index
-                )
-            elif target_output.exists() and existing_policy == "fail":
-                result = {
-                    "status": "FAIL",
-                    "index": index,
-                    "input": str(source),
-                    "relative": str(source.relative_to(input_dir)),
-                    "output": str(target_output),
-                    "copied": False,
-                    "skipped": False,
-                    "error_code": "OUTPUT_EXISTS",
-                    "error_message": "Output already exists and existing_policy=fail",
-                    "output_info": file_snapshot(target_output),
-                }
-            else:
-                result = convert_one_native(
-                    source,
-                    input_root=input_dir,
-                    output_root=output_dir,
-                    staging_root=staging_dir,
-                    diag_dir=diag_dir,
-                    timeout_sec=timeout_sec,
-                    save_strategy=save_strategy,
-                    index=index,
-                )
+            result = _result_for_source(source, resolved_paths, index)
             results.append(result)
             if audit_jsonl:
                 audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -472,21 +511,23 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     report = run_batch(
-        args.input_dir,
-        args.output_dir,
-        staging_dir=args.staging_dir,
-        diag_dir=args.diag_dir,
-        report_json=args.report_json,
-        audit_jsonl=args.audit_jsonl,
-        pattern=str(args.pattern),
-        limit=int(args.limit),
-        timeout_sec=int(args.timeout_sec),
-        save_strategy=str(args.save_strategy),
-        existing_policy=str(args.existing_policy),
-        report_csv=args.report_csv,
-        lock_file=args.lock_file,
-        fail_fast=bool(args.fail_fast),
-        dry_run=bool(args.dry_run),
+        BatchConfig(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            staging_dir=args.staging_dir,
+            diag_dir=args.diag_dir,
+            report_json=args.report_json,
+            audit_jsonl=args.audit_jsonl,
+            pattern=str(args.pattern),
+            limit=int(args.limit),
+            timeout_sec=int(args.timeout_sec),
+            save_strategy=str(args.save_strategy),
+            existing_policy=str(args.existing_policy),
+            report_csv=args.report_csv,
+            lock_file=args.lock_file,
+            fail_fast=bool(args.fail_fast),
+            dry_run=bool(args.dry_run),
+        )
     )
     print(
         json.dumps(

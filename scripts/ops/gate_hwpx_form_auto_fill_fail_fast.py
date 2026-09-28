@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,21 +17,25 @@ sys.path.insert(0, str(ROOT))
 from scripts.ops import audit_hwpx_form_auto_fill_construction_work_design as construction_audit
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit
 from scripts.ops import build_hwpx_form_auto_fill_gate_dashboard as dashboard_builder
-from scripts.ops import gate_hwpx_form_auto_fill_upload as upload_gate
 from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as manifest_promotion_builder
+from scripts.ops import build_hwpx_repo_separation_execution_plan_draft as execution_plan_draft
+from scripts.ops import build_hwpx_repo_separation_owner_review as owner_review_builder
 from scripts.ops import gate_hwpx_form_auto_fill_module_log_contract as module_log_contract
+from scripts.ops import gate_hwpx_form_auto_fill_upload as upload_gate
 from scripts.ops import gate_hwpx_repo_classification_contract as repo_classification_contract_gate
+from scripts.ops import (
+    gate_hwpx_repo_existing_file_classification as existing_file_classification_gate,
+)
 from scripts.ops import gate_hwpx_repo_manifest_drift_zero as manifest_drift_zero_gate
-from scripts.ops import gate_hwpx_repo_existing_file_classification as existing_file_classification_gate
 from scripts.ops import gate_hwpx_repo_new_file_classification as new_file_classification_gate
+from scripts.ops import gate_hwpx_repo_separation_approval_decision as approval_decision_gate
+from scripts.ops import gate_hwpx_repo_separation_execution as separation_execution_gate
+from scripts.ops import (
+    gate_hwpx_repo_separation_final_execution_approval as final_execution_approval_gate,
+)
 from scripts.ops import hwpx_form_auto_fill_module_audit_history as history
 from scripts.ops import install_hwpx_form_auto_fill_persistent_gates as persistent
 from scripts.ops import plan_hwpx_repo_detailed_separation as separation_plan
-from scripts.ops import gate_hwpx_repo_separation_execution as separation_execution_gate
-from scripts.ops import build_hwpx_repo_separation_owner_review as owner_review_builder
-from scripts.ops import gate_hwpx_repo_separation_approval_decision as approval_decision_gate
-from scripts.ops import build_hwpx_repo_separation_execution_plan_draft as execution_plan_draft
-from scripts.ops import gate_hwpx_repo_separation_final_execution_approval as final_execution_approval_gate
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_fail_fast_gate"
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_FAIL_FAST_GATE"
@@ -68,18 +73,20 @@ def _evaluate_zones_from_module_audit(module_payload: dict[str, Any]) -> dict[st
     for zone in zone_manifest["zones"]:
         if not set(zone["modules"]).issubset(module_status):
             continue
-        failed_modules = [module_id for module_id in zone["modules"] if module_status.get(module_id) != "PASS"]
-        zone_results.append(
-            {
-                "id": zone["id"],
-                "status": "PASS" if not failed_modules else "FAIL",
-                "modules": zone["modules"],
-                "failedModules": failed_modules,
-            }
-        )
+        failed_modules = [
+            module_id for module_id in zone["modules"] if module_status.get(module_id) != "PASS"
+        ]
+        zone_results.append({
+            "id": zone["id"],
+            "status": "PASS" if not failed_modules else "FAIL",
+            "modules": zone["modules"],
+            "failedModules": failed_modules,
+        })
     failed = [item for item in zone_results if item["status"] != "PASS"]
     return {
-        "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES" if not failed else "FAIL_HWPX_FORM_AUTO_FILL_ZONE_GATES",
+        "verdict": "PASS_HWPX_FORM_AUTO_FILL_ZONE_GATES"
+        if not failed
+        else "FAIL_HWPX_FORM_AUTO_FILL_ZONE_GATES",
         "summary": {
             "zonesTotal": len(zone_results),
             "zonesPassed": len(zone_results) - len(failed),
@@ -89,19 +96,224 @@ def _evaluate_zones_from_module_audit(module_payload: dict[str, Any]) -> dict[st
     }
 
 
-def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = True) -> dict[str, Any]:
+def _build_uniform_stages(
+    *,
+    report_dir: Path,
+    run_id: str,
+    canonical_report_dir: bool,
+    module_payload: dict[str, Any],
+) -> list[tuple[str, str, str, Callable[[dict[str, Any]], dict[str, Any]]]]:
+    """Stage table for the gates that share the call/step/early-return shape.
+
+    Each entry is (payload_key, step_name, fail_code, compute(payloads)). `compute`
+    receives the payloads accumulated so far, so later stages can read their
+    dependencies (e.g. manifest_drift_zero needs the classification contract).
+    """
+    return [
+        (
+            "module_log_contract_payload",
+            "module_log_contract",
+            "FAIL_MODULE_LOG_CONTRACT",
+            lambda payloads: module_log_contract.run_module_log_contract_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "module_log_contract",
+                    Path("data") / "reports" / "hwpx_form_auto_fill_module_log_contract",
+                ),
+                module_payload=module_payload,
+                run_id=run_id,
+            ),
+        ),
+        (
+            "repo_classification_contract_payload",
+            "repo_classification_contract",
+            "FAIL_REPO_CLASSIFICATION_CONTRACT",
+            lambda payloads: (
+                repo_classification_contract_gate.run_repo_classification_contract_gate(
+                    report_dir=_output_dir(
+                        report_dir,
+                        "repo_classification_contract",
+                        Path("data") / "reports" / "hwpx_repo_classification_contract_gate",
+                    ),
+                    new_files=None if canonical_report_dir else [],
+                )
+            ),
+        ),
+        (
+            "manifest_promotion_payload",
+            "repo_manifest_promotion_candidates",
+            "FAIL_REPO_MANIFEST_PROMOTION_CANDIDATES",
+            lambda payloads: manifest_promotion_builder.build_manifest_promotion_candidates(
+                report_dir=_output_dir(
+                    report_dir,
+                    "repo_manifest_promotion_candidates",
+                    Path("data") / "reports" / "hwpx_repo_manifest_promotion_candidates",
+                ),
+                contract_payload=payloads["repo_classification_contract_payload"],
+            ),
+        ),
+        (
+            "manifest_drift_zero_payload",
+            "repo_manifest_drift_zero",
+            "FAIL_REPO_MANIFEST_DRIFT_ZERO",
+            lambda payloads: manifest_drift_zero_gate.run_manifest_drift_zero_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "repo_manifest_drift_zero",
+                    Path("data") / "reports" / "hwpx_repo_manifest_drift_zero_gate",
+                ),
+                contract_payload=payloads["repo_classification_contract_payload"],
+                promotion_payload=payloads["manifest_promotion_payload"],
+            ),
+        ),
+        (
+            "existing_file_gate_payload",
+            "repo_existing_file_classification",
+            "FAIL_REPO_EXISTING_FILE_CLASSIFICATION",
+            lambda payloads: (
+                existing_file_classification_gate.run_existing_file_classification_gate(
+                    report_dir=_output_dir(
+                        report_dir,
+                        "existing_file_classification",
+                        Path("data") / "reports" / "hwpx_repo_existing_file_classification",
+                    )
+                )
+            ),
+        ),
+        (
+            "new_file_gate_payload",
+            "repo_new_file_classification",
+            "FAIL_REPO_NEW_FILE_CLASSIFICATION",
+            lambda payloads: new_file_classification_gate.run_new_file_classification_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "new_file_classification",
+                    Path("data") / "reports" / "hwpx_repo_new_file_classification",
+                ),
+                new_files=None if canonical_report_dir else [],
+            ),
+        ),
+        (
+            "zone_payload",
+            "zone_gates_from_module_audit",
+            "FAIL_ZONE_GATE",
+            lambda payloads: _evaluate_zones_from_module_audit(module_payload),
+        ),
+        (
+            "upload_payload",
+            "upload_gate",
+            "FAIL_UPLOAD_GATE",
+            lambda payloads: upload_gate.run_upload_gate_scenarios(
+                report_dir=_output_dir(
+                    report_dir,
+                    "upload_gate",
+                    Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate",
+                )
+            ),
+        ),
+        (
+            "construction_payload",
+            "construction_design_audit",
+            "FAIL_CONSTRUCTION_DESIGN_AUDIT",
+            lambda payloads: construction_audit.audit(),
+        ),
+        (
+            "separation_payload",
+            "repo_detailed_separation_plan",
+            "FAIL_REPO_DETAILED_SEPARATION_PLAN",
+            lambda payloads: separation_plan.plan_detailed_separation(
+                report_dir=_output_dir(
+                    report_dir,
+                    "detailed_separation_plan",
+                    Path("data") / "reports" / "hwpx_repo_detailed_separation_plan",
+                )
+            ),
+        ),
+        (
+            "execution_payload",
+            "repo_separation_execution_gate",
+            "FAIL_REPO_SEPARATION_EXECUTION_GATE",
+            lambda payloads: separation_execution_gate.run_execution_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "separation_execution_gate",
+                    Path("data") / "reports" / "hwpx_repo_separation_execution_gate",
+                )
+            ),
+        ),
+        (
+            "owner_review_payload",
+            "repo_separation_owner_review",
+            "FAIL_REPO_SEPARATION_OWNER_REVIEW",
+            lambda payloads: owner_review_builder.build_owner_review_packets(
+                report_dir=_output_dir(
+                    report_dir,
+                    "separation_owner_review",
+                    Path("data") / "reports" / "hwpx_repo_separation_owner_review",
+                )
+            ),
+        ),
+        (
+            "approval_decision_payload",
+            "repo_separation_approval_decision",
+            "FAIL_REPO_SEPARATION_APPROVAL_DECISION",
+            lambda payloads: approval_decision_gate.run_approval_decision_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "separation_approval_decision",
+                    Path("data") / "reports" / "hwpx_repo_separation_approval_decision",
+                )
+            ),
+        ),
+        (
+            "execution_plan_payload",
+            "repo_separation_execution_plan_draft",
+            "FAIL_REPO_SEPARATION_EXECUTION_PLAN_DRAFT",
+            lambda payloads: execution_plan_draft.build_execution_plan_draft(
+                report_dir=_output_dir(
+                    report_dir,
+                    "separation_execution_plan_draft",
+                    Path("data") / "reports" / "hwpx_repo_separation_execution_plan_draft",
+                )
+            ),
+        ),
+        (
+            "final_execution_approval_payload",
+            "repo_separation_final_execution_approval",
+            "FAIL_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL",
+            lambda payloads: final_execution_approval_gate.run_final_execution_approval_gate(
+                report_dir=_output_dir(
+                    report_dir,
+                    "final_exec_approval",
+                    Path("data") / "reports" / "hwpx_repo_separation_final_execution_approval",
+                )
+            ),
+        ),
+    ]
+
+
+def run_fail_fast_gate(
+    report_dir: Path = REPORT_DIR, full_module_audit: bool = True
+) -> dict[str, Any]:
     report_dir.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(UTC).strftime("ff_%Y%m%dT%H%M%SZ")
     canonical_report_dir = report_dir == REPORT_DIR
     steps: list[dict[str, Any]] = []
+    payloads: dict[str, Any] = {}
 
     persistent_payload = persistent.install_persistent_gates(
         report_dir=report_dir / "persistent_gates",
         run_smoke=not full_module_audit,
     )
-    steps.append(_step("persistent_gate_installation", persistent_payload["verdict"], "FAIL_PERSISTENT_GATE_INSTALLATION"))
+    steps.append(
+        _step(
+            "persistent_gate_installation",
+            persistent_payload["verdict"],
+            "FAIL_PERSISTENT_GATE_INSTALLATION",
+        )
+    )
     if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, None, None, None, None, None, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, payloads)
 
     if full_module_audit:
         module_payload = module_audit.run_module_audits(
@@ -112,13 +324,19 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         )
     else:
         module_payload = _module_payload_from_persistent_smoke(persistent_payload)
+    payloads["module_payload"] = module_payload
     steps.append(_step("module_audits", module_payload["verdict"], "FAIL_MODULE_AUDIT"))
     history_summary = history.write_history(
         module_payload,
-        report_dir=_output_dir(report_dir, "module_history", Path("data") / "reports" / "hwpx_form_auto_fill_module_history"),
+        report_dir=_output_dir(
+            report_dir,
+            "module_history",
+            Path("data") / "reports" / "hwpx_form_auto_fill_module_history",
+        ),
         run_id=run_id,
         append=True,
     )
+    payloads["history_summary"] = history_summary
     steps.append(
         _step(
             "module_audit_history",
@@ -129,482 +347,35 @@ def run_fail_fast_gate(report_dir: Path = REPORT_DIR, full_module_audit: bool = 
         )
     )
     if steps[-2]["status"] != "PASS" or steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, None, None, history_summary, None, None, None, None, None, None, None)
+        return _finish(report_dir, run_id, steps, payloads)
 
-    module_log_contract_payload = module_log_contract.run_module_log_contract_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "module_log_contract",
-            Path("data") / "reports" / "hwpx_form_auto_fill_module_log_contract",
-        ),
-        module_payload=module_payload,
+    stages = _build_uniform_stages(
+        report_dir=report_dir,
         run_id=run_id,
+        canonical_report_dir=canonical_report_dir,
+        module_payload=module_payload,
     )
-    steps.append(
-        _step(
-            "module_log_contract",
-            module_log_contract_payload["verdict"],
-            "FAIL_MODULE_LOG_CONTRACT",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-        )
+    for key, name, fail_code, compute in stages:
+        payload = compute(payloads)
+        payloads[key] = payload
+        steps.append(_step(name, payload["verdict"], fail_code))
+        if steps[-1]["status"] != "PASS":
+            return _finish(report_dir, run_id, steps, payloads)
 
-    repo_classification_contract_payload = repo_classification_contract_gate.run_repo_classification_contract_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "repo_classification_contract",
-            Path("data") / "reports" / "hwpx_repo_classification_contract_gate",
-        ),
-        new_files=None if canonical_report_dir else [],
-    )
-    steps.append(
-        _step(
-            "repo_classification_contract",
-            repo_classification_contract_payload["verdict"],
-            "FAIL_REPO_CLASSIFICATION_CONTRACT",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-        )
-
-    manifest_promotion_payload = manifest_promotion_builder.build_manifest_promotion_candidates(
-        report_dir=_output_dir(
-            report_dir,
-            "repo_manifest_promotion_candidates",
-            Path("data") / "reports" / "hwpx_repo_manifest_promotion_candidates",
-        ),
-        contract_payload=repo_classification_contract_payload,
-    )
-    steps.append(
-        _step(
-            "repo_manifest_promotion_candidates",
-            manifest_promotion_payload["verdict"],
-            "FAIL_REPO_MANIFEST_PROMOTION_CANDIDATES",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-        )
-
-    manifest_drift_zero_payload = manifest_drift_zero_gate.run_manifest_drift_zero_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "repo_manifest_drift_zero",
-            Path("data") / "reports" / "hwpx_repo_manifest_drift_zero_gate",
-        ),
-        contract_payload=repo_classification_contract_payload,
-        promotion_payload=manifest_promotion_payload,
-    )
-    steps.append(
-        _step(
-            "repo_manifest_drift_zero",
-            manifest_drift_zero_payload["verdict"],
-            "FAIL_REPO_MANIFEST_DRIFT_ZERO",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-        )
-
-    existing_file_gate_payload = existing_file_classification_gate.run_existing_file_classification_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "existing_file_classification",
-            Path("data") / "reports" / "hwpx_repo_existing_file_classification",
-        )
-    )
-    steps.append(
-        _step(
-            "repo_existing_file_classification",
-            existing_file_gate_payload["verdict"],
-            "FAIL_REPO_EXISTING_FILE_CLASSIFICATION",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-        )
-
-    new_file_gate_payload = new_file_classification_gate.run_new_file_classification_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "new_file_classification",
-            Path("data") / "reports" / "hwpx_repo_new_file_classification",
-        ),
-        new_files=None if canonical_report_dir else [],
-    )
-    steps.append(
-        _step(
-            "repo_new_file_classification",
-            new_file_gate_payload["verdict"],
-            "FAIL_REPO_NEW_FILE_CLASSIFICATION",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            None,
-            None,
-            history_summary,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    zone_payload = _evaluate_zones_from_module_audit(module_payload)
-    steps.append(_step("zone_gates_from_module_audit", zone_payload["verdict"], "FAIL_ZONE_GATE"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, None, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, manifest_drift_zero_payload=manifest_drift_zero_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
-
-    upload_payload = upload_gate.run_upload_gate_scenarios(
-        report_dir=_output_dir(report_dir, "upload_gate", Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate")
-    )
-    steps.append(_step("upload_gate", upload_payload["verdict"], "FAIL_UPLOAD_GATE"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, manifest_drift_zero_payload=manifest_drift_zero_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
-
-    construction_payload = construction_audit.audit()
-    steps.append(_step("construction_design_audit", construction_payload["verdict"], "FAIL_CONSTRUCTION_DESIGN_AUDIT"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, None, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, manifest_drift_zero_payload=manifest_drift_zero_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
-
-    separation_payload = separation_plan.plan_detailed_separation(
-        report_dir=_output_dir(
-            report_dir,
-            "detailed_separation_plan",
-            Path("data") / "reports" / "hwpx_repo_detailed_separation_plan",
-        )
-    )
-    steps.append(_step("repo_detailed_separation_plan", separation_payload["verdict"], "FAIL_REPO_DETAILED_SEPARATION_PLAN"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(report_dir, run_id, steps, module_payload, zone_payload, upload_payload, history_summary, separation_payload, None, None, None, None, None, None, module_log_contract_payload=module_log_contract_payload, repo_classification_contract_payload=repo_classification_contract_payload, manifest_promotion_payload=manifest_promotion_payload, manifest_drift_zero_payload=manifest_drift_zero_payload, existing_file_gate_payload=existing_file_gate_payload, new_file_gate_payload=new_file_gate_payload)
-
-    execution_payload = separation_execution_gate.run_execution_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "separation_execution_gate",
-            Path("data") / "reports" / "hwpx_repo_separation_execution_gate",
-        )
-    )
-    steps.append(_step("repo_separation_execution_gate", execution_payload["verdict"], "FAIL_REPO_SEPARATION_EXECUTION_GATE"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            zone_payload,
-            upload_payload,
-            history_summary,
-            separation_payload,
-            execution_payload,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    owner_review_payload = owner_review_builder.build_owner_review_packets(
-        report_dir=_output_dir(
-            report_dir,
-            "separation_owner_review",
-            Path("data") / "reports" / "hwpx_repo_separation_owner_review",
-        )
-    )
-    steps.append(_step("repo_separation_owner_review", owner_review_payload["verdict"], "FAIL_REPO_SEPARATION_OWNER_REVIEW"))
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            zone_payload,
-            upload_payload,
-            history_summary,
-            separation_payload,
-            execution_payload,
-            owner_review_payload,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    approval_decision_payload = approval_decision_gate.run_approval_decision_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "separation_approval_decision",
-            Path("data") / "reports" / "hwpx_repo_separation_approval_decision",
-        )
-    )
-    steps.append(
-        _step(
-            "repo_separation_approval_decision",
-            approval_decision_payload["verdict"],
-            "FAIL_REPO_SEPARATION_APPROVAL_DECISION",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            zone_payload,
-            upload_payload,
-            history_summary,
-            separation_payload,
-            execution_payload,
-            owner_review_payload,
-            approval_decision_payload,
-            None,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    execution_plan_payload = execution_plan_draft.build_execution_plan_draft(
-        report_dir=_output_dir(
-            report_dir,
-            "separation_execution_plan_draft",
-            Path("data") / "reports" / "hwpx_repo_separation_execution_plan_draft",
-        )
-    )
-    steps.append(
-        _step(
-            "repo_separation_execution_plan_draft",
-            execution_plan_payload["verdict"],
-            "FAIL_REPO_SEPARATION_EXECUTION_PLAN_DRAFT",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            zone_payload,
-            upload_payload,
-            history_summary,
-            separation_payload,
-            execution_payload,
-            owner_review_payload,
-            approval_decision_payload,
-            execution_plan_payload,
-            None,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    final_execution_approval_payload = final_execution_approval_gate.run_final_execution_approval_gate(
-        report_dir=_output_dir(
-            report_dir,
-            "final_exec_approval",
-            Path("data") / "reports" / "hwpx_repo_separation_final_execution_approval",
-        )
-    )
-    steps.append(
-        _step(
-            "repo_separation_final_execution_approval",
-            final_execution_approval_payload["verdict"],
-            "FAIL_REPO_SEPARATION_FINAL_EXECUTION_APPROVAL",
-        )
-    )
-    if steps[-1]["status"] != "PASS":
-        return _finish(
-            report_dir,
-            run_id,
-            steps,
-            module_payload,
-            zone_payload,
-            upload_payload,
-            history_summary,
-            separation_payload,
-            execution_payload,
-            owner_review_payload,
-            approval_decision_payload,
-            execution_plan_payload,
-            final_execution_approval_payload,
-            None,
-            module_log_contract_payload=module_log_contract_payload,
-            repo_classification_contract_payload=repo_classification_contract_payload,
-            manifest_promotion_payload=manifest_promotion_payload,
-            manifest_drift_zero_payload=manifest_drift_zero_payload,
-            existing_file_gate_payload=existing_file_gate_payload,
-            new_file_gate_payload=new_file_gate_payload,
-        )
-
-    preliminary = _finish(
-        report_dir,
-        run_id,
-        steps,
-        module_payload,
-        zone_payload,
-        upload_payload,
-        history_summary,
-        separation_payload,
-        execution_payload,
-        owner_review_payload,
-        approval_decision_payload,
-        execution_plan_payload,
-        final_execution_approval_payload,
-        None,
-        module_log_contract_payload=module_log_contract_payload,
-        repo_classification_contract_payload=repo_classification_contract_payload,
-        manifest_promotion_payload=manifest_promotion_payload,
-        manifest_drift_zero_payload=manifest_drift_zero_payload,
-        existing_file_gate_payload=existing_file_gate_payload,
-        new_file_gate_payload=new_file_gate_payload,
-    )
+    preliminary = _finish(report_dir, run_id, steps, payloads)
     dashboard = dashboard_builder.build_dashboard(
         preliminary,
-        upload_payload,
+        payloads.get("upload_payload"),
         history_summary,
-        report_dir=_output_dir(report_dir, "gate_dashboard", Path("data") / "reports" / "hwpx_form_auto_fill_gate_dashboard"),
+        report_dir=_output_dir(
+            report_dir,
+            "gate_dashboard",
+            Path("data") / "reports" / "hwpx_form_auto_fill_gate_dashboard",
+        ),
     )
+    payloads["dashboard"] = dashboard
     steps.append(_step("gate_dashboard", dashboard["verdict"], "FAIL_GATE_DASHBOARD"))
-    return _finish(
-        report_dir,
-        run_id,
-        steps,
-        module_payload,
-        zone_payload,
-        upload_payload,
-        history_summary,
-        separation_payload,
-        execution_payload,
-        owner_review_payload,
-        approval_decision_payload,
-        execution_plan_payload,
-        final_execution_approval_payload,
-        dashboard,
-        module_log_contract_payload=module_log_contract_payload,
-        repo_classification_contract_payload=repo_classification_contract_payload,
-        manifest_promotion_payload=manifest_promotion_payload,
-        manifest_drift_zero_payload=manifest_drift_zero_payload,
-        existing_file_gate_payload=existing_file_gate_payload,
-        new_file_gate_payload=new_file_gate_payload,
-    )
+    return _finish(report_dir, run_id, steps, payloads)
 
 
 def _module_payload_from_persistent_smoke(persistent_payload: dict[str, Any]) -> dict[str, Any]:
@@ -614,7 +385,9 @@ def _module_payload_from_persistent_smoke(persistent_payload: dict[str, Any]) ->
     return {
         "schemaVersion": "hwpx_form_auto_fill_module_audits_v1",
         "verdict": verdict or module_audit.FAIL_VERDICT,
-        "summary": smoke.get("summary", {"modulesTotal": 1, "modulesPassed": 0, "modulesFailed": 1}),
+        "summary": smoke.get(
+            "summary", {"modulesTotal": 1, "modulesPassed": 0, "modulesFailed": 1}
+        ),
         "moduleResults": [
             {
                 "id": "field_mapping",
@@ -655,24 +428,26 @@ def _finish(
     report_dir: Path,
     run_id: str,
     steps: list[dict[str, Any]],
-    module_payload: dict[str, Any] | None,
-    zone_payload: dict[str, Any] | None,
-    upload_payload: dict[str, Any] | None,
-    history_summary: dict[str, Any] | None,
-    separation_payload: dict[str, Any] | None,
-    execution_payload: dict[str, Any] | None,
-    owner_review_payload: dict[str, Any] | None,
-    approval_decision_payload: dict[str, Any] | None,
-    execution_plan_payload: dict[str, Any] | None,
-    final_execution_approval_payload: dict[str, Any] | None,
-    dashboard: dict[str, Any] | None,
-    module_log_contract_payload: dict[str, Any] | None = None,
-    repo_classification_contract_payload: dict[str, Any] | None = None,
-    manifest_promotion_payload: dict[str, Any] | None = None,
-    manifest_drift_zero_payload: dict[str, Any] | None = None,
-    existing_file_gate_payload: dict[str, Any] | None = None,
-    new_file_gate_payload: dict[str, Any] | None = None,
+    payloads: dict[str, Any],
 ) -> dict[str, Any]:
+    module_payload = payloads.get("module_payload")
+    zone_payload = payloads.get("zone_payload")
+    upload_payload = payloads.get("upload_payload")
+    history_summary = payloads.get("history_summary")
+    separation_payload = payloads.get("separation_payload")
+    execution_payload = payloads.get("execution_payload")
+    owner_review_payload = payloads.get("owner_review_payload")
+    approval_decision_payload = payloads.get("approval_decision_payload")
+    execution_plan_payload = payloads.get("execution_plan_payload")
+    final_execution_approval_payload = payloads.get("final_execution_approval_payload")
+    dashboard = payloads.get("dashboard")
+    module_log_contract_payload = payloads.get("module_log_contract_payload")
+    repo_classification_contract_payload = payloads.get("repo_classification_contract_payload")
+    manifest_promotion_payload = payloads.get("manifest_promotion_payload")
+    manifest_drift_zero_payload = payloads.get("manifest_drift_zero_payload")
+    existing_file_gate_payload = payloads.get("existing_file_gate_payload")
+    new_file_gate_payload = payloads.get("new_file_gate_payload")
+
     failed = [step for step in steps if step["status"] != "PASS"]
     payload = {
         "schemaVersion": "hwpx_form_auto_fill_fail_fast_gate_v1",
@@ -693,8 +468,12 @@ def _finish(
         "historySummary": history_summary,
         "moduleLogContractSummary": (module_log_contract_payload or {}).get("summary"),
         "moduleLogContractVerdict": (module_log_contract_payload or {}).get("verdict"),
-        "repoClassificationContractSummary": (repo_classification_contract_payload or {}).get("summary"),
-        "repoClassificationContractVerdict": (repo_classification_contract_payload or {}).get("verdict"),
+        "repoClassificationContractSummary": (repo_classification_contract_payload or {}).get(
+            "summary"
+        ),
+        "repoClassificationContractVerdict": (repo_classification_contract_payload or {}).get(
+            "verdict"
+        ),
         "repoManifestPromotionSummary": (manifest_promotion_payload or {}).get("summary"),
         "repoManifestPromotionVerdict": (manifest_promotion_payload or {}).get("verdict"),
         "repoManifestDriftZeroSummary": (manifest_drift_zero_payload or {}).get("summary"),
@@ -713,8 +492,12 @@ def _finish(
         "separationApprovalDecisionVerdict": (approval_decision_payload or {}).get("verdict"),
         "separationExecutionPlanSummary": (execution_plan_payload or {}).get("summary"),
         "separationExecutionPlanVerdict": (execution_plan_payload or {}).get("verdict"),
-        "separationFinalExecutionApprovalSummary": (final_execution_approval_payload or {}).get("summary"),
-        "separationFinalExecutionApprovalVerdict": (final_execution_approval_payload or {}).get("verdict"),
+        "separationFinalExecutionApprovalSummary": (final_execution_approval_payload or {}).get(
+            "summary"
+        ),
+        "separationFinalExecutionApprovalVerdict": (final_execution_approval_payload or {}).get(
+            "verdict"
+        ),
         "dashboardVerdict": (dashboard or {}).get("verdict"),
         "security": {
             "piiLeak": 0,
@@ -769,9 +552,13 @@ def _safe_write(path: Path, payload: Any) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-dir", default=str(REPORT_DIR))
-    parser.add_argument("--smoke-only", action="store_true", help="Run representative module audit only.")
+    parser.add_argument(
+        "--smoke-only", action="store_true", help="Run representative module audit only."
+    )
     args = parser.parse_args()
-    payload = run_fail_fast_gate(report_dir=Path(args.report_dir), full_module_audit=not args.smoke_only)
+    payload = run_fail_fast_gate(
+        report_dir=Path(args.report_dir), full_module_audit=not args.smoke_only
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["verdict"] == PASS_VERDICT else 1
 
