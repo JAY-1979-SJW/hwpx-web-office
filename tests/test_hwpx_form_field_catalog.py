@@ -1,4 +1,5 @@
 """HWPX-FORM-FIELD-CATALOG-SEED-01 — 테스트."""
+
 from __future__ import annotations
 
 import json
@@ -11,17 +12,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 CATALOG_JSONL = (
-    PROJECT_ROOT / "data" / "reports"
-    / "hwpx_form_field_catalog" / "form_field_catalog.jsonl"
+    PROJECT_ROOT / "data" / "reports" / "hwpx_form_field_catalog" / "form_field_catalog.jsonl"
 )
-NOTABLE_JSON = (
-    PROJECT_ROOT / "data" / "reports"
-    / "hwpx_form_field_catalog" / "notable_forms.json"
-)
+NOTABLE_JSON = PROJECT_ROOT / "data" / "reports" / "hwpx_form_field_catalog" / "notable_forms.json"
 
 
 def test_form_field_catalog_importable():
     from hwpx.recognition_corpus import form_field_catalog as ffc
+
     assert hasattr(ffc, "build_catalog")
     assert hasattr(ffc, "build_summary")
     assert hasattr(ffc, "FormCatalogEntry")
@@ -29,7 +27,8 @@ def test_form_field_catalog_importable():
 
 
 def test_catalog_output_exists():
-    assert CATALOG_JSONL.exists(), f"form_field_catalog.jsonl 없음"
+    if not CATALOG_JSONL.exists():
+        pytest.skip("실제 로컬 코퍼스로 생성한 catalog 없음(data/reports/는 .gitignore 대상)")
 
 
 def test_catalog_record_structure():
@@ -37,8 +36,18 @@ def test_catalog_record_structure():
         pytest.skip("catalog JSONL 미생성")
     line = CATALOG_JSONL.read_text(encoding="utf-8").splitlines()[0]
     rec = json.loads(line)
-    for key in ("formId", "formName", "domain", "formKind", "byeoljiNumber",
-                "fileCount", "fieldCount", "autoFillableCount", "requiredCount", "fields"):
+    for key in (
+        "formId",
+        "formName",
+        "domain",
+        "formKind",
+        "byeoljiNumber",
+        "fileCount",
+        "fieldCount",
+        "autoFillableCount",
+        "requiredCount",
+        "fields",
+    ):
         assert key in rec, f"key missing: {key}"
 
 
@@ -49,8 +58,15 @@ def test_field_entry_structure():
     for line in lines[:50]:
         rec = json.loads(line)
         for f in rec.get("fields", []):
-            for key in ("primaryLabel", "labels", "semanticField", "autoFillable",
-                        "required", "fileOccurrenceCount", "totalOccurrenceCount"):
+            for key in (
+                "primaryLabel",
+                "labels",
+                "semanticField",
+                "autoFillable",
+                "required",
+                "fileOccurrenceCount",
+                "totalOccurrenceCount",
+            ):
                 assert key in f, f"field key missing: {key}"
             assert isinstance(f["autoFillable"], bool)
             assert isinstance(f["required"], bool)
@@ -75,18 +91,23 @@ def test_catalog_has_sufficient_coverage():
     if not CATALOG_JSONL.exists():
         pytest.skip()
     with_fields = sum(
-        1 for line in CATALOG_JSONL.read_text("utf-8").splitlines()
+        1
+        for line in CATALOG_JSONL.read_text("utf-8").splitlines()
         if json.loads(line).get("fieldCount", 0) > 0
     )
     assert with_fields >= 400, f"필드 있는 서식 너무 적음: {with_fields}"
 
 
 def test_notable_forms_exists():
-    assert NOTABLE_JSON.exists(), "notable_forms.json 없음"
+    if not NOTABLE_JSON.exists():
+        pytest.skip(
+            "실제 로컬 코퍼스로 생성한 notable_forms.json 없음(data/reports/는 .gitignore 대상)"
+        )
 
 
 def test_no_pii_in_catalog():
     import re
+
     if not CATALOG_JSONL.exists():
         pytest.skip()
     pii_re = re.compile(r"\d{2,3}-\d{3,4}-\d{4}|\d{3}-\d{2}-\d{5}")
@@ -103,6 +124,8 @@ def test_no_absolute_path_in_catalog():
 
 
 def test_catalog_module_no_write_package():
-    src = (PROJECT_ROOT / "scripts" / "hwpx" / "recognition_corpus" / "form_field_catalog.py").read_text("utf-8")
+    src = (
+        PROJECT_ROOT / "scripts" / "hwpx" / "recognition_corpus" / "form_field_catalog.py"
+    ).read_text("utf-8")
     assert "write_package" not in src
     assert "apply_edit_plan" not in src

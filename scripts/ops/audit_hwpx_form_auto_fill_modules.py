@@ -25,7 +25,12 @@ PII_RE = re.compile(
     r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
     r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
 )
-TRANSIENT_ERROR_MARKERS = ("PermissionError: [WinError 5]", "winerror 5", "access is denied", "denied")
+TRANSIENT_ERROR_MARKERS = (
+    "PermissionError: [WinError 5]",
+    "winerror 5",
+    "access is denied",
+    "denied",
+)
 
 
 def load_manifest(path: Path = MANIFEST) -> dict[str, Any]:
@@ -60,6 +65,8 @@ def _run_pytest(paths: list[str], timeout: int) -> dict[str, Any]:
                 cwd=str(ROOT),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:
@@ -161,9 +168,13 @@ def audit_module_static(module: dict[str, Any], forbidden_tokens: list[str]) -> 
     missing_files = [rel_path for rel_path in all_files if not (ROOT / rel_path).is_file()]
     source_text = _read_source(source_files)
     combined_text = _read_source(all_files)
-    missing_tokens = [token for token in module.get("requiredTokens", []) if token not in combined_text]
+    missing_tokens = [
+        token for token in module.get("requiredTokens", []) if token not in combined_text
+    ]
     forbidden_hits = [token for token in forbidden_tokens if token.lower() in source_text.lower()]
-    static_status = "PASS" if not missing_files and not missing_tokens and not forbidden_hits else "FAIL"
+    static_status = (
+        "PASS" if not missing_files and not missing_tokens and not forbidden_hits else "FAIL"
+    )
     return {
         "staticStatus": static_status,
         "missingFiles": missing_files,
@@ -172,16 +183,22 @@ def audit_module_static(module: dict[str, Any], forbidden_tokens: list[str]) -> 
     }
 
 
-def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: int) -> dict[str, Any]:
+def audit_module(
+    module: dict[str, Any], forbidden_tokens: list[str], timeout: int
+) -> dict[str, Any]:
     test_files = module.get("testFiles", [])
     static = audit_module_static(module, forbidden_tokens)
-    pytest_run = _run_pytest(test_files, timeout) if test_files and not static["missingFiles"] else {
-        "status": "FAIL",
-        "returncode": 2,
-        "attempts": 0,
-        "durationSeconds": 0.0,
-        "summary": "missing files",
-    }
+    pytest_run = (
+        _run_pytest(test_files, timeout)
+        if test_files and not static["missingFiles"]
+        else {
+            "status": "FAIL",
+            "returncode": 2,
+            "attempts": 0,
+            "durationSeconds": 0.0,
+            "summary": "missing files",
+        }
+    )
     static_status = static["staticStatus"]
     status = "PASS" if static_status == "PASS" and pytest_run["status"] == "PASS" else "FAIL"
     return {
@@ -202,7 +219,9 @@ def audit_module(module: dict[str, Any], forbidden_tokens: list[str], timeout: i
 
 
 def _dirty_baseline() -> dict[str, Any]:
-    result = subprocess.run(["git", "status", "--short"], cwd=str(ROOT), capture_output=True, text=True, timeout=30)
+    result = subprocess.run(
+        ["git", "status", "--short"], cwd=str(ROOT), capture_output=True, text=True, timeout=30
+    )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     return {
         "documented": True,
@@ -223,24 +242,36 @@ def run_module_audits(
     selected = [module for module in modules if not module_ids or module["id"] in module_ids]
     if combined_pytest and selected:
         test_files = sorted({path for module in selected for path in module.get("testFiles", [])})
-        combined_run = _run_pytest_combined(test_files, timeout) if test_files else {
-            "status": "FAIL",
-            "returncode": 2,
-            "attempts": 0,
-            "durationSeconds": 0.0,
-            "summary": "missing files",
-        }
-        results = []
-        for module in selected:
-            static = audit_module_static(module, manifest.get("forbiddenSourceTokens", []))
-            pytest_run = combined_run if module.get("testFiles") and not static["missingFiles"] else {
+        combined_run = (
+            _run_pytest_combined(test_files, timeout)
+            if test_files
+            else {
                 "status": "FAIL",
                 "returncode": 2,
                 "attempts": 0,
                 "durationSeconds": 0.0,
                 "summary": "missing files",
             }
-            status = "PASS" if static["staticStatus"] == "PASS" and pytest_run["status"] == "PASS" else "FAIL"
+        )
+        results = []
+        for module in selected:
+            static = audit_module_static(module, manifest.get("forbiddenSourceTokens", []))
+            pytest_run = (
+                combined_run
+                if module.get("testFiles") and not static["missingFiles"]
+                else {
+                    "status": "FAIL",
+                    "returncode": 2,
+                    "attempts": 0,
+                    "durationSeconds": 0.0,
+                    "summary": "missing files",
+                }
+            )
+            status = (
+                "PASS"
+                if static["staticStatus"] == "PASS" and pytest_run["status"] == "PASS"
+                else "FAIL"
+            )
             results.append({
                 "id": module["id"],
                 "title": module.get("title", module["id"]),
@@ -257,7 +288,10 @@ def run_module_audits(
                 },
             })
     else:
-        results = [audit_module(module, manifest.get("forbiddenSourceTokens", []), timeout) for module in selected]
+        results = [
+            audit_module(module, manifest.get("forbiddenSourceTokens", []), timeout)
+            for module in selected
+        ]
     failed = [item for item in results if item["status"] != "PASS"]
     payload = {
         "schemaVersion": "hwpx_form_auto_fill_module_audits_v1",
@@ -310,8 +344,12 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", default=str(MANIFEST), help="Module audit manifest JSON.")
     parser.add_argument("--report-dir", default=str(REPORT_DIR), help="PII-safe report directory.")
-    parser.add_argument("--timeout", type=int, default=300, help="Per-module pytest timeout in seconds.")
-    parser.add_argument("--module", action="append", help="Run a single module id. May be repeated.")
+    parser.add_argument(
+        "--timeout", type=int, default=300, help="Per-module pytest timeout in seconds."
+    )
+    parser.add_argument(
+        "--module", action="append", help="Run a single module id. May be repeated."
+    )
     return parser.parse_args()
 
 

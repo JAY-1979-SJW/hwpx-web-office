@@ -3,6 +3,7 @@
 감사 스크립트의 핵심 함수만 검증.
 원본 fixture 수정 없음. apply_edit_plan 호출 없음.
 """
+
 from __future__ import annotations
 
 import sys
@@ -15,14 +16,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def _import_audit():
+    audit_path = PROJECT_ROOT / "scripts" / "local" / "hwpx_generic_format_recognition_audit.py"
+    if not audit_path.is_file():
+        pytest.skip(f"local-only 스크립트 없음(커밋 대상 아님): {audit_path}")
     sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "local"))
     import importlib
+
     if "hwpx_generic_format_recognition_audit" in sys.modules:
         return importlib.reload(sys.modules["hwpx_generic_format_recognition_audit"])
     return importlib.import_module("hwpx_generic_format_recognition_audit")
 
 
 # ── T01: 모듈 import ────────────────────────────────────────────────────────
+
 
 def test_audit_module_importable():
     mod = _import_audit()
@@ -34,6 +40,7 @@ def test_audit_module_importable():
 
 
 # ── T02: _read_raw_xml 정상 동작 ────────────────────────────────────────────
+
 
 def test_read_raw_xml_returns_bytes():
     mod = _import_audit()
@@ -48,6 +55,7 @@ def test_read_raw_xml_returns_bytes():
 
 # ── T03: _audit_raw_xml ground truth 추출 ───────────────────────────────────
 
+
 def test_audit_raw_xml_extracts_truth():
     mod = _import_audit()
     p = PROJECT_ROOT / "tests/fixtures/hwpx/gantt/fx_gantt_like_basic.hwpx"
@@ -60,6 +68,7 @@ def test_audit_raw_xml_extracts_truth():
 
 
 # ── T04: _audit_parser_coverage 비율 계산 ───────────────────────────────────
+
 
 def test_parser_coverage_returns_ratios():
     mod = _import_audit()
@@ -74,6 +83,7 @@ def test_parser_coverage_returns_ratios():
 
 
 # ── T05: _decide_doc_verdict 결함 식별 ──────────────────────────────────────
+
 
 def test_decide_doc_verdict_halign_resolved():
     mod = _import_audit()
@@ -92,6 +102,7 @@ def test_decide_doc_verdict_halign_resolved():
 
 # ── T05b: LOW_TEXT 원인 분류 (HWPX-RECOGNITION-LOW-TEXT-RESOLVER-01) ──────────
 
+
 def test_gantt_empty_classified_as_expected_template_empty():
     mod = _import_audit()
     p = PROJECT_ROOT / "tests/fixtures/hwpx/gantt/fx_gantt_like_template_empty.hwpx"
@@ -100,11 +111,11 @@ def test_gantt_empty_classified_as_expected_template_empty():
     cov = mod._audit_parser_coverage(p, truth)
     verdict, issues = mod._decide_doc_verdict(cov, truth)
     # 빈 템플릿: 공정표 빈셀 비중이 크고 객체 존재 → EXPECTED_TEMPLATE_EMPTY
-    assert verdict == "WARN_EXPECTED_TEMPLATE_EMPTY", \
+    assert verdict == "WARN_EXPECTED_TEMPLATE_EMPTY", (
         f"gantt_empty은 빈 템플릿 분류되어야 함, 실제={verdict}, issues={issues}"
+    )
     assert any("LOW_TEXT_EXPECTED_EMPTY_TEMPLATE" in i for i in issues)
-    assert not any("LOW_TEXT_PARSER_GAP" in i for i in issues), \
-        "빈 템플릿은 parser gap이 아님"
+    assert not any("LOW_TEXT_PARSER_GAP" in i for i in issues), "빈 템플릿은 parser gap이 아님"
 
 
 def test_gantt_partial_classified_as_expected_template_empty():
@@ -156,11 +167,17 @@ def test_low_text_parser_gap_classification_when_no_schedule_like_table():
         "cells_with_fontSizePt": 0,
         "cells_with_fontFace": 0,
         "cells_with_fontName": 0,
-        "cells_with_bold": 0, "cells_with_italic": 0,
-        "cells_with_underline": 0, "cells_with_textColor": 0,
+        "cells_with_bold": 0,
+        "cells_with_italic": 0,
+        "cells_with_underline": 0,
+        "cells_with_textColor": 0,
         "cells_with_nested_table": 0,
-        "ratios": {"text_ratio": 0.2, "horizontalAlign_ratio": 0.0,
-                   "fillColor_ratio": 0.0, "fontFace_ratio": 0.0},
+        "ratios": {
+            "text_ratio": 0.2,
+            "horizontalAlign_ratio": 0.0,
+            "fillColor_ratio": 0.0,
+            "fontFace_ratio": 0.0,
+        },
         "table_count_match": True,
         "cell_count_match": True,
         "scheduleLikeTableCount": 0,
@@ -170,12 +187,18 @@ def test_low_text_parser_gap_classification_when_no_schedule_like_table():
         "parser_binDataCount": 0,
     }
     truth = {
-        "table_count": 1, "table_cell_count": 50,
-        "charPr_with_bold": 0, "charPr_with_italic": 0,
-        "charPr_with_underline": 0, "charPr_with_textColor": 0,
-        "paraPr_with_align": 0, "borderFill_with_fillBrush": 0,
-        "nested_table_count": 0, "image_count": 0,
-        "shape_count": 0, "binData_count": 0,
+        "table_count": 1,
+        "table_cell_count": 50,
+        "charPr_with_bold": 0,
+        "charPr_with_italic": 0,
+        "charPr_with_underline": 0,
+        "charPr_with_textColor": 0,
+        "paraPr_with_align": 0,
+        "borderFill_with_fillBrush": 0,
+        "nested_table_count": 0,
+        "image_count": 0,
+        "shape_count": 0,
+        "binData_count": 0,
     }
     verdict, issues = mod._decide_doc_verdict(cov, truth)
     assert verdict == "WARN_LOW_TEXT_PARSER_GAP"
@@ -198,6 +221,7 @@ def test_decide_doc_verdict_char_style_and_fontface_resolved():
 
 # ── T07: verdict 분류 정확성 ────────────────────────────────────────────────
 
+
 def test_verdict_classification():
     mod = _import_audit()
     valid_verdicts = {
@@ -218,23 +242,33 @@ def test_verdict_classification():
 
 # ── T08: 감사 스크립트는 편집 호출 없음 ────────────────────────────────────
 
+
 def test_audit_script_no_edit_calls():
     import re
+
     src_path = PROJECT_ROOT / "scripts" / "local" / "hwpx_generic_format_recognition_audit.py"
+    if not src_path.is_file():
+        pytest.skip(f"local-only 스크립트 없음(커밋 대상 아님): {src_path}")
     src = src_path.read_text(encoding="utf-8")
-    for pat in (r"(?<!#)\bapply_edit_plan\s*\(",
-                r"(?<!#)\bfill_schedule_bars\s*\(",
-                r"(?<!#)\bwrite_package\s*\(",
-                r"(?<!#)\brepair_for_server\s*\("):
+    for pat in (
+        r"(?<!#)\bapply_edit_plan\s*\(",
+        r"(?<!#)\bfill_schedule_bars\s*\(",
+        r"(?<!#)\bwrite_package\s*\(",
+        r"(?<!#)\brepair_for_server\s*\(",
+    ):
         assert not re.search(pat, src), f"forbidden call in audit: {pat}"
 
 
 # ── T09: 원본 fixture 수정 없음 ─────────────────────────────────────────────
 
-@pytest.mark.parametrize("fx_path", [
-    "tests/fixtures/hwpx/gantt/fx_gantt_like_basic.hwpx",
-    "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx",
-])
+
+@pytest.mark.parametrize(
+    "fx_path",
+    [
+        "tests/fixtures/hwpx/gantt/fx_gantt_like_basic.hwpx",
+        "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx",
+    ],
+)
 def test_audit_does_not_modify_fixtures(fx_path):
     mod = _import_audit()
     path = PROJECT_ROOT / fx_path

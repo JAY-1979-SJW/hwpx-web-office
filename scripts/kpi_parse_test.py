@@ -7,9 +7,21 @@ kpi_parse.py 회귀 검증 스크립트
   4) price_x_min 경계 (단위 헤더 우측 컬럼 오참조 방지)
 """
 
-import importlib.util, sys, fitz, sqlite3, tempfile, os
-from pathlib import Path
+import importlib.util
+import os
+import sqlite3
+import sys
+import tempfile
 from collections import defaultdict
+from pathlib import Path
+
+import fitz
+
+# CLI로 직접 실행하는 회귀 검증 스크립트(main() 참고) — test_* 함수들이
+# 인자 m(파서 모듈)을 필수로 받아 pytest가 그대로 수집하면 전부 fixture
+# 오류로 깨진다(scripts/hwpx/test_hwpx_security.py 와 같은 이유·같은 처리).
+__test__ = False
+
 
 def load_parser(path="/home/ubuntu/kpi_parse.py"):
     spec = importlib.util.spec_from_file_location("kpi_parse", path)
@@ -17,11 +29,13 @@ def load_parser(path="/home/ubuntu/kpi_parse.py"):
     spec.loader.exec_module(m)
     return m
 
+
 def load_quality_report(path="/home/ubuntu/kpi_quality_report.py"):
     spec = importlib.util.spec_from_file_location("kpi_quality_report", path)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
 
 def make_temp_db(rows):
     """rows: list of dict with prices 테이블 컬럼. 임시 SQLite 파일 경로 반환."""
@@ -44,11 +58,13 @@ def make_temp_db(rows):
     conn.close()
     return Path(tmp)
 
+
 def run_page(m, pdf_path, page_idx, meta):
     doc = fitz.open(str(pdf_path))
     rows = m.parse_page(doc[page_idx], meta)
     doc.close()
     return rows
+
 
 PDF_BASE = Path("/home/ubuntu/Downloads/kpi_pdf/2026년04월_종합물가정보")
 META_토목 = {"연도": 2026, "월": 4, "책명": "종합물가정보", "분류": "토목"}
@@ -81,7 +97,7 @@ def test_ditto_unit_inheritance(m):
     multi3_rate = multi3_items / len(by_item) * 100 if by_item else 0
 
     result = "PASS" if blank_rate < 35 and multi3_rate < 5 else "WARN"
-    print(f"[TEST 1] 단위 공백률 / 과도한 단위 불일관")
+    print("[TEST 1] 단위 공백률 / 과도한 단위 불일관")
     print(f"  단위 공백률: {blank_rate:.1f}%  (기준 <35%)")
     print(f"  3종 이상 단위 품목: {multi3_rate:.1f}%  (기준 <5%, 오파싱 지표)")
     print(f"  결과: {result}")
@@ -107,7 +123,7 @@ def test_ilwidaega_parsing(m):
     leaked_summary = sum(1 for r in rows if any(kw in r["품목명"] for kw in SKIP_KWDS))
 
     result = "PASS" if count > 500 and has_valid_price > 100 and leaked_summary == 0 else "WARN"
-    print(f"\n[TEST 2] 일위대가형 공사비 파싱")
+    print("\n[TEST 2] 일위대가형 공사비 파싱")
     print(f"  수집 건수: {count}  (기준 >500, 수정 전 131)")
     print(f"  단가 열 유효 가격: {has_valid_price}건  (기준 >100)")
     print(f"  품목명 공백: {blank_item}건")
@@ -122,6 +138,7 @@ def test_spec_price_isolation(m):
     토목 PDF에서 가격 컬럼이 160px 이상 위치에 있는지 확인.
     """
     import re
+
     PRICE_PAT = re.compile(r"^\d[\d,]+$")
     REGIONS = {"서울", "인천", "수원", "부산", "대구", "대전", "광주", "전주", "강원", "제주"}
 
@@ -146,7 +163,7 @@ def test_spec_price_isolation(m):
             continue
         price_x_min = min(region_xs) - 40
 
-        for y, x, t in spans:
+        for _y, x, t in spans:
             if PRICE_PAT.match(t) and len(t) > 4 and x >= price_x_min:
                 total_prices += 1
                 if x < 160:
@@ -155,7 +172,7 @@ def test_spec_price_isolation(m):
     pdf.close()
     rate = suspicious / total_prices * 100 if total_prices else 0
     result = "PASS" if rate < 1.0 else "WARN"
-    print(f"\n[TEST 3] 규격→가격 혼입 차단")
+    print("\n[TEST 3] 규격→가격 혼입 차단")
     print(f"  전체 가격 후보: {total_prices}")
     print(f"  x<160 혼입 의심: {suspicious}건 ({rate:.2f}%)")
     print(f"  결과: {result}")
@@ -168,12 +185,12 @@ def test_unit_col_boundary(m):
     토목 8페이지(기준①) 사례: unit_x=501 > col_map_min=280 → base=240 유지.
     """
     # calc_price_x_min 직접 테스트
-    result_ok = m.calc_price_x_min(280, 501) == 240   # unit_x > col_map_min → ignore
+    result_ok = m.calc_price_x_min(280, 501) == 240  # unit_x > col_map_min → ignore
     result_ok &= m.calc_price_x_min(248, 199) == 219  # unit_x < col_map_min, 199+20=219 > 208
     result_ok &= m.calc_price_x_min(279, 242) == 262  # 사무 케이스: 242+20=262 > 239
 
     result = "PASS" if result_ok else "FAIL"
-    print(f"\n[TEST 4] price_x_min 경계 보정 로직")
+    print("\n[TEST 4] price_x_min 경계 보정 로직")
     print(f"  calc_price_x_min(280, 501) = {m.calc_price_x_min(280, 501)}  (expect 240)")
     print(f"  calc_price_x_min(248, 199) = {m.calc_price_x_min(248, 199)}  (expect 219)")
     print(f"  calc_price_x_min(279, 242) = {m.calc_price_x_min(279, 242)}  (expect 262)")
@@ -198,10 +215,10 @@ def test_ilwidaega_unit_recognition(m):
     # 케이스 1 & 2: 실제 공사비 PDF 파싱 후 hr / 인 단위 등장 여부 확인
     PDF = PDF_BASE / "2026년04월_종합물가정보_공사비.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 5] ilwidaega 단위 인식 — PDF 없음, 구조 검증만 수행")
-        print(f"  UNIT_SET 오염 없음: PASS")
-        print(f"  ILWI_EXTRA_UNITS 정의: PASS")
-        print(f"  결과: PASS")
+        print("\n[TEST 5] ilwidaega 단위 인식 — PDF 없음, 구조 검증만 수행")
+        print("  UNIT_SET 오염 없음: PASS")
+        print("  ILWI_EXTRA_UNITS 정의: PASS")
+        print("  결과: PASS")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -211,13 +228,13 @@ def test_ilwidaega_unit_recognition(m):
     pdf.close()
 
     danwon = [r for r in rows if r["지역"] == "단가"]
-    hr_rows  = [r for r in danwon if r["단위"] == "hr"]
-    in_rows  = [r for r in danwon if r["단위"] == "인"]
+    hr_rows = [r for r in danwon if r["단위"] == "hr"]
+    in_rows = [r for r in danwon if r["단위"] == "인"]
     blank_danwon = [r for r in danwon if not r["단위"]]
     blank_rate = len(blank_danwon) / len(danwon) * 100 if danwon else 100
 
     result = "PASS" if hr_rows and in_rows and blank_rate < 35 else "WARN"
-    print(f"\n[TEST 5] ilwidaega 단위 인식 (hr / 인 / 오탐 방지)")
+    print("\n[TEST 5] ilwidaega 단위 인식 (hr / 인 / 오탐 방지)")
     print(f"  hr 단위 품목: {len(hr_rows)}건  (기준 >0)")
     print(f"  인 단위 품목: {len(in_rows)}건  (기준 >0)")
     print(f"  단가 분기 단위 공백률: {blank_rate:.1f}%  (기준 <35%)")
@@ -235,7 +252,7 @@ def test_ilwidaega_item_fragment(m):
     """
     PDF = PDF_BASE / "2026년04월_종합물가정보_공사비.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 6] ilwidaega 품목명 파편/결합 방지 — PDF 없음, SKIP")
+        print("\n[TEST 6] ilwidaega 품목명 파편/결합 방지 — PDF 없음, SKIP")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -245,6 +262,7 @@ def test_ilwidaega_item_fragment(m):
     pdf.close()
 
     from collections import Counter
+
     item_cnt = Counter(r["품목명"] for r in rows)
 
     # 케이스 1: 결합형 오파싱 없어야 함
@@ -256,7 +274,7 @@ def test_ilwidaega_item_fragment(m):
     short_ok = all(item_cnt.get(nm, 0) >= min_cnt for nm, min_cnt in short_normals.items())
 
     result = "PASS" if combo_bad == 0 and prefix_bad == 0 and short_ok else "FAIL"
-    print(f"\n[TEST 6] ilwidaega 품목명 파편/결합 방지")
+    print("\n[TEST 6] ilwidaega 품목명 파편/결합 방지")
     print(f"  결합형 오파싱 (보통인부특별인부 등): {combo_bad}건  (기준 0)")
     print(f"  구분기호 결합 (사보통인부 등): {prefix_bad}건  (기준 0)")
     print(f"  정상 짧은 품목 유지: {'OK' if short_ok else 'FAIL'}")
@@ -273,7 +291,7 @@ def test_jyogyeong_unit_rate(m):
     """
     PDF = PDF_BASE / "2026년04월_종합물가정보_조경.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 7] 조경 단위 공백률 — PDF 없음, SKIP")
+        print("\n[TEST 7] 조경 단위 공백률 — PDF 없음, SKIP")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -290,7 +308,7 @@ def test_jyogyeong_unit_rate(m):
     ton_cnt = sum(1 for r in rows if r["단위"] == "톤")
 
     result = "PASS" if rate < 35 and set_cnt > 0 else "WARN"
-    print(f"\n[TEST 7] 조경 단위 공백률")
+    print("\n[TEST 7] 조경 단위 공백률")
     print(f"  전체: {total}건  단위공백: {blank}건 ({rate:.1f}%)  (기준 <35%)")
     print(f"  Set 단위: {set_cnt}건  톤 단위: {ton_cnt}건  (기준 >0)")
     print(f"  결과: {result}")
@@ -304,7 +322,7 @@ def test_giyye_multi_section(m):
     """
     PDF = PDF_BASE / "2026년04월_종합물가정보_기계.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 8] 기계 단위 공백률 — PDF 없음, SKIP")
+        print("\n[TEST 8] 기계 단위 공백률 — PDF 없음, SKIP")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -320,7 +338,7 @@ def test_giyye_multi_section(m):
     desktop_cnt = sum(1 for r in rows if "데스크탑" in r["품목명"] or "PC" in r["품목명"])
 
     result = "PASS" if rate < 45 and desktop_cnt > 0 else "WARN"
-    print(f"\n[TEST 8] 기계 단위 공백률 / 다중 섹션 커버리지")
+    print("\n[TEST 8] 기계 단위 공백률 / 다중 섹션 커버리지")
     print(f"  전체: {total}건  단위공백: {blank}건 ({rate:.1f}%)  (기준 <45%)")
     print(f"  데스크탑/PC 품목: {desktop_cnt}건  (기준 >0, stage_y 수정 지표)")
     print(f"  결과: {result}")
@@ -338,9 +356,9 @@ def test_unit_set_no_contamination(m):
 
     PDF = PDF_BASE / "2026년04월_종합물가정보_공사비.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 9] Set·톤 오탐 방지 — PDF 없음, 구조 검증만")
-        print(f"  UNIT_SET 포함: PASS")
-        print(f"  결과: PASS")
+        print("\n[TEST 9] Set·톤 오탐 방지 — PDF 없음, 구조 검증만")
+        print("  UNIT_SET 포함: PASS")
+        print("  결과: PASS")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -355,7 +373,7 @@ def test_unit_set_no_contamination(m):
     ton_danwon = sum(1 for r in rows if r["지역"] == "단가" and r["단위"] == "톤")
     # Set은 공사비 댐퍼류에서 정상 사용됨 — 단위공백률과 톤 오탐만 검사
     result = "PASS" if rate < 5 and ton_danwon == 0 else "WARN"
-    print(f"\n[TEST 9] Set·톤 공사비 오탐 방지")
+    print("\n[TEST 9] Set·톤 공사비 오탐 방지")
     print(f"  공사비 단위공백률: {rate:.1f}%  (기준 <5%)")
     print(f"  공사비 톤 단위(일위대가): {ton_danwon}건  (기준 0)")
     print(f"  결과: {result}")
@@ -369,7 +387,7 @@ def test_paren_header_func(m):
     텍스트 없을 때 None 반환 확인.
     """
     if not hasattr(m, "find_unit_from_paren_header"):
-        print(f"\n[TEST 10] paren header 함수 단위 테스트 — 함수 미존재, FAIL")
+        print("\n[TEST 10] paren header 함수 단위 테스트 — 함수 미존재, FAIL")
         return False
 
     def make_rows(y, text):
@@ -386,9 +404,9 @@ def test_paren_header_func(m):
     # 케이스 5: y 범위 밖 → None
     r5 = m.find_unit_from_paren_header(make_rows(300, "(단위 : 대)"), 100)
 
-    ok = (r1 == "대" and r2 == "개" and r3 == "개" and r4 is None and r5 is None)
+    ok = r1 == "대" and r2 == "개" and r3 == "개" and r4 is None and r5 is None
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 10] find_unit_from_paren_header 직접 단위 테스트")
+    print("\n[TEST 10] find_unit_from_paren_header 직접 단위 테스트")
     print(f"  (단위 : 대)       → '{r1}'  (expect '대')")
     print(f"  (단위 : 개, 대)   → '{r2}'  (expect '개')")
     print(f"  (단위 : 개, m)    → '{r3}'  (expect '개')")
@@ -406,7 +424,7 @@ def test_giyye_paren_unit_effect(m):
     """
     PDF = PDF_BASE / "2026년04월_종합물가정보_기계.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 11] 기계 paren_unit 효과 — PDF 없음, SKIP")
+        print("\n[TEST 11] 기계 paren_unit 효과 — PDF 없음, SKIP")
         return True
 
     pdf = fitz.open(str(PDF))
@@ -423,7 +441,7 @@ def test_giyye_paren_unit_effect(m):
     dae_cnt = sum(1 for r in rows if r["단위"] == "대")
 
     result = "PASS" if rate < 5 and gae_cnt > 0 and dae_cnt > 0 else "WARN"
-    print(f"\n[TEST 11] 기계 paren_unit 효과 (unit_x=None 6페이지)")
+    print("\n[TEST 11] 기계 paren_unit 효과 (unit_x=None 6페이지)")
     print(f"  전체: {total}건  단위공백: {blank}건 ({rate:.1f}%)  (기준 <5%)")
     print(f"  개 단위: {gae_cnt}건  대 단위: {dae_cnt}건  (기준 각 >0)")
     print(f"  결과: {result}")
@@ -452,10 +470,10 @@ def test_paren_unit_no_side_effect(m):
         blank = sum(1 for r in rows if not r["단위"])
         rate = blank / total * 100 if total else 100
         ok_jyogyeong = rate < 20
-        print(f"\n[TEST 12] paren_unit 부작용 없음 — 조경/공사비")
+        print("\n[TEST 12] paren_unit 부작용 없음 — 조경/공사비")
         print(f"  조경 단위공백률: {rate:.1f}%  (기준 <20%)")
     else:
-        print(f"\n[TEST 12] paren_unit 부작용 없음 — 조경 PDF 없음")
+        print("\n[TEST 12] paren_unit 부작용 없음 — 조경 PDF 없음")
 
     # 공사비 확인: paren_unit으로 인한 이상 단위 없는지
     PDF_G = PDF_BASE / "2026년04월_종합물가정보_공사비.pdf"
@@ -472,7 +490,7 @@ def test_paren_unit_no_side_effect(m):
         ok_gongsa = len(unknown) == 0
         print(f"  공사비 미허용 단위: {sorted(unknown) if unknown else '없음'}  (기준 0종)")
     else:
-        print(f"  공사비 PDF 없음 — 건너뜀")
+        print("  공사비 PDF 없음 — 건너뜀")
 
     result = "PASS" if ok_jyogyeong and ok_gongsa else "WARN"
     print(f"  결과: {result}")
@@ -486,31 +504,40 @@ def test_report_structure(m_report):
     """
     DB = Path.home() / "Downloads/kpi_pdf/result/kpi_prices.db"
     if not DB.exists():
-        print(f"\n[TEST 13] 리포트 구조 검증 — DB 없음, SKIP")
+        print("\n[TEST 13] 리포트 구조 검증 — DB 없음, SKIP")
         return True
 
     d = m_report.run_report(DB, year=2026, month=4)
 
     required_keys = [
-        "전체건수", "분류별건수", "단위공백", "분류별단위공백",
-        "미허용단위", "오파싱키워드", "파편형품목", "결합형품목",
-        "저단가레코드", "짧은품목상위20",
+        "전체건수",
+        "분류별건수",
+        "단위공백",
+        "분류별단위공백",
+        "미허용단위",
+        "오파싱키워드",
+        "파편형품목",
+        "결합형품목",
+        "저단가레코드",
+        "짧은품목상위20",
     ]
     missing = [k for k in required_keys if k not in d]
 
     cat_blank = d.get("분류별단위공백", {})
     giyye_rate = cat_blank.get("기계", {}).get("공백률", 999)
-    jyo_rate   = cat_blank.get("조경", {}).get("공백률", 999)
-    gongsa_rate= cat_blank.get("공사비", {}).get("공백률", 999)
+    jyo_rate = cat_blank.get("조경", {}).get("공백률", 999)
+    gongsa_rate = cat_blank.get("공사비", {}).get("공백률", 999)
 
-    ok = (not missing
-          and d["전체건수"] > 100_000
-          and giyye_rate  < 5
-          and jyo_rate    < 20
-          and gongsa_rate < 5)
+    ok = (
+        not missing
+        and d["전체건수"] > 100_000
+        and giyye_rate < 5
+        and jyo_rate < 20
+        and gongsa_rate < 5
+    )
 
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 13] 리포트 구조 + 기존 수치 일치")
+    print("\n[TEST 13] 리포트 구조 + 기존 수치 일치")
     print(f"  누락 키: {missing if missing else '없음'}")
     print(f"  전체 건수: {d['전체건수']:,}건  (기준 >100,000)")
     print(f"  기계 공백률: {giyye_rate:.1f}%  (기준 <5%,  이전 보고 1.2%)")
@@ -527,36 +554,35 @@ def test_report_aggregate_accuracy(m_report):
     """
     BASE = {"연도": 2026, "월": 4, "책명": "TEST", "지역": "서울", "가격": 10000}
     rows = [
-        {**BASE, "분류": "토목", "품목명": "이형철근",  "단위": "M/T"},   # 정상
-        {**BASE, "분류": "토목", "품목명": "시멘트",    "단위": "포"},    # 정상
-        {**BASE, "분류": "토목", "품목명": "레미콘",    "단위": "㎥"},    # 정상
-        {**BASE, "분류": "토목", "품목명": "이형",      "단위": "M/T"},   # 파편형 (2글자)
-        {**BASE, "분류": "공사비", "품목명": "보통인부", "단위": "인"},    # 정상
-        {**BASE, "분류": "공사비", "품목명": "소계합계이상","단위": "인"}, # 오파싱 (소계 포함)
-        {**BASE, "분류": "조경",  "품목명": "잔디초원",  "단위": ""},      # 단위 공백
-        {**BASE, "분류": "기계",  "품목명": "데스크탑",  "단위": "대"},    # 정상
-        {**BASE, "분류": "기계",  "품목명": "보통인부특별인부", "단위": "인"}, # 결합형 패턴
-        {**BASE, "분류": "토목",  "품목명": "정상품목",  "단위": "XX미허용"}, # 미허용 단위
+        {**BASE, "분류": "토목", "품목명": "이형철근", "단위": "M/T"},  # 정상
+        {**BASE, "분류": "토목", "품목명": "시멘트", "단위": "포"},  # 정상
+        {**BASE, "분류": "토목", "품목명": "레미콘", "단위": "㎥"},  # 정상
+        {**BASE, "분류": "토목", "품목명": "이형", "단위": "M/T"},  # 파편형 (2글자)
+        {**BASE, "분류": "공사비", "품목명": "보통인부", "단위": "인"},  # 정상
+        {**BASE, "분류": "공사비", "품목명": "소계합계이상", "단위": "인"},  # 오파싱 (소계 포함)
+        {**BASE, "분류": "조경", "품목명": "잔디초원", "단위": ""},  # 단위 공백
+        {**BASE, "분류": "기계", "품목명": "데스크탑", "단위": "대"},  # 정상
+        {**BASE, "분류": "기계", "품목명": "보통인부특별인부", "단위": "인"},  # 결합형 패턴
+        {**BASE, "분류": "토목", "품목명": "정상품목", "단위": "XX미허용"},  # 미허용 단위
     ]
 
     tmp = make_temp_db(rows)
     try:
         d = m_report.run_report(tmp)
     finally:
-        os.unlink(tmp)
+        Path(tmp).unlink()
 
-    fr    = d["파편형품목"]
-    frag  = fr["건수_구정의"]               # expect 1 ("이형")
+    fr = d["파편형품목"]
+    frag = fr["건수_구정의"]  # expect 1 ("이형")
     combo = d["결합형품목"]["패턴매칭건수"]  # expect 1 ("보통인부특별인부")
-    oprs  = d["오파싱키워드"]["건수"]        # expect 1 ("소계합계이상")
-    unk   = d["미허용단위"]["건수"]          # expect 1 ("XX미허용")
-    blank = d["단위공백"]["건수"]            # expect 1 ("잔디초원")
+    oprs = d["오파싱키워드"]["건수"]  # expect 1 ("소계합계이상")
+    unk = d["미허용단위"]["건수"]  # expect 1 ("XX미허용")
+    blank = d["단위공백"]["건수"]  # expect 1 ("잔디초원")
     jyo_blank = d["분류별단위공백"]["조경"]["공백건수"]  # expect 1
 
-    ok = (frag == 1 and combo == 1 and oprs == 1 and unk == 1
-          and blank == 1 and jyo_blank == 1)
+    ok = frag == 1 and combo == 1 and oprs == 1 and unk == 1 and blank == 1 and jyo_blank == 1
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 14] 집계 정확성 (synthetic DB)")
+    print("\n[TEST 14] 집계 정확성 (synthetic DB)")
     print(f"  파편형 건수(구정의): {frag}  (expect 1)")
     print(f"  결합형 건수: {combo}  (expect 1)")
     print(f"  오파싱 건수: {oprs}  (expect 1)")
@@ -574,28 +600,34 @@ def test_format_report_sections(m_report):
     """
     BASE = {"연도": 2026, "월": 4, "책명": "T", "지역": "서울", "가격": 50000}
     rows = [
-        {**BASE, "분류": "토목",  "품목명": "철근", "단위": "M/T"},
-        {**BASE, "분류": "공사비","품목명": "보통인부","단위": "인"},
-        {**BASE, "분류": "조경",  "품목명": "잔디",  "단위": "㎡"},
-        {**BASE, "분류": "기계",  "품목명": "데스크탑","단위": "대"},
+        {**BASE, "분류": "토목", "품목명": "철근", "단위": "M/T"},
+        {**BASE, "분류": "공사비", "품목명": "보통인부", "단위": "인"},
+        {**BASE, "분류": "조경", "품목명": "잔디", "단위": "㎡"},
+        {**BASE, "분류": "기계", "품목명": "데스크탑", "단위": "대"},
     ]
     tmp = make_temp_db(rows)
     try:
-        d   = m_report.run_report(tmp)
+        d = m_report.run_report(tmp)
         txt = m_report.format_report(d)
     finally:
-        os.unlink(tmp)
+        Path(tmp).unlink()
 
     required_sections = [
-        "[전체 수집]", "[분류별 건수", "[단위 품질]",
-        "[미허용 단위", "[오파싱 키워드", "[파편형 품목 분류]",
-        "[결합형 품목]", "[저단가 레코드", "[짧은 품목명",
+        "[전체 수집]",
+        "[분류별 건수",
+        "[단위 품질]",
+        "[미허용 단위",
+        "[오파싱 키워드",
+        "[파편형 품목 분류]",
+        "[결합형 품목]",
+        "[저단가 레코드",
+        "[짧은 품목명",
     ]
     missing = [s for s in required_sections if s not in txt]
 
     ok = not missing and len(txt) > 200
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 15] format_report 섹션 구조")
+    print("\n[TEST 15] format_report 섹션 구조")
     print(f"  누락 섹션: {missing if missing else '없음'}")
     print(f"  출력 길이: {len(txt)}자  (기준 >200)")
     print(f"  결과: {result}")
@@ -613,7 +645,7 @@ def test_fragment_classification(m_report):
 
     # unit_as_item 확인
     assert cf("개소") == "unit_as_item", "개소는 UNIT_SET 멤버 → unit_as_item"
-    assert cf("대") == "unit_as_item",   "대는 UNIT_SET 멤버 → unit_as_item"
+    assert cf("대") == "unit_as_item", "대는 UNIT_SET 멤버 → unit_as_item"
 
     # modifier_frag 확인
     assert cf("보통") == "modifier_frag", "보통(보통인부 파편) → modifier_frag"
@@ -627,10 +659,10 @@ def test_fragment_classification(m_report):
     assert cf("강판") == "normal_short", "강판(자재) → normal_short"
 
     result = "PASS"
-    print(f"\n[TEST 16] 파편형 3단계 분류 정확성")
-    print(f"  unit_as_item: 개소, 대 ✓")
-    print(f"  modifier_frag: 보통, 이하, 갈색, 회색 ✓")
-    print(f"  normal_short: 경간, 용접, 강판 ✓")
+    print("\n[TEST 16] 파편형 3단계 분류 정확성")
+    print("  unit_as_item: 개소, 대 ✓")
+    print("  modifier_frag: 보통, 이하, 갈색, 회색 ✓")
+    print("  normal_short: 경간, 용접, 강판 ✓")
     print(f"  결과: {result}")
     return True
 
@@ -644,27 +676,30 @@ def test_runtime_stats_param(m):
     # 케이스 1: stats=None, 기존 인터페이스 유지
     PDF = PDF_BASE / "2026년04월_종합물가정보_토목.pdf"
     if not PDF.exists():
-        print(f"\n[TEST 17] 런타임 stats 파라미터 — PDF 없음, SKIP")
+        print("\n[TEST 17] 런타임 stats 파라미터 — PDF 없음, SKIP")
         return True
 
     import inspect
+
     sig = inspect.signature(m.parse_page)
     has_stats_param = "stats" in sig.parameters
-    stats_default_none = (sig.parameters.get("stats") and
-                          sig.parameters["stats"].default is None)
+    stats_default_none = sig.parameters.get("stats") and sig.parameters["stats"].default is None
 
     # 케이스 2: stats dict 전달
-    test_stats = {k: 0 for k in m.RT_STATS_SCHEMA}
+    test_stats = dict.fromkeys(m.RT_STATS_SCHEMA, 0)
     pdf = fitz.open(str(PDF))
-    rows = m.parse_page(pdf[0], META_토목, stats=test_stats)
+    m.parse_page(pdf[0], META_토목, stats=test_stats)
     m.parse_page(pdf[1], META_토목, stats=test_stats)
     pdf.close()
 
-    ok = (has_stats_param and stats_default_none
-          and test_stats["total_pages"] == 2
-          and test_stats["price_pages"] >= 0)  # 가격 페이지 0 이상
+    ok = (
+        has_stats_param
+        and stats_default_none
+        and test_stats["total_pages"] == 2
+        and test_stats["price_pages"] >= 0
+    )  # 가격 페이지 0 이상
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 17] parse_page stats 파라미터")
+    print("\n[TEST 17] parse_page stats 파라미터")
     print(f"  stats 파라미터 존재: {has_stats_param}  (기준 True)")
     print(f"  기본값=None: {stats_default_none}  (기준 True)")
     print(f"  total_pages 카운터 (2페이지): {test_stats['total_pages']}  (기준 2)")
@@ -678,14 +713,19 @@ def test_report_runtime_integration(m_report):
     품질 리포트가 runtime_stats.json을 읽어 런타임통계 키를 반영하는지 확인.
     임시 JSON 파일로 테스트.
     """
-    import tempfile, json
+    import json
+    import tempfile
 
     # 임시 runtime_stats.json 생성
     fake_stats = {
-        "total_pages": 500, "price_pages": 400,
-        "region_header_pages": 300, "stage_header_pages": 80,
-        "ilwidaega_pages": 20, "no_header_pages": 100,
-        "unit_x_none_pages": 6, "paren_header_fallback": 6,
+        "total_pages": 500,
+        "price_pages": 400,
+        "region_header_pages": 300,
+        "stage_header_pages": 80,
+        "ilwidaega_pages": 20,
+        "no_header_pages": 100,
+        "unit_x_none_pages": 6,
+        "paren_header_fallback": 6,
     }
     fd, tmp_rt = tempfile.mkstemp(suffix=".json")
     os.close(fd)
@@ -698,16 +738,18 @@ def test_report_runtime_integration(m_report):
         try:
             d = m_report.run_report(tmp_db, rt_stats_path=Path(tmp_rt))
         finally:
-            os.unlink(tmp_db)
+            Path(tmp_db).unlink()
     finally:
-        os.unlink(tmp_rt)
+        Path(tmp_rt).unlink()
 
     rt = d.get("런타임통계", {})
-    ok = (rt.get("total_pages") == 500
-          and rt.get("unit_x_none_pages") == 6
-          and rt.get("paren_header_fallback") == 6)
+    ok = (
+        rt.get("total_pages") == 500
+        and rt.get("unit_x_none_pages") == 6
+        and rt.get("paren_header_fallback") == 6
+    )
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 18] 리포트 런타임 로그 연계")
+    print("\n[TEST 18] 리포트 런타임 로그 연계")
     print(f"  total_pages 반영: {rt.get('total_pages')}  (expect 500)")
     print(f"  unit_x_none_pages: {rt.get('unit_x_none_pages')}  (expect 6)")
     print(f"  paren_header_fallback: {rt.get('paren_header_fallback')}  (expect 6)")
@@ -723,29 +765,28 @@ def test_normal_short_excluded(m_report):
     """
     BASE = {"연도": 2026, "월": 4, "책명": "T", "지역": "서울", "가격": 50000}
     rows = [
-        {**BASE, "분류": "토목",  "품목명": "경간", "단위": "m"},   # normal_short
-        {**BASE, "분류": "토목",  "품목명": "용접", "단위": "개"},   # normal_short
-        {**BASE, "분류": "공통",  "품목명": "개소", "단위": "조"},   # unit_as_item
-        {**BASE, "분류": "공통",  "품목명": "보통", "단위": ""},     # modifier_frag
-        {**BASE, "분류": "공통",  "품목명": "이하", "단위": "개"},   # modifier_frag
+        {**BASE, "분류": "토목", "품목명": "경간", "단위": "m"},  # normal_short
+        {**BASE, "분류": "토목", "품목명": "용접", "단위": "개"},  # normal_short
+        {**BASE, "분류": "공통", "품목명": "개소", "단위": "조"},  # unit_as_item
+        {**BASE, "분류": "공통", "품목명": "보통", "단위": ""},  # modifier_frag
+        {**BASE, "분류": "공통", "품목명": "이하", "단위": "개"},  # modifier_frag
     ]
     tmp = make_temp_db(rows)
     try:
         d = m_report.run_report(tmp)
     finally:
-        os.unlink(tmp)
+        Path(tmp).unlink()
 
     fr = d["파편형품목"]
-    old_total    = fr["건수_구정의"]          # 5 (전부 ≤2글자)
-    true_total   = fr["진성파편형건수"]       # 3 (개소+보통+이하)
-    norm_total   = fr["정상짧은품목_건수"]    # 2 (경간+용접)
-    unit_cnt     = fr["unit_as_item_건수"]    # 1 (개소)
-    mod_cnt      = fr["modifier_frag_건수"]   # 2 (보통+이하)
+    old_total = fr["건수_구정의"]  # 5 (전부 ≤2글자)
+    true_total = fr["진성파편형건수"]  # 3 (개소+보통+이하)
+    norm_total = fr["정상짧은품목_건수"]  # 2 (경간+용접)
+    unit_cnt = fr["unit_as_item_건수"]  # 1 (개소)
+    mod_cnt = fr["modifier_frag_건수"]  # 2 (보통+이하)
 
-    ok = (old_total == 5 and true_total == 3
-          and norm_total == 2 and unit_cnt == 1 and mod_cnt == 2)
+    ok = old_total == 5 and true_total == 3 and norm_total == 2 and unit_cnt == 1 and mod_cnt == 2
     result = "PASS" if ok else "FAIL"
-    print(f"\n[TEST 19] 정상 짧은 품목 제외 / 파편형 분류")
+    print("\n[TEST 19] 정상 짧은 품목 제외 / 파편형 분류")
     print(f"  구정의 전체(≤2글자): {old_total}  (expect 5)")
     print(f"  진성 파편형        : {true_total}  (expect 3)")
     print(f"  정상 짧은 품목     : {norm_total}  (expect 2,  경간·용접)")
