@@ -21,6 +21,7 @@ import tempfile
 import traceback
 import xml.etree.ElementTree as ET
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -663,13 +664,7 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: l
 # ── markdown report ─────────────────────────────────────────────────────────
 
 
-def _write_markdown(
-    summary: dict, inventory: list[dict], file_results: list[dict], smoke_results: list[dict]
-) -> str:
-    lines: list[str] = []
-    L = lines.append
-    L("# HWPX-RECOGNITION-FULL-COVERAGE-AUDIT-01 Report")
-    L("")
+def _write_summary_section(L: Callable[[str], None], summary: dict) -> None:
     L("## 1. Executive Summary")
     L("")
     L(f"- Overall verdict: **{summary['overallVerdict']}**")
@@ -705,6 +700,9 @@ def _write_markdown(
     )
     L(f"- documentType breakdown: {summary['documentTypeCounts']}")
     L("")
+
+
+def _write_inventory_section(L: Callable[[str], None], inventory: list[dict]) -> None:
     L("## 2. Fixture Inventory")
     L("")
     L("| # | relativePath | sizeBytes | sha256Before(prefix) | include |")
@@ -715,6 +713,9 @@ def _write_markdown(
             f"| {item['sha256Before'][:12]} | {item['include']} |"
         )
     L("")
+
+
+def _write_coverage_matrix_section(L: Callable[[str], None], file_results: list[dict]) -> None:
     L("## 3. Recognition Coverage Matrix")
     L("")
     L("| relativePath | docType | verdict | tables | cells | textRatio | objects | reqCount |")
@@ -728,6 +729,11 @@ def _write_markdown(
             f"| {r.get('fillRequirementCount', '-')} |"
         )
     L("")
+
+
+def _write_smoke_and_footer_sections(
+    L: Callable[[str], None], smoke_results: list[dict], file_results: list[dict], summary: dict
+) -> None:
     L("## 4. Live Sandbox Writer Smoke")
     L("")
     for s in smoke_results:
@@ -752,6 +758,19 @@ def _write_markdown(
     L("")
     L(f"## 8. Final Verdict: {summary['overallVerdict']}")
     L("")
+
+
+def _write_markdown(
+    summary: dict, inventory: list[dict], file_results: list[dict], smoke_results: list[dict]
+) -> str:
+    lines: list[str] = []
+    L = lines.append
+    L("# HWPX-RECOGNITION-FULL-COVERAGE-AUDIT-01 Report")
+    L("")
+    _write_summary_section(L, summary)
+    _write_inventory_section(L, inventory)
+    _write_coverage_matrix_section(L, file_results)
+    _write_smoke_and_footer_sections(L, smoke_results, file_results, summary)
     return "\n".join(lines)
 
 

@@ -234,6 +234,124 @@ def map_objects_to_cells(source_path: Path) -> ObjectCellMappingResult:
     )
 
 
+@dataclass
+class _SectionWalkState:
+    section_idx: int
+    cell_stack: list[dict]
+    table_counter: list[int]
+    obj_counter: list[int]
+    cell_counter: list[int]
+    table_count_global: int
+    local_mappings: list[ObjectCellMappingEntry]
+    seen_object_keys: set[str]
+
+
+def _walk_table_element(elem: ET.Element, state: _SectionWalkState) -> None:
+    table_idx_in_section = state.table_counter[0]
+    state.table_counter[0] += 1
+    global_table_idx = state.table_count_global + table_idx_in_section
+    row_idx = 0
+    for tr in list(elem):
+        if tr.tag != _TAG_TR:
+            continue
+        col_idx = 0
+        for tc in list(tr):
+            if tc.tag != _TAG_TC:
+                continue
+            col_span, row_span = _cell_span(tc)
+            cell_text = _cell_normalized_text(tc)
+            cell_key = f"t_s{state.section_idx}_{table_idx_in_section:03d}:r{row_idx}:c{col_idx}"
+            cell_info = {
+                "tableIndex": global_table_idx,
+                "rowIndex": row_idx,
+                "cellIndex": col_idx,
+                "cellKey": cell_key,
+                "rowSpan": row_span,
+                "colSpan": col_span,
+                "cellText": cell_text,
+            }
+            state.cell_stack.append(cell_info)
+            state.cell_counter[0] += 1
+            for child in list(tc):
+                _walk_object_cell_element(child, state)
+            state.cell_stack.pop()
+            col_idx += 1
+        row_idx += 1
+
+
+def _walk_object_element(
+    elem: ET.Element, tag: str, obj_type: str, state: _SectionWalkState
+) -> None:
+    raw_id = elem.get("id", "")
+    seq = state.obj_counter[0]
+    state.obj_counter[0] += 1
+    object_key = f"obj:s{state.section_idx}:{raw_id or 'auto'}:{seq:04d}"
+    # 안전: duplicate key 방지 (이론상 불가하지만 한번 더 확인)
+    while object_key in state.seen_object_keys:
+        seq += 1
+        object_key = f"obj:s{state.section_idx}:{raw_id or 'auto'}:{seq:04d}"
+    state.seen_object_keys.add(object_key)
+
+    bin_ref = _find_bin_data_ref(elem)
+    is_image_like = (obj_type in _IMAGE_LIKE_TYPES) or (bin_ref is not None)
+
+    if state.cell_stack:
+        top = state.cell_stack[-1]
+        entry = ObjectCellMappingEntry(
+            objectKey=object_key,
+            objectType=obj_type,
+            objectRawTag=tag,
+            sectionIndex=state.section_idx,
+            tableIndex=top["tableIndex"],
+            rowIndex=top["rowIndex"],
+            cellIndex=top["cellIndex"],
+            cellKey=top["cellKey"],
+            cellText=top["cellText"],
+            rowSpan=top["rowSpan"],
+            colSpan=top["colSpan"],
+            binDataRef=bin_ref,
+            confidence=1.0,
+            reason="DESCENDANT_OF_TC",
+            isImageLike=is_image_like,
+        )
+    else:
+        entry = ObjectCellMappingEntry(
+            objectKey=object_key,
+            objectType=obj_type,
+            objectRawTag=tag,
+            sectionIndex=state.section_idx,
+            tableIndex=None,
+            rowIndex=None,
+            cellIndex=None,
+            cellKey=None,
+            cellText=None,
+            rowSpan=None,
+            colSpan=None,
+            binDataRef=bin_ref,
+            confidence=0.0,
+            reason="OUT_OF_CELL",
+            isImageLike=is_image_like,
+        )
+    state.local_mappings.append(entry)
+
+
+def _walk_object_cell_element(elem: ET.Element, state: _SectionWalkState) -> None:
+    tag = elem.tag.split("}")[-1]
+
+    if tag == "tbl":
+        _walk_table_element(elem, state)
+        return
+
+    obj_type = _OBJECT_TAG_TO_TYPE.get(tag)
+    if obj_type is not None:
+        _walk_object_element(elem, tag, obj_type, state)
+        # object의 children에는 재귀하지 않는다 (그룹/컨테이너 단위로 1건)
+        return
+
+    for child in list(elem):
+        _walk_object_cell_element(child, state)
+
+
 def _map_from_section_xmls(
     section_xmls: list[bytes], document_hash: str = "", source_path: str = ""
 ) -> ObjectCellMappingResult:
@@ -249,125 +367,23 @@ def _map_from_section_xmls(
         except ET.ParseError:
             continue
 
-        section_table_counter = [0]
-        section_obj_counter = [0]
-        section_cell_counter = [0]
-        cell_stack: list[dict] = []
-        local_mappings: list[ObjectCellMappingEntry] = []
-
-        def walk(
-            elem: ET.Element,
-            *,
+        state = _SectionWalkState(
             section_idx=section_idx,
-            cell_stack=cell_stack,
-            section_table_counter=section_table_counter,
-            section_obj_counter=section_obj_counter,
-            section_cell_counter=section_cell_counter,
+            cell_stack=[],
+            table_counter=[0],
+            obj_counter=[0],
+            cell_counter=[0],
             table_count_global=table_count_global,
-            local_mappings=local_mappings,
-        ) -> None:
-            tag = elem.tag.split("}")[-1]
-
-            if tag == "tbl":
-                table_idx_in_section = section_table_counter[0]
-                section_table_counter[0] += 1
-                global_table_idx = table_count_global + table_idx_in_section
-                row_idx = 0
-                for tr in list(elem):
-                    if tr.tag != _TAG_TR:
-                        continue
-                    col_idx = 0
-                    for tc in list(tr):
-                        if tc.tag != _TAG_TC:
-                            continue
-                        col_span, row_span = _cell_span(tc)
-                        cell_text = _cell_normalized_text(tc)
-                        cell_key = (
-                            f"t_s{section_idx}_{table_idx_in_section:03d}:r{row_idx}:c{col_idx}"
-                        )
-                        cell_info = {
-                            "tableIndex": global_table_idx,
-                            "rowIndex": row_idx,
-                            "cellIndex": col_idx,
-                            "cellKey": cell_key,
-                            "rowSpan": row_span,
-                            "colSpan": col_span,
-                            "cellText": cell_text,
-                        }
-                        cell_stack.append(cell_info)
-                        section_cell_counter[0] += 1
-                        for child in list(tc):
-                            walk(child)
-                        cell_stack.pop()
-                        col_idx += 1
-                    row_idx += 1
-                return
-
-            obj_type = _OBJECT_TAG_TO_TYPE.get(tag)
-            if obj_type is not None:
-                raw_id = elem.get("id", "")
-                seq = section_obj_counter[0]
-                section_obj_counter[0] += 1
-                object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
-                # 안전: duplicate key 방지 (이론상 불가하지만 한번 더 확인)
-                while object_key in seen_object_keys:
-                    seq += 1
-                    object_key = f"obj:s{section_idx}:{raw_id or 'auto'}:{seq:04d}"
-                seen_object_keys.add(object_key)
-
-                bin_ref = _find_bin_data_ref(elem)
-                is_image_like = (obj_type in _IMAGE_LIKE_TYPES) or (bin_ref is not None)
-
-                if cell_stack:
-                    top = cell_stack[-1]
-                    entry = ObjectCellMappingEntry(
-                        objectKey=object_key,
-                        objectType=obj_type,
-                        objectRawTag=tag,
-                        sectionIndex=section_idx,
-                        tableIndex=top["tableIndex"],
-                        rowIndex=top["rowIndex"],
-                        cellIndex=top["cellIndex"],
-                        cellKey=top["cellKey"],
-                        cellText=top["cellText"],
-                        rowSpan=top["rowSpan"],
-                        colSpan=top["colSpan"],
-                        binDataRef=bin_ref,
-                        confidence=1.0,
-                        reason="DESCENDANT_OF_TC",
-                        isImageLike=is_image_like,
-                    )
-                else:
-                    entry = ObjectCellMappingEntry(
-                        objectKey=object_key,
-                        objectType=obj_type,
-                        objectRawTag=tag,
-                        sectionIndex=section_idx,
-                        tableIndex=None,
-                        rowIndex=None,
-                        cellIndex=None,
-                        cellKey=None,
-                        cellText=None,
-                        rowSpan=None,
-                        colSpan=None,
-                        binDataRef=bin_ref,
-                        confidence=0.0,
-                        reason="OUT_OF_CELL",
-                        isImageLike=is_image_like,
-                    )
-                local_mappings.append(entry)
-                # object의 children에는 재귀하지 않는다 (그룹/컨테이너 단위로 1건)
-                return
-
-            for child in list(elem):
-                walk(child)
+            local_mappings=[],
+            seen_object_keys=seen_object_keys,
+        )
 
         for child in list(root):
-            walk(child)
+            _walk_object_cell_element(child, state)
 
-        mappings.extend(local_mappings)
-        table_count_global += section_table_counter[0]
-        cell_count_global += section_cell_counter[0]
+        mappings.extend(state.local_mappings)
+        table_count_global += state.table_counter[0]
+        cell_count_global += state.cell_counter[0]
 
     mapped = sum(1 for m in mappings if m.cellKey is not None)
     unmapped = sum(1 for m in mappings if m.cellKey is None)

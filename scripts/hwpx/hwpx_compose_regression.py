@@ -17,9 +17,8 @@ from hwpx_package import write_csv, write_json
 from hwpx_package_audit import audit_hwpx_package
 
 
-def _expected_from_job(job: dict[str, Any]) -> list[str]:
-    values: list[str] = [str(value) for value in job.get("expected_values", [])]
-    metadata = job.get("document_metadata", {})
+def _expected_from_metadata(metadata: dict[str, Any]) -> list[str]:
+    values: list[str] = []
     for field in ("title", "creator", "subject", "description", "date"):
         if metadata.get(field):
             values.append(str(metadata[field]))
@@ -28,6 +27,11 @@ def _expected_from_job(job: dict[str, Any]) -> list[str]:
         values.extend(str(item) for item in keywords)
     elif keywords:
         values.append(str(keywords))
+    return values
+
+
+def _expected_from_content(job: dict[str, Any]) -> list[str]:
+    values: list[str] = []
     for paragraph in job.get("paragraphs", []):
         if isinstance(paragraph, str):
             values.append(paragraph)
@@ -40,10 +44,17 @@ def _expected_from_job(job: dict[str, Any]) -> list[str]:
         values.extend(str(value) for value in table.get("headers", []))
         for row in table.get("rows", []):
             values.extend(str(cell) for cell in row)
+    return values
+
+
+def _expected_from_page_numbering(job: dict[str, Any]) -> list[str]:
+    values: list[str] = []
     page_numberings = []
     if isinstance(job.get("page_numbering"), dict):
         page_numberings.append(job["page_numbering"])
-    page_numberings.extend(item for item in job.get("page_numberings", []) if isinstance(item, dict))
+    page_numberings.extend(
+        item for item in job.get("page_numberings", []) if isinstance(item, dict)
+    )
     for spec in page_numberings:
         start_page = spec.get("start_page", 1)
         if not isinstance(start_page, int) or start_page < 1:
@@ -52,6 +63,14 @@ def _expected_from_job(job: dict[str, Any]) -> list[str]:
             values.append(spec["header_text"].replace("{page}", str(start_page)))
         if spec.get("visible_footer") and isinstance(spec.get("footer_text"), str):
             values.append(spec["footer_text"].replace("{page}", str(start_page)))
+    return values
+
+
+def _expected_from_job(job: dict[str, Any]) -> list[str]:
+    values: list[str] = [str(value) for value in job.get("expected_values", [])]
+    values.extend(_expected_from_metadata(job.get("document_metadata", {})))
+    values.extend(_expected_from_content(job))
+    values.extend(_expected_from_page_numbering(job))
     seen = set()
     unique = []
     for value in values:
@@ -105,7 +124,14 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
                 "orientation": "portrait",
                 "width": 59528,
                 "height": 84188,
-                "margins": {"left": 8500, "right": 8500, "top": 7000, "bottom": 7000, "header": 4250, "footer": 4250},
+                "margins": {
+                    "left": 8500,
+                    "right": 8500,
+                    "top": 7000,
+                    "bottom": 7000,
+                    "header": 4250,
+                    "footer": 4250,
+                },
             },
             "page_numbering": {
                 "start_page": 1,
@@ -119,7 +145,12 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
             "paragraphs": [{"text": "P40 page layout paragraph"}],
             "preview_text": {"enabled": True, "include_metadata": True},
             "package_manifest": {"enabled": True},
-            "expected_values": ["P40 Page Header Footer", "P40 Header", "Page 1", "P40 page layout paragraph"],
+            "expected_values": [
+                "P40 Page Header Footer",
+                "P40 Header",
+                "Page 1",
+                "P40 page layout paragraph",
+            ],
             "validate": True,
         },
         "image_chart": {
@@ -215,7 +246,13 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
             ],
             "preview_text": {"enabled": True, "include_metadata": True},
             "package_manifest": {"enabled": True},
-            "expected_values": ["P41 Multi Section", "P41 section one paragraph", "P41 section two paragraph", "Section", "table"],
+            "expected_values": [
+                "P41 Multi Section",
+                "P41 section one paragraph",
+                "P41 section two paragraph",
+                "Section",
+                "table",
+            ],
             "validate": True,
         },
         "section_layout_header_footer": {
@@ -235,21 +272,42 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
                     "orientation": "portrait",
                     "width": 59528,
                     "height": 84188,
-                    "margins": {"left": 8000, "right": 8000, "top": 7000, "bottom": 7000, "header": 4200, "footer": 4200},
+                    "margins": {
+                        "left": 8000,
+                        "right": 8000,
+                        "top": 7000,
+                        "bottom": 7000,
+                        "header": 4200,
+                        "footer": 4200,
+                    },
                 },
                 {
                     "section_index": 1,
                     "orientation": "landscape",
                     "width": 84188,
                     "height": 59528,
-                    "margins": {"left": 6500, "right": 6500, "top": 6000, "bottom": 6000, "header": 3800, "footer": 3800},
+                    "margins": {
+                        "left": 6500,
+                        "right": 6500,
+                        "top": 6000,
+                        "bottom": 6000,
+                        "header": 3800,
+                        "footer": 3800,
+                    },
                 },
                 {
                     "section_index": 2,
                     "orientation": "portrait",
                     "width": 59528,
                     "height": 84188,
-                    "margins": {"left": 9000, "right": 9000, "top": 7500, "bottom": 7500, "header": 4500, "footer": 4500},
+                    "margins": {
+                        "left": 9000,
+                        "right": 9000,
+                        "top": 7500,
+                        "bottom": 7500,
+                        "header": 4500,
+                        "footer": 4500,
+                    },
                 },
             ],
             "page_numberings": [
@@ -316,21 +374,42 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
                     "orientation": "portrait",
                     "width": 59528,
                     "height": 84188,
-                    "margins": {"left": 8000, "right": 8000, "top": 7000, "bottom": 7000, "header": 4200, "footer": 4200},
+                    "margins": {
+                        "left": 8000,
+                        "right": 8000,
+                        "top": 7000,
+                        "bottom": 7000,
+                        "header": 4200,
+                        "footer": 4200,
+                    },
                 },
                 {
                     "section_index": 1,
                     "orientation": "landscape",
                     "width": 84188,
                     "height": 59528,
-                    "margins": {"left": 6500, "right": 6500, "top": 6000, "bottom": 6000, "header": 3800, "footer": 3800},
+                    "margins": {
+                        "left": 6500,
+                        "right": 6500,
+                        "top": 6000,
+                        "bottom": 6000,
+                        "header": 3800,
+                        "footer": 3800,
+                    },
                 },
                 {
                     "section_index": 2,
                     "orientation": "portrait",
                     "width": 59528,
                     "height": 84188,
-                    "margins": {"left": 9000, "right": 9000, "top": 7500, "bottom": 7500, "header": 4500, "footer": 4500},
+                    "margins": {
+                        "left": 9000,
+                        "right": 9000,
+                        "top": 7500,
+                        "bottom": 7500,
+                        "header": 4500,
+                        "footer": 4500,
+                    },
                 },
             ],
             "page_numberings": [
@@ -412,100 +491,124 @@ def golden_jobs(template: Path, out_dir: Path) -> dict[str, dict[str, Any]]:
     }
 
 
-def _profile_checks(profile: str, compose_report: dict[str, Any], audit_report: dict[str, Any]) -> list[dict[str, Any]]:
+def _profile_checks(
+    profile: str, compose_report: dict[str, Any], audit_report: dict[str, Any]
+) -> list[dict[str, Any]]:
     checks = []
     if profile == "image_chart":
         image_count = audit_report.get("summary", {}).get("bindata_images", 0)
-        checks.append(
-            {
-                "name": "bindata_image_count",
-                "status": "PASS" if image_count >= 1 else "FAIL",
-                "value": image_count,
-            }
-        )
+        checks.append({
+            "name": "bindata_image_count",
+            "status": "PASS" if image_count >= 1 else "FAIL",
+            "value": image_count,
+        })
     if profile == "visible_picture_clone":
         summary = audit_report.get("summary", {})
         image_count = summary.get("bindata_images", 0)
         image_refs = summary.get("image_reference_count", 0)
         validation = compose_report.get("validation", {})
-        checks.extend(
-            [
-                {"name": "bindata_image_count", "status": "PASS" if image_count >= 2 else "FAIL", "value": image_count},
-                {"name": "image_reference_count", "status": "PASS" if image_refs >= 2 else "FAIL", "value": image_refs},
-                {
-                    "name": "visible_clone_insert",
-                    "status": "PASS"
-                    if any(
-                        step.get("step") == "visible_image_insert"
-                        and step.get("status") == "VISIBLE_IMAGE_INSERT_PASS"
-                        for step in compose_report.get("steps", [])
-                    )
-                    else "FAIL",
-                },
-                {
-                    "name": "expected_values",
-                    "status": "PASS" if not validation.get("missing_expected_values") else "FAIL",
-                    "missing_expected_values": validation.get("missing_expected_values", []),
-                },
-            ]
-        )
-    if profile == "metadata_text_table":
-        validation = compose_report.get("validation", {})
-        checks.append(
+        checks.extend([
             {
-                "name": "table_expected_values",
+                "name": "bindata_image_count",
+                "status": "PASS" if image_count >= 2 else "FAIL",
+                "value": image_count,
+            },
+            {
+                "name": "image_reference_count",
+                "status": "PASS" if image_refs >= 2 else "FAIL",
+                "value": image_refs,
+            },
+            {
+                "name": "visible_clone_insert",
+                "status": "PASS"
+                if any(
+                    step.get("step") == "visible_image_insert"
+                    and step.get("status") == "VISIBLE_IMAGE_INSERT_PASS"
+                    for step in compose_report.get("steps", [])
+                )
+                else "FAIL",
+            },
+            {
+                "name": "expected_values",
                 "status": "PASS" if not validation.get("missing_expected_values") else "FAIL",
                 "missing_expected_values": validation.get("missing_expected_values", []),
-            }
-        )
+            },
+        ])
+    if profile == "metadata_text_table":
+        validation = compose_report.get("validation", {})
+        checks.append({
+            "name": "table_expected_values",
+            "status": "PASS" if not validation.get("missing_expected_values") else "FAIL",
+            "missing_expected_values": validation.get("missing_expected_values", []),
+        })
     if profile == "multi_section":
         section_count = audit_report.get("summary", {}).get("section_entries", 0)
-        checks.append(
-            {
-                "name": "section_count",
-                "status": "PASS" if section_count >= 3 else "FAIL",
-                "value": section_count,
-            }
-        )
+        checks.append({
+            "name": "section_count",
+            "status": "PASS" if section_count >= 3 else "FAIL",
+            "value": section_count,
+        })
     if profile == "section_layout_header_footer":
         section_count = audit_report.get("summary", {}).get("section_entries", 0)
-        checks.append({"name": "section_count", "status": "PASS" if section_count >= 3 else "FAIL", "value": section_count})
+        checks.append({
+            "name": "section_count",
+            "status": "PASS" if section_count >= 3 else "FAIL",
+            "value": section_count,
+        })
         layout_statuses = [item.get("status") for item in audit_report.get("page_layouts", [])[:3]]
-        checks.append(
-            {
-                "name": "section_page_layouts",
-                "status": "PASS" if len(layout_statuses) >= 3 and all(status == "PASS" for status in layout_statuses) else "FAIL",
-                "statuses": layout_statuses,
-            }
-        )
-        numbering_statuses = [item.get("status") for item in audit_report.get("page_numberings", [])[:3]]
-        start_nums = [item.get("startNum", {}) for item in audit_report.get("page_numberings", [])[:3]]
-        checks.append(
-            {
-                "name": "section_page_numberings",
-                "status": "PASS" if len(numbering_statuses) >= 3 and all(status == "PASS" and start for status, start in zip(numbering_statuses, start_nums)) else "FAIL",
-                "statuses": numbering_statuses,
-                "startNum": start_nums,
-            }
-        )
+        checks.append({
+            "name": "section_page_layouts",
+            "status": "PASS"
+            if len(layout_statuses) >= 3 and all(status == "PASS" for status in layout_statuses)
+            else "FAIL",
+            "statuses": layout_statuses,
+        })
+        numbering_statuses = [
+            item.get("status") for item in audit_report.get("page_numberings", [])[:3]
+        ]
+        start_nums = [
+            item.get("startNum", {}) for item in audit_report.get("page_numberings", [])[:3]
+        ]
+        checks.append({
+            "name": "section_page_numberings",
+            "status": "PASS"
+            if len(numbering_statuses) >= 3
+            and all(
+                status == "PASS" and start
+                for status, start in zip(numbering_statuses, start_nums, strict=True)
+            )
+            else "FAIL",
+            "statuses": numbering_statuses,
+            "startNum": start_nums,
+        })
     if profile == "section_table_image_chart":
         summary = audit_report.get("summary", {})
         section_count = summary.get("section_entries", 0)
         image_count = summary.get("bindata_images", 0)
         image_refs = summary.get("image_reference_count", 0)
         validation = compose_report.get("validation", {})
-        checks.extend(
-            [
-                {"name": "section_count", "status": "PASS" if section_count >= 3 else "FAIL", "value": section_count},
-                {"name": "bindata_image_count", "status": "PASS" if image_count >= 1 else "FAIL", "value": image_count},
-                {"name": "image_reference_count", "status": "PASS" if image_refs >= 1 else "FAIL", "value": image_refs},
-                {
-                    "name": "expected_values",
-                    "status": "PASS" if not validation.get("missing_expected_values") else "FAIL",
-                    "missing_expected_values": validation.get("missing_expected_values", []),
-                },
-            ]
-        )
+        checks.extend([
+            {
+                "name": "section_count",
+                "status": "PASS" if section_count >= 3 else "FAIL",
+                "value": section_count,
+            },
+            {
+                "name": "bindata_image_count",
+                "status": "PASS" if image_count >= 1 else "FAIL",
+                "value": image_count,
+            },
+            {
+                "name": "image_reference_count",
+                "status": "PASS" if image_refs >= 1 else "FAIL",
+                "value": image_refs,
+            },
+            {
+                "name": "expected_values",
+                "status": "PASS" if not validation.get("missing_expected_values") else "FAIL",
+                "missing_expected_values": validation.get("missing_expected_values", []),
+            },
+        ])
     return checks
 
 
@@ -541,7 +644,9 @@ def run_regression_suite(template: Path, out_dir: Path, *, strict: bool = True) 
         write_json(audit_report_path, audit_report)
         profile_checks = _profile_checks(profile, compose_report, audit_report)
         compose_effective_status = compose_report.get("status")
-        if compose_effective_status == "WARN" and _has_only_allowed_warnings(profile, compose_report):
+        if compose_effective_status == "WARN" and _has_only_allowed_warnings(
+            profile, compose_report
+        ):
             compose_effective_status = "PASS"
         status = "PASS"
         if compose_effective_status == "FAIL" or audit_report.get("status") == "FAIL":
@@ -550,24 +655,24 @@ def run_regression_suite(template: Path, out_dir: Path, *, strict: bool = True) 
             status = "WARN"
         if any(check.get("status") == "FAIL" for check in profile_checks):
             status = "FAIL"
-        results.append(
-            {
-                "profile": profile,
-                "status": status,
-                "job": str(job_path),
-                "output": str(output),
-                "compose_report": str(compose_report_path),
-                "audit_report": str(audit_report_path),
-                "compose_status": compose_report.get("status"),
-                "compose_effective_status": compose_effective_status,
-                "audit_status": audit_report.get("status"),
-                "expected_values": expected,
-                "profile_checks": profile_checks,
-            }
-        )
+        results.append({
+            "profile": profile,
+            "status": status,
+            "job": str(job_path),
+            "output": str(output),
+            "compose_report": str(compose_report_path),
+            "audit_report": str(audit_report_path),
+            "compose_status": compose_report.get("status"),
+            "compose_effective_status": compose_effective_status,
+            "audit_status": audit_report.get("status"),
+            "expected_values": expected,
+            "profile_checks": profile_checks,
+        })
 
     summary = {
-        "status": "PASS" if results and all(item["status"] == "PASS" for item in results) else "FAIL",
+        "status": "PASS"
+        if results and all(item["status"] == "PASS" for item in results)
+        else "FAIL",
         "template": str(template),
         "out_dir": str(out_dir),
         "profile_count": len(results),
@@ -587,7 +692,9 @@ def regression_csv_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
             "profile": item["profile"],
             "status": item["status"],
             "compose_status": item["compose_status"],
-            "compose_effective_status": item.get("compose_effective_status", item["compose_status"]),
+            "compose_effective_status": item.get(
+                "compose_effective_status", item["compose_status"]
+            ),
             "audit_status": item["audit_status"],
             "output": item["output"],
         }
@@ -606,7 +713,9 @@ def command_run(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run HWPX direct writer compose regression profiles")
+    parser = argparse.ArgumentParser(
+        description="Run HWPX direct writer compose regression profiles"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="Run golden compose regression profiles")
     run.add_argument("--template", required=True)

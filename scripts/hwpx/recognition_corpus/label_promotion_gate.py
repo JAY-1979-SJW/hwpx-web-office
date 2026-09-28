@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from scripts.hwpx.recognition_corpus import corpus_schema as cs
@@ -46,6 +47,24 @@ def _document_ids_for_label(conn: sqlite3.Connection, normalized_label: str) -> 
     return {r[0] for r in rows}
 
 
+@dataclass
+class _CandidateContext:
+    label: str
+    semantic: str
+    occ: int
+    docs: int
+    score: float
+    request_id: str
+
+
+@dataclass
+class _PromotionCounts:
+    human_approval: int = 0
+    conflict: int = 0
+    disagreement: int = 0
+    ambiguous: int = 0
+
+
 def evaluate_promotion_candidate(
     conn: sqlite3.Connection,
     candidate: dict,
@@ -60,132 +79,95 @@ def evaluate_promotion_candidate(
     tainted_document_ids: disagreement/ambiguous 분류로 인해
     근거가 신뢰 불가한 document_id 집합.
     """
-    label = candidate["normalized_label"]
-    semantic = candidate["proposed_semantic"]
-    occ = int(candidate.get("occurrence_count", 0))
-    docs = int(candidate.get("document_count", 0))
-    score = float(candidate.get("evidence_score", 0.0))
+    ctx = _CandidateContext(
+        label=candidate["normalized_label"],
+        semantic=candidate["proposed_semantic"],
+        occ=int(candidate.get("occurrence_count", 0)),
+        docs=int(candidate.get("document_count", 0)),
+        score=float(candidate.get("evidence_score", 0.0)),
+        request_id=request_id,
+    )
 
     warnings: list[str] = []
 
     # 1) semantic validity
-    if not cs.is_allowed_semantic_type(semantic):
+    if not cs.is_allowed_semantic_type(ctx.semantic):
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_INVALID_SEMANTIC",
             False,
             "INVALID_SEMANTIC_TYPE",
-            occ,
-            docs,
-            score,
-            0,
-            0,
-            0,
-            0,
+            _PromotionCounts(),
             warnings + ["INVALID_SEMANTIC_TYPE"],
-            request_id,
         )
-    if semantic == "UNKNOWN":
+    if ctx.semantic == "UNKNOWN":
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_UNKNOWN_SEMANTIC",
             False,
             "UNKNOWN_SEMANTIC_FORBIDDEN",
-            occ,
-            docs,
-            score,
-            0,
-            0,
-            0,
-            0,
+            _PromotionCounts(),
             warnings + ["UNKNOWN_SEMANTIC_FORBIDDEN"],
-            request_id,
         )
 
-    decisions = _human_decisions(conn, label)
+    decisions = _human_decisions(conn, ctx.label)
     approved = [
         d
         for d in decisions
         if d["decision_status"] == "APPROVED"
-        and d["semantic_type"] == semantic
+        and d["semantic_type"] == ctx.semantic
         and (d.get("decided_by") or "")
     ]
     rejected_same = [
         d
         for d in decisions
-        if d["decision_status"] == "REJECTED" and d["semantic_type"] == semantic
+        if d["decision_status"] == "REJECTED" and d["semantic_type"] == ctx.semantic
     ]
     other_approved = [
         d
         for d in decisions
-        if d["decision_status"] == "APPROVED" and d["semantic_type"] != semantic
+        if d["decision_status"] == "APPROVED" and d["semantic_type"] != ctx.semantic
     ]
 
     # 2) no human approval
     if not approved:
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_NO_HUMAN_APPROVAL",
             False,
             "NO_HUMAN_APPROVAL",
-            occ,
-            docs,
-            score,
-            0,
-            len(other_approved),
-            0,
-            0,
+            _PromotionCounts(conflict=len(other_approved)),
             warnings + ["NO_HUMAN_APPROVAL"],
-            request_id,
         )
 
     # 3) semantic conflict (다른 semantic APPROVED 존재)
     if other_approved:
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_CONFLICT",
             False,
             "CONFLICTING_SEMANTIC_DECISIONS",
-            occ,
-            docs,
-            score,
-            len(approved),
-            len(other_approved),
-            0,
-            0,
+            _PromotionCounts(human_approval=len(approved), conflict=len(other_approved)),
             warnings + ["CONFLICTING_SEMANTIC_DECISIONS"],
-            request_id,
         )
 
     # 4) REJECTED for same semantic → block as conflict (HELD)
     if rejected_same:
         warnings.append("HAS_REJECTED_FOR_SAME_SEMANTIC")
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_CONFLICT",
             False,
             "CONFLICTING_SEMANTIC_DECISIONS",
-            occ,
-            docs,
-            score,
-            len(approved),
-            len(rejected_same),
-            0,
-            0,
+            _PromotionCounts(human_approval=len(approved), conflict=len(rejected_same)),
             warnings,
-            request_id,
         )
 
     # 5) disagreement/ambiguous taint — 모든 evidence가 tainted면 block
     disagreement_count = 0
     ambiguous_count = 0
     if tainted_document_ids is not None:
-        doc_ids = _document_ids_for_label(conn, label)
+        doc_ids = _document_ids_for_label(conn, ctx.label)
         if doc_ids:
             tainted = doc_ids & tainted_document_ids
             clean = doc_ids - tainted
@@ -193,92 +175,68 @@ def evaluate_promotion_candidate(
             if not clean:
                 # 전부 tainted
                 return _result(
-                    label,
-                    semantic,
+                    ctx,
                     "BLOCKED_DISAGREEMENT_ONLY",
                     False,
                     "DISAGREEMENT_REQUIRES_REVIEW",
-                    occ,
-                    docs,
-                    score,
-                    len(approved),
-                    0,
-                    disagreement_count,
-                    0,
+                    _PromotionCounts(human_approval=len(approved), disagreement=disagreement_count),
                     warnings + ["DISAGREEMENT_REQUIRES_REVIEW"],
-                    request_id,
                 )
 
     # 6) low evidence
-    if score < EVIDENCE_SCORE_MIN or occ < 3 or docs < 2:
+    if ctx.score < EVIDENCE_SCORE_MIN or ctx.occ < 3 or ctx.docs < 2:
         return _result(
-            label,
-            semantic,
+            ctx,
             "BLOCKED_LOW_EVIDENCE",
             False,
             "LOW_EVIDENCE_SCORE",
-            occ,
-            docs,
-            score,
-            len(approved),
-            0,
-            disagreement_count,
-            ambiguous_count,
+            _PromotionCounts(
+                human_approval=len(approved),
+                disagreement=disagreement_count,
+                ambiguous=ambiguous_count,
+            ),
             warnings + ["LOW_EVIDENCE_SCORE"],
-            request_id,
         )
 
     # ✅ allowed
     return _result(
-        label,
-        semantic,
+        ctx,
         "PROMOTION_ALLOWED",
         True,
         None,
-        occ,
-        docs,
-        score,
-        len(approved),
-        0,
-        disagreement_count,
-        ambiguous_count,
+        _PromotionCounts(
+            human_approval=len(approved),
+            disagreement=disagreement_count,
+            ambiguous=ambiguous_count,
+        ),
         warnings,
-        request_id,
     )
 
 
 def _result(
-    label,
-    semantic,
-    status,
-    allowed,
-    reason,
-    occ,
-    docs,
-    score,
-    human_approval,
-    conflict,
-    disagreement,
-    ambiguous,
-    warnings,
-    request_id,
-):
+    ctx: _CandidateContext,
+    status: str,
+    allowed: bool,
+    reason: str | None,
+    counts: _PromotionCounts,
+    warnings: list[str],
+) -> dict:
     return {
         "schemaVersion": SCHEMA_VERSION,
         "engineVersion": ENGINE_VERSION,
-        "requestId": request_id,
-        "normalizedLabel": label,
-        "proposedSemantic": semantic,
+        "requestId": ctx.request_id,
+        "normalizedLabel": ctx.label,
+        "proposedSemantic": ctx.semantic,
         "status": status,
         "allowed": allowed,
         "blockedReason": reason,
-        "occurrenceCount": occ,
-        "documentCount": docs,
-        "evidenceScore": score,
-        "humanApprovalCount": human_approval,
-        "conflictCount": conflict,
-        "disagreementCount": disagreement,
-        "ambiguousCount": ambiguous,
+        "occurrenceCount": ctx.occ,
+        "documentCount": ctx.docs,
+        "evidenceScore": ctx.score,
+        "humanApprovalCount": counts.human_approval,
+        "conflictCount": counts.conflict,
+        "disagreementCount": counts.disagreement,
+        "ambiguousCount": counts.ambiguous,
         "warnings": warnings,
     }
 

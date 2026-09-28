@@ -553,27 +553,10 @@ def _label_value_pair_score(grid: list[list[ET.Element]], col_count: int, row_co
     return label_rows / row_count if row_count else 0.0
 
 
-def classify_table_layout(
-    grid: list[list[ET.Element]],
-    header_texts: list[str],
-    paragraphs_around: list[str],
-) -> tuple[str, float, list[str]]:
-    """layoutGuess + confidence + classificationEvidence."""
-    if not grid:
-        return "unknown", 0.0, ["empty grid"]
-
-    scores = _compute_table_scores(grid)
-    row_count = scores["row_count"]
-    col_count = scores["col_count"]
-    total_cells = scores["total_cells"]
-
-    norm_headers = [normalize_header(t) for t in header_texts]
-    header_text_blob = " ".join(norm_headers)
-    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in header_text_blob)
-    date_header_cols = sum(1 for t in norm_headers if is_date_like(t))
-
+def _classify_marker_stamp_or_noise(
+    scores: dict[str, Any], total_cells: int
+) -> tuple[str, float, list[str]] | None:
     evidence: list[str] = []
-
     # ── 1. page_marker_table ─────────────────────────────────────────────────
     if scores["page_marker_score"] > 0:
         evidence.append(f"page marker pattern in cells (score={scores['page_marker_score']:.2f})")
@@ -589,7 +572,13 @@ def classify_table_layout(
     if total_cells == 1:
         evidence.append("single-cell table")
         return "layout_noise", 0.7, evidence
+    return None
 
+
+def _classify_schedule_variants(
+    date_header_cols: int, schedule_hits: int, col_count: int, row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 4. gantt_like_table ──────────────────────────────────────────────────
     if date_header_cols >= 3 and col_count >= 5:
         conf = min(0.6 + 0.05 * date_header_cols, 0.95)
@@ -604,7 +593,13 @@ def classify_table_layout(
     if date_header_cols >= 1 and schedule_hits >= 1:
         evidence.append(f"date_cols={date_header_cols}, schedule_hits={schedule_hits}")
         return "horizontal_schedule", 0.65, evidence
+    return None
 
+
+def _classify_metadata_form_or_legal(
+    scores: dict[str, Any], grid: list[list[ET.Element]], row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 6. metadata_table: 문서 기본정보 표 ─────────────────────────────────
     if scores["metadata_score"] >= 0.15:
         evidence.append(f"metadata labels (score={scores['metadata_score']:.2f})")
@@ -629,7 +624,13 @@ def classify_table_layout(
             f"merge_ratio={scores['merge_ratio']:.2f}"
         )
         return "legal_complex_table", 0.60, evidence
+    return None
 
+
+def _classify_structural_layout(
+    scores: dict[str, Any], col_count: int, row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 9. nested_container_table ────────────────────────────────────────────
     if scores["nested_table_count"] >= 1:
         evidence.append(f"nested_tables={scores['nested_table_count']}")
@@ -647,11 +648,45 @@ def classify_table_layout(
     if scores["label_value_pair_score"] >= 0.6 and row_count >= 3:
         evidence.append(f"label-value pair score={scores['label_value_pair_score']:.2f}")
         return "vertical_table", 0.55, evidence
+    return None
 
-    evidence.append(
+
+def classify_table_layout(
+    grid: list[list[ET.Element]],
+    header_texts: list[str],
+    paragraphs_around: list[str],
+) -> tuple[str, float, list[str]]:
+    """layoutGuess + confidence + classificationEvidence."""
+    if not grid:
+        return "unknown", 0.0, ["empty grid"]
+
+    scores = _compute_table_scores(grid)
+    row_count = scores["row_count"]
+    col_count = scores["col_count"]
+    total_cells = scores["total_cells"]
+
+    norm_headers = [normalize_header(t) for t in header_texts]
+    header_text_blob = " ".join(norm_headers)
+    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in header_text_blob)
+    date_header_cols = sum(1 for t in norm_headers if is_date_like(t))
+
+    result = _classify_marker_stamp_or_noise(scores, total_cells)
+    if result is not None:
+        return result
+    result = _classify_schedule_variants(date_header_cols, schedule_hits, col_count, row_count)
+    if result is not None:
+        return result
+    result = _classify_metadata_form_or_legal(scores, grid, row_count)
+    if result is not None:
+        return result
+    result = _classify_structural_layout(scores, col_count, row_count)
+    if result is not None:
+        return result
+
+    evidence = [
         f"no pattern matched: row={row_count} col={col_count} "
         f"merge={scores['merge_ratio']:.2f} text={scores['text_cell_ratio']:.2f}"
-    )
+    ]
     return "unknown", 0.3, evidence
 
 
@@ -1005,6 +1040,76 @@ def _parse_and_catalog(
 # ── fixture candidate selection ───────────────────────────────────────────────
 
 
+def _select_simple_form_table(tables_by_file: dict[str, list[dict[str, Any]]], add: Any) -> None:
+    for fid, tables in tables_by_file.items():
+        if any(t["layoutGuess"] == "form_table" and t["rowCount"] <= 6 for t in tables):
+            add(fid, "simple_form_table", "form_table with <=6 rows detected", 0.85)
+            break
+
+
+def _select_schedule_categories(
+    tables_by_file: dict[str, list[dict[str, Any]]], used: set[str], add: Any
+) -> None:
+    for category, layout in (
+        ("vertical_schedule", "vertical_schedule"),
+        ("horizontal_schedule", "horizontal_schedule"),
+        ("gantt_bar_schedule", "gantt_like_table"),
+        ("calendar_schedule", "calendar_like_table"),
+    ):
+        for fid, tables in tables_by_file.items():
+            if fid in used:
+                continue
+            if any(t["layoutGuess"] == layout for t in tables):
+                add(fid, category, f"table layout {layout}", 0.8)
+                break
+
+
+def _select_merged_cell_complex(
+    by_file_parse: dict[str, dict[str, Any]], used: set[str], add: Any
+) -> None:
+    for fid, parse in by_file_parse.items():
+        if fid in used:
+            continue
+        if parse.get("mergedCellCount", 0) >= 5:
+            add(fid, "merged_cell_complex", f"merged_cell={parse['mergedCellCount']}", 0.7)
+            break
+
+
+def _select_many_tables_document(
+    by_file_parse: dict[str, dict[str, Any]], used: set[str], add: Any
+) -> None:
+    for fid, parse in sorted(
+        by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True
+    ):
+        if fid in used:
+            continue
+        if parse.get("tableCount", 0) >= 5:
+            add(fid, "many_tables_document", f"table_count={parse['tableCount']}", 0.65)
+            break
+
+
+def _select_parse_failure_high_priority(ctx: CorpusContext, used: set[str], add: Any) -> None:
+    failure_by_file: dict[str, list[dict]] = defaultdict(list)
+    for f in ctx.failure_records:
+        failure_by_file[f["fileId"]].append(f)
+    for fid, fails in failure_by_file.items():
+        if fid in used:
+            continue
+        high = [f for f in fails if f.get("fixturePriority") == "high"]
+        if high:
+            add(fid, "parse_failure_high_priority", f"failures={len(fails)}", 0.95)
+            break
+
+
+def _select_hancom_compatibility_edge_case(ctx: CorpusContext, used: set[str], add: Any) -> None:
+    for fid, pkg in ((p["fileId"], p) for p in ctx.package_records):
+        if fid in used:
+            continue
+        if pkg.get("warnings"):
+            add(fid, "hancom_compatibility_edge_case", f"warnings={pkg['warnings']}", 0.6)
+            break
+
+
 def select_fixture_candidates(ctx: CorpusContext) -> None:
     by_file_parse = {p["fileId"]: p for p in ctx.parse_records}
     by_file_inv = {f["fileId"]: f for f in ctx.file_records}
@@ -1012,7 +1117,7 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
     for t in ctx.table_records:
         tables_by_file[t["fileId"]].append(t)
 
-    used = set()
+    used: set[str] = set()
 
     def add(fid: str, category: str, reason: str, confidence: float):
         if fid in used or fid not in by_file_inv:
@@ -1029,63 +1134,12 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
             "copyRecommended": True,
         })
 
-    # 1. simple_form_table
-    for fid, tables in tables_by_file.items():
-        if any(t["layoutGuess"] == "form_table" and t["rowCount"] <= 6 for t in tables):
-            add(fid, "simple_form_table", "form_table with <=6 rows detected", 0.85)
-            break
-
-    # 2. vertical_schedule  3. horizontal_schedule  4. gantt_bar_schedule  5. calendar
-    for category, layout in (
-        ("vertical_schedule", "vertical_schedule"),
-        ("horizontal_schedule", "horizontal_schedule"),
-        ("gantt_bar_schedule", "gantt_like_table"),
-        ("calendar_schedule", "calendar_like_table"),
-    ):
-        for fid, tables in tables_by_file.items():
-            if fid in used:
-                continue
-            if any(t["layoutGuess"] == layout for t in tables):
-                add(fid, category, f"table layout {layout}", 0.8)
-                break
-
-    # 6. merged_cell_complex
-    for fid, parse in by_file_parse.items():
-        if fid in used:
-            continue
-        if parse.get("mergedCellCount", 0) >= 5:
-            add(fid, "merged_cell_complex", f"merged_cell={parse['mergedCellCount']}", 0.7)
-            break
-
-    # 7. many_tables_document
-    for fid, parse in sorted(
-        by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True
-    ):
-        if fid in used:
-            continue
-        if parse.get("tableCount", 0) >= 5:
-            add(fid, "many_tables_document", f"table_count={parse['tableCount']}", 0.65)
-            break
-
-    # 8. parse_failure_high_priority
-    failure_by_file: dict[str, list[dict]] = defaultdict(list)
-    for f in ctx.failure_records:
-        failure_by_file[f["fileId"]].append(f)
-    for fid, fails in failure_by_file.items():
-        if fid in used:
-            continue
-        high = [f for f in fails if f.get("fixturePriority") == "high"]
-        if high:
-            add(fid, "parse_failure_high_priority", f"failures={len(fails)}", 0.95)
-            break
-
-    # 9. hancom_compatibility_edge_case
-    for fid, pkg in ((p["fileId"], p) for p in ctx.package_records):
-        if fid in used:
-            continue
-        if pkg.get("warnings"):
-            add(fid, "hancom_compatibility_edge_case", f"warnings={pkg['warnings']}", 0.6)
-            break
+    _select_simple_form_table(tables_by_file, add)
+    _select_schedule_categories(tables_by_file, used, add)
+    _select_merged_cell_complex(by_file_parse, used, add)
+    _select_many_tables_document(by_file_parse, used, add)
+    _select_parse_failure_high_priority(ctx, used, add)
+    _select_hancom_compatibility_edge_case(ctx, used, add)
 
 
 # ── report writers ────────────────────────────────────────────────────────────

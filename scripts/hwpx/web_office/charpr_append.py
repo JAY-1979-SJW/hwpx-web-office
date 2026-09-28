@@ -160,6 +160,42 @@ def append_char_pr_for_size(
     )
 
 
+def _wanted_value(source: dict[str, Any], overrides: dict[str, Any], key: str) -> Any:
+    if key == "fontSizePt":
+        return overrides.get("fontSizePt", source.get("fontSizePt"))
+    if key == "textColor":
+        return overrides.get("textColor", source.get("textColor"))
+    if key == "bold":
+        return overrides.get("bold", source.get("bold"))
+    if key == "italic":
+        return overrides.get("italic", source.get("italic"))
+    if key == "underline":
+        return overrides.get("underline", source.get("underline"))
+    return None
+
+
+def _font_ref_matches(d: dict[str, Any], source: dict[str, Any], overrides: dict[str, Any]) -> bool:
+    if "fontFaceId" in overrides:
+        # fontRef 전체(모든 언어 슬롯)가 요청한 face id 로 통일돼
+        # 있어야 매칭(append 함수가 그렇게 만들기 때문).
+        fr = d.get("fontRef") or {}
+        if not fr or any(
+            fr.get(slot) != str(overrides["fontFaceId"]) for slot in _FONT_REF_SLOTS if slot in fr
+        ):
+            return False
+        return True
+    return d.get("fontRef") == source.get("fontRef")
+
+
+def _char_pr_attrs_match(
+    d: dict[str, Any], source: dict[str, Any], overrides: dict[str, Any]
+) -> bool:
+    for key in ("fontSizePt", "textColor", "bold", "italic", "underline"):
+        if d.get(key) != _wanted_value(source, overrides, key):
+            return False
+    return True
+
+
 def find_matching_char_pr(
     char_pr_defs: dict[str, dict[str, Any]],
     source_char_pr_id: str,
@@ -181,43 +217,12 @@ def find_matching_char_pr(
     if source is None:
         return None
 
-    def _wanted(d: dict[str, Any], key: str) -> Any:
-        if key == "fontSizePt":
-            return overrides.get("fontSizePt", source.get("fontSizePt"))
-        if key == "textColor":
-            return overrides.get("textColor", source.get("textColor"))
-        if key == "bold":
-            return overrides.get("bold", source.get("bold"))
-        if key == "italic":
-            return overrides.get("italic", source.get("italic"))
-        if key == "underline":
-            return overrides.get("underline", source.get("underline"))
-        return None
-
     for cid, d in char_pr_defs.items():
         if cid == str(source_char_pr_id):
             continue
-        if "fontFaceId" in overrides:
-            # fontRef 전체(모든 언어 슬롯)가 요청한 face id 로 통일돼
-            # 있어야 매칭(append 함수가 그렇게 만들기 때문).
-            fr = d.get("fontRef") or {}
-            if not fr or any(
-                fr.get(slot) != str(overrides["fontFaceId"])
-                for slot in _FONT_REF_SLOTS
-                if slot in fr
-            ):
-                continue
-        elif d.get("fontRef") != source.get("fontRef"):
+        if not _font_ref_matches(d, source, overrides):
             continue
-        if d.get("fontSizePt") != _wanted(d, "fontSizePt"):
-            continue
-        if d.get("textColor") != _wanted(d, "textColor"):
-            continue
-        if d.get("bold") != _wanted(d, "bold"):
-            continue
-        if d.get("italic") != _wanted(d, "italic"):
-            continue
-        if d.get("underline") != _wanted(d, "underline"):
+        if not _char_pr_attrs_match(d, source, overrides):
             continue
         return cid
     return None

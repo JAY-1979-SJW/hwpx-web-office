@@ -21,6 +21,7 @@ import json
 import re
 import time
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -93,6 +94,95 @@ def download(flseq_link: str, retries: int = 3) -> bytes | None:
     return None
 
 
+@dataclass
+class _DownloadCounts:
+    saved: int = 0
+    skipped_dup: int = 0
+    skipped_done: int = 0
+    failed: int = 0
+    non_hwp: int = 0
+
+
+@dataclass
+class _DownloadContext:
+    rows_len: int
+    t0: float
+    done_seq: set[str]
+    seen_hash: set[str]
+    plog: object
+    args: object
+    counts: _DownloadCounts
+
+
+def _process_one_row(r: dict, i: int, ctx: _DownloadContext) -> bool:
+    """한 서식을 처리한다. limit 도달 시 True(중단) 반환."""
+    counts = ctx.counts
+    seq = str(r.get("seq") or "")
+    if not seq or seq in ctx.done_seq:
+        counts.skipped_done += 1
+        return False
+    link = r.get("hwpLink") or ""
+    if not link:
+        counts.failed += 1
+        ctx.plog.write(json.dumps({"seq": seq, "status": "NO_LINK"}, ensure_ascii=False) + "\n")
+        return False
+    data = download(link)
+    if data is None:
+        counts.failed += 1
+        ctx.plog.write(json.dumps({"seq": seq, "status": "FAILED"}, ensure_ascii=False) + "\n")
+        time.sleep(ctx.args.delay)
+        return False
+    digest = hashlib.sha256(data).hexdigest()
+    is_hwp = data[:8] == HWP_OLE
+    is_zip = data[:2] == b"PK"  # HWPX(zip)
+    if digest in ctx.seen_hash:
+        counts.skipped_dup += 1
+        ctx.done_seq.add(seq)
+        ctx.plog.write(
+            json.dumps({"seq": seq, "sha256": digest, "status": "DUP"}, ensure_ascii=False) + "\n"
+        )
+        time.sleep(ctx.args.delay)
+        return False
+    ext = "hwpx" if is_zip else "hwp"
+    fname = f"{seq}_{_safe(r.get('name', ''))}.{ext}"
+    (HWP_DIR / fname).write_bytes(data)
+    ctx.seen_hash.add(digest)
+    ctx.done_seq.add(seq)
+    counts.saved += 1
+    if not is_hwp and not is_zip:
+        counts.non_hwp += 1
+    ctx.plog.write(
+        json.dumps(
+            {
+                "seq": seq,
+                "sha256": digest,
+                "status": "SAVED",
+                "file": fname,
+                "ext": ext,
+                "name": r.get("name"),
+                "ministry": r.get("ministry"),
+                "lawName": r.get("lawName"),
+            },
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
+    if counts.saved % 100 == 0:
+        ctx.plog.flush()
+        el = time.time() - ctx.t0
+        rate = counts.saved / el if el else 0
+        rem = (ctx.rows_len - i) / rate / 60 if rate else 0
+        _log(
+            f"  … {i}/{ctx.rows_len} · 저장 {counts.saved} 중복 {counts.skipped_dup} "
+            f"실패 {counts.failed} [{el:.0f}s, ~{rate:.1f}/s, 남은 ~{rem:.0f}분]"
+        )
+    if ctx.args.limit and counts.saved >= ctx.args.limit:
+        _log(f"[limit] {ctx.args.limit} 도달, 중단")
+        return True
+    time.sleep(ctx.args.delay)
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--delay", type=float, default=0.35, help="호출 간 지연(초)")
@@ -113,78 +203,26 @@ def main():
     )
 
     t0 = time.time()
-    saved = skipped_dup = skipped_done = failed = non_hwp = 0
+    counts = _DownloadCounts()
     with PROGRESS.open("a", encoding="utf-8") as plog:
+        ctx = _DownloadContext(
+            rows_len=len(rows),
+            t0=t0,
+            done_seq=done_seq,
+            seen_hash=seen_hash,
+            plog=plog,
+            args=args,
+            counts=counts,
+        )
         for i, r in enumerate(rows, 1):
-            seq = str(r.get("seq") or "")
-            if not seq or seq in done_seq:
-                skipped_done += 1
-                continue
-            link = r.get("hwpLink") or ""
-            if not link:
-                failed += 1
-                plog.write(json.dumps({"seq": seq, "status": "NO_LINK"}, ensure_ascii=False) + "\n")
-                continue
-            data = download(link)
-            if data is None:
-                failed += 1
-                plog.write(json.dumps({"seq": seq, "status": "FAILED"}, ensure_ascii=False) + "\n")
-                time.sleep(args.delay)
-                continue
-            digest = hashlib.sha256(data).hexdigest()
-            is_hwp = data[:8] == HWP_OLE
-            is_zip = data[:2] == b"PK"  # HWPX(zip)
-            if digest in seen_hash:
-                skipped_dup += 1
-                done_seq.add(seq)
-                plog.write(
-                    json.dumps({"seq": seq, "sha256": digest, "status": "DUP"}, ensure_ascii=False)
-                    + "\n"
-                )
-                time.sleep(args.delay)
-                continue
-            ext = "hwpx" if is_zip else "hwp"
-            fname = f"{seq}_{_safe(r.get('name', ''))}.{ext}"
-            (HWP_DIR / fname).write_bytes(data)
-            seen_hash.add(digest)
-            done_seq.add(seq)
-            saved += 1
-            if not is_hwp and not is_zip:
-                non_hwp += 1
-            plog.write(
-                json.dumps(
-                    {
-                        "seq": seq,
-                        "sha256": digest,
-                        "status": "SAVED",
-                        "file": fname,
-                        "ext": ext,
-                        "name": r.get("name"),
-                        "ministry": r.get("ministry"),
-                        "lawName": r.get("lawName"),
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
-            if saved % 100 == 0:
-                plog.flush()
-                el = time.time() - t0
-                rate = saved / el if el else 0
-                rem = (len(rows) - i) / rate / 60 if rate else 0
-                _log(
-                    f"  … {i}/{len(rows)} · 저장 {saved} 중복 {skipped_dup} 실패 {failed} "
-                    f"[{el:.0f}s, ~{rate:.1f}/s, 남은 ~{rem:.0f}분]"
-                )
-            if args.limit and saved >= args.limit:
-                _log(f"[limit] {args.limit} 도달, 중단")
+            if _process_one_row(r, i, ctx):
                 break
-            time.sleep(args.delay)
 
     el = time.time() - t0
     _log(
-        f"[done] 저장 {saved} · 중복스킵 {skipped_dup} · 완료스킵 {skipped_done} · "
-        f"실패 {failed} · 비HWP시그니처 {non_hwp} · {el / 60:.1f}분"
+        f"[done] 저장 {counts.saved} · 중복스킵 {counts.skipped_dup} · "
+        f"완료스킵 {counts.skipped_done} · 실패 {counts.failed} · "
+        f"비HWP시그니처 {counts.non_hwp} · {el / 60:.1f}분"
     )
     _log(f"[dir] {HWP_DIR}")
 

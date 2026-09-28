@@ -4,11 +4,13 @@ PENDING promotion candidate를 사람 승인용 review batch로 정리.
 이번 공정은 human_label_decisions INSERT / dictionary version 생성 /
 production 사전 수정을 수행하지 않는다.
 """
+
 from __future__ import annotations
 
 import sqlite3
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC
 
 from scripts.hwpx.recognition_corpus import corpus_schema as cs
 
@@ -23,25 +25,36 @@ TOP_CONTEXT_LIMIT = 3
 
 # multi-meaning / generic label 후보
 MULTI_MEANING_LABELS = frozenset({
-    "성명", "이름", "주소", "구분", "내용", "비고", "항목",
-    "날짜", "일자", "기간", "수량", "단위", "번호", "구역", "계",
+    "성명",
+    "이름",
+    "주소",
+    "구분",
+    "내용",
+    "비고",
+    "항목",
+    "날짜",
+    "일자",
+    "기간",
+    "수량",
+    "단위",
+    "번호",
+    "구역",
+    "계",
 })
 
 
 # ── ranking & bucketing ──────────────────────────────────────────────────
 
-def _risk_flags(cand: dict, *,
-                  is_conflict: bool, is_disagreement_only: bool,
-                  is_ambiguous_only: bool) -> list[str]:
+
+def _risk_flags(
+    cand: dict, *, is_conflict: bool, is_disagreement_only: bool, is_ambiguous_only: bool
+) -> list[str]:
     flags: list[str] = []
     sem = cand.get("proposed_semantic") or cand.get("proposedSemantic")
     label = cand.get("normalized_label") or cand.get("normalizedLabel")
-    occ = int(cand.get("occurrence_count")
-                or cand.get("occurrenceCount") or 0)
-    docs = int(cand.get("document_count")
-                  or cand.get("documentCount") or 0)
-    score = float(cand.get("evidence_score")
-                      or cand.get("evidenceScore") or 0.0)
+    occ = int(cand.get("occurrence_count") or cand.get("occurrenceCount") or 0)
+    docs = int(cand.get("document_count") or cand.get("documentCount") or 0)
+    score = float(cand.get("evidence_score") or cand.get("evidenceScore") or 0.0)
     if sem == "UNKNOWN":
         flags.append("UNKNOWN_SEMANTIC")
     if is_conflict:
@@ -62,10 +75,13 @@ def _risk_flags(cand: dict, *,
     return flags
 
 
-def bucket_promotion_candidate(cand: dict, *,
-                                    conflicts: int = 0,
-                                    is_disagreement_only: bool = False,
-                                    is_ambiguous_only: bool = False) -> str:
+def bucket_promotion_candidate(
+    cand: dict,
+    *,
+    conflicts: int = 0,
+    is_disagreement_only: bool = False,
+    is_ambiguous_only: bool = False,
+) -> str:
     sem = cand.get("proposed_semantic") or cand.get("proposedSemantic")
     if sem == "UNKNOWN":
         return "BLOCKED_UNKNOWN_SEMANTIC"
@@ -76,12 +92,9 @@ def bucket_promotion_candidate(cand: dict, *,
     if is_ambiguous_only:
         return "BLOCKED_AMBIGUOUS_ONLY"
 
-    occ = int(cand.get("occurrence_count")
-                  or cand.get("occurrenceCount") or 0)
-    docs = int(cand.get("document_count")
-                  or cand.get("documentCount") or 0)
-    score = float(cand.get("evidence_score")
-                      or cand.get("evidenceScore") or 0.0)
+    occ = int(cand.get("occurrence_count") or cand.get("occurrenceCount") or 0)
+    docs = int(cand.get("document_count") or cand.get("documentCount") or 0)
+    score = float(cand.get("evidence_score") or cand.get("evidenceScore") or 0.0)
     if score < 0.3 or occ < 5 or docs < 2:
         return "HELD_LOW_EVIDENCE"
     if occ >= 200 and docs >= 30 and score >= 0.6:
@@ -109,36 +122,37 @@ def _recommend_decision(bucket: str, risk_flags: list[str]) -> str:
 
 def rank_promotion_candidates(candidates: Iterable[dict]) -> list[dict]:
     """occurrence × evidenceScore + documents priority desc."""
+
     def _key(c):
-        occ = int(c.get("occurrence_count")
-                      or c.get("occurrenceCount") or 0)
-        docs = int(c.get("document_count")
-                      or c.get("documentCount") or 0)
-        score = float(c.get("evidence_score")
-                          or c.get("evidenceScore") or 0.0)
+        occ = int(c.get("occurrence_count") or c.get("occurrenceCount") or 0)
+        docs = int(c.get("document_count") or c.get("documentCount") or 0)
+        score = float(c.get("evidence_score") or c.get("evidenceScore") or 0.0)
         return -(occ * score + docs * 5)
+
     return sorted(candidates, key=_key)
 
 
 # ── DB context lookup ───────────────────────────────────────────────────
 
-def _semantic_conflict_count(conn: sqlite3.Connection, label: str,
-                                  proposed: str) -> int:
+
+def _semantic_conflict_count(conn: sqlite3.Connection, label: str, proposed: str) -> int:
     rows = cs.detect_semantic_conflicts(conn, label)
     return sum(1 for r in rows if r["semantic_type"] != proposed)
 
 
 def _example_documents(conn, label, limit) -> list[str]:
     rows = conn.execute(
-        "SELECT DISTINCT document_id FROM label_occurrences "
-        "WHERE normalized_label=? LIMIT ?", (label, limit)).fetchall()
+        "SELECT DISTINCT document_id FROM label_occurrences WHERE normalized_label=? LIMIT ?",
+        (label, limit),
+    ).fetchall()
     return [r[0] for r in rows]
 
 
 def _example_label_texts(conn, label, limit) -> list[str]:
     rows = conn.execute(
-        "SELECT DISTINCT label_text FROM label_occurrences "
-        "WHERE normalized_label=? LIMIT ?", (label, limit)).fetchall()
+        "SELECT DISTINCT label_text FROM label_occurrences WHERE normalized_label=? LIMIT ?",
+        (label, limit),
+    ).fetchall()
     return [r[0] for r in rows]
 
 
@@ -149,7 +163,9 @@ def _document_types(conn, doc_ids: list[str]) -> dict[str, int]:
     rows = conn.execute(
         f"SELECT document_type, COUNT(*) "
         f"  FROM document_classifications WHERE document_id IN "
-        f"({placeholders}) GROUP BY document_type", doc_ids).fetchall()
+        f"({placeholders}) GROUP BY document_type",
+        doc_ids,
+    ).fetchall()
     return {r[0]: r[1] for r in rows}
 
 
@@ -157,14 +173,20 @@ def _top_contexts(conn, label, limit) -> list[str]:
     rows = conn.execute(
         "SELECT neighbor_text FROM label_occurrences "
         "WHERE normalized_label=? AND neighbor_text IS NOT NULL "
-        "AND neighbor_text != '' LIMIT ?", (label, limit)).fetchall()
+        "AND neighbor_text != '' LIMIT ?",
+        (label, limit),
+    ).fetchall()
     return [r[0][:60] for r in rows]
 
 
-def _build_review_candidate(conn, raw, *,
-                                 tainted_disagreement: set[str] | None,
-                                 tainted_ambiguous: set[str] | None,
-                                 candidate_id: str) -> dict:
+def _build_review_candidate(
+    conn,
+    raw,
+    *,
+    tainted_disagreement: set[str] | None,
+    tainted_ambiguous: set[str] | None,
+    candidate_id: str,
+) -> dict:
     label = raw["normalized_label"]
     proposed = raw["proposed_semantic"]
     conflicts = _semantic_conflict_count(conn, label, proposed)
@@ -173,24 +195,24 @@ def _build_review_candidate(conn, raw, *,
     tainted_d = tainted_disagreement or set()
     tainted_a = tainted_ambiguous or set()
     if doc_ids:
-        clean = [d for d in doc_ids
-                    if d not in tainted_d and d not in tainted_a]
-        is_disagreement_only = (
-            all(d in tainted_d for d in doc_ids) if doc_ids else False)
-        is_ambiguous_only = (
-            all(d in tainted_a for d in doc_ids) if doc_ids else False)
+        is_disagreement_only = all(d in tainted_d for d in doc_ids) if doc_ids else False
+        is_ambiguous_only = all(d in tainted_a for d in doc_ids) if doc_ids else False
     else:
         is_disagreement_only = False
         is_ambiguous_only = False
 
     bucket = bucket_promotion_candidate(
-        raw, conflicts=conflicts,
+        raw,
+        conflicts=conflicts,
         is_disagreement_only=is_disagreement_only,
-        is_ambiguous_only=is_ambiguous_only)
+        is_ambiguous_only=is_ambiguous_only,
+    )
     flags = _risk_flags(
-        raw, is_conflict=conflicts > 0,
+        raw,
+        is_conflict=conflicts > 0,
         is_disagreement_only=is_disagreement_only,
-        is_ambiguous_only=is_ambiguous_only)
+        is_ambiguous_only=is_ambiguous_only,
+    )
     rec = _recommend_decision(bucket, flags)
     reason = f"bucket={bucket} risk={','.join(flags) or 'none'}"
 
@@ -201,11 +223,9 @@ def _build_review_candidate(conn, raw, *,
         "occurrenceCount": int(raw["occurrence_count"]),
         "documentCount": int(raw["document_count"]),
         "evidenceScore": float(raw["evidence_score"]),
-        "exampleLabels": _example_label_texts(
-            conn, label, EXAMPLE_LABEL_LIMIT),
+        "exampleLabels": _example_label_texts(conn, label, EXAMPLE_LABEL_LIMIT),
         "exampleDocuments": doc_ids[:EXAMPLE_DOCUMENT_LIMIT],
-        "documentTypes": _document_types(
-            conn, doc_ids[:EXAMPLE_DOCUMENT_LIMIT]),
+        "documentTypes": _document_types(conn, doc_ids[:EXAMPLE_DOCUMENT_LIMIT]),
         "subTypes": [],
         "topContexts": _top_contexts(conn, label, TOP_CONTEXT_LIMIT),
         "riskFlags": flags,
@@ -217,14 +237,15 @@ def _build_review_candidate(conn, raw, *,
 
 # ── batch build ─────────────────────────────────────────────────────────
 
+
 def build_promotion_review_batch(
-        conn: sqlite3.Connection,
-        *,
-        top_n: int = DEFAULT_TOP_N,
-        tainted_disagreement: set[str] | None = None,
-        tainted_ambiguous: set[str] | None = None,
-        source_corpus_sha: str = "",
-        request_id: str = "",
+    conn: sqlite3.Connection,
+    *,
+    top_n: int = DEFAULT_TOP_N,
+    tainted_disagreement: set[str] | None = None,
+    tainted_ambiguous: set[str] | None = None,
+    source_corpus_sha: str = "",
+    request_id: str = "",
 ) -> dict:
     rows = conn.execute(
         "SELECT normalized_label, proposed_semantic, occurrence_count,"
@@ -232,19 +253,28 @@ def build_promotion_review_batch(
         " WHERE status='PENDING'"
     ).fetchall()
     raws = [
-        {"normalized_label": r[0], "proposed_semantic": r[1],
-            "occurrence_count": r[2], "document_count": r[3],
-            "evidence_score": r[4]} for r in rows
+        {
+            "normalized_label": r[0],
+            "proposed_semantic": r[1],
+            "occurrence_count": r[2],
+            "document_count": r[3],
+            "evidence_score": r[4],
+        }
+        for r in rows
     ]
     ranked = rank_promotion_candidates(raws)[:top_n]
 
     candidates: list[dict] = []
     for i, raw in enumerate(ranked):
-        candidates.append(_build_review_candidate(
-            conn, raw,
-            tainted_disagreement=tainted_disagreement,
-            tainted_ambiguous=tainted_ambiguous,
-            candidate_id=f"cand-{i:05d}"))
+        candidates.append(
+            _build_review_candidate(
+                conn,
+                raw,
+                tainted_disagreement=tainted_disagreement,
+                tainted_ambiguous=tainted_ambiguous,
+                candidate_id=f"cand-{i:05d}",
+            )
+        )
 
     buckets: dict[str, list[dict]] = {
         "HIGH_PRIORITY_REVIEW": [],
@@ -260,13 +290,17 @@ def build_promotion_review_batch(
         b = c["_bucket"]
         buckets.setdefault(b, []).append(c)
 
-    reviewable = (len(buckets["HIGH_PRIORITY_REVIEW"])
-                      + len(buckets["MEDIUM_PRIORITY_REVIEW"])
-                      + len(buckets["LOW_PRIORITY_REVIEW"]))
-    blocked = (len(buckets["BLOCKED_UNKNOWN_SEMANTIC"])
-                  + len(buckets["BLOCKED_CONFLICT"])
-                  + len(buckets["BLOCKED_DISAGREEMENT_ONLY"])
-                  + len(buckets["BLOCKED_AMBIGUOUS_ONLY"]))
+    reviewable = (
+        len(buckets["HIGH_PRIORITY_REVIEW"])
+        + len(buckets["MEDIUM_PRIORITY_REVIEW"])
+        + len(buckets["LOW_PRIORITY_REVIEW"])
+    )
+    blocked = (
+        len(buckets["BLOCKED_UNKNOWN_SEMANTIC"])
+        + len(buckets["BLOCKED_CONFLICT"])
+        + len(buckets["BLOCKED_DISAGREEMENT_ONLY"])
+        + len(buckets["BLOCKED_AMBIGUOUS_ONLY"])
+    )
 
     warnings: list[str] = []
     if blocked > reviewable:
@@ -285,24 +319,26 @@ def build_promotion_review_batch(
         "unknownSemanticCount": len(buckets["BLOCKED_UNKNOWN_SEMANTIC"]),
         "disagreementOnlyCount": len(buckets["BLOCKED_DISAGREEMENT_ONLY"]),
         "ambiguousOnlyCount": len(buckets["BLOCKED_AMBIGUOUS_ONLY"]),
-        "buckets": {k: [{kk: vv for kk, vv in c.items() if kk != "_bucket"}
-                              for c in v]
-                       for k, v in buckets.items()},
+        "buckets": {
+            k: [{kk: vv for kk, vv in c.items() if kk != "_bucket"} for c in v]
+            for k, v in buckets.items()
+        },
         "topReviewCandidates": [
             {kk: vv for kk, vv in c.items() if kk != "_bucket"}
-            for c in (buckets["HIGH_PRIORITY_REVIEW"][:20]
-                          + buckets["MEDIUM_PRIORITY_REVIEW"][:20])
+            for c in (buckets["HIGH_PRIORITY_REVIEW"][:20] + buckets["MEDIUM_PRIORITY_REVIEW"][:20])
         ],
         "warnings": warnings,
     }
 
 
 def _utc_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    from datetime import datetime
+
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 # ── markdown ─────────────────────────────────────────────────────────────
+
 
 def build_review_markdown(batch: dict, *, max_rows: int = 100) -> str:
     lines = [
@@ -324,16 +360,19 @@ def build_review_markdown(batch: dict, *, max_rows: int = 100) -> str:
         "| reviewerComment |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
-    rows = (batch["buckets"]["HIGH_PRIORITY_REVIEW"]
-              + batch["buckets"]["MEDIUM_PRIORITY_REVIEW"]
-              + batch["buckets"]["LOW_PRIORITY_REVIEW"])
+    rows = (
+        batch["buckets"]["HIGH_PRIORITY_REVIEW"]
+        + batch["buckets"]["MEDIUM_PRIORITY_REVIEW"]
+        + batch["buckets"]["LOW_PRIORITY_REVIEW"]
+    )
     for c in rows[:max_rows]:
         risk = ",".join(c["riskFlags"]) or "-"
         lines.append(
             f"| {c['candidateId']} | {c['normalizedLabel']} "
             f"| {c['proposedSemantic']} | {c['occurrenceCount']} "
             f"| {c['documentCount']} | {c['evidenceScore']:.2f} "
-            f"| {risk} | {c['recommendedDecision']} |  |  |")
+            f"| {risk} | {c['recommendedDecision']} |  |  |"
+        )
     return "\n".join(lines)
 
 
@@ -342,69 +381,86 @@ def build_review_markdown(batch: dict, *, max_rows: int = 100) -> str:
 ALLOWED_DECISIONS = ("APPROVE", "REJECT", "HOLD")
 
 
-def validate_human_approval_batch_input(
-        approval: dict,
-        *,
-        review_batch: dict | None = None,
-) -> dict:
-    """approval JSON validate. INSERT는 수행하지 않는다."""
+def _validate_top_level_fields(approval: dict) -> list[dict]:
     errors: list[dict] = []
     must = ("schemaVersion", "approvedBy", "decidedAt", "decisions")
     for k in must:
         if k not in approval:
             errors.append({"code": "MISSING_FIELD", "field": k})
     if approval.get("schemaVersion") != APPROVAL_INPUT_SCHEMA_VERSION:
-        errors.append({"code": "INVALID_SCHEMA_VERSION",
-                          "field": "schemaVersion"})
+        errors.append({"code": "INVALID_SCHEMA_VERSION", "field": "schemaVersion"})
     if not (approval.get("approvedBy") or "").strip():
-        errors.append({"code": "EMPTY_APPROVED_BY",
-                          "field": "approvedBy"})
+        errors.append({"code": "EMPTY_APPROVED_BY", "field": "approvedBy"})
+    return errors
 
-    # build lookup if review_batch provided
+
+def _build_label_lookup(review_batch: dict | None) -> dict[str, dict]:
     label_by_id: dict[str, dict] = {}
     if review_batch is not None:
         for bucket_name, items in review_batch.get("buckets", {}).items():
             for c in items:
                 label_by_id[c["candidateId"]] = {**c, "_bucket": bucket_name}
+    return label_by_id
+
+
+def _validate_approve_against_label(cand: dict, d: dict, ctx: dict) -> list[dict]:
+    errors: list[dict] = []
+    if cand["normalizedLabel"] != d.get("normalizedLabel"):
+        errors.append({"code": "LABEL_ID_MISMATCH", **ctx})
+    bucket = cand.get("_bucket", "")
+    if bucket == "BLOCKED_CONFLICT":
+        errors.append({"code": "APPROVE_CONFLICT", **ctx})
+    if bucket == "BLOCKED_DISAGREEMENT_ONLY":
+        errors.append({"code": "APPROVE_DISAGREEMENT_ONLY", **ctx})
+    if bucket == "BLOCKED_AMBIGUOUS_ONLY":
+        errors.append({"code": "APPROVE_AMBIGUOUS_ONLY", **ctx})
+    if bucket == "BLOCKED_UNKNOWN_SEMANTIC":
+        errors.append({"code": "APPROVE_UNKNOWN_SEMANTIC", **ctx})
+    return errors
+
+
+def _validate_one_decision(i: int, d: dict, label_by_id: dict[str, dict]) -> list[dict]:
+    errors: list[dict] = []
+    ctx = {"index": i, "candidateId": d.get("candidateId")}
+    if d.get("decision") not in ALLOWED_DECISIONS:
+        errors.append({"code": "INVALID_DECISION", **ctx})
+        return errors
+    if d.get("decision") == "APPROVE":
+        if d.get("proposedSemantic") == "UNKNOWN":
+            errors.append({"code": "APPROVE_UNKNOWN_SEMANTIC", **ctx})
+        if label_by_id:
+            cand = label_by_id.get(d.get("candidateId"))
+            if cand is None:
+                errors.append({"code": "UNKNOWN_CANDIDATE_ID", **ctx})
+            else:
+                errors.extend(_validate_approve_against_label(cand, d, ctx))
+    return errors
+
+
+def validate_human_approval_batch_input(
+    approval: dict,
+    *,
+    review_batch: dict | None = None,
+) -> dict:
+    """approval JSON validate. INSERT는 수행하지 않는다."""
+    errors = _validate_top_level_fields(approval)
+    label_by_id = _build_label_lookup(review_batch)
 
     for i, d in enumerate(approval.get("decisions", []) or []):
-        ctx = {"index": i, "candidateId": d.get("candidateId")}
-        if d.get("decision") not in ALLOWED_DECISIONS:
-            errors.append({"code": "INVALID_DECISION", **ctx})
-            continue
-        if d.get("decision") == "APPROVE":
-            if d.get("proposedSemantic") == "UNKNOWN":
-                errors.append({"code": "APPROVE_UNKNOWN_SEMANTIC", **ctx})
-            if label_by_id:
-                cand = label_by_id.get(d.get("candidateId"))
-                if cand is None:
-                    errors.append({"code": "UNKNOWN_CANDIDATE_ID", **ctx})
-                else:
-                    if cand["normalizedLabel"] != d.get("normalizedLabel"):
-                        errors.append({"code": "LABEL_ID_MISMATCH", **ctx})
-                    bucket = cand.get("_bucket", "")
-                    if bucket == "BLOCKED_CONFLICT":
-                        errors.append({"code": "APPROVE_CONFLICT", **ctx})
-                    if bucket == "BLOCKED_DISAGREEMENT_ONLY":
-                        errors.append({"code": "APPROVE_DISAGREEMENT_ONLY",
-                                          **ctx})
-                    if bucket == "BLOCKED_AMBIGUOUS_ONLY":
-                        errors.append({"code": "APPROVE_AMBIGUOUS_ONLY",
-                                          **ctx})
-                    if bucket == "BLOCKED_UNKNOWN_SEMANTIC":
-                        errors.append({"code": "APPROVE_UNKNOWN_SEMANTIC",
-                                          **ctx})
+        errors.extend(_validate_one_decision(i, d, label_by_id))
 
-    return {"ok": not errors, "errors": errors,
-              "decisionCount": len(approval.get("decisions", []) or [])}
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "decisionCount": len(approval.get("decisions", []) or []),
+    }
 
 
 def audit_review_batch_safety() -> dict:
     """이 모듈 자체의 정적 안전성 점검 (insert/dictionary build 부재 등)."""
-    src = (cs.PROJECT_ROOT
-            / "scripts/hwpx/recognition_corpus/"
-              "label_promotion_review_batch.py"
-           ).read_text(encoding="utf-8")
+    src = (
+        cs.PROJECT_ROOT / "scripts/hwpx/recognition_corpus/label_promotion_review_batch.py"
+    ).read_text(encoding="utf-8")
     _ins = "INSERT" + " INTO "
     forbidden = {
         _ins + "human_label_decisions",
@@ -417,8 +473,7 @@ def audit_review_batch_safety() -> dict:
         "pytesseract",
     }
     # 자신의 forbidden 리터럴은 제외하고 실제 코드 라인에서만 검사
-    code_lines = [ln for ln in src.splitlines()
-                       if not ln.lstrip().startswith(("#", '"', "'"))]
+    code_lines = [ln for ln in src.splitlines() if not ln.lstrip().startswith(("#", '"', "'"))]
     code = "\n".join(code_lines)
     hits = sorted(n for n in forbidden if n in code)
     return {"ok": not hits, "violations": hits}
