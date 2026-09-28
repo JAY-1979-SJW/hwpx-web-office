@@ -16,7 +16,9 @@ rangeStart==rangeEnd, afterText=최종 조합 문자열, containerScope 유지)
   - smoke script 자체 존재 + 필수 핸들러 import
   - 본 audit 가 writer 신규 호출을 하지 않음 (self-check)
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
 import re
@@ -31,10 +33,8 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-SMOKE_JS = (PR / "frontend/web_office_viewer/"
-                  "para_edit_ime_live_smoke.mjs")
-BROWSER_SELF_TEST_JS = (PR / "frontend/web_office_viewer/"
-                              "para_edit_browser_self_test.mjs")
+SMOKE_JS = PR / "frontend/web_office_viewer/para_edit_ime_live_smoke.mjs"
+BROWSER_SELF_TEST_JS = PR / "frontend/web_office_viewer/para_edit_browser_self_test.mjs"
 
 # 본 공정 baseline 이후 LOCKED 자재 (writer/adapter/model 등)
 LOCKED_FILES = [
@@ -64,15 +64,22 @@ FORBIDDEN_WRITER_SYMBOLS = [
 REQUIRED_SMOKE_IMPORTS = [
     r"para_edit_state\.mjs",
     r"para_edit_runtime\.mjs",
-    r"onCompositionStart", r"onCompositionUpdate",
+    r"onCompositionStart",
+    r"onCompositionUpdate",
     r"onCompositionEnd",
 ]
 
 
 def _node_ok() -> bool:
     try:
-        r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, encoding="utf-8", errors="replace", timeout=10)
+        r = subprocess.run(
+            ["node", "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -81,15 +88,12 @@ def _node_ok() -> bool:
 def _check_smoke_script() -> list[dict]:
     findings: list[dict] = []
     if not SMOKE_JS.is_file():
-        findings.append({"code": "SMOKE_JS_MISSING", "level": "FAIL",
-                          "detail": str(SMOKE_JS)})
+        findings.append({"code": "SMOKE_JS_MISSING", "level": "FAIL", "detail": str(SMOKE_JS)})
         return findings
     src = SMOKE_JS.read_text(encoding="utf-8")
     for pat in REQUIRED_SMOKE_IMPORTS:
         if not re.search(pat, src):
-            findings.append({
-                "code": "SMOKE_IMPORT_MISSING", "level": "FAIL",
-                "detail": pat})
+            findings.append({"code": "SMOKE_IMPORT_MISSING", "level": "FAIL", "detail": pat})
     return findings
 
 
@@ -98,9 +102,7 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({
-                "code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
@@ -110,18 +112,25 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(PR),
+                timeout=20,
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
+            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN", "detail": f"{rel}: {e}"})
             continue
         if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
+            findings.append({
+                "code": "GIT_DIFF_RC",
+                "level": "WARN",
+                "detail": f"{rel}: rc={r.returncode}",
+            })
             continue
         if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
+            findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
     return findings
 
 
@@ -129,8 +138,8 @@ def _run_smoke() -> tuple[dict | None, str]:
     if not _node_ok():
         return None, "node not available"
     r = subprocess.run(
-        ["node", str(SMOKE_JS)], capture_output=True, text=True,
-        timeout=30, encoding="utf-8")
+        ["node", str(SMOKE_JS)], capture_output=True, text=True, timeout=30, encoding="utf-8"
+    )
     if r.returncode != 0:
         return None, f"smoke rc={r.returncode}: {r.stderr.strip()}"
     try:
@@ -142,35 +151,37 @@ def _run_smoke() -> tuple[dict | None, str]:
 def _check_smoke_output(out: dict) -> list[dict]:
     findings: list[dict] = []
     if out.get("verdict") != "PASS":
-        findings.append({"code": "SMOKE_VERDICT_NOT_PASS",
-                          "level": "FAIL",
-                          "detail": out.get("verdict")})
+        findings.append({
+            "code": "SMOKE_VERDICT_NOT_PASS",
+            "level": "FAIL",
+            "detail": out.get("verdict"),
+        })
     checks = out.get("checks") or {}
     if not checks:
-        findings.append({"code": "SMOKE_NO_CHECKS", "level": "FAIL",
-                          "detail": "checks empty"})
+        findings.append({"code": "SMOKE_NO_CHECKS", "level": "FAIL", "detail": "checks empty"})
     for name, c in checks.items():
         if not c.get("ok"):
-            findings.append({"code": "SMOKE_CHECK_FAIL",
-                              "level": "FAIL",
-                              "detail": f"{name}: {c}"})
+            findings.append({"code": "SMOKE_CHECK_FAIL", "level": "FAIL", "detail": f"{name}: {c}"})
     # liveCommand 계약 재확인 (이중 안전망)
     lc = out.get("liveCommand") or {}
     if lc.get("expectedBefore") != "":
-        findings.append({"code": "LIVE_CMD_EXPECTED_BEFORE_NOT_EMPTY",
-                          "level": "FAIL", "detail": str(lc)})
+        findings.append({
+            "code": "LIVE_CMD_EXPECTED_BEFORE_NOT_EMPTY",
+            "level": "FAIL",
+            "detail": str(lc),
+        })
     if lc.get("rangeStart") != lc.get("rangeEnd"):
-        findings.append({"code": "LIVE_CMD_RANGE_NOT_POINT",
-                          "level": "FAIL", "detail": str(lc)})
+        findings.append({"code": "LIVE_CMD_RANGE_NOT_POINT", "level": "FAIL", "detail": str(lc)})
     if lc.get("commandType") != "TYPE_TEXT":
-        findings.append({"code": "LIVE_CMD_TYPE_MISMATCH",
-                          "level": "FAIL", "detail": str(lc)})
+        findings.append({"code": "LIVE_CMD_TYPE_MISMATCH", "level": "FAIL", "detail": str(lc)})
     if (lc.get("containerScope") or {}).get("kind") != "cell":
-        findings.append({"code": "LIVE_CMD_SCOPE_NOT_CELL",
-                          "level": "FAIL", "detail": str(lc)})
+        findings.append({"code": "LIVE_CMD_SCOPE_NOT_CELL", "level": "FAIL", "detail": str(lc)})
     if lc.get("afterText") != out.get("finalText"):
-        findings.append({"code": "LIVE_CMD_AFTER_TEXT_MISMATCH",
-                          "level": "FAIL", "detail": str(lc)})
+        findings.append({
+            "code": "LIVE_CMD_AFTER_TEXT_MISMATCH",
+            "level": "FAIL",
+            "detail": str(lc),
+        })
     return findings
 
 
@@ -179,8 +190,8 @@ def _fixture() -> Path | None:
     if not db.is_file():
         # 레거시 corpus DB 부재 — 카탈로그 표본으로 대체한다.
         # 이게 없으면 감리가 조용히 SKIP 되어 안 돈 채 통과처럼 보인다.
-        from scripts.hwpx.web_office.hwpx_sample_source import (
-            resolve_sample as _catalog_sample)
+        from scripts.hwpx.web_office.hwpx_sample_source import resolve_sample as _catalog_sample
+
         return _catalog_sample()
     try:
         conn = sqlite3.connect(db)
@@ -202,16 +213,17 @@ def _fixture() -> Path | None:
     return p if p.is_file() else None
 
 
-REQUIRED_V7 = ("V2_NO_CROSS_PARAGRAPH_LEAK",
-                "V3_UNTOUCHED_RUNS_PRESERVED",
-                "V4_CHARPR_PRESERVED", "V5_PARPR_PRESERVED",
-                "V6_OUTPUT_ISOLATED")
-REQUIRED_RB = ("V1_RANGE_POSITION_OK",
-                "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
+REQUIRED_V7 = (
+    "V2_NO_CROSS_PARAGRAPH_LEAK",
+    "V3_UNTOUCHED_RUNS_PRESERVED",
+    "V4_CHARPR_PRESERVED",
+    "V5_PARPR_PRESERVED",
+    "V6_OUTPUT_ISOLATED",
+)
+REQUIRED_RB = ("V1_RANGE_POSITION_OK", "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
 
 
-def _run_e2e_with_live_text(fixture: Path,
-                                                            final_text: str) -> dict[str, Any]:
+def _run_e2e_with_live_text(fixture: Path, final_text: str) -> dict[str, Any]:
     """live smoke 의 finalText 를 SCENARIO_TYPE 으로 E2E 투입.
 
     Python e2e_pipeline 은 source HWPX 의 paragraph 좌표를 사용하므로,
@@ -220,80 +232,95 @@ def _run_e2e_with_live_text(fixture: Path,
     paragraph 에 TYPE_TEXT 시나리오를 실행해, IME 출력이 E2E 와
     호환되는 표현인지 확인한다.
     """
-    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-        run_para_edit_e2e, SCENARIO_TYPE)
-    from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-        import_hwpx_as_ro_view)
+    from scripts.hwpx.web_office.para_edit_e2e_pipeline import SCENARIO_TYPE, run_para_edit_e2e
+    from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
 
     doc = import_hwpx_as_ro_view(fixture)
     ro_p = next(
-        (p for p in doc.paragraphs
-          if (p.containerScope or {}).get("kind") == "cell"
-          and p.parPrIDRef and p.runs and p.runs[0].charPrIDRef
-          and len(p.text or "") >= 2), None)
+        (
+            p
+            for p in doc.paragraphs
+            if (p.containerScope or {}).get("kind") == "cell"
+            and p.parPrIDRef
+            and p.runs
+            and p.runs[0].charPrIDRef
+            and len(p.text or "") >= 2
+        ),
+        None,
+    )
     if ro_p is None:
         return {"ok": False, "reason": "no cell paragraph fixture"}
 
     sha_b = hashlib.sha256(fixture.read_bytes()).hexdigest()
     mt_b = fixture.stat().st_mtime_ns
-    out: dict[str, Any] = {"ok": True, "fixture":
-                                str(fixture.relative_to(PR)),
-                                "paragraphId": ro_p.paragraphId,
-                                "finalText": final_text}
+    out: dict[str, Any] = {
+        "ok": True,
+        "fixture": str(fixture.relative_to(PR)),
+        "paragraphId": ro_p.paragraphId,
+        "finalText": final_text,
+    }
     with tempfile.TemporaryDirectory() as td:
         outp = Path(td) / "ime_e2e.hwpx"
         res = run_para_edit_e2e(
-            source_path=fixture, output_path=outp,
-            scenario=SCENARIO_TYPE, paragraph_id=ro_p.paragraphId,
-            range_anchor=0, insert_text=final_text, allow_writer=True)
+            source_path=fixture,
+            output_path=outp,
+            scenario=SCENARIO_TYPE,
+            paragraph_id=ro_p.paragraphId,
+            range_anchor=0,
+            insert_text=final_text,
+            allow_writer=True,
+        )
         out["outputCreated"] = res.get("outputCreated")
         out["writerActivated"] = res.get("writerActivated")
         out["rejectedCount"] = len(res.get("rejected") or [])
         out["verify7"] = (res.get("verify7") or {}).get("results", {})
         out["readback"] = res.get("readback") or {}
         out["outputInSandbox"] = str(outp).startswith(td)
-    out["shaPreserved"] = (
-        hashlib.sha256(fixture.read_bytes()).hexdigest() == sha_b)
+    out["shaPreserved"] = hashlib.sha256(fixture.read_bytes()).hexdigest() == sha_b
     out["mtimePreserved"] = fixture.stat().st_mtime_ns == mt_b
     return out
+
+
+def _missing_pass_findings(values: dict, keys: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": f"{k}={values.get(k)}"}
+        for k in keys
+        if values.get(k) != "PASS"
+    ]
 
 
 def _check_e2e(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
-        findings.append({"code": "E2E_SKIPPED", "level": "WARN",
-                          "detail": dyn.get("reason", "fixture missing")})
+        findings.append({
+            "code": "E2E_SKIPPED",
+            "level": "WARN",
+            "detail": dyn.get("reason", "fixture missing"),
+        })
         return findings
     if not dyn.get("outputCreated"):
-        findings.append({"code": "E2E_OUTPUT_NOT_CREATED",
-                          "level": "FAIL", "detail": dyn})
+        findings.append({"code": "E2E_OUTPUT_NOT_CREATED", "level": "FAIL", "detail": dyn})
         return findings
     if not dyn.get("outputInSandbox"):
-        findings.append({"code": "E2E_OUTPUT_OUTSIDE_SANDBOX",
-                          "level": "FAIL", "detail": dyn})
+        findings.append({"code": "E2E_OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": dyn})
     if dyn.get("rejectedCount"):
-        findings.append({"code": "E2E_REJECTED_NOT_EMPTY",
-                          "level": "FAIL", "detail": dyn})
+        findings.append({"code": "E2E_REJECTED_NOT_EMPTY", "level": "FAIL", "detail": dyn})
     v7 = dyn.get("verify7") or {}
-    for k in REQUIRED_V7:
-        if v7.get(k) != "PASS":
-            findings.append({"code": "E2E_V7_NOT_PASS",
-                              "level": "FAIL",
-                              "detail": f"{k}={v7.get(k)}"})
+    findings += _missing_pass_findings(v7, REQUIRED_V7, "E2E_V7_NOT_PASS")
     rb = dyn.get("readback") or {}
-    for k in REQUIRED_RB:
-        if rb.get(k) != "PASS":
-            findings.append({"code": "E2E_READBACK_NOT_PASS",
-                              "level": "FAIL",
-                              "detail": f"{k}={rb.get(k)}"})
+    findings += _missing_pass_findings(rb, REQUIRED_RB, "E2E_READBACK_NOT_PASS")
     if dyn.get("shaPreserved") is False:
-        findings.append({"code": "SOURCE_SHA_TOUCHED",
-                          "level": "FAIL",
-                          "detail": "fixture sha before != after"})
+        findings.append({
+            "code": "SOURCE_SHA_TOUCHED",
+            "level": "FAIL",
+            "detail": "fixture sha before != after",
+        })
     if dyn.get("mtimePreserved") is False:
-        findings.append({"code": "SOURCE_MTIME_TOUCHED",
-                          "level": "WARN",
-                          "detail": "fixture mtime before != after"})
+        findings.append({
+            "code": "SOURCE_MTIME_TOUCHED",
+            "level": "WARN",
+            "detail": "fixture mtime before != after",
+        })
     return findings
 
 
@@ -306,11 +333,9 @@ def audit() -> dict[str, Any]:
     smoke, smoke_err = _run_smoke()
     if smoke is None:
         if "node not available" in smoke_err:
-            findings.append({"code": "SMOKE_SKIPPED", "level": "WARN",
-                              "detail": smoke_err})
+            findings.append({"code": "SMOKE_SKIPPED", "level": "WARN", "detail": smoke_err})
         else:
-            findings.append({"code": "SMOKE_RUN_FAIL", "level": "FAIL",
-                              "detail": smoke_err})
+            findings.append({"code": "SMOKE_RUN_FAIL", "level": "FAIL", "detail": smoke_err})
     else:
         findings.extend(_check_smoke_output(smoke))
 
@@ -319,13 +344,12 @@ def audit() -> dict[str, Any]:
     if fx is not None:
         try:
             dyn = _run_e2e_with_live_text(fx, final_text)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # ruff: ignore[blind-except]
             dyn = {"ok": False, "reason": f"E2E raised: {e}"}
         findings.extend(_check_e2e(dyn))
     else:
         dyn = {"ok": False, "reason": "fixture missing"}
-        findings.append({"code": "E2E_SKIPPED", "level": "WARN",
-                          "detail": "fixture missing"})
+        findings.append({"code": "E2E_SKIPPED", "level": "WARN", "detail": "fixture missing"})
 
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]

@@ -2,7 +2,9 @@
 
 ApplyFormat toolbar command 부분 준공 동결의 정적 검증.
 """
+
 from __future__ import annotations
+
 import json
 import re
 import subprocess
@@ -14,8 +16,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-CLOSEOUT_DOC = (PR / "docs/architecture/"
-                   "web_office_para_edit_applyformat_toolbar_command_closeout.md")
+CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_applyformat_toolbar_command_closeout.md"
 BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
 
 DOC_REQUIRED_IN_SCOPE = [
@@ -24,14 +25,18 @@ DOC_REQUIRED_IN_SCOPE = [
     "onApplyCharPr",
     "read-only mode",
     "commandLog append-only",
-    "undoStack", "redoStack",
+    "undoStack",
+    "redoStack",
     "paragraph.text 무변경",
-    "inverse.restoreSegments", "_applyFormatInverse",
+    "inverse.restoreSegments",
+    "_applyFormatInverse",
     "buildSaveDryRunPayload",
     "node smoke",
     "para_edit_apply_format_smoke.mjs",
     "makeApplyFormatCommand",
-    "COMPOSITION_LOCKED", "NO_TEXT_RANGE", "EMPTY_RANGE",
+    "COMPOSITION_LOCKED",
+    "NO_TEXT_RANGE",
+    "EMPTY_RANGE",
     "TARGET_CHARPR_NOT_IN_HEADER",
 ]
 DOC_REQUIRED_OUT_OF_SCOPE = [
@@ -95,29 +100,34 @@ REQUIRED_JS_SMOKES = [
 
 # 활성화 신호 — 본 commit 의 핵심 패턴이 자재에 살아 있어야 한다
 REQUIRED_SOURCE_PATTERNS = [
-    (PR / "frontend/web_office_viewer/para_edit_state.mjs",
-      [r"export\s+function\s+applyFormatToSelection\(",
-        r"COMPOSITION_LOCKED",
-        r"TARGET_CHARPR_NOT_IN_HEADER"]),
-    (PR / "frontend/web_office_viewer/para_edit_command.mjs",
-      [r'k === "APPLY_FORMAT"',
-        r"function\s+_applyFormat\(",
-        r"function\s+_applyFormatInverse\("]),
-    (PR / "frontend/web_office_viewer/components/"
-        "WebOfficeFormatPreview.tsx",
-      [r"enableApplyCommand",
-        r"onApplyCharPr",
-        r"readOnlyMode\s*=\s*!enableApplyCommand"]),
+    (
+        PR / "frontend/web_office_viewer/para_edit_state.mjs",
+        [
+            r"export\s+function\s+applyFormatToSelection\(",
+            r"COMPOSITION_LOCKED",
+            r"TARGET_CHARPR_NOT_IN_HEADER",
+        ],
+    ),
+    (
+        PR / "frontend/web_office_viewer/para_edit_command.mjs",
+        [
+            r'k === "APPLY_FORMAT"',
+            r"function\s+_applyFormat\(",
+            r"function\s+_applyFormatInverse\(",
+        ],
+    ),
+    (
+        PR / "frontend/web_office_viewer/components/WebOfficeFormatPreview.tsx",
+        [r"enableApplyCommand", r"onApplyCharPr", r"readOnlyMode\s*=\s*!enableApplyCommand"],
+    ),
 ]
 
 # 차단 범위가 코드에 우발 활성화된 흔적 없음
 FORBIDDEN_SOURCE_PATTERNS = [
     (r"def\s+create_char_pr\b", "신규 charPr 생성 함수 우발 도입"),
-    (r"package\.entries\[[^\]]*header\.xml[^\]]*\]\s*=",
-      "header.xml write 경로 우발 도입"),
+    (r"package\.entries\[[^\]]*header\.xml[^\]]*\]\s*=", "header.xml write 경로 우발 도입"),
     (r"save_paragraph_edits\(", "backend save 직접 호출 우발 도입"),
-    (r"apply_paragraph_edits_plan\(",
-      "backend apply 직접 호출 우발 도입"),
+    (r"apply_paragraph_edits_plan\(", "backend apply 직접 호출 우발 도입"),
     (r"create_hwpx_document\(", "writer 직접 호출 우발 도입"),
     (r"write_package\(", "writer 직접 호출 우발 도입"),
 ]
@@ -137,35 +147,38 @@ FORBIDDEN_AUDIT_WRITER_SYMBOLS = [
 ]
 
 
+def _missing_phrase_findings(src: str, phrases: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src
+    ]
+
+
 def _check_required_doc() -> list[dict]:
     findings: list[dict] = []
     if not CLOSEOUT_DOC.is_file():
-        findings.append({"code": "MISSING_DOC", "level": "FAIL",
-                          "detail": str(CLOSEOUT_DOC.relative_to(PR))})
+        findings.append({
+            "code": "MISSING_DOC",
+            "level": "FAIL",
+            "detail": str(CLOSEOUT_DOC.relative_to(PR)),
+        })
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in DOC_REQUIRED_IN_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_OUT_OF_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_NEXT_PROCESSES:
-        if phrase not in src:
-            findings.append({"code": "DOC_NEXT_PROCESS_MISSING",
-                              "level": "FAIL", "detail": phrase})
+    findings += _missing_phrase_findings(src, DOC_REQUIRED_IN_SCOPE, "DOC_IN_SCOPE_PHRASE_MISSING")
+    findings += _missing_phrase_findings(
+        src, DOC_REQUIRED_OUT_OF_SCOPE, "DOC_OUT_OF_SCOPE_PHRASE_MISSING"
+    )
+    findings += _missing_phrase_findings(
+        src, DOC_REQUIRED_NEXT_PROCESSES, "DOC_NEXT_PROCESS_MISSING"
+    )
     if BASELINE_COMMIT not in src:
-        findings.append({"code": "DOC_BASELINE_MISSING",
-                          "level": "FAIL",
-                          "detail": f"baseline {BASELINE_COMMIT}"})
+        findings.append({
+            "code": "DOC_BASELINE_MISSING",
+            "level": "FAIL",
+            "detail": f"baseline {BASELINE_COMMIT}",
+        })
     # 회귀 자재 인용 검증
-    for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES:
-        name = Path(rel).name
-        if name not in src:
-            findings.append({"code": "DOC_FILE_NOT_LISTED",
-                              "level": "FAIL", "detail": name})
+    required_names = [Path(rel).name for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES]
+    findings += _missing_phrase_findings(src, required_names, "DOC_FILE_NOT_LISTED")
     return findings
 
 
@@ -173,8 +186,7 @@ def _check_required_files() -> list[dict]:
     findings: list[dict] = []
     for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES:
         if not (PR / rel).is_file():
-            findings.append({"code": "MISSING_FILE", "level": "FAIL",
-                              "detail": rel})
+            findings.append({"code": "MISSING_FILE", "level": "FAIL", "detail": rel})
     return findings
 
 
@@ -184,18 +196,25 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(PR),
+                timeout=20,
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
+            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN", "detail": f"{rel}: {e}"})
             continue
         if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
+            findings.append({
+                "code": "GIT_DIFF_RC",
+                "level": "WARN",
+                "detail": f"{rel}: rc={r.returncode}",
+            })
             continue
         if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
+            findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
     return findings
 
 
@@ -203,16 +222,20 @@ def _check_required_source_patterns() -> list[dict]:
     findings: list[dict] = []
     for path, patterns in REQUIRED_SOURCE_PATTERNS:
         if not path.is_file():
-            findings.append({"code": "SOURCE_MISSING", "level": "FAIL",
-                              "detail": str(path.relative_to(PR))})
+            findings.append({
+                "code": "SOURCE_MISSING",
+                "level": "FAIL",
+                "detail": str(path.relative_to(PR)),
+            })
             continue
         src = path.read_text(encoding="utf-8")
         for pat in patterns:
             if not re.search(pat, src):
-                findings.append({"code": "REQUIRED_PATTERN_MISSING",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{path.relative_to(PR)}: {pat}"})
+                findings.append({
+                    "code": "REQUIRED_PATTERN_MISSING",
+                    "level": "FAIL",
+                    "detail": f"{path.relative_to(PR)}: {pat}",
+                })
     return findings
 
 
@@ -225,10 +248,11 @@ def _check_forbidden_source_patterns() -> list[dict]:
         src = p.read_text(encoding="utf-8")
         for pat, label in FORBIDDEN_SOURCE_PATTERNS:
             if re.search(pat, src):
-                findings.append({"code": "FORBIDDEN_PATTERN_PRESENT",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{rel}: {label} ({pat})"})
+                findings.append({
+                    "code": "FORBIDDEN_PATTERN_PRESENT",
+                    "level": "FAIL",
+                    "detail": f"{rel}: {label} ({pat})",
+                })
     return findings
 
 
@@ -237,8 +261,7 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
@@ -253,8 +276,7 @@ def audit() -> dict[str, Any]:
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]
     return {
-        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-"
-                          "TOOLBAR-COMMAND-CLOSEOUT-01",
+        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-CLOSEOUT-01",
         "baseline": BASELINE_COMMIT,
         "findings": findings,
         "verdict": "FAIL" if fail else ("WARN" if warn else "PASS"),

@@ -132,6 +132,21 @@ def test_ilwidaega_parsing(m):
     return result == "PASS"
 
 
+def _page_text_spans(page) -> list[tuple[int, int, str]]:
+    """페이지의 (y, x, 텍스트) span 목록을 추출한다."""
+    spans = []
+    for block in page.get_text("dict").get("blocks", []):
+        if block.get("type") != 0:
+            continue
+        for line in block["lines"]:
+            y = round(line["bbox"][1])
+            for span in line["spans"]:
+                t = span["text"].strip()
+                if t:
+                    spans.append((y, round(span["origin"][0]), t))
+    return spans
+
+
 def test_spec_price_isolation(m):
     """
     규격 열(x<160) 수치가 가격으로 혼입되지 않아야 한다.
@@ -147,16 +162,7 @@ def test_spec_price_isolation(m):
     total_prices = 0
 
     for pi in range(pdf.page_count):
-        spans = []
-        for block in pdf[pi].get_text("dict").get("blocks", []):
-            if block.get("type") != 0:
-                continue
-            for line in block["lines"]:
-                y = round(line["bbox"][1])
-                for span in line["spans"]:
-                    t = span["text"].strip()
-                    if t:
-                        spans.append((y, round(span["origin"][0]), t))
+        spans = _page_text_spans(pdf[pi])
 
         region_xs = [x for y, x, t in spans if t.replace(" ", "") in REGIONS]
         if not region_xs:

@@ -5,18 +5,23 @@ kprc.or.kr 주요자재 가격 PDF 파싱 (Claude Code CLI OCR)
 - 출력: ~/Downloads/kprc_pdf/result/주요자재_가격_3년_YYYYMMDD.json
 """
 
-import json, re, fitz, subprocess
-from pathlib import Path
+import json
+import re
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
-PDF_DIR  = Path.home() / "Downloads/kprc_pdf/주요자재별_거래가격"
-OUT_DIR  = Path.home() / "Downloads/kprc_pdf/result"
-TMP_DIR  = Path.home() / "Downloads/kprc_pdf/tmp_pages"
-MODEL    = "claude-haiku-4-5-20251001"
+import fitz
+
+PDF_DIR = Path.home() / "Downloads/kprc_pdf/주요자재별_거래가격"
+OUT_DIR = Path.home() / "Downloads/kprc_pdf/result"
+TMP_DIR = Path.home() / "Downloads/kprc_pdf/tmp_pages"
+MODEL = "claude-haiku-4-5-20251001"
 YEAR_MIN = 2024
 
 
 # ── 이미지 렌더링 ────────────────────────────────────────────────────────────
+
 
 def render_page_to_file(pdf_path: Path, page_idx: int, scale: float) -> Path | None:
     """PDF 페이지 한 장을 PNG 파일로 저장 후 경로 반환."""
@@ -85,13 +90,22 @@ def ocr_page(img_path: Path, prompt: str) -> list[dict]:
     try:
         result = subprocess.run(
             [
-                "claude", "-p", full_prompt,
-                "--tools", "Read",
-                "--model", MODEL,
+                "claude",
+                "-p",
+                full_prompt,
+                "--tools",
+                "Read",
+                "--model",
+                MODEL,
                 "--dangerously-skip-permissions",
-                "--output-format", "text",
+                "--output-format",
+                "text",
             ],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
         )
         text = result.stdout.strip()
         m = re.search(r"\{.*\}", text, re.DOTALL)
@@ -99,18 +113,37 @@ def ocr_page(img_path: Path, prompt: str) -> list[dict]:
             return json.loads(m.group()).get("items", [])
         if result.returncode != 0:
             print(f"    [CLI ERR] {result.stderr[:200]}")
-    except Exception as e:
+    except Exception as e:  # ruff: ignore[blind-except] — CLI/JSON 오류 다양, 보고 후 계속 진행
         print(f"    [OCR ERROR] {e}")
     return []
 
 
 # ── PDF 1개 파싱 ─────────────────────────────────────────────────────────────
 
+
+def _rows_from_items(items: list[dict], source: str) -> list[dict]:
+    """OCR 품목 목록을 연도/월 컷오프 적용한 가격 행으로 펼친다."""
+    rows = []
+    for item in items:
+        for p in item.get("가격", []):
+            if p.get("연도", 0) >= YEAR_MIN and p.get("가격") is not None:
+                rows.append({
+                    "품목명": item.get("품목명", ""),
+                    "규격": item.get("규격", ""),
+                    "단위": item.get("단위", ""),
+                    "연도": p["연도"],
+                    "월": p["월"],
+                    "가격": p["가격"],
+                    "출처": source,
+                })
+    return rows
+
+
 def parse_pdf(pdf_path: Path) -> list[dict]:
     """PDF 전체 파싱 → [{품목명, 규격, 단위, 연도, 월, 가격, 출처}] 반환."""
     rows = []
-    doc  = fitz.open(str(pdf_path))
-    n    = doc.page_count
+    doc = fitz.open(str(pdf_path))
+    n = doc.page_count
     doc.close()
     print(f"  페이지 수: {n}")
 
@@ -124,38 +157,21 @@ def parse_pdf(pdf_path: Path) -> list[dict]:
 
     # p1~p4: 차트 페이지
     for i in range(min(4, n)):
-        items = _collect(i, 2.0, PROMPT_CHART, f"chart p{i+1}")
-        for item in items:
-            for p in item.get("가격", []):
-                if p.get("연도", 0) >= YEAR_MIN and p.get("가격") is not None:
-                    rows.append({
-                        "품목명": item.get("품목명", ""),
-                        "규격":   item.get("규격", ""),
-                        "단위":   item.get("단위", ""),
-                        "연도":   p["연도"], "월": p["월"], "가격": p["가격"],
-                        "출처":   "차트페이지",
-                    })
-        print(f"    chart p{i+1}: {len(items)}품목")
+        items = _collect(i, 2.0, PROMPT_CHART, f"chart p{i + 1}")
+        rows.extend(_rows_from_items(items, "차트페이지"))
+        print(f"    chart p{i + 1}: {len(items)}품목")
 
     # p5~: 종합 가격표 페이지
     for i in range(4, n):
-        items = _collect(i, 2.5, PROMPT_TABLE, f"table p{i+1}")
-        for item in items:
-            for p in item.get("가격", []):
-                if p.get("연도", 0) >= YEAR_MIN and p.get("가격") is not None:
-                    rows.append({
-                        "품목명": item.get("품목명", ""),
-                        "규격":   item.get("규격", ""),
-                        "단위":   item.get("단위", ""),
-                        "연도":   p["연도"], "월": p["월"], "가격": p["가격"],
-                        "출처":   "종합표",
-                    })
-        print(f"    table p{i+1}: {len(items)}품목")
+        items = _collect(i, 2.5, PROMPT_TABLE, f"table p{i + 1}")
+        rows.extend(_rows_from_items(items, "종합표"))
+        print(f"    table p{i + 1}: {len(items)}품목")
 
     return rows
 
 
 # ── JSON 저장 ────────────────────────────────────────────────────────────────
+
 
 def save_json(all_rows: list[dict], out_path: Path):
     pivot: dict = {}
@@ -165,17 +181,25 @@ def save_json(all_rows: list[dict], out_path: Path):
             pivot[key] = {"품목명": r["품목명"], "규격": r["규격"], "단위": r["단위"], "가격": []}
         pivot[key]["가격"].append({"연도": r["연도"], "월": r["월"], "가격": r["가격"]})
 
-    out_path.write_text(json.dumps({
-        "생성일시": datetime.now().isoformat(timespec="seconds"),
-        "총행수":   len(all_rows),
-        "품목수":   len(pivot),
-        "rows":     all_rows,
-        "pivot":    list(pivot.values()),
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(
+            {
+                "생성일시": datetime.now().isoformat(timespec="seconds"),
+                "총행수": len(all_rows),
+                "품목수": len(pivot),
+                "rows": all_rows,
+                "pivot": list(pivot.values()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"JSON 저장: {out_path}")
 
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────
+
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)

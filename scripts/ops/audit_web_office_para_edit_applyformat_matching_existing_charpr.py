@@ -2,7 +2,9 @@
 
 existing charPr matcher + Format Toolbar 의 정적·동적 검증.
 """
+
 from __future__ import annotations
+
 import json
 import re
 import sqlite3
@@ -15,26 +17,30 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-MATCHER_MJS = (PR / "frontend/web_office_viewer/"
-                      "format_charpr_matcher.mjs")
-TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
-                      "WebOfficeFormatToolbar.tsx")
-SMOKE_JS = (PR / "frontend/web_office_viewer/"
-                  "format_charpr_matcher_smoke.mjs")
+MATCHER_MJS = PR / "frontend/web_office_viewer/format_charpr_matcher.mjs"
+TOOLBAR_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatToolbar.tsx"
+SMOKE_JS = PR / "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs"
 BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
 
 REQUIRED_MATCHER_PATTERNS = [
     r"export\s+function\s+matchToggle\(",
     r"export\s+function\s+matchAllToggles\(",
-    r'export\s+const\s+MATCH_DIMENSIONS',
-    r'"bold"', r'"underline"', r'"italic"',
+    r"export\s+const\s+MATCH_DIMENSIONS",
+    r'"bold"',
+    r'"underline"',
+    r'"italic"',
     r"_attrsEqual\(",
-    r"fontName", r"fontSizePt", r"textColor",
+    r"fontName",
+    r"fontSizePt",
+    r"textColor",
 ]
 FORBIDDEN_MATCHER_PATTERNS = [
-    r"fuzzy", r"approximate", r"similar",
+    r"fuzzy",
+    r"approximate",
+    r"similar",
     r"Math\.abs",
-    r"prompt\(", r"showColorPicker",
+    r"prompt\(",
+    r"showColorPicker",
     r"def\s+create_char_pr\b",
 ]
 REQUIRED_TOOLBAR_PATTERNS = [
@@ -99,12 +105,10 @@ def _check_matcher_static() -> list[dict]:
     src = MATCHER_MJS.read_text(encoding="utf-8")
     for pat in REQUIRED_MATCHER_PATTERNS:
         if not re.search(pat, src):
-            findings.append({"code": "MATCHER_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "MATCHER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
     for pat in FORBIDDEN_MATCHER_PATTERNS:
         if re.search(pat, src, re.IGNORECASE):
-            findings.append({"code": "MATCHER_FORBIDDEN_PATTERN",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "MATCHER_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat})
     return findings
 
 
@@ -116,12 +120,10 @@ def _check_toolbar_static() -> list[dict]:
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
     for pat in REQUIRED_TOOLBAR_PATTERNS:
         if not re.search(pat, src):
-            findings.append({"code": "TOOLBAR_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "TOOLBAR_PATTERN_MISSING", "level": "FAIL", "detail": pat})
     for pat in FORBIDDEN_TOOLBAR_PATTERNS:
         if re.search(pat, src):
-            findings.append({"code": "TOOLBAR_FORBIDDEN_PATTERN",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "TOOLBAR_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat})
     return findings
 
 
@@ -131,18 +133,25 @@ def _check_locked_files() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(PR),
+                timeout=20,
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
+            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN", "detail": f"{rel}: {e}"})
             continue
         if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
+            findings.append({
+                "code": "GIT_DIFF_RC",
+                "level": "WARN",
+                "detail": f"{rel}: rc={r.returncode}",
+            })
             continue
         if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
+            findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
     return findings
 
 
@@ -151,15 +160,20 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
 def _node_ok() -> bool:
     try:
-        r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, encoding="utf-8", errors="replace", timeout=10)
+        r = subprocess.run(
+            ["node", "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -170,8 +184,9 @@ def _run_smoke() -> tuple[dict | None, str]:
         return None, "node not available"
     if not SMOKE_JS.is_file():
         return None, "smoke missing"
-    r = subprocess.run(["node", str(SMOKE_JS)], capture_output=True,
-                                      text=True, timeout=30, encoding="utf-8")
+    r = subprocess.run(
+        ["node", str(SMOKE_JS)], capture_output=True, text=True, timeout=30, encoding="utf-8"
+    )
     if r.returncode != 0:
         return None, f"rc={r.returncode}: {r.stderr.strip()}"
     try:
@@ -183,15 +198,51 @@ def _run_smoke() -> tuple[dict | None, str]:
 def _check_smoke(out: dict) -> list[dict]:
     findings: list[dict] = []
     if out.get("verdict") != "PASS":
-        findings.append({"code": "SMOKE_VERDICT_NOT_PASS",
-                          "level": "FAIL",
-                          "detail": out.get("verdict")})
+        findings.append({
+            "code": "SMOKE_VERDICT_NOT_PASS",
+            "level": "FAIL",
+            "detail": out.get("verdict"),
+        })
     for name, c in (out.get("checks") or {}).items():
         if not c.get("ok"):
-            findings.append({"code": "SMOKE_CHECK_FAIL",
-                              "level": "FAIL",
-                              "detail": f"{name}: {c}"})
+            findings.append({"code": "SMOKE_CHECK_FAIL", "level": "FAIL", "detail": f"{name}: {c}"})
     return findings
+
+
+def _axis_toggle_hits(defs: dict) -> tuple[bool, bool, bool]:
+    """한 문서의 charPr 정의들에서 bold/italic/underline 토글 쌍 존재 여부."""
+    gB: dict = {}
+    gI: dict = {}
+    gU: dict = {}
+    for _cid, d in defs.items():
+        kB = (
+            d.get("fontName"),
+            d.get("fontSizePt"),
+            d.get("textColor"),
+            d.get("italic"),
+            d.get("underline"),
+        )
+        kI = (
+            d.get("fontName"),
+            d.get("fontSizePt"),
+            d.get("textColor"),
+            d.get("bold"),
+            d.get("underline"),
+        )
+        kU = (
+            d.get("fontName"),
+            d.get("fontSizePt"),
+            d.get("textColor"),
+            d.get("bold"),
+            d.get("italic"),
+        )
+        gB.setdefault(kB, set()).add(d.get("bold"))
+        gI.setdefault(kI, set()).add(d.get("italic"))
+        gU.setdefault(kU, set()).add(d.get("underline"))
+    has_bold = any(True in g and False in g for g in gB.values())
+    has_italic = any(True in g and False in g for g in gI.values())
+    has_underline = any(True in g and False in g for g in gU.values())
+    return has_bold, has_italic, has_underline
 
 
 def _run_fixture_stats() -> dict[str, Any]:
@@ -210,41 +261,27 @@ def _run_fixture_stats() -> dict[str, Any]:
         conn.close()
     except sqlite3.Error as e:
         return {"ok": False, "reason": str(e)}
-    from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
-        char_pr_defs_only)
-    total = 0; bold = 0; italic = 0; underline = 0
+    from scripts.hwpx.web_office.charpr_inventory import char_pr_defs_only
+
+    total = 0
+    bold = 0
+    italic = 0
+    underline = 0
     for (sp,) in rows:
         p = PR / sp
         if not p.is_file():
             continue
         try:
             defs = char_pr_defs_only(p)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             continue
         if not defs:
             continue
         total += 1
-        # bold pairs
-        gB: dict = {}; gI: dict = {}; gU: dict = {}
-        for cid, d in defs.items():
-            kB = (d.get("fontName"), d.get("fontSizePt"),
-                          d.get("textColor"), d.get("italic"),
-                          d.get("underline"))
-            kI = (d.get("fontName"), d.get("fontSizePt"),
-                          d.get("textColor"), d.get("bold"),
-                          d.get("underline"))
-            kU = (d.get("fontName"), d.get("fontSizePt"),
-                          d.get("textColor"), d.get("bold"),
-                          d.get("italic"))
-            gB.setdefault(kB, set()).add(d.get("bold"))
-            gI.setdefault(kI, set()).add(d.get("italic"))
-            gU.setdefault(kU, set()).add(d.get("underline"))
-        if any(True in g and False in g for g in gB.values()):
-            bold += 1
-        if any(True in g and False in g for g in gI.values()):
-            italic += 1
-        if any(True in g and False in g for g in gU.values()):
-            underline += 1
+        has_bold, has_italic, has_underline = _axis_toggle_hits(defs)
+        bold += has_bold
+        italic += has_italic
+        underline += has_underline
     return {
         "ok": True,
         "totalFixtures": total,
@@ -257,24 +294,31 @@ def _run_fixture_stats() -> dict[str, Any]:
 def _check_fixture_stats(stats: dict) -> list[dict]:
     findings: list[dict] = []
     if not stats.get("ok"):
-        findings.append({"code": "FIXTURE_STATS_SKIPPED",
-                          "level": "WARN",
-                          "detail": stats.get("reason")})
+        findings.append({
+            "code": "FIXTURE_STATS_SKIPPED",
+            "level": "WARN",
+            "detail": stats.get("reason"),
+        })
         return findings
     if stats["totalFixtures"] < 5:
-        findings.append({"code": "FIXTURE_STATS_TOO_FEW",
-                          "level": "WARN",
-                          "detail": f"total={stats['totalFixtures']}"})
+        findings.append({
+            "code": "FIXTURE_STATS_TOO_FEW",
+            "level": "WARN",
+            "detail": f"total={stats['totalFixtures']}",
+        })
         return findings
     if stats["boldPct"] < 0.2:
-        findings.append({"code": "BOLD_MATCH_TOO_LOW",
-                          "level": "FAIL",
-                          "detail": f"bold={stats['boldPct']:.1%}"})
+        findings.append({
+            "code": "BOLD_MATCH_TOO_LOW",
+            "level": "FAIL",
+            "detail": f"bold={stats['boldPct']:.1%}",
+        })
     if stats["italicPct"] > 0.3:
         findings.append({
             "code": "ITALIC_MATCH_UNEXPECTEDLY_HIGH",
             "level": "FAIL",
-            "detail": f"italic={stats['italicPct']:.1%}"})
+            "detail": f"italic={stats['italicPct']:.1%}",
+        })
     return findings
 
 
@@ -288,11 +332,9 @@ def audit() -> dict[str, Any]:
     smoke, smoke_err = _run_smoke()
     if smoke is None:
         if "node not available" in smoke_err:
-            findings.append({"code": "SMOKE_SKIPPED", "level": "WARN",
-                              "detail": smoke_err})
+            findings.append({"code": "SMOKE_SKIPPED", "level": "WARN", "detail": smoke_err})
         else:
-            findings.append({"code": "SMOKE_RUN_FAIL",
-                              "level": "FAIL", "detail": smoke_err})
+            findings.append({"code": "SMOKE_RUN_FAIL", "level": "FAIL", "detail": smoke_err})
     else:
         findings.extend(_check_smoke(smoke))
 
@@ -302,8 +344,7 @@ def audit() -> dict[str, Any]:
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]
     return {
-        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-"
-                          "MATCHING-EXISTING-CHARPR-01",
+        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-MATCHING-EXISTING-CHARPR-01",
         "baseline": BASELINE_COMMIT,
         "findings": findings,
         "verdict": "FAIL" if fail else ("WARN" if warn else "PASS"),

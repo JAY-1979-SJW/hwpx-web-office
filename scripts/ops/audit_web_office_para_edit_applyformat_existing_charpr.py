@@ -4,7 +4,9 @@ APPLY_FORMAT 1차 본공사 — 같은 문서 header.xml 의 기존 charPrIDRef 
 교체. 신규 charPr 생성 / header.xml mutation / 원본 HWPX 직접 수정 모두
 금지.
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
 import re
@@ -19,17 +21,13 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-ADAPTER = (PR / "scripts/hwpx/web_office/"
-                  "paragraph_writer_adapter.py")
+ADAPTER = PR / "scripts/hwpx/web_office/paragraph_writer_adapter.py"
 OPS = PR / "scripts/hwpx/hwpx_paragraph_ops.py"
-MODEL = (PR / "scripts/hwpx/web_office/para_edit_model.py")
-PLAN = (PR / "scripts/hwpx/web_office/paragraph_edit_plan.py")
-PIPELINE = (PR / "scripts/hwpx/web_office/"
-                    "para_edit_e2e_pipeline.py")
-VERIFY7 = (PR / "scripts/hwpx/web_office/"
-                    "paragraph_save_verify7.py")
-JS_CMD = (PR / "frontend/web_office_viewer/"
-                  "para_edit_command.mjs")
+MODEL = PR / "scripts/hwpx/web_office/para_edit_model.py"
+PLAN = PR / "scripts/hwpx/web_office/paragraph_edit_plan.py"
+PIPELINE = PR / "scripts/hwpx/web_office/para_edit_e2e_pipeline.py"
+VERIFY7 = PR / "scripts/hwpx/web_office/paragraph_save_verify7.py"
+JS_CMD = PR / "frontend/web_office_viewer/para_edit_command.mjs"
 
 REQUIRED_PATTERNS_BY_FILE: dict[Path, list[str]] = {
     ADAPTER: [
@@ -72,7 +70,7 @@ FORBIDDEN_PATTERNS_BY_FILE: dict[Path, list[str]] = {
     ADAPTER: [
         r"def\s+create_char_pr\b",
         r"package\.entries\[[^\]]*header\.xml[^\]]*\]\s*=",
-        r'\.set_entry\([^)]*header\.xml',
+        r"\.set_entry\([^)]*header\.xml",
     ],
     OPS: [
         r"def\s+create_char_pr\b",
@@ -99,26 +97,31 @@ def _check_static() -> list[dict]:
     findings: list[dict] = []
     for path, patterns in REQUIRED_PATTERNS_BY_FILE.items():
         if not path.is_file():
-            findings.append({"code": "SOURCE_MISSING", "level": "FAIL",
-                              "detail": str(path.relative_to(PR))})
+            findings.append({
+                "code": "SOURCE_MISSING",
+                "level": "FAIL",
+                "detail": str(path.relative_to(PR)),
+            })
             continue
         src = path.read_text(encoding="utf-8")
         for pat in patterns:
             if not re.search(pat, src):
-                findings.append({"code": "REQUIRED_PATTERN_MISSING",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{path.relative_to(PR)}: {pat}"})
+                findings.append({
+                    "code": "REQUIRED_PATTERN_MISSING",
+                    "level": "FAIL",
+                    "detail": f"{path.relative_to(PR)}: {pat}",
+                })
     for path, patterns in FORBIDDEN_PATTERNS_BY_FILE.items():
         if not path.is_file():
             continue
         src = path.read_text(encoding="utf-8")
         for pat in patterns:
             if re.search(pat, src):
-                findings.append({"code": "FORBIDDEN_PATTERN_PRESENT",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{path.relative_to(PR)}: {pat}"})
+                findings.append({
+                    "code": "FORBIDDEN_PATTERN_PRESENT",
+                    "level": "FAIL",
+                    "detail": f"{path.relative_to(PR)}: {pat}",
+                })
     return findings
 
 
@@ -127,12 +130,12 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
-def _pick_multi(scope_kind: str):
+def _load_candidate_source_rows() -> list[tuple[str]] | None:
+    """corpus DB 또는 카탈로그 폴백에서 후보 source_path 목록을 가져온다."""
     db = PR / "data/recognition_corpus/corpus.sqlite3"
     if db.is_file():
         try:
@@ -144,25 +147,29 @@ def _pick_multi(scope_kind: str):
             """).fetchall()
             conn.close()
         except sqlite3.Error:
-            return None, None
-    else:
-        # 레거시 corpus DB 부재 — 카탈로그 후보를 같은 형태로 공급한다.
-        # 표본 하나만 주면 조건에 맞는 문단이 없을 때 None 이 흘러가 터진다.
-        from scripts.hwpx.web_office.hwpx_sample_source import (
-            catalog_candidates)
-        rows = [(str(p.relative_to(PR)).replace("\\", "/"),)
-                for p in catalog_candidates(limit=200)]
-        if not rows:
-            return None, None
-    from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-        import_hwpx_as_ro_view)
+            return None
+        return rows
+    # 레거시 corpus DB 부재 — 카탈로그 후보를 같은 형태로 공급한다.
+    # 표본 하나만 주면 조건에 맞는 문단이 없을 때 None 이 흘러가 터진다.
+    from scripts.hwpx.web_office.hwpx_sample_source import catalog_candidates
+
+    rows = [(str(p.relative_to(PR)).replace("\\", "/"),) for p in catalog_candidates(limit=200)]
+    return rows or None
+
+
+def _pick_multi(scope_kind: str):
+    rows = _load_candidate_source_rows()
+    if not rows:
+        return None, None
+    from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
+
     for (sp,) in rows:
         p = PR / sp
         if not p.is_file():
             continue
         try:
             doc = import_hwpx_as_ro_view(p)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             continue
         for par in doc.paragraphs:
             sc = par.containerScope or {}
@@ -170,41 +177,41 @@ def _pick_multi(scope_kind: str):
                 continue
             if not par.parPrIDRef or len(par.runs) < 3:
                 continue
-            if not all(r.text and r.charPrIDRef
-                          for r in par.runs[:3]):
+            if not all(r.text and r.charPrIDRef for r in par.runs[:3]):
                 continue
             return p, par
     return None, None
 
 
-REQUIRED_V7 = ("V2_NO_CROSS_PARAGRAPH_LEAK",
-                "V3_UNTOUCHED_RUNS_PRESERVED",
-                "V4_CHARPR_PRESERVED", "V5_PARPR_PRESERVED",
-                "V6_OUTPUT_ISOLATED")
-REQUIRED_RB = ("V1_RANGE_POSITION_OK",
-                "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
+REQUIRED_V7 = (
+    "V2_NO_CROSS_PARAGRAPH_LEAK",
+    "V3_UNTOUCHED_RUNS_PRESERVED",
+    "V4_CHARPR_PRESERVED",
+    "V5_PARPR_PRESERVED",
+    "V6_OUTPUT_ISOLATED",
+)
+REQUIRED_RB = ("V1_RANGE_POSITION_OK", "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
 
 
 def _run_dynamic() -> dict[str, Any]:
-    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-        run_para_edit_e2e, SCENARIO_APPLY_FORMAT)
-    from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
-        paragraph_char_pr_inventory)
+    from scripts.hwpx.web_office.charpr_inventory import paragraph_char_pr_inventory
+    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (
+        SCENARIO_APPLY_FORMAT,
+        run_para_edit_e2e,
+    )
+
     out: dict[str, Any] = {"ok": True, "byScope": {}}
     any_ok = False
     for scope_kind in ("cell", "block"):
         fx, par = _pick_multi(scope_kind)
         if fx is None:
-            out["byScope"][scope_kind] = {"ok": False,
-                                                                "reason": "no fixture"}
+            out["byScope"][scope_kind] = {"ok": False, "reason": "no fixture"}
             continue
         inv = paragraph_char_pr_inventory(fx)
         entries = inv["paragraphInventory"][par.paragraphId]
-        targets = [e["charPrId"] for e in entries
-                          if e["inHeader"] and e["charPrId"] is not None]
+        targets = [e["charPrId"] for e in entries if e["inHeader"] and e["charPrId"] is not None]
         if not targets:
-            out["byScope"][scope_kind] = {"ok": False,
-                                                                "reason": "no target charPr"}
+            out["byScope"][scope_kind] = {"ok": False, "reason": "no target charPr"}
             continue
         tgt = targets[0]
         sha_b = hashlib.sha256(fx.read_bytes()).hexdigest()
@@ -215,12 +222,15 @@ def _run_dynamic() -> dict[str, Any]:
             outp = Path(td) / "af.hwpx"
             r0_len = len(par.runs[0].text)
             res = run_para_edit_e2e(
-                source_path=fx, output_path=outp,
+                source_path=fx,
+                output_path=outp,
                 scenario=SCENARIO_APPLY_FORMAT,
                 paragraph_id=par.paragraphId,
                 range_anchor=max(0, r0_len - 1),
                 range_focus=r0_len + 1,
-                target_char_pr_id=tgt, allow_writer=True)
+                target_char_pr_id=tgt,
+                allow_writer=True,
+            )
             v7 = (res.get("verify7") or {}).get("results", {})
             rb = res.get("readback") or {}
             with zipfile.ZipFile(outp) as zo:
@@ -232,14 +242,15 @@ def _run_dynamic() -> dict[str, Any]:
                 "targetCharPrId": tgt,
                 "outputCreated": res.get("outputCreated"),
                 "rejectedCount": len(res.get("rejected") or []),
-                "verify7": v7, "readback": rb,
+                "verify7": v7,
+                "readback": rb,
                 "outputInSandbox": str(outp).startswith(td),
                 "headerUnchanged": header_after == header_before,
             }
         out["byScope"][scope_kind]["shaPreserved"] = (
-            hashlib.sha256(fx.read_bytes()).hexdigest() == sha_b)
-        out["byScope"][scope_kind]["mtimePreserved"] = (
-            fx.stat().st_mtime_ns == mt_b)
+            hashlib.sha256(fx.read_bytes()).hexdigest() == sha_b
+        )
+        out["byScope"][scope_kind]["mtimePreserved"] = fx.stat().st_mtime_ns == mt_b
         any_ok = True
     out["ok"] = any_ok
     return out
@@ -248,48 +259,44 @@ def _run_dynamic() -> dict[str, Any]:
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
-        findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN",
-                          "detail": "no fixture"})
+        findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN", "detail": "no fixture"})
         return findings
     for scope_kind, sec in dyn["byScope"].items():
         if not sec.get("ok"):
-            findings.append({"code": "SCOPE_FIXTURE_MISSING",
-                              "level": "WARN", "detail": scope_kind})
+            findings.append({
+                "code": "SCOPE_FIXTURE_MISSING",
+                "level": "WARN",
+                "detail": scope_kind,
+            })
             continue
         name = f"{scope_kind}.APPLY_FORMAT"
         if not sec["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
             continue
         if not sec["outputInSandbox"]:
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
         if sec["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
         if not sec["headerUnchanged"]:
-            findings.append({"code": "HEADER_XML_CHANGED",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "HEADER_XML_CHANGED", "level": "FAIL", "detail": name})
         for k in REQUIRED_V7:
             if sec["verify7"].get(k) != "PASS":
-                findings.append({"code": "V7_NOT_PASS",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{name}: {k}="
-                                      f"{sec['verify7'].get(k)}"})
+                findings.append({
+                    "code": "V7_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={sec['verify7'].get(k)}",
+                })
         for k in REQUIRED_RB:
             if sec["readback"].get(k) != "PASS":
-                findings.append({"code": "READBACK_NOT_PASS",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{name}: {k}="
-                                      f"{sec['readback'].get(k)}"})
+                findings.append({
+                    "code": "READBACK_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={sec['readback'].get(k)}",
+                })
         if sec.get("shaPreserved") is False:
-            findings.append({"code": "SOURCE_SHA_TOUCHED",
-                              "level": "FAIL", "detail": scope_kind})
+            findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
         if sec.get("mtimePreserved") is False:
-            findings.append({"code": "SOURCE_MTIME_TOUCHED",
-                              "level": "WARN", "detail": scope_kind})
+            findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
     return findings
 
 
@@ -299,10 +306,9 @@ def audit() -> dict[str, Any]:
     findings.extend(_check_audit_no_writer_calls())
     try:
         dyn = _run_dynamic()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # ruff: ignore[blind-except]
         dyn = {"ok": False, "reason": f"dynamic raised: {e}"}
-        findings.append({"code": "DYNAMIC_RAISED", "level": "FAIL",
-                          "detail": dyn["reason"]})
+        findings.append({"code": "DYNAMIC_RAISED", "level": "FAIL", "detail": dyn["reason"]})
     findings.extend(_check_dynamic(dyn))
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]

@@ -20,7 +20,9 @@ multi-run paragraph 에서 caret 가 scope.runIndex 가 가리키는 run 밖에
     inside r1 / paragraph end) 에서 V1~V7 PASS
   - 원본 sha/mtime 무변경, output sandbox 격리
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
 import re
@@ -34,11 +36,9 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-ADAPTER = (PR / "scripts/hwpx/web_office/"
-                  "paragraph_writer_adapter.py")
+ADAPTER = PR / "scripts/hwpx/web_office/paragraph_writer_adapter.py"
 OPS = PR / "scripts/hwpx/hwpx_paragraph_ops.py"
-SAVE_PIPELINE = (PR / "scripts/hwpx/web_office/"
-                              "paragraph_save_pipeline.py")
+SAVE_PIPELINE = PR / "scripts/hwpx/web_office/paragraph_save_pipeline.py"
 
 REQUIRED_ADAPTER_PATTERNS = [
     # caret 재탐색 라우팅 흔적
@@ -89,34 +89,36 @@ FORBIDDEN_WRITER_SYMBOLS = [
 def _check_static() -> list[dict]:
     findings: list[dict] = []
     if not ADAPTER.is_file():
-        findings.append({"code": "ADAPTER_MISSING", "level": "FAIL",
-                          "detail": str(ADAPTER)})
+        findings.append({"code": "ADAPTER_MISSING", "level": "FAIL", "detail": str(ADAPTER)})
         return findings
     ad_src = ADAPTER.read_text(encoding="utf-8")
     for pat in REQUIRED_ADAPTER_PATTERNS:
         if not re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "ADAPTER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
     for pat in FORBIDDEN_ADAPTER_PATTERNS:
         if re.search(pat, ad_src):
-            findings.append({"code": "ADAPTER_FORBIDDEN_FEATURE",
-                              "level": "FAIL", "detail": pat})
+            findings.append({"code": "ADAPTER_FORBIDDEN_FEATURE", "level": "FAIL", "detail": pat})
     for frag in FORBIDDEN_ADAPTER_FRAGMENTS:
         if re.search(frag, ad_src):
-            findings.append({"code": "ADAPTER_FORBIDDEN_FRAGMENT",
-                              "level": "FAIL", "detail": frag})
+            findings.append({"code": "ADAPTER_FORBIDDEN_FRAGMENT", "level": "FAIL", "detail": frag})
     if OPS.is_file():
         ops_src = OPS.read_text(encoding="utf-8")
         for pat in FORBIDDEN_OPS_PATTERNS_AFTER_BASELINE:
             if re.search(pat, ops_src):
-                findings.append({"code": "OPS_FORBIDDEN_NEW_PRIMITIVE",
-                                  "level": "FAIL", "detail": pat})
+                findings.append({
+                    "code": "OPS_FORBIDDEN_NEW_PRIMITIVE",
+                    "level": "FAIL",
+                    "detail": pat,
+                })
     if SAVE_PIPELINE.is_file():
         sp_src = SAVE_PIPELINE.read_text(encoding="utf-8")
         for pat in REQUIRED_PIPELINE_PATTERNS:
             if not re.search(pat, sp_src):
-                findings.append({"code": "PIPELINE_PATTERN_MISSING",
-                                  "level": "FAIL", "detail": pat})
+                findings.append({
+                    "code": "PIPELINE_PATTERN_MISSING",
+                    "level": "FAIL",
+                    "detail": pat,
+                })
     return findings
 
 
@@ -125,12 +127,12 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
-def _pick_multi_run(scope_kind: str):
+def _load_candidate_source_rows() -> list[tuple[str]] | None:
+    """corpus DB 또는 카탈로그 폴백에서 후보 source_path 목록을 가져온다."""
     db = PR / "data/recognition_corpus/corpus.sqlite3"
     if db.is_file():
         try:
@@ -142,25 +144,29 @@ def _pick_multi_run(scope_kind: str):
             """).fetchall()
             conn.close()
         except sqlite3.Error:
-            return None, None
-    else:
-        # 레거시 corpus DB 부재 — 카탈로그 후보를 같은 형태로 공급한다.
-        # 표본 하나만 주면 조건에 맞는 문단이 없을 때 None 이 흘러가 터진다.
-        from scripts.hwpx.web_office.hwpx_sample_source import (
-            catalog_candidates)
-        rows = [(str(p.relative_to(PR)).replace("\\", "/"),)
-                for p in catalog_candidates(limit=200)]
-        if not rows:
-            return None, None
-    from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-        import_hwpx_as_ro_view)
+            return None
+        return rows
+    # 레거시 corpus DB 부재 — 카탈로그 후보를 같은 형태로 공급한다.
+    # 표본 하나만 주면 조건에 맞는 문단이 없을 때 None 이 흘러가 터진다.
+    from scripts.hwpx.web_office.hwpx_sample_source import catalog_candidates
+
+    rows = [(str(p.relative_to(PR)).replace("\\", "/"),) for p in catalog_candidates(limit=200)]
+    return rows or None
+
+
+def _pick_multi_run(scope_kind: str):
+    rows = _load_candidate_source_rows()
+    if not rows:
+        return None, None
+    from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
+
     for (sp,) in rows:
         p = PR / sp
         if not p.is_file():
             continue
         try:
             doc = import_hwpx_as_ro_view(p)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             continue
         for par in doc.paragraphs:
             sc = par.containerScope or {}
@@ -168,19 +174,20 @@ def _pick_multi_run(scope_kind: str):
                 continue
             if not par.parPrIDRef or len(par.runs) < 3:
                 continue
-            if not all(r.text and r.charPrIDRef
-                          for r in par.runs[:3]):
+            if not all(r.text and r.charPrIDRef for r in par.runs[:3]):
                 continue
             return p, par
     return None, None
 
 
-REQUIRED_V7 = ("V2_NO_CROSS_PARAGRAPH_LEAK",
-                "V3_UNTOUCHED_RUNS_PRESERVED",
-                "V4_CHARPR_PRESERVED", "V5_PARPR_PRESERVED",
-                "V6_OUTPUT_ISOLATED")
-REQUIRED_RB = ("V1_RANGE_POSITION_OK",
-                "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
+REQUIRED_V7 = (
+    "V2_NO_CROSS_PARAGRAPH_LEAK",
+    "V3_UNTOUCHED_RUNS_PRESERVED",
+    "V4_CHARPR_PRESERVED",
+    "V5_PARPR_PRESERVED",
+    "V6_OUTPUT_ISOLATED",
+)
+REQUIRED_RB = ("V1_RANGE_POSITION_OK", "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
 
 
 def _caret_inside_r1(par) -> int:
@@ -190,14 +197,19 @@ def _caret_inside_r1(par) -> int:
 
 
 def _run_one(fixture: Path, par, caret: int) -> dict:
-    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-        run_para_edit_e2e, SCENARIO_TYPE)
+    from scripts.hwpx.web_office.para_edit_e2e_pipeline import SCENARIO_TYPE, run_para_edit_e2e
+
     with tempfile.TemporaryDirectory() as td:
         out = Path(td) / "t.hwpx"
         res = run_para_edit_e2e(
-            source_path=fixture, output_path=out,
-            scenario=SCENARIO_TYPE, paragraph_id=par.paragraphId,
-            range_anchor=caret, insert_text="Z", allow_writer=True)
+            source_path=fixture,
+            output_path=out,
+            scenario=SCENARIO_TYPE,
+            paragraph_id=par.paragraphId,
+            range_anchor=caret,
+            insert_text="Z",
+            allow_writer=True,
+        )
         applied = res.get("appliedPlanEdits") or []
         return {
             "caret": caret,
@@ -206,11 +218,8 @@ def _run_one(fixture: Path, par, caret: int) -> dict:
             "verify7": (res.get("verify7") or {}).get("results", {}),
             "readback": res.get("readback") or {},
             "outputInSandbox": str(out).startswith(td),
-            "typeMultiRun": bool(applied
-                                                and applied[0].get(
-                                                    "typeMultiRun")),
-            "appliedCharPrIDRef": (applied[0].get("applyCharPrIDRef")
-                                                      if applied else None),
+            "typeMultiRun": bool(applied and applied[0].get("typeMultiRun")),
+            "appliedCharPrIDRef": (applied[0].get("applyCharPrIDRef") if applied else None),
         }
 
 
@@ -220,8 +229,7 @@ def _run_dynamic() -> dict[str, Any]:
     for scope_kind in ("cell", "block"):
         fx, par = _pick_multi_run(scope_kind)
         if fx is None:
-            out["byScope"][scope_kind] = {"ok": False,
-                                                                "reason": "no fixture"}
+            out["byScope"][scope_kind] = {"ok": False, "reason": "no fixture"}
             continue
         sha_b = hashlib.sha256(fx.read_bytes()).hexdigest()
         mt_b = fx.stat().st_mtime_ns
@@ -229,12 +237,12 @@ def _run_dynamic() -> dict[str, Any]:
         caret = _caret_inside_r1(par)
         result = _run_one(fx, par, caret)
         out["byScope"][scope_kind] = {
-            "ok": True, "fixture": str(fx.relative_to(PR)),
+            "ok": True,
+            "fixture": str(fx.relative_to(PR)),
             "paragraphId": par.paragraphId,
             "containerScope": par.containerScope,
             "result": result,
-            "shaPreserved": (hashlib.sha256(fx.read_bytes()).hexdigest()
-                                          == sha_b),
+            "shaPreserved": (hashlib.sha256(fx.read_bytes()).hexdigest() == sha_b),
             "mtimePreserved": fx.stat().st_mtime_ns == mt_b,
         }
         any_ok = True
@@ -245,49 +253,49 @@ def _run_dynamic() -> dict[str, Any]:
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
-        findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN",
-                          "detail": "no fixture"})
+        findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN", "detail": "no fixture"})
         return findings
     for scope_kind, sec in dyn["byScope"].items():
         if not sec.get("ok"):
-            findings.append({"code": "SCOPE_FIXTURE_MISSING",
-                              "level": "WARN", "detail": scope_kind})
+            findings.append({
+                "code": "SCOPE_FIXTURE_MISSING",
+                "level": "WARN",
+                "detail": scope_kind,
+            })
             continue
         r = sec["result"]
         name = f"{scope_kind}.TYPE_TEXT.inside_r1"
         if not r["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
             continue
         if not r["outputInSandbox"]:
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
         if r["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
         if not r["typeMultiRun"]:
-            findings.append({"code": "TYPE_MULTI_RUN_FLAG_MISSING",
-                              "level": "FAIL", "detail": name})
+            findings.append({
+                "code": "TYPE_MULTI_RUN_FLAG_MISSING",
+                "level": "FAIL",
+                "detail": name,
+            })
         for k in REQUIRED_V7:
             if r["verify7"].get(k) != "PASS":
-                findings.append({"code": "V7_NOT_PASS",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{name}: {k}="
-                                      f"{r['verify7'].get(k)}"})
+                findings.append({
+                    "code": "V7_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={r['verify7'].get(k)}",
+                })
         for k in REQUIRED_RB:
             if r["readback"].get(k) != "PASS":
-                findings.append({"code": "READBACK_NOT_PASS",
-                                  "level": "FAIL",
-                                  "detail":
-                                      f"{name}: {k}="
-                                      f"{r['readback'].get(k)}"})
+                findings.append({
+                    "code": "READBACK_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={r['readback'].get(k)}",
+                })
         if sec.get("shaPreserved") is False:
-            findings.append({"code": "SOURCE_SHA_TOUCHED",
-                              "level": "FAIL", "detail": scope_kind})
+            findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL", "detail": scope_kind})
         if sec.get("mtimePreserved") is False:
-            findings.append({"code": "SOURCE_MTIME_TOUCHED",
-                              "level": "WARN", "detail": scope_kind})
+            findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN", "detail": scope_kind})
     return findings
 
 
@@ -297,10 +305,9 @@ def audit() -> dict[str, Any]:
     findings.extend(_check_audit_no_writer_calls())
     try:
         dyn = _run_dynamic()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # ruff: ignore[blind-except]
         dyn = {"ok": False, "reason": f"dynamic raised: {e}"}
-        findings.append({"code": "DYNAMIC_RAISED",
-                          "level": "FAIL", "detail": dyn["reason"]})
+        findings.append({"code": "DYNAMIC_RAISED", "level": "FAIL", "detail": dyn["reason"]})
     findings.extend(_check_dynamic(dyn))
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]
