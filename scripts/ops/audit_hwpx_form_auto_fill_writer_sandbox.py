@@ -5,7 +5,6 @@ A01~A28 전 항목 실행 후 판정 출력.
 """
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import subprocess
@@ -126,11 +125,10 @@ def run_audit() -> int:
     # A02. import
     try:
         from hwpx.pipeline.form_auto_fill_writer_sandbox import (
-            run_sandbox_write, SandboxWriteResult, SCHEMA_VERSION,
-            BLOCKED_NOT_APPROVED, BLOCKED_HOLD, BLOCKED_ATTACHMENT_REQUIRED,
+            run_sandbox_write, BLOCKED_NOT_APPROVED, BLOCKED_HOLD, BLOCKED_ATTACHMENT_REQUIRED,
             BLOCKED_NO_TARGET_LOCATION, BLOCKED_AMBIGUOUS_TARGET,
             BLOCKED_LOW_TARGET_CONFIDENCE,
-            _resolve_targets, _do_write, _readback_verify,
+            _do_write, _readback_verify,
         )
     except Exception as exc:
         ar_obj.check("A02", "writer sandbox importable", False, str(exc))
@@ -231,7 +229,6 @@ def run_audit() -> int:
     ar_obj.check("A14", "ambiguous target blocked", len(amb) > 0)
 
     # A15. low confidence target 차단 (monkeypatch 없이 직접 확인)
-    import importlib
     import hwpx.pipeline.form_auto_fill_writer_sandbox as ws_mod
     orig_min = ws_mod.TARGET_CONF_MIN
     ws_mod.TARGET_CONF_MIN = 0.99

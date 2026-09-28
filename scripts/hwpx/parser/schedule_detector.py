@@ -16,7 +16,6 @@ from .parser_contract import (
     BarRangeInfo,
     DateColumnInfo,
     ProgressColumnInfo,
-    ScheduleAxisMappingResult,
     ScheduleBarPlanCandidate,
     ScheduleBarRangeRequest,
     ScheduleDateRange,

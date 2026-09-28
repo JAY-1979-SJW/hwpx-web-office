@@ -10,7 +10,6 @@ env unset 시: AdapterDisabled raise → source_extractor가 skipped로 처리 (
 """
 from __future__ import annotations
 
-from typing import Any
 
 from . import adapter_contract as ac
 

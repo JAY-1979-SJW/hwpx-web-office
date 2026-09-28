@@ -6,7 +6,6 @@ JS 브라우저 상태기계 + runtime + React 컴포넌트의 정적 잠금 +
 from __future__ import annotations
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 PR = Path(__file__).resolve().parents[2]

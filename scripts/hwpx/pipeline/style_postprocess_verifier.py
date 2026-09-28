@@ -5,7 +5,6 @@ Parser V2로 재파싱한 결과에서 셀 스타일 값을 검증한다.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 

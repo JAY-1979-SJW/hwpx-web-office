@@ -13,7 +13,6 @@ node 로 frontend/web_office_viewer/render_smoke.mjs 를 실행해 실제 HTML
 from __future__ import annotations
 import hashlib
 import json
-import shutil
 import sqlite3
 import subprocess
 import sys

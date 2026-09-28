@@ -6,7 +6,6 @@ closeout 문서 + RISK-LEDGER 별책이 시방서의 필수 섹션 / 토큰을 �
 from __future__ import annotations
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 PR = Path(__file__).resolve().parents[2]

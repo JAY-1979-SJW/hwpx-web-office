@@ -5,14 +5,10 @@ A01~A16 감리 항목 전체를 순서대로 실행하고 결과를 출력한다
 """
 from __future__ import annotations
 
-import hashlib
-import json
-import os
 import re
 import subprocess
 import sys
 import tempfile
-import time
 import zipfile
 from pathlib import Path
 

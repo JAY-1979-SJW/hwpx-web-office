@@ -16,7 +16,7 @@ from hancom_hwpx_work_schedule_demo import WorkItem, append_work_schedule
 from hwp_full_fidelity_header import build_decoded_header_xml
 from hwp_to_hwpx_standalone import convert_hwp_to_hwpx
 from hwpx_border_fill_style import apply_border_fill_definitions
-from hwpx_package import HwpxPackage, HwpxValidator, audit_hwpx_package_consistency, local_name
+from hwpx_package import HwpxPackage, audit_hwpx_package_consistency, local_name
 from hwpx_package_audit import audit_hwpx_package
 from hwpx_manifest_ops import repair_package_manifest
 from hwpx_spine_repair import repair_hwpx_spine

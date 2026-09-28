@@ -180,7 +180,7 @@ def create_app() -> Any:
             )
 
         # dry_run 모드로 sandbox 실행
-        from hwpx.pipeline.approval_gate import ApprovalResult, ApprovedField
+        from hwpx.pipeline.approval_gate import ApprovedField
         # approval_dict에서 ApprovalResult 재구성
         approved = [
             ApprovedField(

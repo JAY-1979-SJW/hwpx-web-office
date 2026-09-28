@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-E2E-FULL-CLOSEOUT-01 정식 준공검사.
+"""WEB-OFFICE-PARA-EDIT-E2E-FULL-CLOSEOUT-01 정식 준공검사.
 
 cell containerScope · 단일 run 범위에서 PARA-EDIT E2E (TYPE_TEXT /
 REPLACE_TEXT_RANGE / DELETE_TEXT_RANGE / SET_CELL_TEXT) 가 V1~V7 PASS
@@ -9,7 +9,9 @@ REPLACE_TEXT_RANGE / DELETE_TEXT_RANGE / SET_CELL_TEXT) 가 V1~V7 PASS
 정적으로 검증하며, 동적 신호는 fixture 가용 시 sandbox tmp_path 안에서만
 수집한다.
 """
+
 from __future__ import annotations
+
 import hashlib
 import re
 import sqlite3
@@ -21,8 +23,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-CLOSEOUT_DOC = (PR / "docs/architecture/"
-                   "web_office_para_edit_e2e_full_closeout.md")
+CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_e2e_full_closeout.md"
 
 REQUIRED_DOCS = [
     CLOSEOUT_DOC,
@@ -74,11 +75,16 @@ SAFETY_GATE_PATTERNS = {
 
 # 문서에 등기되어야 하는 키 문구 — 준공 범위 잠금
 DOC_REQUIRED_PHRASES = [
-    "SET_CELL_TEXT", "TYPE_TEXT", "REPLACE_TEXT_RANGE",
+    "SET_CELL_TEXT",
+    "TYPE_TEXT",
+    "REPLACE_TEXT_RANGE",
     "DELETE_TEXT_RANGE",
-    "V1_RANGE_POSITION_OK", "V2_NO_CROSS_PARAGRAPH_LEAK",
-    "V3_UNTOUCHED_RUNS_PRESERVED", "V4_CHARPR_PRESERVED",
-    "V5_PARPR_PRESERVED", "V6_OUTPUT_ISOLATED",
+    "V1_RANGE_POSITION_OK",
+    "V2_NO_CROSS_PARAGRAPH_LEAK",
+    "V3_UNTOUCHED_RUNS_PRESERVED",
+    "V4_CHARPR_PRESERVED",
+    "V5_PARPR_PRESERVED",
+    "V6_OUTPUT_ISOLATED",
     "V7_READBACK_MATCH",
     "MULTI_RUN_RANGE_NOT_SUPPORTED",
     "BODY_PARAGRAPH_NOT_SUPPORTED",
@@ -103,8 +109,10 @@ def _check_required_docs() -> list[dict]:
     for p in REQUIRED_DOCS:
         if not p.is_file():
             findings.append({
-                "code": "MISSING_DOC", "level": "FAIL",
-                "detail": str(p.relative_to(PR))})
+                "code": "MISSING_DOC",
+                "level": "FAIL",
+                "detail": str(p.relative_to(PR)),
+            })
     return findings
 
 
@@ -115,9 +123,7 @@ def _check_closeout_doc_phrases() -> list[dict]:
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
     for phrase in DOC_REQUIRED_PHRASES:
         if phrase not in src:
-            findings.append({
-                "code": "DOC_PHRASE_MISSING", "level": "FAIL",
-                "detail": phrase})
+            findings.append({"code": "DOC_PHRASE_MISSING", "level": "FAIL", "detail": phrase})
     return findings
 
 
@@ -125,9 +131,11 @@ def _check_safety_gate_patterns() -> list[dict]:
     findings: list[dict] = []
     for path, patterns in SAFETY_GATE_PATTERNS.items():
         if not path.is_file():
-            findings.append({"code": "SAFETY_FILE_MISSING",
-                              "level": "FAIL",
-                              "detail": str(path.relative_to(PR))})
+            findings.append({
+                "code": "SAFETY_FILE_MISSING",
+                "level": "FAIL",
+                "detail": str(path.relative_to(PR)),
+            })
             continue
         src = path.read_text(encoding="utf-8")
         for pat in patterns:
@@ -135,7 +143,8 @@ def _check_safety_gate_patterns() -> list[dict]:
                 findings.append({
                     "code": "SAFETY_GATE_PATTERN_MISSING",
                     "level": "FAIL",
-                    "detail": f"{path.relative_to(PR)}: {pat}"})
+                    "detail": f"{path.relative_to(PR)}: {pat}",
+                })
     return findings
 
 
@@ -145,33 +154,38 @@ def _check_audit_no_writer_calls() -> list[dict]:
     me = Path(__file__).read_text(encoding="utf-8")
     for sym in FORBIDDEN_WRITER_SYMBOLS:
         if re.search(sym, me):
-            findings.append({
-                "code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                "level": "FAIL", "detail": sym})
+            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
     return findings
 
 
 def _check_locked_files() -> list[dict]:
     """본 공정 baseline 이후 LOCKED 파일이 무수정인지 확인."""
-    import subprocess  # noqa: WPS433
+    import subprocess
+
     findings: list[dict] = []
     for rel in LOCKED_FILES:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(PR),
+                timeout=20,
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
+            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN", "detail": f"{rel}: {e}"})
             continue
         if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC",
-                              "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
+            findings.append({
+                "code": "GIT_DIFF_RC",
+                "level": "WARN",
+                "detail": f"{rel}: rc={r.returncode}",
+            })
             continue
         if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
+            findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
     return findings
 
 
@@ -180,8 +194,8 @@ def _fixture() -> Path | None:
     if not db.is_file():
         # 레거시 corpus DB 부재 — 카탈로그 표본으로 대체한다.
         # 이게 없으면 감리가 조용히 SKIP 되어 안 돈 채 통과처럼 보인다.
-        from scripts.hwpx.web_office.hwpx_sample_source import (
-            resolve_sample as _catalog_sample)
+        from scripts.hwpx.web_office.hwpx_sample_source import resolve_sample as _catalog_sample
+
         return _catalog_sample()
     try:
         conn = sqlite3.connect(db)
@@ -203,36 +217,48 @@ def _fixture() -> Path | None:
     return p if p.is_file() else None
 
 
-REQUIRED_V7 = ("V2_NO_CROSS_PARAGRAPH_LEAK",
-                "V3_UNTOUCHED_RUNS_PRESERVED",
-                "V4_CHARPR_PRESERVED", "V5_PARPR_PRESERVED",
-                "V6_OUTPUT_ISOLATED")
-REQUIRED_RB = ("V1_RANGE_POSITION_OK",
-                "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
+REQUIRED_V7 = (
+    "V2_NO_CROSS_PARAGRAPH_LEAK",
+    "V3_UNTOUCHED_RUNS_PRESERVED",
+    "V4_CHARPR_PRESERVED",
+    "V5_PARPR_PRESERVED",
+    "V6_OUTPUT_ISOLATED",
+)
+REQUIRED_RB = ("V1_RANGE_POSITION_OK", "V4_CHARPR_PRESERVED", "V7_READBACK_MATCH")
 
 
 def _run_dynamic_e2e(fixture: Path) -> dict[str, Any]:
-    import tempfile  # noqa: WPS433
-    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-        run_para_edit_e2e, SCENARIO_TYPE, SCENARIO_REPLACE,
-        SCENARIO_DELETE)
-    from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-        import_hwpx_as_ro_view)
+    import tempfile
+
+    from scripts.hwpx.web_office.para_edit_e2e_pipeline import (
+        SCENARIO_DELETE,
+        SCENARIO_REPLACE,
+        SCENARIO_TYPE,
+        run_para_edit_e2e,
+    )
+    from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
 
     doc = import_hwpx_as_ro_view(fixture)
     ro_p = next(
-        (p for p in doc.paragraphs
-          if (p.containerScope or {}).get("kind") == "cell"
-          and p.parPrIDRef and p.runs and p.runs[0].charPrIDRef
-          and len(p.text or "") >= 2),
-        None)
+        (
+            p
+            for p in doc.paragraphs
+            if (p.containerScope or {}).get("kind") == "cell"
+            and p.parPrIDRef
+            and p.runs
+            and p.runs[0].charPrIDRef
+            and len(p.text or "") >= 2
+        ),
+        None,
+    )
     if ro_p is None:
         return {"ok": False, "reason": "no cell paragraph fixture"}
 
     sha_b = hashlib.sha256(fixture.read_bytes()).hexdigest()
     mt_b = fixture.stat().st_mtime_ns
     out: dict[str, Any] = {
-        "ok": True, "scenarios": [],
+        "ok": True,
+        "scenarios": [],
         "paragraphId": ro_p.paragraphId,
         "fixture": str(fixture.relative_to(PR)),
     }
@@ -246,9 +272,14 @@ def _run_dynamic_e2e(fixture: Path) -> dict[str, Any]:
         ]:
             outp = td_path / f"closeout_{scn}.hwpx"
             res = run_para_edit_e2e(
-                source_path=fixture, output_path=outp,
-                scenario=scn, paragraph_id=ro_p.paragraphId,
-                range_anchor=0, allow_writer=True, **kw)
+                source_path=fixture,
+                output_path=outp,
+                scenario=scn,
+                paragraph_id=ro_p.paragraphId,
+                range_anchor=0,
+                allow_writer=True,
+                **kw,
+            )
             v7 = (res.get("verify7") or {}).get("results", {})
             rb = res.get("readback") or {}
             out["scenarios"].append({
@@ -256,12 +287,12 @@ def _run_dynamic_e2e(fixture: Path) -> dict[str, Any]:
                 "outputCreated": res.get("outputCreated"),
                 "writerActivated": res.get("writerActivated"),
                 "rejectedCount": len(res.get("rejected") or []),
-                "verify7": v7, "readback": rb,
+                "verify7": v7,
+                "readback": rb,
                 "outputInSandbox": str(outp).startswith(str(td_path)),
             })
 
-    out["shaPreserved"] = (
-        hashlib.sha256(fixture.read_bytes()).hexdigest() == sha_b)
+    out["shaPreserved"] = hashlib.sha256(fixture.read_bytes()).hexdigest() == sha_b
     out["mtimePreserved"] = fixture.stat().st_mtime_ns == mt_b
     return out
 
@@ -269,45 +300,57 @@ def _run_dynamic_e2e(fixture: Path) -> dict[str, Any]:
 def _check_dynamic(dyn: dict) -> list[dict]:
     findings: list[dict] = []
     if not dyn.get("ok"):
-        findings.append({"code": "DYNAMIC_SKIPPED", "level": "WARN",
-                          "detail": dyn.get("reason", "fixture missing")})
+        findings.append({
+            "code": "DYNAMIC_SKIPPED",
+            "level": "WARN",
+            "detail": dyn.get("reason", "fixture missing"),
+        })
         return findings
-    expected_scns = {"TYPE_TEXT", "REPLACE_TEXT_RANGE",
-                      "DELETE_TEXT_RANGE"}
+    expected_scns = {"TYPE_TEXT", "REPLACE_TEXT_RANGE", "DELETE_TEXT_RANGE"}
     actual = {sc["scenario"] for sc in dyn["scenarios"]}
     if actual != expected_scns:
-        findings.append({"code": "SCENARIO_SET_MISMATCH",
-                          "level": "FAIL",
-                          "detail": f"actual={sorted(actual)}"})
+        findings.append({
+            "code": "SCENARIO_SET_MISMATCH",
+            "level": "FAIL",
+            "detail": f"actual={sorted(actual)}",
+        })
     for sc in dyn["scenarios"]:
         name = sc["scenario"]
         if not sc["outputCreated"]:
-            findings.append({"code": "OUTPUT_NOT_CREATED",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_NOT_CREATED", "level": "FAIL", "detail": name})
             continue
         if not sc.get("outputInSandbox"):
-            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "OUTPUT_OUTSIDE_SANDBOX", "level": "FAIL", "detail": name})
         if sc["rejectedCount"]:
-            findings.append({"code": "REJECTED_NOT_EMPTY",
-                              "level": "FAIL", "detail": name})
+            findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
         v7 = sc["verify7"]
         for k in REQUIRED_V7:
             if v7.get(k) != "PASS":
-                findings.append({"code": "V7_NOT_PASS", "level": "FAIL",
-                                  "detail": f"{name}: {k}={v7.get(k)}"})
+                findings.append({
+                    "code": "V7_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={v7.get(k)}",
+                })
         rb = sc["readback"]
         for k in REQUIRED_RB:
             if rb.get(k) != "PASS":
-                findings.append({"code": "READBACK_NOT_PASS",
-                                  "level": "FAIL",
-                                  "detail": f"{name}: {k}={rb.get(k)}"})
+                findings.append({
+                    "code": "READBACK_NOT_PASS",
+                    "level": "FAIL",
+                    "detail": f"{name}: {k}={rb.get(k)}",
+                })
     if dyn.get("shaPreserved") is False:
-        findings.append({"code": "SOURCE_SHA_TOUCHED", "level": "FAIL",
-                          "detail": "fixture sha before != after"})
+        findings.append({
+            "code": "SOURCE_SHA_TOUCHED",
+            "level": "FAIL",
+            "detail": "fixture sha before != after",
+        })
     if dyn.get("mtimePreserved") is False:
-        findings.append({"code": "SOURCE_MTIME_TOUCHED", "level": "WARN",
-                          "detail": "fixture mtime before != after"})
+        findings.append({
+            "code": "SOURCE_MTIME_TOUCHED",
+            "level": "WARN",
+            "detail": "fixture mtime before != after",
+        })
     return findings
 
 
@@ -324,9 +367,8 @@ def audit() -> dict[str, Any]:
     if fx is not None:
         try:
             dyn = _run_dynamic_e2e(fx)
-        except Exception as e:  # noqa: BLE001
-            findings.append({"code": "DYNAMIC_RAISED", "level": "FAIL",
-                              "detail": str(e)})
+        except Exception as e:  # ruff: ignore[blind-except]
+            findings.append({"code": "DYNAMIC_RAISED", "level": "FAIL", "detail": str(e)})
     findings.extend(_check_dynamic(dyn))
 
     fail = [f for f in findings if f["level"] == "FAIL"]
@@ -342,4 +384,5 @@ def audit() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import json
+
     print(json.dumps(audit(), ensure_ascii=False, indent=2))

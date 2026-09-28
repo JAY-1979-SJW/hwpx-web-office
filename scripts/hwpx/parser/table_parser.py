@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 from .parser_contract import TableInfo, CellInfo
 from .errors import WarnCode

@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from hwpx.recognition_corpus.form_index import FormIndex, DEFAULT_JSONL
 

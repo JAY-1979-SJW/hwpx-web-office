@@ -35,7 +35,7 @@ except ImportError:                      # 스크립트 직접 실행 폴백
         border_sides_css, parse_page_geometry)
     from coord_table import (
         solve_axis, expand_rowspan_content, normalize_declared,
-        compress_to_anchor, paginate_rows, col_rank_map)
+        paginate_rows, col_rank_map)
 
 # 하위호환 별칭(기존 내부명 참조 보호) — 신규 코드는 coord_* 모듈을 쓸 것.
 _own_text = own_text

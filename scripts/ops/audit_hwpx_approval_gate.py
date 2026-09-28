@@ -87,9 +87,8 @@ def run_audit() -> int:
     # C02. import
     try:
         from hwpx.pipeline.approval_gate import (
-            apply_decisions, FieldDecision, ApprovalResult,
-            ACTION_CONFIRM, ACTION_EDIT, ACTION_HOLD, ACTION_ATTACHMENT,
-            GATE_VERSION, result_to_dict,
+            apply_decisions, FieldDecision, ACTION_CONFIRM, ACTION_EDIT, ACTION_HOLD, ACTION_ATTACHMENT,
+            result_to_dict,
         )
     except Exception as exc:
         ar.check("C02", "approval_gate importable", False, str(exc))

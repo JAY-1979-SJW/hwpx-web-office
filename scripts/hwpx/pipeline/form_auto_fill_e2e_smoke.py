@@ -19,9 +19,7 @@ import io
 import os
 import re
 import zipfile
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 from xml.etree import ElementTree as ET
 
 SCHEMA_VERSION = "form_auto_fill_e2e_smoke_v1"
@@ -331,11 +329,9 @@ def _stage_readback_hardening(approval, template_path: Path, output_path: Path) 
 # ---------------------------------------------------------------------------
 
 def _stage_download_review(sandbox_result, hardening_result) -> dict:
-    from scripts.hwpx.pipeline.form_writer_ui_connect import build_ui_result_payload
     from scripts.hwpx.pipeline.form_writer_download_review import build_download_payload
 
     # sandbox result → ui result dict
-    from scripts.hwpx.pipeline.form_auto_fill_writer_sandbox import SandboxWriteResult
     sr = sandbox_result  # SandboxWriteResult instance
     ui_result = {
         "writerStatus": "SUCCESS" if not sr.sourceMutated and not sr._readback_any_fail(hardening_result) else "FAILED_READBACK",
@@ -373,7 +369,6 @@ def _stage_download_review(sandbox_result, hardening_result) -> dict:
 # ---------------------------------------------------------------------------
 
 def _stage_final_export(dl_payload: dict) -> dict:
-    from scripts.hwpx.pipeline.form_writer_download_review import apply_review_decision_from_dict
     from scripts.hwpx.pipeline.form_writer_final_export_gate import build_final_export_payload
 
     decision_dict = {

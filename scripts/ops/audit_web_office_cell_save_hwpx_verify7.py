@@ -23,8 +23,7 @@ from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
 from scripts.hwpx.web_office.edit_command_model import (  # noqa: E402
     make_set_cell_text_command)
 from scripts.hwpx.web_office.cell_save_pipeline import (  # noqa: E402
-    save_cell_edits, VERDICT_PASS, VERDICT_REJECTED, VERDICT_FAIL,
-    VERDICT_NOOP)
+    save_cell_edits, VERDICT_PASS)
 from scripts.hwpx.web_office.cell_save_audit import (  # noqa: E402
     append_save_audit_record)
 

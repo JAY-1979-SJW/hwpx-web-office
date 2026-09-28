@@ -15,7 +15,6 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from typing import Any
 
 SCHEMA_VERSION = "form_writer_download_review_v1"
 

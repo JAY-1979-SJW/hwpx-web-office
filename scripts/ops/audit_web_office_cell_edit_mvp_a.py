@@ -5,7 +5,6 @@ Python 측 EditCommand 모델 + dry-run plan 정합성, JS 측 셀 편집 상태
 잠근다.
 """
 from __future__ import annotations
-import hashlib
 import json
 import subprocess
 import sys
@@ -86,8 +85,7 @@ def _run_js_self_test() -> dict:
 def _python_unit_audit() -> dict:
     """Python EditCommand 모델 핵심 시나리오를 인라인 검증."""
     from scripts.hwpx.web_office.edit_command_model import (
-        make_set_cell_text_command, validate_against_current,
-        apply_forward, apply_inverse, COMMAND_TYPE_SET_CELL_TEXT,
+        make_set_cell_text_command, apply_forward, apply_inverse, COMMAND_TYPE_SET_CELL_TEXT,
     )
     from scripts.hwpx.web_office.cell_edit_plan import (
         build_dry_run_edit_plan, SAVE_DRY_RUN_NOOP,

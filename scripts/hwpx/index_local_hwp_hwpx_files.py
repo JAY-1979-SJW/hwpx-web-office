@@ -11,7 +11,6 @@ import argparse
 import csv
 import json
 import os
-import sys
 import time
 from collections import Counter
 from datetime import datetime, timezone

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 from scripts.hwpx.recognition_corpus import corpus_schema as cs
 

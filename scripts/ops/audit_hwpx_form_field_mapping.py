@@ -5,7 +5,6 @@ A01~A20 전 항목 실행 후 판정 출력.
 """
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 import sys
@@ -79,11 +78,9 @@ def run_audit() -> int:
     # A02/A03. import + ParseResult / catalog input
     try:
         from hwpx.pipeline.form_field_mapper import (
-            map_fields, MappingResult, STATUS_AUTO, STATUS_REVIEW, STATUS_MISS,
-            _validate_field, _evidence_bonus,
+            map_fields, STATUS_REVIEW, _validate_field,
         )
         from hwpx.pipeline.upload_document_parser import ExtractedField, ParseResult
-        from hwpx.recognition_corpus.form_field_catalog import build_catalog
         import_ok = True
     except Exception as exc:
         ar.check("A02", "modules importable", False, str(exc))

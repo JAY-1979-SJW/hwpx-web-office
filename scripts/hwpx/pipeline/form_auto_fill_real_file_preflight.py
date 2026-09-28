@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import time
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path

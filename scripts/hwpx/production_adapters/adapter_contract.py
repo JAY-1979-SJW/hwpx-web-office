@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 CONTRACT_NAME = "HWPX-PRODUCTION-ADAPTER-CONTRACT-01"
 CONTRACT_VERSION = "v1"

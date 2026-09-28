@@ -31,7 +31,6 @@ import os
 import re
 import sys
 import time
-import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from datetime import datetime

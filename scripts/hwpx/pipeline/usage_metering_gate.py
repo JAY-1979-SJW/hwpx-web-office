@@ -22,7 +22,6 @@ AI fill 과금 게이트 — AI 후보 생성(ai_proposal_fn) 호출 1건을 계
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable

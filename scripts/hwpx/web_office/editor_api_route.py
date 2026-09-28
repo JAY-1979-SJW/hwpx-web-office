@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import io
 import os
-import tempfile
 import uuid
 import zipfile
 from pathlib import Path

@@ -16,9 +16,6 @@ _PROFILER_PATH = Path(__file__).resolve().parents[3] / "scripts" / "local"
 if str(_PROFILER_PATH) not in sys.path:
     sys.path.insert(0, str(_PROFILER_PATH))
 
-import xml.etree.ElementTree as ET
-import unicodedata
-import re
 
 # profiler 모듈에서 핵심 분류 함수만 가져옴
 try:

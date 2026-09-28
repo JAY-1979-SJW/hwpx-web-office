@@ -13,7 +13,7 @@ from typing import Any
 from .pipeline_contract import (
     PipelineResult, RecognitionResult, make_request_id,
 )
-from .plan_builder import build_edit_plan, build_edit_plan_from_form, _FIELD_LABEL_MAP
+from .plan_builder import build_edit_plan, build_edit_plan_from_form
 from .form_recognizer import recognize_form
 from .reparse_verifier import verify as reparse_verify
 from .hancom_safe_gate import verify as hancom_verify

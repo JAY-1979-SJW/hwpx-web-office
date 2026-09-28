@@ -8,7 +8,6 @@ import re
 import xml.etree.ElementTree as ET
 
 from .parser_contract import StyleInfo
-from .errors import WarnCode
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"

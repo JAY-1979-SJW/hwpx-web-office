@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from .fill_review_contract import (
     ALLOWED_DECISIONS,
     DECISION_APPROVE,
-    DECISION_REJECT,
     DECISION_HOLD,
     DECISION_EDIT_VALUE,
     DECISION_REQUEST_MATERIAL,
@@ -29,11 +28,9 @@ from .fill_review_contract import (
     OFFICIAL_PARAGRAPH_FULL_REPLACE_OP,
     FORBIDDEN_PARAGRAPH_OP_NAMES,
     STATUS_MATCHED,
-    STATUS_NEEDS_VALUE,
     STATUS_NEEDS_USER_INPUT,
     STATUS_READY_FOR_REVIEW,
     RISK_LOW,
-    RISK_MEDIUM,
     RISK_HIGH,
 )
 

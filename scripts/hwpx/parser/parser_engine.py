@@ -25,7 +25,6 @@ from .parser_contract import (
 from .package_reader import read_package_info, read_header_xml, read_section_xmls
 from .style_parser import (
     parse_style_summary, enrich_style_info,
-    parse_char_pr_defs, parse_para_pr_defs, parse_border_fill_defs,
 )
 from .block_parser import parse_blocks_from_section
 from .table_parser import parse_tables_from_section

@@ -62,8 +62,7 @@ def run_audit() -> int:
     # B02. import
     try:
         from hwpx.pipeline.review_panel import (
-            build_review_panel, ReviewPanel, PANEL_VERSION,
-            AutoFillItem, ReviewItem, MissingItem, AttachmentItem,
+            build_review_panel, PANEL_VERSION,
         )
         import_ok = True
     except Exception as exc:

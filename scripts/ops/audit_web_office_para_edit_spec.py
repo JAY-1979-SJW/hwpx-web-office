@@ -5,7 +5,6 @@ PARA-EDIT 시방서 + R-P3 별책이 시방서 검증 항목을 모두 포함하
 """
 from __future__ import annotations
 import json
-import sys
 from pathlib import Path
 
 PR = Path(__file__).resolve().parents[2]

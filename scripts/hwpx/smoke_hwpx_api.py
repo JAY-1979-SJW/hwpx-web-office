@@ -14,11 +14,9 @@ import os
 import sys
 import json
 import time
-import hashlib
 import requests
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urljoin
 
 def mask_pii(text, max_length=300):
     """Mask sensitive Korean text in preview"""

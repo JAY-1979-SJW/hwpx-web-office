@@ -42,7 +42,7 @@ try:
     sys.path.insert(0, str(ROOT))
     import scripts.hwpx.pipeline.form_writer_ui_connect as uc
     _check("A02", "approval gate result input supported", True)
-except Exception as e:
+except Exception:
     _check("A02", "approval gate result input supported", False)
     uc = None  # type: ignore
 

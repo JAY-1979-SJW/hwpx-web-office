@@ -6,11 +6,8 @@ production 사전 수정을 수행하지 않는다.
 """
 from __future__ import annotations
 
-import json
 import sqlite3
-import time
 import uuid
-from pathlib import Path
 from typing import Iterable
 
 from scripts.hwpx.recognition_corpus import corpus_schema as cs

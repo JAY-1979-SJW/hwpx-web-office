@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 HARNESS_NAME = "HWPX-LIVE-SMOKE-HARNESS-01"
 HARNESS_VERSION = "v1"

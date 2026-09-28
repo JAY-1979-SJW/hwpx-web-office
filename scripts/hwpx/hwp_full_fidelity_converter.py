@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Independent HWP -> HWPX full-fidelity conversion workbench.
 
 This tool is intentionally fail-closed. It does not use Hancom Office, COM,
@@ -33,32 +33,6 @@ import hwp_full_fidelity_layouts as hwp_layouts
 import hwp_full_fidelity_package as hwp_package
 import hwp_full_fidelity_section_updates as hwp_section_updates
 import hwp_full_fidelity_security as hwp_security
-from hwp_full_fidelity_decoders import (
-    decode_binary_data,
-    decode_border_fill,
-    decode_bullet,
-    decode_char_shape,
-    decode_ctrl_header,
-    decode_document_properties,
-    decode_face_name,
-    decode_footnote_shape,
-    decode_id_mappings,
-    decode_known_record,
-    decode_list_header,
-    decode_numbering,
-    decode_page_border_fill,
-    decode_page_def,
-    decode_para_char_shape,
-    decode_para_header,
-    decode_para_line_seg,
-    decode_para_shape,
-    decode_picture,
-    decode_shape_component,
-    decode_shape_component_rectangle,
-    decode_style,
-    decode_tab_def,
-    decode_table,
-)
 from hwpx_package import HwpxValidator
 
 

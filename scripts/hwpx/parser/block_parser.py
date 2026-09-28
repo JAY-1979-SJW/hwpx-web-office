@@ -9,7 +9,6 @@ import unicodedata
 import xml.etree.ElementTree as ET
 
 from .parser_contract import BlockInfo
-from .errors import WarnCode
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 _TAG_P = f"{{{NS_HP}}}p"

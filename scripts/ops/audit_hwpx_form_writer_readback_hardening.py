@@ -115,13 +115,10 @@ def run_audit() -> int:
     # A02. import
     try:
         from hwpx.pipeline.form_writer_readback_hardening import (
-            verify_readback, ReadbackHardeningResult, SCHEMA_VERSION,
-            READBACK_PASS, READBACK_WARN_NORMALIZED_MATCH,
+            verify_readback, READBACK_WARN_NORMALIZED_MATCH,
             READBACK_FAIL_MISSING_TARGET, READBACK_FAIL_VALUE_MISMATCH,
             READBACK_FAIL_EMPTY_VALUE, READBACK_FAIL_TRUNCATED_VALUE,
-            READBACK_FAIL_DUPLICATE_TARGET, READBACK_FAIL_OUTPUT_XML_BROKEN,
-            VERDICT_PASS, VERDICT_FAIL_MISMATCH, VERDICT_FAIL_BROKEN,
-            VERDICT_FAIL_XML_MUTATION, VERDICT_WARN_NORMALIZED,
+            READBACK_FAIL_DUPLICATE_TARGET, VERDICT_FAIL_BROKEN,
             _sha256,
         )
     except Exception as exc:
