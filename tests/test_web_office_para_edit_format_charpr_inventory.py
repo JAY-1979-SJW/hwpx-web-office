@@ -1,17 +1,17 @@
-﻿"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 감리.
+"""WEB-OFFICE-PARA-EDIT-FORMAT-CHARPR-INVENTORY-01 감리.
 
 charPr inventory read-only helper 의 정확성 + 원본 무변경 + d61f10f
 부분준공 잠금 자재 무수정 확인.
 """
+
 from __future__ import annotations
+
 import hashlib
 import json
 import sqlite3
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
 import zipfile
-from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -19,10 +19,8 @@ import pytest
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
-from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
-    paragraph_char_pr_inventory, char_pr_defs_only)
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-    import_hwpx_as_ro_view)
+from scripts.hwpx.web_office.charpr_inventory import char_pr_defs_only, paragraph_char_pr_inventory  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 BASELINE_COMMIT = "15364fe"  # PARA_INSERT 준공 후 갱신 (d61f10f → bb0939b)
 
@@ -53,11 +51,11 @@ def _fixture() -> Path | None:
 
 
 FIXTURE = _fixture()
-need_fx = pytest.mark.skipif(
-    FIXTURE is None, reason="fixture missing")
+need_fx = pytest.mark.skipif(FIXTURE is None, reason="fixture missing")
 
 
 # ── 1. 모든 paragraph 의 모든 run charPr 가 수집되는지 ──────────
+
 
 @need_fx
 def test_all_runs_collected_in_paragraph_inventory():
@@ -67,11 +65,11 @@ def test_all_runs_collected_in_paragraph_inventory():
         entries = inv["paragraphInventory"].get(par.paragraphId)
         assert entries is not None, par.paragraphId
         total = sum(e["usageCount"] for e in entries)
-        assert total == len(par.runs), (par.paragraphId, total,
-                                                                len(par.runs))
+        assert total == len(par.runs), (par.paragraphId, total, len(par.runs))
 
 
 # ── 2. usageCount 정확성 ─────────────────────────────────────
+
 
 @need_fx
 def test_usage_count_matches_run_grouping():
@@ -80,14 +78,15 @@ def test_usage_count_matches_run_grouping():
     for par in doc.paragraphs[:20]:
         # ro_view 로부터 직접 카운트
         from collections import Counter
+
         expected = Counter(r.charPrIDRef for r in par.runs)
         entries = inv["paragraphInventory"][par.paragraphId]
         actual = {e["charPrId"]: e["usageCount"] for e in entries}
-        assert actual == dict(expected), (par.paragraphId, actual,
-                                                                          expected)
+        assert actual == dict(expected), (par.paragraphId, actual, expected)
 
 
 # ── 3. header.xml charPr 속성 매핑 ───────────────────────────
+
 
 @need_fx
 def test_header_charpr_attrs_mapped():
@@ -112,6 +111,7 @@ def test_header_charpr_attrs_mapped():
 
 # ── 4. dangling charPrIDRef 검출 — 합성 case ──────────────────
 
+
 @need_fx
 def test_dangling_charpr_detected_via_synthetic(tmp_path):
     """fixture 를 복제 후 paragraph 의 첫 run charPrIDRef 를 header 에
@@ -120,43 +120,41 @@ def test_dangling_charpr_detected_via_synthetic(tmp_path):
     src = FIXTURE
     dst = tmp_path / "synth_dangling.hwpx"
     # zip → 모든 entries 복사, section0.xml 만 mutate
-    with zipfile.ZipFile(src) as zin, \
-            zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for info in zin.infolist():
             data = zin.read(info.filename)
-            if (info.filename.replace("\\", "/")
-                    .endswith("section0.xml")):
+            if info.filename.replace("\\", "/").endswith("section0.xml"):
                 xml = data.decode("utf-8", "ignore")
                 # 첫 charPrIDRef 를 9999 (header 에 없음 가정) 로 교체
                 # 1 회만 치환
-                fake_id = '999999'
+                fake_id = "999999"
                 import re as _re
+
                 new_xml, n = _re.subn(
-                    r'charPrIDRef="\d+"',
-                    f'charPrIDRef="{fake_id}"', xml, count=1)
+                    r'charPrIDRef="\d+"', f'charPrIDRef="{fake_id}"', xml, count=1
+                )
                 data = new_xml.encode("utf-8")
             zout.writestr(info, data)
     inv = paragraph_char_pr_inventory(dst)
-    assert "999999" in inv["danglingCharPrIDRefs"], (
-        inv["danglingCharPrIDRefs"][:10])
+    assert "999999" in inv["danglingCharPrIDRefs"], inv["danglingCharPrIDRefs"][:10]
 
 
 # ── 5. paragraph 단위와 문서 단위 inventory 구분 ──────────────
+
 
 @need_fx
 def test_paragraph_scope_vs_document_scope_distinct():
     doc = import_hwpx_as_ro_view(FIXTURE)
     target_pid = doc.paragraphs[0].paragraphId
-    inv = paragraph_char_pr_inventory(FIXTURE,
-                                                                    paragraph_id=target_pid)
+    inv = paragraph_char_pr_inventory(FIXTURE, paragraph_id=target_pid)
     # paragraphInventory 는 target 1건만
     assert list(inv["paragraphInventory"].keys()) == [target_pid]
     # documentInventory 는 paragraph_id 필터와 무관하게 문서 전체
-    assert (len(inv["documentInventory"])
-                  >= len(inv["paragraphInventory"][target_pid]))
+    assert len(inv["documentInventory"]) >= len(inv["paragraphInventory"][target_pid])
 
 
 # ── 6. char_pr_defs_only 단독 호출 ──────────────────────────
+
 
 @need_fx
 def test_char_pr_defs_only_returns_header_definitions():
@@ -170,10 +168,11 @@ def test_char_pr_defs_only_returns_header_definitions():
 
 # ── 7. writer 호출 0건 (정적 grep) ──────────────────────────
 
+
 def test_inventory_module_has_no_writer_calls():
     import re
-    src = (PR / "scripts/hwpx/web_office/charpr_inventory.py"
-              ).read_text(encoding="utf-8")
+
+    src = (PR / "scripts/hwpx/web_office/charpr_inventory.py").read_text(encoding="utf-8")
     forbidden = [
         r"\.write_xml\(",
         r"\.write_package\(",
@@ -187,6 +186,7 @@ def test_inventory_module_has_no_writer_calls():
 
 
 # ── 8. 원본 sha256 / mtime_ns 무변경 ────────────────────────
+
 
 @need_fx
 def test_inventory_does_not_modify_source():
@@ -214,16 +214,27 @@ LOCKED = [
 
 
 def test_locked_d61f10f_files_unchanged():
+    if (
+        subprocess.run(["git", "cat-file", "-e", BASELINE_COMMIT], capture_output=True).returncode
+        != 0
+    ):
+        pytest.skip(
+            f"baseline commit {BASELINE_COMMIT} not reachable in this branch's history (extracted branch)"
+        )
     for rel in LOCKED:
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, cwd=str(PR), timeout=20)
+            capture_output=True,
+            text=True,
+            cwd=str(PR),
+            timeout=20,
+        )
         assert r.returncode == 0, (rel, r.stderr)
-        assert not r.stdout.strip(), (
-            f"{rel} changed vs {BASELINE_COMMIT}")
+        assert not r.stdout.strip(), f"{rel} changed vs {BASELINE_COMMIT}"
 
 
 # ── 10. ApplyFormat 흔적 없음 (정적) ────────────────────────
+
 
 def test_no_applyformat_traces_in_writer_chain():
     """WEB-OFFICE-PARA-EDIT-APPLYFORMAT-EXISTING-CHARPR-01:
@@ -231,6 +242,7 @@ def test_no_applyformat_traces_in_writer_chain():
     흔적은 허용. 신규 charPr 생성 함수 (def create_char_pr) 만 계속 차단.
     """
     import re
+
     forbidden = [
         r"def\s+create_char_pr\b",
     ]
@@ -250,11 +262,11 @@ def test_no_applyformat_traces_in_writer_chain():
 
 # ── 11. audit verdict PASS ─────────────────────────────────
 
+
 def test_audit_script_pass():
-    from scripts.ops.audit_web_office_para_edit_format_charpr_inventory \
-        import audit
+    from scripts.ops.audit_web_office_para_edit_format_charpr_inventory import audit
+
     rep = audit()
-    fails = [f for f in rep["findings"]
-              if f.get("level") == "FAIL"]
+    fails = [f for f in rep["findings"] if f.get("level") == "FAIL"]
     assert not fails, json.dumps(rep, ensure_ascii=False, indent=2)
     assert rep["verdict"] in ("PASS", "WARN"), rep

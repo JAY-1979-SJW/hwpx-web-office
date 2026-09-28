@@ -1,10 +1,12 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-EXISTING-CHARPR-01.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-EXISTING-CHARPR-01.
 
 matchAxisChange("fontSizePt", v) + extractAxisValues + Format Toolbar
 fontSize dropdown 정합 검증. bold/underline/italic 회귀 + dropdown
 candidate enabling + 운영 fixture 통계 회귀.
 """
+
 from __future__ import annotations
+
 import json
 import re
 import sqlite3
@@ -17,19 +19,15 @@ import pytest
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
-MATCHER_MJS = (PR / "frontend/web_office_viewer/"
-                      "format_charpr_matcher.mjs")
-TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
-                      "WebOfficeFormatToolbar.tsx")
-SMOKE_JS = (PR / "frontend/web_office_viewer/"
-                  "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "15364fe"  # PARA_INSERT 준공 후 갱신 (8098944 → 1f442ec)
+MATCHER_MJS = PR / "frontend/web_office_viewer/format_charpr_matcher.mjs"
+TOOLBAR_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatToolbar.tsx"
+SMOKE_JS = PR / "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs"
+BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
 
 
 def _node_ok() -> bool:
     try:
-        r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+        r = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -40,19 +38,20 @@ need_node = pytest.mark.skipif(not NODE_OK, reason="node not available")
 
 
 def _run_smoke() -> dict:
-    r = subprocess.run(["node", str(SMOKE_JS)], capture_output=True,
-                                      text=True, timeout=30, encoding="utf-8")
+    r = subprocess.run(
+        ["node", str(SMOKE_JS)], capture_output=True, text=True, timeout=30, encoding="utf-8"
+    )
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
 
 # ── 1. matcher 모듈 확장 검증 ────────────────────────────
 
+
 def test_matcher_exports_match_axis_change():
     src = MATCHER_MJS.read_text(encoding="utf-8")
     assert re.search(r"export\s+function\s+matchAxisChange\(", src)
-    assert re.search(
-        r'export\s+const\s+MATCH_AXIS_CHANGE_DIMENSIONS', src)
+    assert re.search(r"export\s+const\s+MATCH_AXIS_CHANGE_DIMENSIONS", src)
     assert re.search(r"export\s+function\s+extractAxisValues\(", src)
 
 
@@ -60,8 +59,7 @@ def test_axis_enum_includes_fontsizept():
     """fontSizePt 가 axis enum 에 포함되어 있어야 한다.
     (이후 공정에서 textColor / fontName 도 추가될 수 있음.)"""
     src = MATCHER_MJS.read_text(encoding="utf-8")
-    m = re.search(
-        r"MATCH_AXIS_CHANGE_DIMENSIONS\s*=\s*\[([^\]]+)\]", src)
+    m = re.search(r"MATCH_AXIS_CHANGE_DIMENSIONS\s*=\s*\[([^\]]+)\]", src)
     assert m, "MATCH_AXIS_CHANGE_DIMENSIONS not found"
     dims = re.findall(r'"(\w+)"', m.group(1))
     assert "fontSizePt" in dims, dims
@@ -69,12 +67,12 @@ def test_axis_enum_includes_fontsizept():
 
 def test_matcher_no_fuzzy_keyword():
     src = MATCHER_MJS.read_text(encoding="utf-8")
-    for pat in (r"\bfuzzy\b", r"\bapproximate\b", r"\bsimilar\b",
-                          r"Math\.abs"):
+    for pat in (r"\bfuzzy\b", r"\bapproximate\b", r"\bsimilar\b", r"Math\.abs"):
         assert not re.search(pat, src, re.IGNORECASE), pat
 
 
 # ── 2. matcher smoke ────────────────────────────────────
+
 
 @need_node
 def test_matcher_smoke_verdict_pass():
@@ -87,11 +85,13 @@ def test_matcher_smoke_verdict_pass():
 @need_node
 def test_matcher_smoke_fontsize_success_and_failure():
     out = _run_smoke()
-    for k in ("fontSizeMatchingSuccess",
-                "fontSizeMatchingFailure",
-                "fontSizeNoopReturnsNull",
-                "heightMismatchExcluded",
-                "axisChangeSelfExcluded"):
+    for k in (
+        "fontSizeMatchingSuccess",
+        "fontSizeMatchingFailure",
+        "fontSizeNoopReturnsNull",
+        "heightMismatchExcluded",
+        "axisChangeSelfExcluded",
+    ):
         assert out["checks"][k]["ok"], k
 
 
@@ -105,14 +105,16 @@ def test_matcher_smoke_other_axes_rejected():
 @need_node
 def test_matcher_smoke_extract_axis_values():
     out = _run_smoke()
-    for k in ("extractAxisValuesShape",
-                "extractAxisValuesSorted",
-                "extractAxisValuesCurrentMarked",
-                "extractAxisValuesMatch12",
-                "extractAxisValuesMatch14",
-                "extractAxisValuesEnabled12",
-                "extractAxisValuesRejectColor",
-                "extractAxisValuesDedup"):
+    for k in (
+        "extractAxisValuesShape",
+        "extractAxisValuesSorted",
+        "extractAxisValuesCurrentMarked",
+        "extractAxisValuesMatch12",
+        "extractAxisValuesMatch14",
+        "extractAxisValuesEnabled12",
+        "extractAxisValuesRejectColor",
+        "extractAxisValuesDedup",
+    ):
         assert out["checks"][k]["ok"], k
 
 
@@ -120,16 +122,22 @@ def test_matcher_smoke_extract_axis_values():
 def test_matcher_smoke_toggle_regression_preserved():
     """기존 bold/underline/italic matchToggle 회귀 유지."""
     out = _run_smoke()
-    for k in ("boldToggleSuccess", "boldToggleOffSuccess",
-                "underlineToggleSuccess", "italicToggleSuccess",
-                "noMatchReturnsNull", "selfExcluded",
-                "differentSizeNotMatched",
-                "differentColorNotMatched",
-                "fuzzyToggleNotMatched"):
+    for k in (
+        "boldToggleSuccess",
+        "boldToggleOffSuccess",
+        "underlineToggleSuccess",
+        "italicToggleSuccess",
+        "noMatchReturnsNull",
+        "selfExcluded",
+        "differentSizeNotMatched",
+        "differentColorNotMatched",
+        "fuzzyToggleNotMatched",
+    ):
         assert out["checks"][k]["ok"], k
 
 
 # ── 3. toolbar fontSize dropdown 정합 ─────────────────────
+
 
 def test_toolbar_has_fontsize_dropdown():
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
@@ -147,8 +155,11 @@ def test_toolbar_no_font_name_dropdown_or_html_color_input():
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
     forbidden = [
         r'<input[^>]+type="color"',
-        r"ColorPicker", r"colorPicker",
-        r"FontPicker", r"systemFonts", r"fontList",
+        r"ColorPicker",
+        r"colorPicker",
+        r"FontPicker",
+        r"systemFonts",
+        r"fontList",
     ]
     for pat in forbidden:
         assert not re.search(pat, src), pat
@@ -181,8 +192,7 @@ def test_toolbar_dropdown_disabled_policy():
 
 def test_toolbar_opt_in_default_false():
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
-    assert "enableApplyCommand = false" in src \
-            or "enableApplyCommand=false" in src
+    assert "enableApplyCommand = false" in src or "enableApplyCommand=false" in src
     assert "!enableApplyCommand" in src
 
 
@@ -209,16 +219,27 @@ LOCKED_VS_8098944 = [
 
 
 def test_locked_files_unchanged_vs_baseline():
+    if (
+        subprocess.run(["git", "cat-file", "-e", BASELINE_COMMIT], capture_output=True).returncode
+        != 0
+    ):
+        pytest.skip(
+            f"baseline commit {BASELINE_COMMIT} not reachable in this branch's history (extracted branch)"
+        )
     for rel in LOCKED_VS_8098944:
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, cwd=str(PR), timeout=20)
+            capture_output=True,
+            text=True,
+            cwd=str(PR),
+            timeout=20,
+        )
         assert r.returncode == 0, (rel, r.stderr)
-        assert not r.stdout.strip(), (
-            f"{rel} changed vs {BASELINE_COMMIT}")
+        assert not r.stdout.strip(), f"{rel} changed vs {BASELINE_COMMIT}"
 
 
 # ── 5. 운영 fixture 통계 회귀: fontSize matching ≥ 90% ─────
+
 
 def _fixtures(limit: int = 30) -> list[Path]:
     db = PR / "data/recognition_corpus/corpus.sqlite3"
@@ -244,13 +265,14 @@ need_fx = pytest.mark.skipif(not FX, reason="no operational fixtures")
 
 @need_fx
 def test_fixture_fontsize_matching_at_least_90_pct():
-    from scripts.hwpx.web_office.charpr_inventory import (
-        char_pr_defs_only)
-    matched = 0; total = 0
+    from scripts.hwpx.web_office.charpr_inventory import char_pr_defs_only
+
+    matched = 0
+    total = 0
     for p in FX:
         try:
             defs = char_pr_defs_only(p)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             continue
         if not defs:
             continue
@@ -258,13 +280,16 @@ def test_fixture_fontsize_matching_at_least_90_pct():
         # group by (fontName, textColor, bold, italic, underline) —
         # within group, count distinct fontSizePt
         grp: dict = {}
-        for cid, d in defs.items():
-            key = (d.get("fontName"), d.get("textColor"),
-                          d.get("bold"), d.get("italic"),
-                          d.get("underline"))
+        for _cid, d in defs.items():
+            key = (
+                d.get("fontName"),
+                d.get("textColor"),
+                d.get("bold"),
+                d.get("italic"),
+                d.get("underline"),
+            )
             grp.setdefault(key, set()).add(d.get("fontSizePt"))
-        if any(len({s for s in g if s is not None}) >= 2
-                  for g in grp.values()):
+        if any(len({s for s in g if s is not None}) >= 2 for g in grp.values()):
             matched += 1
     assert total >= 5, f"too few fixtures: {total}"
     pct = matched / total
@@ -273,11 +298,13 @@ def test_fixture_fontsize_matching_at_least_90_pct():
 
 # ── 6. audit verdict PASS ──────────────────────────────────
 
+
 def test_audit_script_pass():
     from scripts.ops.audit_web_office_para_edit_applyformat_fontsize_matching_existing_charpr import (
-        audit)
+        audit,
+    )
+
     rep = audit()
-    fails = [f for f in rep["findings"]
-              if f.get("level") == "FAIL"]
+    fails = [f for f in rep["findings"] if f.get("level") == "FAIL"]
     assert not fails, json.dumps(rep, ensure_ascii=False, indent=2)
     assert rep["verdict"] in ("PASS", "WARN"), rep
