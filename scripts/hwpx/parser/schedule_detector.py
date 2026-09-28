@@ -92,6 +92,54 @@ def _cells_by_row_col(table) -> dict[tuple[int, int], Any]:
 # ── STEP 2: 날짜축 탐지 ───────────────────────────────────────────────────────
 
 
+_DATE_LABEL_CONFIDENCE = {
+    "month:": 0.95,
+    "week:": 0.90,
+    "day:": 0.80,
+    "date:": 0.85,
+}
+
+
+def _row_date_columns(
+    cells: dict[tuple[int, int], Any], row_i: int, cols: int
+) -> list[DateColumnInfo]:
+    date_cols: list[DateColumnInfo] = []
+    for col_i in range(cols):
+        cell = cells.get((row_i, col_i))
+        if not cell:
+            continue
+        text = (getattr(cell, "normalizedText", "") or "").strip()
+        if not text:
+            continue
+        norm = normalize_axis_label(text)
+        conf = next(
+            (c for prefix, c in _DATE_LABEL_CONFIDENCE.items() if norm.startswith(prefix)), 0.0
+        )
+        if conf > 0:
+            date_cols.append(
+                DateColumnInfo(col=col_i, label=text, normalized=norm, confidence=conf)
+            )
+    return date_cols
+
+
+def _classify_header_rows(
+    date_cols: list[DateColumnInfo], header_row: int
+) -> tuple[list[int], list[int], list[int]]:
+    month_header_rows: list[int] = []
+    week_header_rows: list[int] = []
+    day_header_rows: list[int] = []
+    for d in date_cols:
+        if d.normalized.startswith("month:"):
+            if header_row not in month_header_rows:
+                month_header_rows.append(header_row)
+        elif d.normalized.startswith("week:"):
+            if header_row not in week_header_rows:
+                week_header_rows.append(header_row)
+        elif d.normalized.startswith("day:") and header_row not in day_header_rows:
+            day_header_rows.append(header_row)
+    return month_header_rows, week_header_rows, day_header_rows
+
+
 def detect_time_axis(table) -> TimeAxisInfo:
     cells = _cells_by_row_col(table)
     rows = getattr(table, "rowCount", 0)
@@ -101,34 +149,9 @@ def detect_time_axis(table) -> TimeAxisInfo:
     best_date_cols: list[DateColumnInfo] = []
     best_score: float = 0.0
     evidence: list[str] = []
-    month_header_rows: list[int] = []
-    week_header_rows: list[int] = []
-    day_header_rows: list[int] = []
 
     for row_i in range(min(rows, 4)):
-        date_cols: list[DateColumnInfo] = []
-        for col_i in range(cols):
-            cell = cells.get((row_i, col_i))
-            if not cell:
-                continue
-            text = (getattr(cell, "normalizedText", "") or "").strip()
-            if not text:
-                continue
-            norm = normalize_axis_label(text)
-            conf = 0.0
-            if norm.startswith("month:"):
-                conf = 0.95
-            elif norm.startswith("week:"):
-                conf = 0.90
-            elif norm.startswith("day:"):
-                conf = 0.80
-            elif norm.startswith("date:"):
-                conf = 0.85
-            if conf > 0:
-                date_cols.append(
-                    DateColumnInfo(col=col_i, label=text, normalized=norm, confidence=conf)
-                )
-
+        date_cols = _row_date_columns(cells, row_i, cols)
         if len(date_cols) >= 2:
             score = len(date_cols) * sum(d.confidence for d in date_cols) / len(date_cols)
             if score > best_score:
@@ -148,16 +171,9 @@ def detect_time_axis(table) -> TimeAxisInfo:
     evidence.append(f"date_cols={[d.col for d in best_date_cols]}")
     evidence.append(f"unit={unit}")
 
-    # 월/주/일 헤더 행 분류
-    for d in best_date_cols:
-        if d.normalized.startswith("month:"):
-            if best_header_row not in month_header_rows:
-                month_header_rows.append(best_header_row)
-        elif d.normalized.startswith("week:"):
-            if best_header_row not in week_header_rows:
-                week_header_rows.append(best_header_row)
-        elif d.normalized.startswith("day:") and best_header_row not in day_header_rows:
-            day_header_rows.append(best_header_row)
+    month_header_rows, week_header_rows, day_header_rows = _classify_header_rows(
+        best_date_cols, best_header_row
+    )
 
     axis_conf = min(0.99, best_score / (len(best_date_cols) + 1))
     return TimeAxisInfo(
