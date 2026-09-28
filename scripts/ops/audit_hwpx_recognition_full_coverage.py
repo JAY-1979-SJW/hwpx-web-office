@@ -11,6 +11,7 @@ end-to-end 인식 능력을 전수 감사한다.
 - output 파일은 reports/ tmp 하위에만 생성한다.
 - AI API / OCR / DB / network 호출 없음.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,15 +38,31 @@ SCAN_DIRS = (
     "docs",
 )
 EXCLUDE_PREFIXES = (
-    "reports/", "tmp/", ".tmp/", "build/", "dist/",
-    "node_modules/", "__pycache__/", "output/",
+    "reports/",
+    "tmp/",
+    ".tmp/",
+    "build/",
+    "dist/",
+    "node_modules/",
+    "__pycache__/",
+    "output/",
     # sandbox/draft 산출물은 corpus inventory에서 제외 (CLAUDE.md §8 창고 정책)
-    "data/drafts/", "data/artifacts/", "data/approvals/",
-    "data/uploads/", "data/evidence/", "data/sessions/",
+    "data/drafts/",
+    "data/artifacts/",
+    "data/approvals/",
+    "data/uploads/",
+    "data/evidence/",
+    "data/sessions/",
+    # pytest 가 테스트 중 만드는 임시 산출물(예: broken.hwpx, sanitized 입력)
+    # — 2026-09-29 실측: "tmp/" 는 최상위 tmp/ 만 잡고 data/tmp/ 는 못 걸러서
+    # 6609개 테스트 찌꺼기가 "실제 서식"으로 잘못 집계돼 파싱 실패율이
+    # 98.5%로 뻥튀기됐었다(진짜 corpus는 84건, 전부 파싱 정상).
+    "data/tmp/",
 )
 
 
 # ── inventory ────────────────────────────────────────────────────────────────
+
 
 def _scan_hwpx_inventory() -> list[dict]:
     items: list[dict] = []
@@ -60,11 +77,14 @@ def _scan_hwpx_inventory() -> list[dict]:
             try:
                 stat = p.stat()
                 sha = hashlib.sha256(p.read_bytes()).hexdigest()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
                 items.append({
-                    "relativePath": rel, "fileName": p.name,
-                    "fileSize": -1, "sha256Before": "",
-                    "mtimeBefore": -1, "include": False,
+                    "relativePath": rel,
+                    "fileName": p.name,
+                    "fileSize": -1,
+                    "sha256Before": "",
+                    "mtimeBefore": -1,
+                    "include": False,
                     "excludeReason": f"read_error: {exc}",
                 })
                 continue
@@ -82,12 +102,13 @@ def _scan_hwpx_inventory() -> list[dict]:
 
 # ── per-file recognition audit ───────────────────────────────────────────────
 
+
 def _audit_required_xml_parts(path: Path) -> tuple[bool, list[str]]:
     required = {"mimetype", "META-INF/container.xml", "Contents/header.xml"}
     try:
         with zipfile.ZipFile(path) as zf:
             names = set(zf.namelist())
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         return False, sorted(required) + ["Contents/section*.xml"]
     missing = sorted(required - names)
     if not any(n.startswith("Contents/section") and n.endswith(".xml") for n in names):
@@ -119,8 +140,9 @@ def _audit_one_file(item: dict) -> dict:
     # 2) parser
     try:
         from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
+
         r = parse_hwpx_v2(path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["verdict"] = "FAIL_PARSE_ERROR"
         rec_out["errors"].append({"stage": "parse", "detail": str(exc)})
         rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -153,6 +175,7 @@ def _audit_one_file(item: dict) -> dict:
         from scripts.hwpx.parser.object_cell_mapper import (
             map_objects_to_cells_with_geometry,
         )
+
         ocm = map_objects_to_cells_with_geometry(path)
         rec_out["objectMapping"] = {
             "tableCount": ocm.tableCount,
@@ -164,7 +187,7 @@ def _audit_one_file(item: dict) -> dict:
             "ambiguousCandidateCount": ocm.ambiguousCandidateCount,
             "noGeometryObjectCount": ocm.noGeometryObjectCount,
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "object_mapping", "detail": str(exc)})
         rec_out["objectMapping"] = None
 
@@ -173,33 +196,40 @@ def _audit_one_file(item: dict) -> dict:
         from scripts.hwpx.parser.object_cell_confirmation_gate import (
             apply_geometric_confirmation,
         )
+
         if rec_out["objectMapping"] and ocm.geometricCandidates:
             amb = next((c for c in ocm.geometricCandidates if c.ambiguous), None)
             if amb is not None:
                 gate_out = apply_geometric_confirmation(
                     ocm,
-                    [{"objectKey": amb.objectKey,
-                       "candidateCellKey": amb.candidateCellKey,
-                       "decision": "APPROVE",
-                       "reviewer": "audit", "reason": "smoke"}],
+                    [
+                        {
+                            "objectKey": amb.objectKey,
+                            "candidateCellKey": amb.candidateCellKey,
+                            "decision": "APPROVE",
+                            "reviewer": "audit",
+                            "reason": "smoke",
+                        }
+                    ],
                 )
                 rec_out["ambiguousAutoPromotionBlocked"] = (
-                    gate_out.confirmedMappingCount == 0
-                    and gate_out.blockedConfirmationCount >= 1
+                    gate_out.confirmedMappingCount == 0 and gate_out.blockedConfirmationCount >= 1
                 )
             else:
                 rec_out["ambiguousAutoPromotionBlocked"] = None
         else:
             rec_out["ambiguousAutoPromotionBlocked"] = None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({
-            "stage": "confirmation_gate", "detail": str(exc),
+            "stage": "confirmation_gate",
+            "detail": str(exc),
         })
         rec_out["ambiguousAutoPromotionBlocked"] = False
 
     # 5) FillRequirement smoke — recognition.cells에서 라벨/값 매핑 시도
     try:
         from scripts.hwpx.fill_review import fill_review_contract as fr
+
         synth_cells = []
         for t in r.tables:
             for c in t.cells:
@@ -215,18 +245,21 @@ def _audit_one_file(item: dict) -> dict:
             documentId="audit",
             sourceDocumentHash=item["sha256Before"],
             sourcePath=item["relativePath"],
-            cells=synth_cells, paragraphs=synth_paragraphs,
+            cells=synth_cells,
+            paragraphs=synth_paragraphs,
         )
         reqs = fr.build_fill_requirements(rec_dict)
         rec_out["fillRequirementCount"] = len(reqs)
         rec_out["fillRequirementSemanticBreakdown"] = {}
         for req in reqs:
             sem = req.get("semanticType", "UNKNOWN")
-            rec_out["fillRequirementSemanticBreakdown"][sem] = \
+            rec_out["fillRequirementSemanticBreakdown"][sem] = (
                 rec_out["fillRequirementSemanticBreakdown"].get(sem, 0) + 1
-    except Exception as exc:
+            )
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({
-            "stage": "fill_requirement", "detail": str(exc),
+            "stage": "fill_requirement",
+            "detail": str(exc),
         })
         rec_out["verdict"] = "FAIL_FILL_REQUIREMENT_ERROR"
         rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -240,17 +273,19 @@ def _audit_one_file(item: dict) -> dict:
         items = fr.build_review_items(reqs, matches, missing)
         rec_out["missingMaterialCount"] = len(missing)
         rec_out["reviewItemCount"] = len(items)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "evidence", "detail": str(exc)})
 
     # 7) UI payload smoke
     try:
         from scripts.hwpx.fill_review import fill_review_ui_adapter as ui
+
         payload = ui.build_fill_review_page_payload(rec_dict, items, missing, [])
-        rec_out["uiPayloadReady"] = bool(payload.get("reviewSections") is not None
-                                              and "summary" in payload)
+        rec_out["uiPayloadReady"] = bool(
+            payload.get("reviewSections") is not None and "summary" in payload
+        )
         rec_out["uiPayloadSummary"] = payload.get("summary")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "ui_payload", "detail": str(exc)})
         rec_out["uiPayloadReady"] = False
 
@@ -264,7 +299,8 @@ def _audit_one_file(item: dict) -> dict:
                 "decisions": [],
             }
             val = ui.validate_decision_payload(
-                dp, ui_items,
+                dp,
+                ui_items,
                 expected_source_hash=item["sha256Before"],
             )
             rec_out["decisionValidationSmoke"] = {
@@ -272,18 +308,20 @@ def _audit_one_file(item: dict) -> dict:
                 "accepted": val.acceptedDecisionCount,
                 "errors": [e.get("code") for e in val.errors],
             }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "decision_validation", "detail": str(exc)})
 
     # 9) sha/mtime after (writer 미호출 — 변경 없어야 함)
     rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
     rec_out["mtimeAfter"] = path.stat().st_mtime
-    if rec_out["sha256After"] != item["sha256Before"] \
-       or rec_out["mtimeAfter"] != item["mtimeBefore"]:
+    if (
+        rec_out["sha256After"] != item["sha256Before"]
+        or rec_out["mtimeAfter"] != item["mtimeBefore"]
+    ):
         rec_out["verdict"] = "FAIL_UNSAFE_MUTATION"
         rec_out["errors"].append({
             "stage": "source_mutation",
-            "detail": f"sha256 or mtime changed during audit",
+            "detail": "sha256 or mtime changed during audit",
         })
         return rec_out
 
@@ -302,19 +340,24 @@ def _audit_one_file(item: dict) -> dict:
 
 # ── live sandbox writer smoke (대표 fixture 2종만) ──────────────────────────
 
+
 def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
     """대표 fixture에 대해 setParagraphText / replaceTextRun smoke."""
     results: list[dict] = []
     METADATA_FORM = PROJECT_ROOT / "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx"
     if not METADATA_FORM.exists():
-        return [{"scenario": "fixture_missing", "verdict": "SKIPPED",
-                  "detail": "METADATA_FORM not found"}]
+        return [
+            {
+                "scenario": "fixture_missing",
+                "verdict": "SKIPPED",
+                "detail": "METADATA_FORM not found",
+            }
+        ]
 
     # 사본 with placeholder paragraph
     ET.register_namespace("hp", NS_HP)
     src = tmp_dir / "audit_smoke_src.hwpx"
-    with zipfile.ZipFile(METADATA_FORM) as zin, \
-         zipfile.ZipFile(src, "w") as zout:
+    with zipfile.ZipFile(METADATA_FORM) as zin, zipfile.ZipFile(src, "w") as zout:
         for info in zin.infolist():
             data = zin.read(info.filename)
             if info.filename == "Contents/section0.xml":
@@ -334,81 +377,101 @@ def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
 
     # 1) setParagraphText smoke (live pipeline 경유)
     try:
-        from scripts.hwpx.fill_review import fill_review_live_pipeline as pipe
         from scripts.hwpx.fill_review import fill_review_contract as fr
+        from scripts.hwpx.fill_review import fill_review_live_pipeline as pipe
+
         rec = fr.make_document_recognition_result(
-            documentId="d", sourceDocumentHash=sha,
-            paragraphs=[{"paragraphKey": "p_s0_0001",
-                          "text": "__PROJECT_NAME__"}],
+            documentId="d",
+            sourceDocumentHash=sha,
+            paragraphs=[{"paragraphKey": "p_s0_0001", "text": "__PROJECT_NAME__"}],
         )
         out_p = tmp_dir / "audit_smoke_paragraph.hwpx"
         review_only = {
-            "sourcePath": src, "outputPath": out_p,
+            "sourcePath": src,
+            "outputPath": out_p,
             "sourceDocumentHash": sha,
             "recognitionResult": rec,
-            "evidenceInputs": [{
-                "inputId": "in", "sourceName": "x.xlsx", "sourceHash": "sha:e",
-                "sourceTypeHint": "CONTRACT_XLSX",
-                "extractedFields": {"projectName": "VAL"},
-            }],
+            "evidenceInputs": [
+                {
+                    "inputId": "in",
+                    "sourceName": "x.xlsx",
+                    "sourceHash": "sha:e",
+                    "sourceTypeHint": "CONTRACT_XLSX",
+                    "extractedFields": {"projectName": "VAL"},
+                }
+            ],
         }
         r0 = pipe.run_fill_review_live_pipeline_sandbox(review_only)
-        ui_items = [it for sec in r0["uiPayload"]["reviewSections"]
-                       for it in sec["items"]]
+        ui_items = [it for sec in r0["uiPayload"]["reviewSections"] for it in sec["items"]]
         dp = {
-            "documentId": "d", "sourceDocumentHash": sha,
-            "decisions": [{"reviewItemId": ui_items[0]["reviewItemId"],
-                              "decision": "APPROVE",
-                              "userComment": "", "decidedBy": "u", "decidedAt": "now"}],
+            "documentId": "d",
+            "sourceDocumentHash": sha,
+            "decisions": [
+                {
+                    "reviewItemId": ui_items[0]["reviewItemId"],
+                    "decision": "APPROVE",
+                    "userComment": "",
+                    "decidedBy": "u",
+                    "decidedAt": "now",
+                }
+            ],
         }
         res = pipe.run_fill_review_live_pipeline_sandbox({
-            **review_only, "decisionPayload": dp,
+            **review_only,
+            "decisionPayload": dp,
         })
         results.append({
             "scenario": "setParagraphText",
-            "verdict": ("PASS" if res["pipelineStatus"] == "WRITER_APPLIED"
-                          else "FAIL"),
+            "verdict": ("PASS" if res["pipelineStatus"] == "WRITER_APPLIED" else "FAIL"),
             "pipelineStatus": res["pipelineStatus"],
             "outputCreated": res["outputCreated"],
             "originalUnmodified": res["originalUnmodified"],
         })
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         results.append({
-            "scenario": "setParagraphText", "verdict": "FAIL",
+            "scenario": "setParagraphText",
+            "verdict": "FAIL",
             "detail": str(exc),
         })
 
     # 2) replaceTextRun smoke (live executor 직접)
     try:
         from scripts.hwpx.pipeline import generic_edit_plan_writer_executor_live_sandbox as live
+
         out_r = tmp_dir / "audit_smoke_replace.hwpx"
         fake_wcp = {
-            "planId": "p", "verdict": "READY_FOR_WRITER",
-            "readyForWriter": True, "blockedOps": [],
-            "writerCalls": [{
-                "commandId": "c1", "operationId": "op",
-                "operationType": "replaceTextRun",
-                "writerMethod": "writer.replace_text_run",
-                "target": {"sectionIndex": 0, "paragraphIndex": 1,
-                              "paragraphKey": "p_s0_0001"},
-                "value": {"find": "__PROJECT_NAME__", "replace": "REPLACED"},
-                "expectedBefore": "__PROJECT_NAME__",
-                "preserveStyle": True, "riskLevel": "low",
-                "approvedBy": "audit", "sourceDocumentHash": sha,
-            }],
+            "planId": "p",
+            "verdict": "READY_FOR_WRITER",
+            "readyForWriter": True,
+            "blockedOps": [],
+            "writerCalls": [
+                {
+                    "commandId": "c1",
+                    "operationId": "op",
+                    "operationType": "replaceTextRun",
+                    "writerMethod": "writer.replace_text_run",
+                    "target": {"sectionIndex": 0, "paragraphIndex": 1, "paragraphKey": "p_s0_0001"},
+                    "value": {"find": "__PROJECT_NAME__", "replace": "REPLACED"},
+                    "expectedBefore": "__PROJECT_NAME__",
+                    "preserveStyle": True,
+                    "riskLevel": "low",
+                    "approvedBy": "audit",
+                    "sourceDocumentHash": sha,
+                }
+            ],
         }
         res2 = live.execute_writer_call_plan_live_sandbox(fake_wcp, src, out_r)
         results.append({
             "scenario": "replaceTextRun",
-            "verdict": ("PASS" if res2.verdict == "PASS_LIVE_SANDBOX_APPLIED"
-                          else "FAIL"),
+            "verdict": ("PASS" if res2.verdict == "PASS_LIVE_SANDBOX_APPLIED" else "FAIL"),
             "writerVerdict": res2.verdict,
             "outputCreated": res2.outputCreated,
             "originalUnmodified": res2.originalUnmodified,
         })
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         results.append({
-            "scenario": "replaceTextRun", "verdict": "FAIL",
+            "scenario": "replaceTextRun",
+            "verdict": "FAIL",
             "detail": str(exc),
         })
 
@@ -417,15 +480,17 @@ def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
     mtime_after = src.stat().st_mtime
     results.append({
         "scenario": "source_immutability",
-        "verdict": ("PASS" if (sha_after == src_sha_before
-                                  and mtime_after == src_mtime_before)
-                      else "FAIL"),
-        "sha256Before": src_sha_before, "sha256After": sha_after,
+        "verdict": (
+            "PASS" if (sha_after == src_sha_before and mtime_after == src_mtime_before) else "FAIL"
+        ),
+        "sha256Before": src_sha_before,
+        "sha256After": sha_after,
     })
     return results
 
 
 # ── documentType classification ──────────────────────────────────────────────
+
 
 def _classify_document_type(relative_path: str) -> str:
     """파일 경로 패턴 기반 문서 유형 분류 (manifest 없이 결정적으로).
@@ -451,8 +516,8 @@ def _classify_document_type(relative_path: str) -> str:
 
 # ── overall aggregation ─────────────────────────────────────────────────────
 
-def _aggregate(file_results: list[dict], smoke_results: list[dict],
-                  inventory: list[dict]) -> dict:
+
+def _aggregate(file_results: list[dict], smoke_results: list[dict], inventory: list[dict]) -> dict:
     counts: dict[str, int] = {}
     for r in file_results:
         v = r["verdict"]
@@ -483,12 +548,13 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict],
     total = len(inventory)
     included = sum(1 for i in inventory if i["include"])
     excluded = total - included
-    parsed = sum(1 for r in file_results
-                    if r["verdict"] not in ("FAIL_PARSE_ERROR",
-                                                "FAIL_STRUCTURE_MISMATCH"))
+    parsed = sum(
+        1
+        for r in file_results
+        if r["verdict"] not in ("FAIL_PARSE_ERROR", "FAIL_STRUCTURE_MISMATCH")
+    )
     parse_failed = total - parsed
-    unsafe_mut = sum(1 for r in file_results
-                        if r["verdict"] == "FAIL_UNSAFE_MUTATION")
+    unsafe_mut = sum(1 for r in file_results if r["verdict"] == "FAIL_UNSAFE_MUTATION")
     full = counts.get("PASS_FULL_RECOGNITION", 0)
     core = counts.get("PASS_CORE_RECOGNITION_ONLY", 0)
     partial = counts.get("WARN_PARTIAL_RECOGNITION", 0)
@@ -511,8 +577,11 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict],
     elif smoke_blocked > 0:
         overall = "WARN_WRITER_SMOKE_FAILED"
     elif full + core + template_empty == total and smoke_pass >= 2:
-        overall = "PASS_CORE_COVERAGE_WITH_KNOWN_TEMPLATE_GAPS" \
-                    if template_empty > 0 else "PASS_FULL_COVERAGE"
+        overall = (
+            "PASS_CORE_COVERAGE_WITH_KNOWN_TEMPLATE_GAPS"
+            if template_empty > 0
+            else "PASS_FULL_COVERAGE"
+        )
     else:
         overall = "WARN_PARTIAL_COVERAGE"
 
@@ -533,13 +602,12 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict],
         "textExtractionFailCount": 0,
         "tableExtractionFailCount": 0,
         "objectMappingFailCount": sum(
-            1 for r in file_results
+            1
+            for r in file_results
             if any(e.get("stage") == "object_mapping" for e in r.get("errors") or [])
         ),
         "fillRequirementFailCount": fill_fail,
-        "uiPayloadFailCount": sum(
-            1 for r in file_results if r.get("uiPayloadReady") is False
-        ),
+        "uiPayloadFailCount": sum(1 for r in file_results if r.get("uiPayloadReady") is False),
         "writerReadinessFailCount": 0,
         "writerSmokePassCount": smoke_pass,
         "writerSmokeBlockedCount": smoke_blocked,
@@ -559,8 +627,10 @@ def _aggregate(file_results: list[dict], smoke_results: list[dict],
 
 # ── markdown report ─────────────────────────────────────────────────────────
 
-def _write_markdown(summary: dict, inventory: list[dict],
-                       file_results: list[dict], smoke_results: list[dict]) -> str:
+
+def _write_markdown(
+    summary: dict, inventory: list[dict], file_results: list[dict], smoke_results: list[dict]
+) -> str:
     lines: list[str] = []
     L = lines.append
     L("# HWPX-RECOGNITION-FULL-COVERAGE-AUDIT-01 Report")
@@ -568,30 +638,36 @@ def _write_markdown(summary: dict, inventory: list[dict],
     L("## 1. Executive Summary")
     L("")
     L(f"- Overall verdict: **{summary['overallVerdict']}**")
-    L(f"- Total HWPX: {summary['totalHwpxFiles']} "
-       f"(included={summary['includedHwpxFiles']}, "
-       f"excluded={summary['excludedHwpxFiles']})")
-    L(f"- Parsed: {summary['parsedCount']} / "
-       f"Parse failed: {summary['parseFailedCount']}")
+    L(
+        f"- Total HWPX: {summary['totalHwpxFiles']} "
+        f"(included={summary['includedHwpxFiles']}, "
+        f"excluded={summary['excludedHwpxFiles']})"
+    )
+    L(f"- Parsed: {summary['parsedCount']} / Parse failed: {summary['parseFailedCount']}")
     L(f"- Full recognition: {summary['fullRecognitionPassCount']}")
     L(f"- Core recognition only: {summary['coreRecognitionOnlyCount']}")
     L(f"- Template empty (gantt 등): {summary['templateEmptyWarnCount']}")
     L(f"- Fill requirement fail: {summary['fillRequirementFailCount']}")
     L(f"- Unsafe mutation: {summary['unsafeMutationCount']}")
-    L(f"- Writer smoke pass / blocked: "
-       f"{summary['writerSmokePassCount']} / {summary['writerSmokeBlockedCount']}")
+    L(
+        f"- Writer smoke pass / blocked: "
+        f"{summary['writerSmokePassCount']} / {summary['writerSmokeBlockedCount']}"
+    )
     L("")
     L("### 1.1 Document Type Classification (post-expansion lock)")
     L("")
     L(f"- fillable_form total: **{summary['fillableFormTotal']}**")
     L(f"  - PASS_FULL_RECOGNITION: **{summary['fillableFormPassFullCount']}**")
     L(f"  - PASS_CORE_RECOGNITION_ONLY: {summary['fillableFormPassCoreOnlyCount']}")
-    L(f"  - **fillableFormCoverageRate: "
-       f"{summary['fillableFormCoverageRate']}**")
-    L(f"- reference_table: {summary['referenceTableCount']} "
-       f"(별표 N — 부록 참고자료성, fillable 분모 제외)")
-    L(f"- empty_template: {summary['emptyTemplateCount']} "
-       f"(gantt 빈 공정표 — 정상 WARN_TEMPLATE_EMPTY)")
+    L(f"  - **fillableFormCoverageRate: {summary['fillableFormCoverageRate']}**")
+    L(
+        f"- reference_table: {summary['referenceTableCount']} "
+        f"(별표 N — 부록 참고자료성, fillable 분모 제외)"
+    )
+    L(
+        f"- empty_template: {summary['emptyTemplateCount']} "
+        f"(gantt 빈 공정표 — 정상 WARN_TEMPLATE_EMPTY)"
+    )
     L(f"- documentType breakdown: {summary['documentTypeCounts']}")
     L("")
     L("## 2. Fixture Inventory")
@@ -599,19 +675,23 @@ def _write_markdown(summary: dict, inventory: list[dict],
     L("| # | relativePath | sizeBytes | sha256Before(prefix) | include |")
     L("|---|---|---|---|---|")
     for i, item in enumerate(inventory, 1):
-        L(f"| {i} | {item['relativePath']} | {item['fileSize']} "
-           f"| {item['sha256Before'][:12]} | {item['include']} |")
+        L(
+            f"| {i} | {item['relativePath']} | {item['fileSize']} "
+            f"| {item['sha256Before'][:12]} | {item['include']} |"
+        )
     L("")
     L("## 3. Recognition Coverage Matrix")
     L("")
     L("| relativePath | docType | verdict | tables | cells | textRatio | objects | reqCount |")
     L("|---|---|---|---|---|---|---|---|")
     for r in file_results:
-        L(f"| {r['relativePath']} | {r.get('documentType', '-')} "
-           f"| {r['verdict']} "
-           f"| {r.get('tableCount', '-')} | {r.get('cellCount', '-')} "
-           f"| {r.get('textRatio', '-')} | {r.get('objectCount', '-')} "
-           f"| {r.get('fillRequirementCount', '-')} |")
+        L(
+            f"| {r['relativePath']} | {r.get('documentType', '-')} "
+            f"| {r['verdict']} "
+            f"| {r.get('tableCount', '-')} | {r.get('cellCount', '-')} "
+            f"| {r.get('textRatio', '-')} | {r.get('objectCount', '-')} "
+            f"| {r.get('fillRequirementCount', '-')} |"
+        )
     L("")
     L("## 4. Live Sandbox Writer Smoke")
     L("")
@@ -620,9 +700,7 @@ def _write_markdown(summary: dict, inventory: list[dict],
     L("")
     L("## 5. Source Immutability")
     L("")
-    sha_kept = all(
-        r.get("sha256After") == r.get("sha256Before") for r in file_results
-    )
+    sha_kept = all(r.get("sha256After") == r.get("sha256Before") for r in file_results)
     L(f"- All files sha256 invariant: **{sha_kept}**")
     L("")
     L("## 6. Known Gaps")
@@ -644,27 +722,42 @@ def _write_markdown(summary: dict, inventory: list[dict],
 
 # ── main ────────────────────────────────────────────────────────────────────
 
+
 def run_audit() -> dict:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     inventory = _scan_hwpx_inventory()
     if not inventory:
         summary = {
-            "totalHwpxFiles": 0, "includedHwpxFiles": 0, "excludedHwpxFiles": 0,
-            "parsedCount": 0, "parseFailedCount": 0,
-            "fullRecognitionPassCount": 0, "coreRecognitionOnlyCount": 0,
-            "partialRecognitionWarnCount": 0, "templateEmptyWarnCount": 0,
-            "textExtractionFailCount": 0, "tableExtractionFailCount": 0,
-            "objectMappingFailCount": 0, "fillRequirementFailCount": 0,
-            "uiPayloadFailCount": 0, "writerReadinessFailCount": 0,
-            "writerSmokePassCount": 0, "writerSmokeBlockedCount": 0,
-            "readbackFailCount": 0, "unsafeMutationCount": 0,
-            "verdictCounts": {}, "overallVerdict": "WARN_NO_HWPX_FIXTURES",
+            "totalHwpxFiles": 0,
+            "includedHwpxFiles": 0,
+            "excludedHwpxFiles": 0,
+            "parsedCount": 0,
+            "parseFailedCount": 0,
+            "fullRecognitionPassCount": 0,
+            "coreRecognitionOnlyCount": 0,
+            "partialRecognitionWarnCount": 0,
+            "templateEmptyWarnCount": 0,
+            "textExtractionFailCount": 0,
+            "tableExtractionFailCount": 0,
+            "objectMappingFailCount": 0,
+            "fillRequirementFailCount": 0,
+            "uiPayloadFailCount": 0,
+            "writerReadinessFailCount": 0,
+            "writerSmokePassCount": 0,
+            "writerSmokeBlockedCount": 0,
+            "readbackFailCount": 0,
+            "unsafeMutationCount": 0,
+            "verdictCounts": {},
+            "overallVerdict": "WARN_NO_HWPX_FIXTURES",
         }
         (OUTPUT_DIR / "audit.json").write_text(
-            json.dumps({"summary": summary, "inventory": [],
-                          "fileResults": [], "smokeResults": []},
-                         ensure_ascii=False, indent=2),
-            encoding="utf-8")
+            json.dumps(
+                {"summary": summary, "inventory": [], "fileResults": [], "smokeResults": []},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         return summary
 
     file_results: list[dict] = []
@@ -673,13 +766,14 @@ def run_audit() -> dict:
             continue
         try:
             file_results.append(_audit_one_file(item))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 이 단계만 errors 기록 후 다음 단계/파일 계속
             file_results.append({
                 "relativePath": item["relativePath"],
                 "fileName": item["fileName"],
                 "verdict": "FAIL_PARSE_ERROR",
-                "errors": [{"stage": "audit_outer",
-                              "detail": f"{exc}\n{traceback.format_exc()[:200]}"}],
+                "errors": [
+                    {"stage": "audit_outer", "detail": f"{exc}\n{traceback.format_exc()[:200]}"}
+                ],
                 "sha256Before": item["sha256Before"],
                 "sha256After": item["sha256Before"],
                 "mtimeBefore": item["mtimeBefore"],

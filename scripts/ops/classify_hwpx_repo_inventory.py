@@ -171,6 +171,8 @@ def classify_path(path: str) -> tuple[str, str, str]:
                 "install_",
                 "classify_",
                 "build_",
+                "inspect_",
+                "diagnose_",
                 "dashboard",
                 "history",
                 "candidate_scan",

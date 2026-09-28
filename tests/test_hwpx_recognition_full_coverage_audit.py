@@ -35,9 +35,12 @@ def audit_run(audit):
 
 
 # 커밋된 tests/fixtures 는 15개뿐이라(git ls-files -- '*.hwpx'), 실제 로컬
-# 코퍼스(수천 건, data/ 등 .gitignore 대상)가 없는 CI에서는 아래 count-locked
-# 검증들이 애초에 성립하지 않는다 — 임계값은 그 둘을 넉넉히 가른다.
-_FULL_CORPUS_MIN = 100
+# 코퍼스(수집분, data/ 등 .gitignore 대상)가 없는 CI에서는 아래 count-locked
+# 검증들이 애초에 성립하지 않는다 — 임계값은 그 둘을 넉넉히 가른다. 2026-09-29
+# 실측: data/tmp/ 스캔 버그 수정 후 로컬 실제 코퍼스는 98건(전부 정상 파싱,
+# fillableFormTotal=21·referenceTableCount=12로 락 테스트 기댓값과 거의 일치)
+# — 이 정도는 "충분히 크다"로 보고 50으로 낮춰 로컬에서는 실제 검증되게 한다.
+_FULL_CORPUS_MIN = 50
 
 
 @pytest.fixture(scope="module")
