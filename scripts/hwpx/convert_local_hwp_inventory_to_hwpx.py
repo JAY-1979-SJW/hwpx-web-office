@@ -14,6 +14,7 @@ import subprocess
 import time
 import uuid
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -332,34 +333,111 @@ def run_persistent_worker(
     return _finalize_worker_results(pre_results, target_map, result_path, proc, batch_staging)
 
 
-def run_conversion(
-    *,
-    inventory_csv: Path,
+@dataclass
+class ConversionConfig:
+    """`run_conversion` 의 묶인 설정 (원래 18개 keyword-only 인자였음)."""
+
+    inventory_csv: Path
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+    report_json: Path
+    report_csv: Path | None
+    audit_jsonl: Path | None
+    offset: int
+    limit: int
+    timeout_sec: int
+    save_strategy: str
+    existing_policy: str
+    skip_inventory_peer: bool
+    root_contains: str
+    dry_run: bool
+    fail_fast: bool
+    lock_file: Path | None
+    engine: str
+
+
+def _append_audit_jsonl(audit_jsonl: Path | None, result: dict[str, Any]) -> None:
+    if not audit_jsonl:
+        return
+    audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    with audit_jsonl.open("a", encoding="utf-8") as fh:
+        fh.write(
+            json.dumps(
+                {
+                    "event": "local_hwp_inventory_conversion_item",
+                    "logged_at": iso_now(),
+                    "result": result,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+
+
+@dataclass
+class _ResolvedDirs:
+    """`config` 의 output/staging/diag 디렉토리를 resolve() 한 결과 묶음."""
+
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+
+
+def _result_for_row(
+    index: int,
+    row_target: tuple[dict[str, str], Path, Path, Path],
+    peers: set[str],
+    config: ConversionConfig,
+    dirs: _ResolvedDirs,
+) -> dict[str, Any] | None:
+    """단일 행의 변환 결과를 계산한다.
+
+    engine="persistent" 이고 즉시 처리 대상이 아니면 None 을 반환해
+    지연(pending_persistent) 처리 대상임을 알린다.
+    """
+    row, source, root, target = row_target
+    peer_key = os.path.normcase(str(source.with_suffix("")))
+    peer = source.with_suffix(".hwpx")
+    if config.dry_run:
+        return planned_result(index, source, root, target)
+    if config.skip_inventory_peer and peer_key in peers:
+        return skipped_result(index, source, root, target, "INVENTORY_HWPX_PEER_EXISTS", peer)
+    if target.exists() and config.existing_policy == "skip":
+        return skipped_result(index, source, root, target, "OUTPUT_EXISTS")
+    if target.exists() and config.existing_policy == "fail":
+        return {
+            "status": "FAIL",
+            "index": index,
+            "input": str(source),
+            "relative": str(row_relative(row, root, source)),
+            "output": str(target),
+            "error_code": "OUTPUT_EXISTS",
+            "error_message": "Output exists and existing_policy=fail",
+        }
+    if config.engine == "persistent":
+        return None
+    return convert_one_native(
+        source,
+        input_root=root,
+        output_root=dirs.output_dir / safe_anchor(str(root)),
+        staging_root=dirs.staging_dir,
+        diag_dir=dirs.diag_dir,
+        timeout_sec=config.timeout_sec,
+        save_strategy=config.save_strategy,
+        index=index,
+    )
+
+
+def _discover_target_rows(
+    rows: list[dict[str, str]],
     output_dir: Path,
-    staging_dir: Path,
-    diag_dir: Path,
-    report_json: Path,
-    report_csv: Path | None,
-    audit_jsonl: Path | None,
+    root_filter: str,
     offset: int,
     limit: int,
-    timeout_sec: int,
-    save_strategy: str,
-    existing_policy: str,
-    skip_inventory_peer: bool,
-    root_contains: str,
-    dry_run: bool,
-    fail_fast: bool,
-    lock_file: Path | None,
-    engine: str,
-) -> dict[str, Any]:
-    started = iso_now()
-    rows = read_inventory(inventory_csv)
-    peers = inventory_hwpx_peers(rows) if skip_inventory_peer else set()
-    output_dir = output_dir.expanduser().resolve()
-    staging_dir = staging_dir.expanduser().resolve()
-    diag_dir = diag_dir.expanduser().resolve()
-    root_filter = root_contains.lower()
+) -> list[tuple[dict[str, str], Path, Path, Path]]:
+    """인벤토리 행 중 .hwp 대상만 골라 (row, source, root, target) 목록을 만든다."""
     hwp_rows: list[tuple[dict[str, str], Path, Path, Path]] = []
     for row in rows:
         source = row_path(row)
@@ -375,93 +453,50 @@ def run_conversion(
         hwp_rows = hwp_rows[offset:]
     if limit > 0:
         hwp_rows = hwp_rows[:limit]
+    return hwp_rows
+
+
+def run_conversion(config: ConversionConfig) -> dict[str, Any]:
+    started = iso_now()
+    rows = read_inventory(config.inventory_csv)
+    peers = inventory_hwpx_peers(rows) if config.skip_inventory_peer else set()
+    dirs = _ResolvedDirs(
+        output_dir=config.output_dir.expanduser().resolve(),
+        staging_dir=config.staging_dir.expanduser().resolve(),
+        diag_dir=config.diag_dir.expanduser().resolve(),
+    )
+    hwp_rows = _discover_target_rows(
+        rows, dirs.output_dir, config.root_contains.lower(), config.offset, config.limit
+    )
 
     results: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
-    with BatchLock(lock_file):
+    with BatchLock(config.lock_file):
         pending_persistent: list[tuple[int, dict[str, str], Path, Path, Path]] = []
-        for index, (row, source, root, target) in enumerate(hwp_rows, 1):
-            result: dict[str, Any]
-            peer_key = os.path.normcase(str(source.with_suffix("")))
-            peer = source.with_suffix(".hwpx")
-            if dry_run:
-                result = planned_result(index, source, root, target)
-            elif skip_inventory_peer and peer_key in peers:
-                result = skipped_result(
-                    index, source, root, target, "INVENTORY_HWPX_PEER_EXISTS", peer
-                )
-            elif target.exists() and existing_policy == "skip":
-                result = skipped_result(index, source, root, target, "OUTPUT_EXISTS")
-            elif target.exists() and existing_policy == "fail":
-                result = {
-                    "status": "FAIL",
-                    "index": index,
-                    "input": str(source),
-                    "relative": str(row_relative(row, root, source)),
-                    "output": str(target),
-                    "error_code": "OUTPUT_EXISTS",
-                    "error_message": "Output exists and existing_policy=fail",
-                }
-            elif engine == "persistent":
+        for index, row_target in enumerate(hwp_rows, 1):
+            result = _result_for_row(index, row_target, peers, config, dirs)
+            if result is None:
+                row, source, root, target = row_target
                 pending_persistent.append((index, row, source, root, target))
                 continue
-            else:
-                result = convert_one_native(
-                    source,
-                    input_root=root,
-                    output_root=output_dir / safe_anchor(str(root)),
-                    staging_root=staging_dir,
-                    diag_dir=diag_dir,
-                    timeout_sec=timeout_sec,
-                    save_strategy=save_strategy,
-                    index=index,
-                )
             results.append(result)
             counts[str(result.get("status"))] += 1
-            if audit_jsonl:
-                audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
-                with audit_jsonl.open("a", encoding="utf-8") as fh:
-                    fh.write(
-                        json.dumps(
-                            {
-                                "event": "local_hwp_inventory_conversion_item",
-                                "logged_at": iso_now(),
-                                "result": result,
-                            },
-                            ensure_ascii=False,
-                            sort_keys=True,
-                        )
-                        + "\n"
-                    )
-            if fail_fast and result.get("status") == "FAIL":
+            _append_audit_jsonl(config.audit_jsonl, result)
+            if config.fail_fast and result.get("status") == "FAIL":
                 break
         if pending_persistent:
             for result in run_persistent_worker(
                 pending_persistent,
-                output_dir=output_dir,
-                staging_dir=staging_dir,
-                diag_dir=diag_dir,
-                timeout_sec=timeout_sec,
-                save_strategy=save_strategy,
+                output_dir=dirs.output_dir,
+                staging_dir=dirs.staging_dir,
+                diag_dir=dirs.diag_dir,
+                timeout_sec=config.timeout_sec,
+                save_strategy=config.save_strategy,
             ):
                 results.append(result)
                 counts[str(result.get("status"))] += 1
-                if audit_jsonl:
-                    audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
-                    with audit_jsonl.open("a", encoding="utf-8") as fh:
-                        fh.write(
-                            json.dumps(
-                                {
-                                    "event": "local_hwp_inventory_conversion_item",
-                                    "logged_at": iso_now(),
-                                    "result": result,
-                                },
-                                ensure_ascii=False,
-                                sort_keys=True,
-                            )
-                            + "\n"
-                        )
-                if fail_fast and result.get("status") == "FAIL":
+                _append_audit_jsonl(config.audit_jsonl, result)
+                if config.fail_fast and result.get("status") == "FAIL":
                     break
 
     report = {
@@ -469,31 +504,31 @@ def run_conversion(
         "mode": "local_hwp_inventory_to_hwpx",
         "started_at": started,
         "finished_at": datetime.now(UTC).isoformat(),
-        "inventory_csv": str(inventory_csv),
-        "output_dir": str(output_dir),
-        "staging_dir": str(staging_dir),
-        "diag_dir": str(diag_dir),
+        "inventory_csv": str(config.inventory_csv),
+        "output_dir": str(dirs.output_dir),
+        "staging_dir": str(dirs.staging_dir),
+        "diag_dir": str(dirs.diag_dir),
         "target_count": len(hwp_rows),
-        "offset": offset,
-        "limit": limit,
+        "offset": config.offset,
+        "limit": config.limit,
         "ok_count": counts["PASS"],
         "skip_count": counts["SKIP"],
         "plan_count": counts["PLAN"],
         "fail_count": counts["FAIL"],
-        "existing_policy": existing_policy,
-        "skip_inventory_peer": skip_inventory_peer,
-        "dry_run": dry_run,
-        "save_strategy": save_strategy,
-        "engine": engine,
-        "timeout_sec": timeout_sec,
-        "report_json": str(report_json),
-        "report_csv": str(report_csv) if report_csv else "",
-        "audit_jsonl": str(audit_jsonl) if audit_jsonl else "",
+        "existing_policy": config.existing_policy,
+        "skip_inventory_peer": config.skip_inventory_peer,
+        "dry_run": config.dry_run,
+        "save_strategy": config.save_strategy,
+        "engine": config.engine,
+        "timeout_sec": config.timeout_sec,
+        "report_json": str(config.report_json),
+        "report_csv": str(config.report_csv) if config.report_csv else "",
+        "audit_jsonl": str(config.audit_jsonl) if config.audit_jsonl else "",
         "results": results,
     }
-    write_json(report_json, report)
-    if report_csv:
-        write_csv_report(report_csv, results)
+    write_json(config.report_json, report)
+    if config.report_csv:
+        write_csv_report(config.report_csv, results)
     return report
 
 
@@ -541,24 +576,26 @@ def main() -> int:
     parser.add_argument("--engine", choices=["single", "persistent"], default="persistent")
     args = parser.parse_args()
     report = run_conversion(
-        inventory_csv=args.inventory_csv,
-        output_dir=args.output_dir,
-        staging_dir=args.staging_dir,
-        diag_dir=args.diag_dir,
-        report_json=args.report_json,
-        report_csv=args.report_csv,
-        audit_jsonl=args.audit_jsonl,
-        offset=int(args.offset),
-        limit=int(args.limit),
-        timeout_sec=int(args.timeout_sec),
-        save_strategy=str(args.save_strategy),
-        existing_policy=str(args.existing_policy),
-        skip_inventory_peer=not bool(args.no_skip_inventory_peer),
-        root_contains=str(args.root_contains),
-        dry_run=bool(args.dry_run),
-        fail_fast=bool(args.fail_fast),
-        lock_file=args.lock_file,
-        engine=str(args.engine),
+        ConversionConfig(
+            inventory_csv=args.inventory_csv,
+            output_dir=args.output_dir,
+            staging_dir=args.staging_dir,
+            diag_dir=args.diag_dir,
+            report_json=args.report_json,
+            report_csv=args.report_csv,
+            audit_jsonl=args.audit_jsonl,
+            offset=int(args.offset),
+            limit=int(args.limit),
+            timeout_sec=int(args.timeout_sec),
+            save_strategy=str(args.save_strategy),
+            existing_policy=str(args.existing_policy),
+            skip_inventory_peer=not bool(args.no_skip_inventory_peer),
+            root_contains=str(args.root_contains),
+            dry_run=bool(args.dry_run),
+            fail_fast=bool(args.fail_fast),
+            lock_file=args.lock_file,
+            engine=str(args.engine),
+        )
     )
     print(
         json.dumps(
