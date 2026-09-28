@@ -637,54 +637,64 @@ def split_paragraphs(extraction: dict[str, Any]) -> list[str]:
     return [paragraph for section in split_section_paragraphs(extraction) for paragraph in section]
 
 
+_TABLE_BLOCK_COPY_KEYS = (
+    "source_row_count",
+    "source_col_count",
+    "record_index",
+    "section",
+    "payload_size",
+    "row_cell_counts",
+    "row_cell_count_total",
+    "reconstruction",
+    "reconstructed_row_count",
+    "reconstructed_col_count",
+    "mergedCells",
+    "coveredCells",
+)
+
+
+def _normalize_table_block(block: dict[str, Any]) -> dict[str, Any] | None:
+    rows = block.get("rows")
+    if not (isinstance(rows, list) and rows):
+        return None
+    normalized: dict[str, Any] = {
+        "type": "table",
+        "rows": [[str(cell) for cell in row] for row in rows if isinstance(row, list)],
+    }
+    for key in _TABLE_BLOCK_COPY_KEYS:
+        if key in block:
+            normalized[key] = block.get(key)
+    return normalized
+
+
+def _normalize_paragraph_block(block: dict[str, Any]) -> dict[str, Any] | None:
+    text = " ".join(str(block.get("text") or "").split())
+    if not text:
+        return None
+    return {"type": "paragraph", "text": text}
+
+
 def split_section_blocks(extraction: dict[str, Any]) -> list[list[dict[str, Any]]]:
     section_blocks: list[list[dict[str, Any]]] = []
     for section in extraction.get("sections", []):
         if not isinstance(section, dict):
             continue
         blocks = section.get("blocks")
-        if isinstance(blocks, list) and blocks:
-            normalized_blocks = []
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                if block.get("type") == "table":
-                    rows = block.get("rows")
-                    if isinstance(rows, list) and rows:
-                        normalized = {
-                            "type": "table",
-                            "rows": [
-                                [str(cell) for cell in row] for row in rows if isinstance(row, list)
-                            ],
-                        }
-                        for key in (
-                            "source_row_count",
-                            "source_col_count",
-                            "record_index",
-                            "section",
-                            "payload_size",
-                            "row_cell_counts",
-                            "row_cell_count_total",
-                        ):
-                            if key in block:
-                                normalized[key] = block.get(key)
-                        for key in (
-                            "reconstruction",
-                            "reconstructed_row_count",
-                            "reconstructed_col_count",
-                        ):
-                            if key in block:
-                                normalized[key] = block.get(key)
-                        for key in ("mergedCells", "coveredCells"):
-                            if key in block:
-                                normalized[key] = block.get(key)
-                        normalized_blocks.append(normalized)
-                elif block.get("type") == "paragraph":
-                    text = " ".join(str(block.get("text") or "").split())
-                    if text:
-                        normalized_blocks.append({"type": "paragraph", "text": text})
-            if normalized_blocks:
-                section_blocks.append(normalized_blocks)
+        if not (isinstance(blocks, list) and blocks):
+            continue
+        normalized_blocks = []
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            normalized = None
+            if block.get("type") == "table":
+                normalized = _normalize_table_block(block)
+            elif block.get("type") == "paragraph":
+                normalized = _normalize_paragraph_block(block)
+            if normalized is not None:
+                normalized_blocks.append(normalized)
+        if normalized_blocks:
+            section_blocks.append(normalized_blocks)
     return section_blocks
 
 
@@ -2031,7 +2041,7 @@ def convert_batch_target(  # ruff: ignore[too-many-arguments] -- convert_hwp_to_
         return result
 
 
-def convert_batch(
+def convert_batch(  # ruff: ignore[too-many-arguments] -- 외부 파일(router/sdk) + CLI 호출부 다수, 시그니처 변경 보류
     input_dir: Path,
     output_dir: Path,
     *,
@@ -2230,7 +2240,7 @@ def convert_watch_detections(  # ruff: ignore[too-many-arguments] -- 외부 파�
     return results
 
 
-def watch_batch(
+def watch_batch(  # ruff: ignore[too-many-arguments] -- convert_batch/convert_watch_detections와 옵션 시그니처 통일, 변경 보류
     input_dir: Path,
     output_dir: Path,
     *,

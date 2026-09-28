@@ -11,7 +11,6 @@ from typing import Any
 
 import olefile
 
-
 ROOT = Path(__file__).resolve().parents[1]
 HWP_SIGNATURE = bytes.fromhex("d0cf11e0a1b11ae1")
 HWPTAG_PARA_TEXT = 67
@@ -68,7 +67,40 @@ HWP_RECORD_TAGS = {
     115: "SHAPE_COMPONENT_UNKNOWN",
 }
 TEXT_ONLY_SUPPORTED_TAGS = {66, 67, 68, 69, 70}
-FIDELITY_RISK_TAGS = {18, 20, 21, 23, 24, 25, 26, 28, 30, 31, 32, 71, 72, 73, 75, 76, 77, 84, 85, 86, 87, 88, 90, 91, 92, 93, 94, 95, 96, 97, 98, 115}
+FIDELITY_RISK_TAGS = {
+    18,
+    20,
+    21,
+    23,
+    24,
+    25,
+    26,
+    28,
+    30,
+    31,
+    32,
+    71,
+    72,
+    73,
+    75,
+    76,
+    77,
+    84,
+    85,
+    86,
+    87,
+    88,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    115,
+}
 
 
 FIELD_KEYWORDS = [
@@ -253,8 +285,15 @@ def parse_table_record_payload(payload: bytes) -> dict[str, Any]:
             result["source_row_count"] = row_count
         if 0 < col_count <= 2000:
             result["source_col_count"] = col_count
-        if result["source_row_count"] and result["source_col_count"] and len(payload) >= 18 + row_count * 2:
-            counts = [int.from_bytes(payload[offset : offset + 2], "little") for offset in range(18, 18 + row_count * 2, 2)]
+        if (
+            result["source_row_count"]
+            and result["source_col_count"]
+            and len(payload) >= 18 + row_count * 2
+        ):
+            counts = [
+                int.from_bytes(payload[offset : offset + 2], "little")
+                for offset in range(18, 18 + row_count * 2, 2)
+            ]
             if all(0 < count <= col_count for count in counts):
                 result["row_cell_counts"] = counts
                 result["row_cell_count_total"] = sum(counts)
@@ -276,66 +315,104 @@ def _append_cell_text(rows: list[list[str]], row_index: int, col_index: int, tex
     rows[row_index][col_index] = f"{existing}\n{text}" if existing else text
 
 
+def _parse_row_col_counts(source_row_count: object, source_col_count: object) -> tuple[int, int]:
+    try:
+        return int(source_row_count or 0), int(source_col_count or 0)
+    except (TypeError, ValueError):
+        return 0, 0
+
+
+def _parse_cell_counts(row_cell_counts: object) -> list[int]:
+    if not isinstance(row_cell_counts, list):
+        return []
+    counts = []
+    for value in row_cell_counts:
+        try:
+            counts.append(int(value))
+        except (TypeError, ValueError):
+            return []
+    return counts
+
+
+def _reconstruct_rows_by_cell_counts(
+    paragraphs: list[str], counts: list[int], row_count: int, col_count: int
+) -> tuple[list[list[str]], dict[str, dict[str, int]], list[str]] | None:
+    rows = [["" for _col in range(col_count)] for _row in range(row_count)]
+    merged_cells: dict[str, dict[str, int]] = {}
+    covered_cells: list[str] = []
+    paragraph_index = 0
+    last_anchor = (row_count - 1, 0)
+    for row_index, cell_count in enumerate(counts):
+        spans = _distributed_col_spans(col_count, cell_count)
+        if not spans:
+            return None
+        col_index = 0
+        for col_span in spans:
+            if paragraph_index < len(paragraphs):
+                rows[row_index][col_index] = paragraphs[paragraph_index]
+                paragraph_index += 1
+            last_anchor = (row_index, col_index)
+            if col_span > 1:
+                merged_cells[f"{row_index},{col_index}"] = {"colSpan": col_span, "rowSpan": 1}
+                covered_cells.extend(
+                    f"{row_index},{covered_col}"
+                    for covered_col in range(col_index + 1, min(col_index + col_span, col_count))
+                )
+            col_index += col_span
+    for paragraph in paragraphs[paragraph_index:]:
+        _append_cell_text(rows, last_anchor[0], last_anchor[1], paragraph)
+    return rows, merged_cells, covered_cells
+
+
+def _reconstruct_rows_by_grid(
+    paragraphs: list[str], row_count: int, col_count: int
+) -> list[list[str]]:
+    rows = [["" for _col in range(col_count)] for _row in range(row_count)]
+    capacity = row_count * col_count
+    for index, paragraph in enumerate(paragraphs):
+        if index < capacity:
+            rows[index // col_count][index % col_count] = paragraph
+        else:
+            existing = rows[-1][-1]
+            rows[-1][-1] = f"{existing}\n{paragraph}" if existing else paragraph
+    return rows
+
+
 def reconstruct_table_rows(
     paragraphs: list[str],
     source_row_count: object = None,
     source_col_count: object = None,
     row_cell_counts: object = None,
 ) -> tuple[list[list[str]], str, dict[str, Any]]:
-    try:
-        row_count = int(source_row_count or 0)
-        col_count = int(source_col_count or 0)
-    except (TypeError, ValueError):
-        row_count = 0
-        col_count = 0
-    counts = []
-    if isinstance(row_cell_counts, list):
-        for value in row_cell_counts:
-            try:
-                counts.append(int(value))
-            except (TypeError, ValueError):
-                counts = []
-                break
-    if row_count > 0 and col_count > 0 and len(counts) == row_count and sum(counts) > 0 and all(0 < count <= col_count for count in counts):
-        rows = [["" for _col in range(col_count)] for _row in range(row_count)]
-        merged_cells: dict[str, dict[str, int]] = {}
-        covered_cells: list[str] = []
-        paragraph_index = 0
-        last_anchor = (row_count - 1, 0)
-        for row_index, cell_count in enumerate(counts):
-            spans = _distributed_col_spans(col_count, cell_count)
-            if not spans:
-                return reconstruct_table_rows(paragraphs, source_row_count, source_col_count)
-            col_index = 0
-            for col_span in spans:
-                if paragraph_index < len(paragraphs):
-                    rows[row_index][col_index] = paragraphs[paragraph_index]
-                    paragraph_index += 1
-                last_anchor = (row_index, col_index)
-                if col_span > 1:
-                    merged_cells[f"{row_index},{col_index}"] = {"colSpan": col_span, "rowSpan": 1}
-                    covered_cells.extend(f"{row_index},{covered_col}" for covered_col in range(col_index + 1, min(col_index + col_span, col_count)))
-                col_index += col_span
-        for paragraph in paragraphs[paragraph_index:]:
-            _append_cell_text(rows, last_anchor[0], last_anchor[1], paragraph)
+    row_count, col_count = _parse_row_col_counts(source_row_count, source_col_count)
+    counts = _parse_cell_counts(row_cell_counts)
+    if (
+        row_count > 0
+        and col_count > 0
+        and len(counts) == row_count
+        and sum(counts) > 0
+        and all(0 < count <= col_count for count in counts)
+    ):
+        reconstructed = _reconstruct_rows_by_cell_counts(paragraphs, counts, row_count, col_count)
+        if reconstructed is None:
+            return reconstruct_table_rows(paragraphs, source_row_count, source_col_count)
+        rows, merged_cells, covered_cells = reconstructed
         defaults = {"mergedCells": merged_cells, "coveredCells": covered_cells}
         return rows, "source_row_cell_counts", defaults
     if row_count > 0 and col_count > 0:
-        rows = [["" for _col in range(col_count)] for _row in range(row_count)]
-        capacity = row_count * col_count
-        for index, paragraph in enumerate(paragraphs):
-            if index < capacity:
-                rows[index // col_count][index % col_count] = paragraph
-            else:
-                existing = rows[-1][-1]
-                rows[-1][-1] = f"{existing}\n{paragraph}" if existing else paragraph
+        rows = _reconstruct_rows_by_grid(paragraphs, row_count, col_count)
         return rows, "source_grid_row_major", {}
     return [[paragraph] for paragraph in paragraphs], "one_text_paragraph_per_row", {}
 
 
 def finalize_table_block(block: dict[str, Any]) -> dict[str, Any]:
     paragraphs = [str(item) for item in block.get("paragraphs", []) if str(item)]
-    rows, reconstruction, defaults = reconstruct_table_rows(paragraphs, block.get("source_row_count"), block.get("source_col_count"), block.get("row_cell_counts"))
+    rows, reconstruction, defaults = reconstruct_table_rows(
+        paragraphs,
+        block.get("source_row_count"),
+        block.get("source_col_count"),
+        block.get("row_cell_counts"),
+    )
     block["rows"] = rows
     block["reconstruction"] = reconstruction
     block["reconstructed_row_count"] = len(rows)
@@ -345,17 +422,139 @@ def finalize_table_block(block: dict[str, Any]) -> dict[str, Any]:
     return block
 
 
+def _extract_section_record_data(
+    ole: olefile.OleFileIO,
+    name: str,
+    header: dict[str, Any],
+    record_counts: Counter,
+) -> dict[str, Any]:
+    raw = ole.openstream(name).read()
+    data = decompress_if_needed(raw, header["compressed"])
+    texts = []
+    blocks: list[dict[str, Any]] = []
+    active_table: dict[str, Any] | None = None
+    per_section = Counter()
+    for record_index, (tag_id, level, payload) in enumerate(iter_records(data)):
+        record_counts[tag_id] += 1
+        per_section[tag_id] += 1
+        if tag_id == 77:
+            if active_table is not None and active_table["paragraphs"]:
+                blocks.append(finalize_table_block(active_table))
+            table_meta = parse_table_record_payload(payload)
+            active_table = {
+                "type": "table",
+                "section": name,
+                "record_index": record_index,
+                "level": level,
+                **table_meta,
+                "rows": [],
+                "paragraphs": [],
+                "reconstruction": "one_text_paragraph_per_row",
+            }
+        if tag_id == HWPTAG_PARA_TEXT:
+            para = clean_para_text(payload)
+            if para:
+                texts.append(para)
+                if active_table is not None and level > int(active_table.get("level", -1)):
+                    active_table["paragraphs"].append(para)
+                else:
+                    if active_table is not None and active_table["paragraphs"]:
+                        blocks.append(finalize_table_block(active_table))
+                        active_table = None
+                    blocks.append({"type": "paragraph", "text": para})
+    if active_table is not None and active_table["paragraphs"]:
+        blocks.append(finalize_table_block(active_table))
+    section_text = normalize_text("\n".join(texts))
+    section_table_blocks = [block for block in blocks if block.get("type") == "table"]
+    return {
+        "name": name,
+        "paragraphs": len(texts),
+        "text": section_text,
+        "record_counts": dict(per_section),
+        "blocks": blocks,
+        "table_blocks": section_table_blocks,
+    }
+
+
+def _infer_table_reconstruction_mode(table_blocks: list[dict[str, Any]]) -> str:
+    if any(block.get("reconstruction") == "source_row_cell_counts" for block in table_blocks):
+        return "source_row_cell_counts"
+    if any(block.get("reconstruction") == "source_grid_row_major" for block in table_blocks):
+        return "source_grid_row_major"
+    return "one_text_paragraph_per_row"
+
+
+def _build_table_shapes(table_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "section": block.get("section"),
+            "record_index": block.get("record_index"),
+            "source_row_count": block.get("source_row_count"),
+            "source_col_count": block.get("source_col_count"),
+            "row_cell_counts": block.get("row_cell_counts"),
+            "row_cell_count_total": block.get("row_cell_count_total"),
+            "reconstruction": block.get("reconstruction"),
+            "reconstructed_row_count": block.get(
+                "reconstructed_row_count", len(block.get("rows", []))
+            ),
+            "reconstructed_col_count": block.get(
+                "reconstructed_col_count",
+                max((len(row) for row in block.get("rows", [])), default=0),
+            ),
+            "payload_size": block.get("payload_size"),
+        }
+        for block in table_blocks
+    ]
+
+
+def _build_feature_inventory(
+    section_names: list[str],
+    bindata_streams: list[str],
+    table_blocks: list[dict[str, Any]],
+    record_counts: Counter,
+    section_record_counts: dict[str, dict[int, int]],
+) -> dict[str, Any]:
+    risk_tags = {
+        str(tag): {
+            "name": HWP_RECORD_TAGS.get(tag, f"UNKNOWN_{tag}"),
+            "count": count,
+        }
+        for tag, count in sorted(record_counts.items())
+        if tag in FIDELITY_RISK_TAGS or tag not in TEXT_ONLY_SUPPORTED_TAGS
+    }
+    return {
+        "section_count": len(section_names),
+        "bindata_count": len(bindata_streams),
+        "bindata_streams": bindata_streams,
+        "table_count": len(table_blocks),
+        "reconstructed_table_count": len(table_blocks),
+        "table_reconstruction": _infer_table_reconstruction_mode(table_blocks),
+        "table_shapes": _build_table_shapes(table_blocks),
+        "risk_record_tags": risk_tags,
+        "section_record_counts": {
+            name: {str(k): v for k, v in counts.items()}
+            for name, counts in section_record_counts.items()
+        },
+    }
+
+
 def extract_hwp_text(path: Path) -> dict[str, Any]:
     if path.read_bytes()[:8] != HWP_SIGNATURE:
         return {"ok": False, "error": "INPUT_NOT_HWP", "text": "", "sections": []}
     try:
         ole = olefile.OleFileIO(str(path))
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except]
         return {"ok": False, "error": f"OLE_OPEN_FAILED: {exc}", "text": "", "sections": []}
     with ole:
         header = read_file_header(ole)
         if header["encrypted"]:
-            return {"ok": False, "error": "ENCRYPTED_HWP", "header": header, "text": "", "sections": []}
+            return {
+                "ok": False,
+                "error": "ENCRYPTED_HWP",
+                "header": header,
+                "text": "",
+                "sections": [],
+            }
         section_names = []
         for item in ole.listdir(streams=True, storages=False):
             name = "/".join(item)
@@ -368,102 +567,31 @@ def extract_hwp_text(path: Path) -> dict[str, Any]:
         record_counts = Counter()
         section_record_counts: dict[str, dict[int, int]] = {}
         for name in section_names:
-            raw = ole.openstream(name).read()
-            data = decompress_if_needed(raw, header["compressed"])
-            texts = []
-            blocks: list[dict[str, Any]] = []
-            active_table: dict[str, Any] | None = None
-            per_section = Counter()
-            for record_index, (tag_id, level, payload) in enumerate(iter_records(data)):
-                record_counts[tag_id] += 1
-                per_section[tag_id] += 1
-                if tag_id == 77:
-                    if active_table is not None and active_table["paragraphs"]:
-                        blocks.append(finalize_table_block(active_table))
-                    table_meta = parse_table_record_payload(payload)
-                    active_table = {
-                        "type": "table",
-                        "section": name,
-                        "record_index": record_index,
-                        "level": level,
-                        **table_meta,
-                        "rows": [],
-                        "paragraphs": [],
-                        "reconstruction": "one_text_paragraph_per_row",
-                    }
-                if tag_id == HWPTAG_PARA_TEXT:
-                    para = clean_para_text(payload)
-                    if para:
-                        texts.append(para)
-                        if active_table is not None and level > int(active_table.get("level", -1)):
-                            active_table["paragraphs"].append(para)
-                        else:
-                            if active_table is not None and active_table["paragraphs"]:
-                                blocks.append(finalize_table_block(active_table))
-                                active_table = None
-                            blocks.append({"type": "paragraph", "text": para})
-            if active_table is not None and active_table["paragraphs"]:
-                blocks.append(finalize_table_block(active_table))
-            section_text = normalize_text("\n".join(texts))
-            section_record_counts[name] = dict(per_section)
-            section_table_blocks = [block for block in blocks if block.get("type") == "table"]
-            table_blocks.extend(section_table_blocks)
-            sections.append(
-                {
-                    "name": name,
-                    "paragraphs": len(texts),
-                    "text": section_text,
-                    "record_counts": dict(per_section),
-                    "blocks": blocks,
-                    "table_blocks": section_table_blocks,
-                }
-            )
-            if section_text:
-                full_parts.append(section_text)
+            section_data = _extract_section_record_data(ole, name, header, record_counts)
+            section_record_counts[name] = section_data["record_counts"]
+            table_blocks.extend(section_data["table_blocks"])
+            sections.append(section_data)
+            if section_data["text"]:
+                full_parts.append(section_data["text"])
         full_text = normalize_text("\n".join(full_parts))
-        bindata_streams = ["/".join(item) for item in ole.listdir(streams=True, storages=False) if item and item[0] == "BinData"]
-        risk_tags = {
-            str(tag): {
-                "name": HWP_RECORD_TAGS.get(tag, f"UNKNOWN_{tag}"),
-                "count": count,
-            }
-            for tag, count in sorted(record_counts.items())
-            if tag in FIDELITY_RISK_TAGS or tag not in TEXT_ONLY_SUPPORTED_TAGS
-        }
-        feature_inventory = {
-            "section_count": len(section_names),
-            "bindata_count": len(bindata_streams),
-            "bindata_streams": bindata_streams,
-            "table_count": len(table_blocks),
-            "reconstructed_table_count": len(table_blocks),
-            "table_reconstruction": "source_row_cell_counts"
-            if any(block.get("reconstruction") == "source_row_cell_counts" for block in table_blocks)
-            else ("source_grid_row_major" if any(block.get("reconstruction") == "source_grid_row_major" for block in table_blocks) else "one_text_paragraph_per_row"),
-            "table_shapes": [
-                {
-                    "section": block.get("section"),
-                    "record_index": block.get("record_index"),
-                    "source_row_count": block.get("source_row_count"),
-                    "source_col_count": block.get("source_col_count"),
-                    "row_cell_counts": block.get("row_cell_counts"),
-                    "row_cell_count_total": block.get("row_cell_count_total"),
-                    "reconstruction": block.get("reconstruction"),
-                    "reconstructed_row_count": block.get("reconstructed_row_count", len(block.get("rows", []))),
-                    "reconstructed_col_count": block.get("reconstructed_col_count", max((len(row) for row in block.get("rows", [])), default=0)),
-                    "payload_size": block.get("payload_size"),
-                }
-                for block in table_blocks
-            ],
-            "risk_record_tags": risk_tags,
-            "section_record_counts": {name: {str(k): v for k, v in counts.items()} for name, counts in section_record_counts.items()},
-        }
+        bindata_streams = [
+            "/".join(item)
+            for item in ole.listdir(streams=True, storages=False)
+            if item and item[0] == "BinData"
+        ]
+        feature_inventory = _build_feature_inventory(
+            section_names, bindata_streams, table_blocks, record_counts, section_record_counts
+        )
         return {
             "ok": bool(full_text),
             "error": "" if full_text else "NO_TEXT_EXTRACTED",
             "header": header,
             "sections": sections,
             "record_counts": dict(record_counts),
-            "record_tag_names": {str(tag): HWP_RECORD_TAGS.get(tag, f"UNKNOWN_{tag}") for tag in sorted(record_counts)},
+            "record_tag_names": {
+                str(tag): HWP_RECORD_TAGS.get(tag, f"UNKNOWN_{tag}")
+                for tag in sorted(record_counts)
+            },
             "feature_inventory": feature_inventory,
             "text": full_text,
         }
@@ -486,9 +614,23 @@ def extract_fields_from_text(text: str) -> list[str]:
         for keyword in FIELD_KEYWORDS:
             if keyword in line:
                 fields.append(keyword)
-        if re.fullmatch(r"[가-힣A-Za-z0-9ㆍ·()/ ]{2,20}", line):
-            if any(hint in line for hint in ["명", "자", "일", "번호", "주소", "기간", "면적", "용도", "종류", "위치", "능력"]):
-                fields.append(line)
+        if re.fullmatch(r"[가-힣A-Za-z0-9ㆍ·()/ ]{2,20}", line) and any(
+            hint in line
+            for hint in [
+                "명",
+                "자",
+                "일",
+                "번호",
+                "주소",
+                "기간",
+                "면적",
+                "용도",
+                "종류",
+                "위치",
+                "능력",
+            ]
+        ):
+            fields.append(line)
     result = []
     for field in fields:
         field = re.sub(r"\s+", " ", field).strip()
@@ -507,7 +649,9 @@ def extract_attachments_from_text(text: str) -> list[str]:
             attachments.append(line)
             continue
         if capture and len(attachments) < 20:
-            if any(keyword in line for keyword in ATTACHMENT_KEYWORDS) or re.match(r"^\d+[.)]", line):
+            if any(keyword in line for keyword in ATTACHMENT_KEYWORDS) or re.match(
+                r"^\d+[.)]", line
+            ):
                 attachments.append(line)
         if capture and any(term in line for term in ["처리절차", "작성방법", "유의사항"]):
             capture = False
@@ -549,32 +693,34 @@ def audit_package(package_dir: Path) -> list[dict[str, Any]]:
             text_path = text_dir / f"{int(row['no']):03d}_{safe_title}.txt"
             text_path.write_text(extracted["text"], encoding="utf-8")
             text_rel = str(text_path.relative_to(package_dir))
-        results.append(
-            {
-                "no": row["no"],
-                "trade": row["trade"],
-                "agency": row["agency"],
-                "phase": row["phase"],
-                "title": row["title"],
-                "file_path": row["file_path"],
-                "extract_ok": extracted["ok"],
-                "extract_error": extracted.get("error", ""),
-                "paragraph_count": sum(section.get("paragraphs", 0) for section in extracted.get("sections", [])),
-                "text_length": len(extracted.get("text", "")),
-                "body_field_candidates": fields,
-                "body_field_count": len(fields),
-                "body_attachment_candidates": attachments,
-                "body_attachment_count": len(attachments),
-                "text_path": text_rel,
-            }
-        )
+        results.append({
+            "no": row["no"],
+            "trade": row["trade"],
+            "agency": row["agency"],
+            "phase": row["phase"],
+            "title": row["title"],
+            "file_path": row["file_path"],
+            "extract_ok": extracted["ok"],
+            "extract_error": extracted.get("error", ""),
+            "paragraph_count": sum(
+                section.get("paragraphs", 0) for section in extracted.get("sections", [])
+            ),
+            "text_length": len(extracted.get("text", "")),
+            "body_field_candidates": fields,
+            "body_field_count": len(fields),
+            "body_attachment_candidates": attachments,
+            "body_attachment_count": len(attachments),
+            "text_path": text_rel,
+        })
     return results
 
 
 def write_outputs(package_dir: Path, rows: list[dict[str, Any]]) -> None:
     out_dir = package_dir / "04_본문추출"
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "본문기반_입력항목.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "본문기반_입력항목.json").write_text(
+        json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     fields = [
         "no",
         "trade",
@@ -596,7 +742,10 @@ def write_outputs(package_dir: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(fp, fieldnames=fields)
         writer.writeheader()
         for row in rows:
-            writer.writerow({k: "|".join(map(str, row[k])) if isinstance(row.get(k), list) else row.get(k, "") for k in fields})
+            writer.writerow({
+                k: "|".join(map(str, row[k])) if isinstance(row.get(k), list) else row.get(k, "")
+                for k in fields
+            })
     by_trade = defaultdict(list)
     for row in rows:
         by_trade[row["trade"]].append(row)
@@ -617,10 +766,16 @@ def write_outputs(package_dir: Path, rows: list[dict[str, Any]]) -> None:
         items = by_trade[trade]
         lines.append(
             f"| {trade} | {len(items)} | {sum(1 for row in items if row['extract_ok'])} | "
-            f"{round(sum(row['body_field_count'] for row in items)/len(items), 1)} | "
-            f"{round(sum(row['body_attachment_count'] for row in items)/len(items), 1)} |"
+            f"{round(sum(row['body_field_count'] for row in items) / len(items), 1)} | "
+            f"{round(sum(row['body_attachment_count'] for row in items) / len(items), 1)} |"
         )
-    lines.extend(["", "## 문서별 상세", "", "| No | 공종 | 서식 | 본문라벨 | 첨부후보 | 본문텍스트 |", "| ---: | --- | --- | ---: | ---: | --- |"])
+    lines.extend([
+        "",
+        "## 문서별 상세",
+        "",
+        "| No | 공종 | 서식 | 본문라벨 | 첨부후보 | 본문텍스트 |",
+        "| ---: | --- | --- | ---: | ---: | --- |",
+    ])
     for row in rows:
         lines.append(
             f"| {row['no']} | {row['trade']} | {row['title']} | {row['body_field_count']} | "

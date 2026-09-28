@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only P9D audit: ParseHwpxHandler usecase gate wiring readiness."""
+
 from __future__ import annotations
 
 import argparse
@@ -25,16 +26,101 @@ class Finding:
     detail: str
 
 
+@dataclass
+class _GateSignals:
+    handler_exists: bool
+    usecase_exists: bool
+    result_exists: bool
+    handler_references_usecase: bool
+    handler_references_result: bool
+    usecase_no_http_import: bool
+    handler_uses_gate_directly: bool
+    error_key_in_handler: bool
+    status_415_in_handler: bool
+    status_413_in_handler: bool
+    endpoint_preserved: bool
+    gate_files_exist: dict[str, bool]
+
+
 def read(path: Path) -> str:
     p = ROOT / path
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
 
 
+def _collect_findings(signals: _GateSignals) -> list[Finding]:
+    checks: list[tuple[bool, str, str, str]] = [
+        (not signals.handler_exists, "FAIL", "handler_missing", "ParseHwpxHandler.java not found"),
+        (
+            not signals.usecase_exists,
+            "FAIL",
+            "usecase_missing",
+            "HwpxUploadParseUseCase.java not found",
+        ),
+        (
+            not signals.result_exists,
+            "FAIL",
+            "result_missing",
+            "HwpxUploadParseResult.java not found",
+        ),
+        (
+            not signals.handler_references_usecase,
+            "FAIL",
+            "handler_not_wired",
+            "ParseHwpxHandler does not reference HwpxUploadParseUseCase",
+        ),
+        (
+            not signals.handler_references_result,
+            "WARN",
+            "handler_result_ref_missing",
+            "ParseHwpxHandler does not reference HwpxUploadParseResult",
+        ),
+        (
+            not signals.usecase_no_http_import,
+            "FAIL",
+            "usecase_imports_http",
+            "HwpxUploadParseUseCase imports from http package — layer boundary violated",
+        ),
+        (
+            signals.handler_uses_gate_directly,
+            "WARN",
+            "handler_gate_direct",
+            "ParseHwpxHandler references gate classes directly (should delegate via usecase)",
+        ),
+        (
+            not signals.error_key_in_handler,
+            "FAIL",
+            "error_key_missing",
+            'ParseHwpxHandler does not include "error" key in responses',
+        ),
+        (
+            not signals.status_415_in_handler,
+            "WARN",
+            "status_415_missing",
+            "ParseHwpxHandler does not map to HTTP 415 for unsupported file types",
+        ),
+        (
+            not signals.status_413_in_handler,
+            "WARN",
+            "status_413_missing",
+            "ParseHwpxHandler does not map to HTTP 413 for oversized uploads",
+        ),
+        (
+            not signals.endpoint_preserved,
+            "FAIL",
+            "endpoint_path_changed",
+            "/parse-hwpx endpoint is no longer mapped to ParseHwpxHandler in EngineHttpServer",
+        ),
+    ]
+    findings = [Finding(sev, rule, detail) for triggered, sev, rule, detail in checks if triggered]
+    for name, exists in signals.gate_files_exist.items():
+        if not exists:
+            findings.append(Finding("FAIL", f"gate_file_missing_{name}", f"{name}.java not found"))
+    return findings
+
+
 def audit() -> dict:
-    findings: list[Finding] = []
     handler_text = read(HANDLER)
     usecase_text = read(USECASE)
-    result_text = read(RESULT)
     server_text = read(SERVER)
 
     handler_exists = (ROOT / HANDLER).exists()
@@ -53,31 +139,22 @@ def audit() -> dict:
     endpoint_preserved = "/parse-hwpx" in server_text and "ParseHwpxHandler" in server_text
     gate_files_exist = {name: (ROOT / path).exists() for name, path in GATE_FILES.items()}
 
-    if not handler_exists:
-        findings.append(Finding("FAIL", "handler_missing", "ParseHwpxHandler.java not found"))
-    if not usecase_exists:
-        findings.append(Finding("FAIL", "usecase_missing", "HwpxUploadParseUseCase.java not found"))
-    if not result_exists:
-        findings.append(Finding("FAIL", "result_missing", "HwpxUploadParseResult.java not found"))
-    if not handler_references_usecase:
-        findings.append(Finding("FAIL", "handler_not_wired", "ParseHwpxHandler does not reference HwpxUploadParseUseCase"))
-    if not handler_references_result:
-        findings.append(Finding("WARN", "handler_result_ref_missing", "ParseHwpxHandler does not reference HwpxUploadParseResult"))
-    if not usecase_no_http_import:
-        findings.append(Finding("FAIL", "usecase_imports_http", "HwpxUploadParseUseCase imports from http package — layer boundary violated"))
-    if handler_uses_gate_directly:
-        findings.append(Finding("WARN", "handler_gate_direct", "ParseHwpxHandler references gate classes directly (should delegate via usecase)"))
-    if not error_key_in_handler:
-        findings.append(Finding("FAIL", "error_key_missing", 'ParseHwpxHandler does not include "error" key in responses'))
-    if not status_415_in_handler:
-        findings.append(Finding("WARN", "status_415_missing", "ParseHwpxHandler does not map to HTTP 415 for unsupported file types"))
-    if not status_413_in_handler:
-        findings.append(Finding("WARN", "status_413_missing", "ParseHwpxHandler does not map to HTTP 413 for oversized uploads"))
-    if not endpoint_preserved:
-        findings.append(Finding("FAIL", "endpoint_path_changed", "/parse-hwpx endpoint is no longer mapped to ParseHwpxHandler in EngineHttpServer"))
-    for name, exists in gate_files_exist.items():
-        if not exists:
-            findings.append(Finding("FAIL", f"gate_file_missing_{name}", f"{name}.java not found"))
+    findings = _collect_findings(
+        _GateSignals(
+            handler_exists=handler_exists,
+            usecase_exists=usecase_exists,
+            result_exists=result_exists,
+            handler_references_usecase=handler_references_usecase,
+            handler_references_result=handler_references_result,
+            usecase_no_http_import=usecase_no_http_import,
+            handler_uses_gate_directly=handler_uses_gate_directly,
+            error_key_in_handler=error_key_in_handler,
+            status_415_in_handler=status_415_in_handler,
+            status_413_in_handler=status_413_in_handler,
+            endpoint_preserved=endpoint_preserved,
+            gate_files_exist=gate_files_exist,
+        )
+    )
 
     severities = {f.severity for f in findings}
     status = "FAIL" if "FAIL" in severities else ("WARN" if "WARN" in severities else "PASS")
@@ -123,7 +200,9 @@ def main() -> int:
     for item in result["findings"][:20]:
         print(f"{item['severity']} {item['rule']}")
     if args.json_path:
-        Path(args.json_path).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        Path(args.json_path).write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     return 0
 
 
