@@ -7,6 +7,12 @@ node_modules/
 .env
 .tmp/
 *.hwpx
+# 합성 테스트 fixture(PII 없음, 30~90KB)는 CI가 실제로 쓸 수 있게 예외 —
+# 2026-09-28 완성도 감사에서 실측: 이 파일들이 git에 한 번도 커밋된 적
+# 없어서 로컬에서만 통과하고 깨끗한 CI 환경에서는 항상 실패하고 있었음.
+!tests/fixtures/hwpx/**/*.hwpx
+
+# 데이터 디렉토리 (data/reports/와 data/cache/는 제외)
 data/
 reports/
 
