@@ -1,0 +1,18 @@
+# 저장소 전체 로컬 개발/테스트 의존성.
+#
+# 2026-09-28 완성도 감사에서 실측: 이 파일이 없어서(스크립트별로 흩어진
+# import 만 존재) 새 환경(이번 복구 폴더)에서 pytest 수집이 26개 파일
+# 임포트 실패로 깨져 있었다 — olefile/fastapi/pymupdf 누락을 아무도
+# 감지하지 못했다(회귀 게이트가 이 파일에 의존하지 않았으므로).
+#
+# scripts/hwpx/web_office/requirements.txt 는 web office 서비스 배포판
+# 전용(fastapi 3종)이라 별도 유지 — 이 파일은 로컬 개발 전체 범위.
+
+fastapi==0.115.6
+starlette==0.41.3
+httpx==0.28.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+olefile==0.47
+pymupdf==1.28.2
+pytest==9.1.1

@@ -123,7 +123,9 @@ def classify_path(path: str) -> tuple[str, str, str]:
     # .claude/ 는 프로젝트 도구 설정(훅 등록 등)이다 — .githooks 와 같은 성격.
     if lower.startswith(".claude/"):
         return "CONFIG_BUILD", "unassigned", "keep_claude_config"
-    if path in {".gitignore", "CLAUDE.md"} or name in {"package.json", "package-lock.json", "pyproject.toml"}:
+    if path in {".gitignore", "CLAUDE.md"} or name in {
+        "package.json", "package-lock.json", "pyproject.toml", "requirements.txt",
+    }:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
         return "REPORT_DOC", "docs_reports", "keep_pii_safe_report"
