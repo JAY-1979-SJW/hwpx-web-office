@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-STRUCTURE-SCOPE-BOUNDARY-REJECT-01 준공검사.
+"""WEB-OFFICE-PARA-EDIT-STRUCTURE-SCOPE-BOUNDARY-REJECT-01 준공검사.
 
 body paragraph (kind=="block") 외 scope에서 PARA_INSERT / PARA_DELETE가
 명시적 reason code로 reject되는지 정적·동적 검증.
@@ -108,7 +108,7 @@ def _check_locked_files() -> list[dict]:
     for rel in LOCKED_FILES_VS_BASELINE:
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, cwd=str(PR), timeout=20)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
         if r.returncode != 0 or r.stdout.strip():
             findings.append({"code": "LOCKED_FILE_CHANGED",
                              "level": "FAIL", "detail": rel})
@@ -118,7 +118,7 @@ def _check_locked_files() -> list[dict]:
 def _check_staged_zero() -> list[dict]:
     findings: list[dict] = []
     r = subprocess.run(["git", "diff", "--cached", "--name-only"],
-                       capture_output=True, text=True, cwd=str(PR), timeout=10)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=10)
     hwpx_staged = [
         f for f in r.stdout.strip().splitlines()
         if any(f.startswith(p) for p in (
@@ -137,7 +137,7 @@ def _check_js_smoke() -> list[dict]:
     findings: list[dict] = []
     smoke = PR / "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
     r = subprocess.run(["node", str(smoke)],
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     try:
         out = json.loads(r.stdout.strip().split("\n")[-1])
         if out.get("verdict") != "PASS":
@@ -161,7 +161,7 @@ def _check_python_tests() -> list[dict]:
          "tests/test_web_office_para_edit_structure_para_insert.py",
          "tests/test_web_office_para_edit_structure_para_delete.py",
          "-q", "--tb=short"],
-        capture_output=True, text=True, cwd=str(PR), timeout=60)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=60)
     if r.returncode != 0:
         findings.append({"code": "PYTHON_TESTS_FAIL", "level": "FAIL",
                          "detail": r.stdout[-2000:]})
