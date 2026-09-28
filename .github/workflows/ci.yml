@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+jobs:
+  pytest:
+    # 저장소가 Windows 전용 도구(COM 자동화, .ps1 스크립트, 한컴 연동)에
+    # 의존하는 부분이 있어 windows-latest 로 고정한다.
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run pytest
+        run: python -m pytest -q
