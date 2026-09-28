@@ -139,6 +139,7 @@ def classify_path(path: str) -> tuple[str, str, str]:
         "package-lock.json",
         "pyproject.toml",
         "requirements.txt",
+        "locked_files.toml",
     }:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
