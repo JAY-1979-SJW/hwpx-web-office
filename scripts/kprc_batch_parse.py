@@ -34,7 +34,7 @@ except ImportError:
     sys.exit(2)
 
 
-MODEL = "claude-haiku-4-5-20251001"   # 상위 모델 fallback 금지
+MODEL = "claude-haiku-4-5-20251001"  # 상위 모델 fallback 금지
 
 PROMPT_CHART = """아래 이미지는 건설자재 가격 차트와 그 아래 표다.
 표에서 데이터를 추출해 JSON만 반환하라 (설명 없이):
@@ -102,68 +102,122 @@ def call_claude(prompt: str, image_path: Path, timeout: int = 180) -> dict:
     try:
         proc = subprocess.run(
             [
-                "claude", "-p", full_prompt,
-                "--tools", "Read",
-                "--model", MODEL,
+                "claude",
+                "-p",
+                full_prompt,
+                "--tools",
+                "Read",
+                "--model",
+                MODEL,
                 "--dangerously-skip-permissions",
-                "--output-format", "json",
+                "--output-format",
+                "json",
             ],
-            capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
         )
     except subprocess.TimeoutExpired:
-        return {"ok": False, "err": "timeout", "items": [],
-                "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-                "duration_ms": int((time.time()-t0)*1000)}
-    except Exception as e:
-        return {"ok": False, "err": f"subprocess: {e}", "items": [],
-                "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-                "duration_ms": int((time.time()-t0)*1000)}
+        return {
+            "ok": False,
+            "err": "timeout",
+            "items": [],
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
+    except OSError as e:
+        return {
+            "ok": False,
+            "err": f"subprocess: {e}",
+            "items": [],
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
 
     if proc.returncode != 0:
-        return {"ok": False, "err": f"rc={proc.returncode} stderr={proc.stderr[:200]}",
-                "items": [], "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-                "duration_ms": int((time.time()-t0)*1000)}
+        return {
+            "ok": False,
+            "err": f"rc={proc.returncode} stderr={proc.stderr[:200]}",
+            "items": [],
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
 
     try:
         resp = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
-        return {"ok": False, "err": f"cli_json_decode: {e}",
-                "items": [], "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-                "duration_ms": int((time.time()-t0)*1000)}
+        return {
+            "ok": False,
+            "err": f"cli_json_decode: {e}",
+            "items": [],
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
 
     usage = resp.get("usage", {}) or {}
-    input_tokens = int(usage.get("input_tokens") or 0) + \
-                   int(usage.get("cache_read_input_tokens") or 0) + \
-                   int(usage.get("cache_creation_input_tokens") or 0)
+    input_tokens = (
+        int(usage.get("input_tokens") or 0)
+        + int(usage.get("cache_read_input_tokens") or 0)
+        + int(usage.get("cache_creation_input_tokens") or 0)
+    )
     output_tokens = int(usage.get("output_tokens") or 0)
     # 모델 검증 — 혹시라도 상위 모델로 fallback되면 실패 처리
     used_model = resp.get("model") or resp.get("modelUsed") or ""
     if used_model and "haiku" not in used_model.lower():
-        return {"ok": False, "err": f"unexpected_model: {used_model}",
-                "items": [], "input_tokens": input_tokens, "output_tokens": output_tokens,
-                "total_tokens": input_tokens + output_tokens,
-                "duration_ms": int((time.time()-t0)*1000)}
+        return {
+            "ok": False,
+            "err": f"unexpected_model: {used_model}",
+            "items": [],
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
 
     result_text = resp.get("result") or ""
     m = re.search(r"\{.*\}", result_text, re.DOTALL)
     if not m:
-        return {"ok": False, "err": "no_json_in_result",
-                "items": [], "input_tokens": input_tokens, "output_tokens": output_tokens,
-                "total_tokens": input_tokens + output_tokens,
-                "duration_ms": int((time.time()-t0)*1000)}
+        return {
+            "ok": False,
+            "err": "no_json_in_result",
+            "items": [],
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
     try:
         items = json.loads(m.group()).get("items", [])
     except json.JSONDecodeError as e:
-        return {"ok": False, "err": f"inner_json_decode: {e}",
-                "items": [], "input_tokens": input_tokens, "output_tokens": output_tokens,
-                "total_tokens": input_tokens + output_tokens,
-                "duration_ms": int((time.time()-t0)*1000)}
-
-    return {"ok": True, "err": None, "items": items,
-            "input_tokens": input_tokens, "output_tokens": output_tokens,
+        return {
+            "ok": False,
+            "err": f"inner_json_decode: {e}",
+            "items": [],
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
-            "duration_ms": int((time.time()-t0)*1000)}
+            "duration_ms": int((time.time() - t0) * 1000),
+        }
+
+    return {
+        "ok": True,
+        "err": None,
+        "items": items,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+        "duration_ms": int((time.time() - t0) * 1000),
+    }
 
 
 def parse_pdf(pdf: Path, pages_dir: Path, year_min: int = 2023) -> dict:
@@ -185,35 +239,45 @@ def parse_pdf(pdf: Path, pages_dir: Path, year_min: int = 2023) -> dict:
         r = call_claude(prompt, img)
         try:
             img.unlink(missing_ok=True)
-        except Exception:
+        except OSError:
             pass
 
         calls.append({
-            "page": i + 1, "ok": r["ok"], "err": r.get("err"),
+            "page": i + 1,
+            "ok": r["ok"],
+            "err": r.get("err"),
             "n_items": len(r.get("items", [])),
-            "input_tokens": r["input_tokens"], "output_tokens": r["output_tokens"],
-            "total_tokens": r["total_tokens"], "duration_ms": r["duration_ms"],
+            "input_tokens": r["input_tokens"],
+            "output_tokens": r["output_tokens"],
+            "total_tokens": r["total_tokens"],
+            "duration_ms": r["duration_ms"],
         })
-        agg_in  += r["input_tokens"]
+        agg_in += r["input_tokens"]
         agg_out += r["output_tokens"]
 
         if r["ok"]:
             src_label = "차트페이지" if i < 4 else "종합표"
             for item in r["items"]:
                 for p in item.get("가격", []):
-                    y = p.get("연도"); m = p.get("월"); v = p.get("가격")
+                    y = p.get("연도")
+                    m = p.get("월")
+                    v = p.get("가격")
                     if not isinstance(y, int) or v is None:
                         continue
                     if y < year_min:
                         continue
                     all_rows.append({
                         "품목명": item.get("품목명", ""),
-                        "규격":   item.get("규격", ""),
-                        "단위":   item.get("단위", ""),
-                        "연도":   y, "월": m, "가격": v,
-                        "출처":   src_label,
+                        "규격": item.get("규격", ""),
+                        "단위": item.get("단위", ""),
+                        "연도": y,
+                        "월": m,
+                        "가격": v,
+                        "출처": src_label,
                     })
-        log(f"  page {i+1}/{n}  ok={r['ok']}  items={len(r.get('items',[]))}  tok_in={r['input_tokens']} tok_out={r['output_tokens']}")
+        log(
+            f"  page {i + 1}/{n}  ok={r['ok']}  items={len(r.get('items', []))}  tok_in={r['input_tokens']} tok_out={r['output_tokens']}"
+        )
 
     # 중복 제거 (품목, 규격, 연, 월)
     seen = set()
@@ -242,7 +306,11 @@ def parse_pdf(pdf: Path, pages_dir: Path, year_min: int = 2023) -> dict:
         "n_pages": n,
         "rows": dedup,
         "pivot": list(pivot_map.values()),
-        "usage": {"input_tokens": agg_in, "output_tokens": agg_out, "total_tokens": agg_in + agg_out},
+        "usage": {
+            "input_tokens": agg_in,
+            "output_tokens": agg_out,
+            "total_tokens": agg_in + agg_out,
+        },
         "pages": calls,
     }
 
@@ -264,13 +332,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdfs", nargs="+", required=True, help="대상 PDF 경로 (공백 구분)")
     ap.add_argument("--batch", required=True, help="배치 이름 (로그/파일명)")
-    ap.add_argument("--out",   required=True, help="출력 디렉토리")
+    ap.add_argument("--out", required=True, help="출력 디렉토리")
     ap.add_argument("--year-min", type=int, default=2023)
     args = ap.parse_args()
 
-    out_dir    = Path(args.out)
+    out_dir = Path(args.out)
     parsed_dir = out_dir / "parsed"
-    pages_dir  = out_dir / "pages"
+    pages_dir = out_dir / "pages"
     parsed_dir.mkdir(parents=True, exist_ok=True)
     pages_dir.mkdir(parents=True, exist_ok=True)
 
@@ -280,7 +348,7 @@ def main():
     pdfs.sort(reverse=True)
 
     log(f"batch={args.batch}  model={MODEL}  n_pdfs={len(pdfs)}")
-    log(f"대상 파일 (최신순):")
+    log("대상 파일 (최신순):")
     for p in pdfs:
         log(f"  - {p.name}")
 
@@ -294,7 +362,7 @@ def main():
         t0 = time.time()
         try:
             res = parse_pdf(pdf, pages_dir, year_min=args.year_min)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — 이 PDF만 실패 기록, 나머지 배치 계속
             log(f"  FATAL  {type(e).__name__}: {e}")
             failed.append({"pdf": pdf.name, "err": f"{type(e).__name__}: {e}"})
             continue
@@ -313,55 +381,67 @@ def main():
             "elapsed_sec": round(elapsed, 2),
         }
         results.append(rec)
-        total_in   += res["usage"]["input_tokens"]
-        total_out  += res["usage"]["output_tokens"]
+        total_in += res["usage"]["input_tokens"]
+        total_out += res["usage"]["output_tokens"]
         total_rows += len(res["rows"])
 
         # 파일별 JSON 저장
         out_path = parsed_dir / f"{pdf.stem}.json"
-        out_path.write_text(json.dumps({
-            "pdf": pdf.name,
-            "생성일시": datetime.now().isoformat(timespec="seconds"),
-            "model": MODEL,
-            "n_pages": res["n_pages"],
-            "n_rows":  len(res["rows"]),
-            "n_items": len(res["pivot"]),
-            "usage":   res["usage"],
-            "anomaly": anom,
-            "rows":    res["rows"],
-            "pivot":   res["pivot"],
-            "pages":   res["pages"],
-        }, ensure_ascii=False, indent=2), encoding="utf-8")
+        out_path.write_text(
+            json.dumps(
+                {
+                    "pdf": pdf.name,
+                    "생성일시": datetime.now().isoformat(timespec="seconds"),
+                    "model": MODEL,
+                    "n_pages": res["n_pages"],
+                    "n_rows": len(res["rows"]),
+                    "n_items": len(res["pivot"]),
+                    "usage": res["usage"],
+                    "anomaly": anom,
+                    "rows": res["rows"],
+                    "pivot": res["pivot"],
+                    "pages": res["pages"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
         if not res["ok"]:
-            failed.append({"pdf": pdf.name, "partial": res["partial"],
-                           "fail_pages": [c for c in res["pages"] if not c["ok"]]})
+            failed.append({
+                "pdf": pdf.name,
+                "partial": res["partial"],
+                "fail_pages": [c for c in res["pages"] if not c["ok"]],
+            })
 
-        log(f"  → rows={len(res['rows'])}  tok_in={res['usage']['input_tokens']:,}  "
-            f"tok_out={res['usage']['output_tokens']:,}  elapsed={elapsed:.1f}s")
+        log(
+            f"  → rows={len(res['rows'])}  tok_in={res['usage']['input_tokens']:,}  "
+            f"tok_out={res['usage']['output_tokens']:,}  elapsed={elapsed:.1f}s"
+        )
 
     total_elapsed = time.time() - batch_start
-    ok_cnt   = sum(1 for r in results if r["ok"])
+    ok_cnt = sum(1 for r in results if r["ok"])
     fail_cnt = len(pdfs) - ok_cnt
     total_tok = total_in + total_out
     avg_tok_per_file = (total_tok / len(pdfs)) if pdfs else 0
-    avg_tok_per_row  = (total_tok / total_rows) if total_rows else 0
+    avg_tok_per_row = (total_tok / total_rows) if total_rows else 0
 
     summary = {
-        "batch":              args.batch,
-        "생성일시":            datetime.now().isoformat(timespec="seconds"),
-        "model":              MODEL,
-        "n_pdfs":             len(pdfs),
-        "n_success":          ok_cnt,
-        "n_failed":           fail_cnt,
-        "total_rows":         total_rows,
+        "batch": args.batch,
+        "생성일시": datetime.now().isoformat(timespec="seconds"),
+        "model": MODEL,
+        "n_pdfs": len(pdfs),
+        "n_success": ok_cnt,
+        "n_failed": fail_cnt,
+        "total_rows": total_rows,
         "total_input_tokens": total_in,
-        "total_output_tokens":total_out,
-        "total_tokens":       total_tok,
-        "avg_tokens_per_file":round(avg_tok_per_file, 1),
+        "total_output_tokens": total_out,
+        "total_tokens": total_tok,
+        "avg_tokens_per_file": round(avg_tok_per_file, 1),
         "avg_tokens_per_row": round(avg_tok_per_row, 2),
-        "total_elapsed_sec":  round(total_elapsed, 2),
-        "files":              results,
+        "total_elapsed_sec": round(total_elapsed, 2),
+        "files": results,
     }
     summary_path = out_dir / f"batch_summary_{args.batch}.json"
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

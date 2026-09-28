@@ -10,32 +10,49 @@
   coord_table  — 표 축 해석·정규화·앵커 압축·블록 페이지네이션(순수 계산)
   본 파일       — 문서 순회(walk)·표 방출(walk_table)·섹션 병합(extract)
 """
+
 import json
 import math
 import os
 import re
 import sys
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 
 try:
-    from .coord_xml import (
-        HU, ln, own_text, own_runs, slice_segments, direct_linesegs, sane_hu)
     from .coord_styles import (
-        parse_para_aligns, css_align, parse_char_prs, parse_border_fills,
-        border_sides_css, parse_page_geometry)
+        border_sides_css,
+        css_align,
+        parse_border_fills,
+        parse_char_prs,
+        parse_page_geometry,
+        parse_para_aligns,
+    )
     from .coord_table import (
-        solve_axis, expand_rowspan_content, normalize_declared,
-        compress_to_anchor, paginate_rows, col_rank_map)
-except ImportError:                      # 스크립트 직접 실행 폴백
-    from coord_xml import (
-        HU, ln, own_text, own_runs, slice_segments, direct_linesegs, sane_hu)
+        col_rank_map,
+        expand_rowspan_content,
+        normalize_declared,
+        paginate_rows,
+        solve_axis,
+    )
+    from .coord_xml import HU, direct_linesegs, ln, own_runs, own_text, sane_hu, slice_segments
+except ImportError:  # 스크립트 직접 실행 폴백
     from coord_styles import (
-        parse_para_aligns, css_align, parse_char_prs, parse_border_fills,
-        border_sides_css, parse_page_geometry)
+        border_sides_css,
+        css_align,
+        parse_border_fills,
+        parse_char_prs,
+        parse_page_geometry,
+        parse_para_aligns,
+    )
     from coord_table import (
-        solve_axis, expand_rowspan_content, normalize_declared,
-        paginate_rows, col_rank_map)
+        col_rank_map,
+        expand_rowspan_content,
+        normalize_declared,
+        paginate_rows,
+        solve_axis,
+    )
+    from coord_xml import HU, direct_linesegs, ln, own_runs, own_text, sane_hu, slice_segments
 
 # 하위호환 별칭(기존 내부명 참조 보호) — 신규 코드는 coord_* 모듈을 쓸 것.
 _own_text = own_text
@@ -75,8 +92,7 @@ def _extract_section(path, secname, row_scale=1.0):
         tbl_order[_t] = _i
 
     def _cell_id(tbl, row, col):
-        return "cell_t_s%d_%03d_r%d_c%d" % (
-            _sec_idx, tbl_order.get(tbl, 0), row, col)
+        return "cell_t_s%d_%03d_r%d_c%d" % (_sec_idx, tbl_order.get(tbl, 0), row, col)
 
     border_fills = parse_border_fills(z)
     char_prs = parse_char_prs(z)
@@ -87,13 +103,18 @@ def _extract_section(path, secname, row_scale=1.0):
     page_h = geo["page_h"]
     m_left = geo["m_left"]
     m_top = geo["m_top"]
-    content_h = geo["content_h"]
 
     lines = []
     boxes = []
     warnings: list[dict] = []
-    st = {"page_idx": 0, "prev_vpos": -1, "flow_y": m_top, "max_y": m_top,
-          "col_count": 1, "col_idx": 0}
+    st = {
+        "page_idx": 0,
+        "prev_vpos": -1,
+        "flow_y": m_top,
+        "max_y": m_top,
+        "col_count": 1,
+        "col_idx": 0,
+    }
 
     def _update_col_state(p):
         """다단(colPr colCount>=2) 구간 진입/이탈 반영 — 페이지 카운터용.
@@ -141,9 +162,11 @@ def _extract_section(path, secname, row_scale=1.0):
         else:
             st["page_idx"] += 1
         if os.environ.get("COORD_DEBUG"):
-            print(f"[DBG reset] col_count={st['col_count']} "
-                  f"col_idx={st['col_idx']} page_idx={st['page_idx']}",
-                  file=sys.stderr)
+            print(
+                f"[DBG reset] col_count={st['col_count']} "
+                f"col_idx={st['col_idx']} page_idx={st['page_idx']}",
+                file=sys.stderr,
+            )
 
     def emit_para(p, block_idx=None):
         txt, spans = own_runs(p)
@@ -164,8 +187,7 @@ def _extract_section(path, secname, row_scale=1.0):
         for ctrl_container in p.iter():
             if ln(ctrl_container.tag) != "container":
                 continue
-            sz_el = next((e for e in ctrl_container.iter()
-                          if ln(e.tag) == "curSz"), None)
+            sz_el = next((e for e in ctrl_container.iter() if ln(e.tag) == "curSz"), None)
             if sz_el is not None:
                 try:
                     _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
@@ -174,8 +196,7 @@ def _extract_section(path, secname, row_scale=1.0):
         for i, s in enumerate(segs):
             vpos = float(s.get("vertpos", "0"))
             a = int(s.get("textpos", "0") or "0")
-            b = (int(segs[i + 1].get("textpos", "0") or "0")
-                 if i + 1 < len(segs) else len(txt))
+            b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
             line_txt = txt[a:b]
             # 페이지 상태머신은 가시 줄만 구동 — 빈 문단(공백 줄)은 페이지를
             # 만들지 않는다. 문서 끝의 빈 문단 수백 개가 vpos 리셋을 반복해
@@ -184,8 +205,7 @@ def _extract_section(path, secname, row_scale=1.0):
             _obj_h = 0
             if not line_txt.strip() and _obj_heights:
                 _raw_vsz = int(float(s.get("vertsize", 0) or 0))
-                _obj_h = next(
-                    (h for h in _obj_heights if abs(h - _raw_vsz) <= 5), 0)
+                _obj_h = next((h for h in _obj_heights if abs(h - _raw_vsz) <= 5), 0)
             _vis = bool(line_txt.strip()) or _obj_h > 0
             if _vis:
                 if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
@@ -201,8 +221,7 @@ def _extract_section(path, secname, row_scale=1.0):
             # 페이지에 놓는다(한컴 배치: 각주 vpos 는 표가 끝난 페이지 기준).
             # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
             # 증가), 1.5줄 이상 실침범 시에만 발동.
-            if (i == 0 and page_h > 0 and line_txt.strip()
-                    and y < st["flow_y"] - max(h * 1.5, 20.0)):
+            if i == 0 and page_h > 0 and line_txt.strip() and y < st["flow_y"] - max(h * 1.5, 20.0):
                 if vpos < 1.0:
                     # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
                     # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
@@ -217,17 +236,20 @@ def _extract_section(path, secname, row_scale=1.0):
                     # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
                     # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
                     _guard = 0
-                    while (y < st["flow_y"] - max(h * 1.5, 20.0)
-                            and _guard < 6):
+                    while y < st["flow_y"] - max(h * 1.5, 20.0) and _guard < 6:
                         st["page_idx"] += 1
                         y = (st["page_idx"] * page_h) + m_top + vpos * HU
                         _guard += 1
-            line = {"text": line_txt,
-                    "segments": slice_segments(txt, spans, a, b),
-                    "x": round(x, 1),
-                    "y": round(y, 1), "w": round(w, 1),
-                    "h": round(h, 1),
-                    "baseline": round(bl, 1), "cell": False}
+            line = {
+                "text": line_txt,
+                "segments": slice_segments(txt, spans, a, b),
+                "x": round(x, 1),
+                "y": round(y, 1),
+                "w": round(w, 1),
+                "h": round(h, 1),
+                "baseline": round(bl, 1),
+                "cell": False,
+            }
             if align:
                 line["align"] = align
             # 본문 문단(표 셀 아님) 클릭 편집 배선용 — block_idx 는
@@ -238,8 +260,10 @@ def _extract_section(path, secname, row_scale=1.0):
             if block_idx is not None and line_txt.strip():
                 line["paragraphId"] = f"par_s{_sec_idx}_b{block_idx}_p0"
                 line["containerScope"] = {
-                    "kind": "block", "sectionIndex": _sec_idx,
-                    "blockIndex": block_idx}
+                    "kind": "block",
+                    "sectionIndex": _sec_idx,
+                    "blockIndex": block_idx,
+                }
                 # 캐럿 위치 편집(문장 중 클릭 지점에 정확히 삽입)용 —
                 # 이 줄이 문단 전체 텍스트(txt) 중 몇 번째 글자부터
                 # 시작하는지. 프런트가 클릭된 화면 좌표를 이 줄 안
@@ -272,7 +296,7 @@ def _extract_section(path, secname, row_scale=1.0):
         # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
         # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
         content = 0.0
-        compact = 0.0   # 줄간격 제거 시 최소 높이(글리프 합) — 앵커 압축용
+        compact = 0.0  # 줄간격 제거 시 최소 높이(글리프 합) — 앵커 압축용
         for cp in tc.iter():
             if ln(cp.tag) == "p" and _nearest_cell(cp) is tc:
                 for cl in _cell_para_lines(cp):
@@ -284,8 +308,7 @@ def _extract_section(path, secname, row_scale=1.0):
             if ln(nt.tag) == "tbl" and _nearest_cell(nt) is tc:
                 pp = _nearest_p(nt)
                 nsegs = direct_linesegs(pp) if pp is not None else []
-                nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
-                         if nsegs else 0.0)
+                nvpos = float(nsegs[0].get("vertpos", "0")) * HU if nsegs else 0.0
                 nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
                 nh = sane_hu(nsz.get("height", "0"))
                 content = max(content, nvpos + nh)
@@ -306,8 +329,7 @@ def _extract_section(path, secname, row_scale=1.0):
             # 세로쓰기(textDirection=VERTICAL/VERTICALALL) — 자리수 헤더
             # (조/천억/백억 등 좁고 긴 금액칸)에서 흔함. CSS writing-mode
             # 로 렌더러가 처리하도록 셀 단위로 전달.
-            "vertical": str(sub.get("textDirection", "")).startswith(
-                "VERTICAL"),
+            "vertical": str(sub.get("textDirection", "")).startswith("VERTICAL"),
             "tc": tc,
         }
 
@@ -316,8 +338,9 @@ def _extract_section(path, secname, row_scale=1.0):
         그리고, 셀 안 중첩표는 그 셀 내용 좌상단에서 재귀 배치한다.
         anchor_vpos: 표 다음 본문 문단의 저장 vpos(페이지 상대) — 다중페이지
         표의 실제 높이를 원본 좌표에서 역산하는 권위 앵커. 반환: 표 하단 y."""
-        cells = [_cell_info(tc) for tc in tbl.iter()
-                 if ln(tc.tag) == "tc" and _nearest_tbl(tc) is tbl]
+        cells = [
+            _cell_info(tc) for tc in tbl.iter() if ln(tc.tag) == "tc" and _nearest_tbl(tc) is tbl
+        ]
         if not cells:
             return base_y
         ncol = max((c["col"] + c["colSpan"] for c in cells), default=1)
@@ -372,13 +395,10 @@ def _extract_section(path, secname, row_scale=1.0):
                 for c in cells:
                     if c["rowSpan"] == 1 and c["row"] not in _zero_rows:
                         _cv = c["hCompact"] + c["mt"]
-                        if _cv > _comp[c["row"]]:
-                            _comp[c["row"]] = _cv
+                        _comp[c["row"]] = max(_comp[c["row"]], _cv)
                 for i in range(nrow):
-                    if _comp[i] > row_h[i]:
-                        _comp[i] = row_h[i]
-                _new = [max(_comp[i], row_h[i] * row_scale)
-                        for i in range(nrow)]
+                    _comp[i] = min(_comp[i], row_h[i])
+                _new = [max(_comp[i], row_h[i] * row_scale) for i in range(nrow)]
                 # 행별 α — 각 행의 실제 압축률(원↔컴팩트 사이 위치).
                 # 표 전역 단일 α는 꽉 찬 행(압축률 1.0)과 여유 행(0.x)을
                 # 평균내 꽉 찬 행의 줄이 밖으로 밀린다(물림).
@@ -386,8 +406,7 @@ def _extract_section(path, secname, row_scale=1.0):
                 for i in range(nrow):
                     d = row_h[i] - _comp[i]
                     if d > 1e-6:
-                        _row_alpha[i] = min(1.0, max(
-                            0.0, (row_h[i] - _new[i]) / d))
+                        _row_alpha[i] = min(1.0, max(0.0, (row_h[i] - _new[i]) / d))
                 _calib_alpha = _row_alpha
                 row_h = _new
         # 표 압축 폐지 — 원본 해부 결과 한컴은 다중페이지 표를 압축하지 않고
@@ -396,12 +415,15 @@ def _extract_section(path, secname, row_scale=1.0):
         # cellSz(한컴 저장 실높이) 그대로 두고, 표 뒤 본문은 emit_para 의
         # 흐름 불변식이 올바른 페이지로 보낸다. (α압축은 2쪽 오가정 위에서
         # 행을 글리프 밀착까지 눌러 서식이 뭉개지는 결함이었다)
-        alpha = _calib_alpha   # 0.0 | 행별 α 리스트(캘리브레이션 축소 시)
+        alpha = _calib_alpha  # 0.0 | 행별 α 리스트(캘리브레이션 축소 시)
         if os.environ.get("COORD_DEBUG"):
-            print(f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
-                  f"nrow={nrow} ncol={ncol} th={th:.0f} "
-                  f"sum={sum(row_h):.0f} row_h="
-                  f"{[round(h, 1) for h in row_h]}", file=sys.stderr)
+            print(
+                f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
+                f"nrow={nrow} ncol={ncol} th={th:.0f} "
+                f"sum={sum(row_h):.0f} row_h="
+                f"{[round(h, 1) for h in row_h]}",
+                file=sys.stderr,
+            )
         col_x = [0.0] * (ncol + 1)
         for i in range(ncol):
             col_x[i + 1] = col_x[i] + col_w[i]
@@ -410,25 +432,22 @@ def _extract_section(path, secname, row_scale=1.0):
         table_bottom = base_y
         for c in cells:
             if c["rowSpan"] == 1 and c["row"] in _zero_rows:
-                continue   # 접힌 반복 헤더행 — 비표시
-            cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]),
-                                                        c["col"]))
+                continue  # 접힌 반복 헤더행 — 비표시
+            cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]), c["col"]))
             cx = base_x + col_x[c["col"]]
-            cy = row_abs[c["row"]]
             cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
             _last = min(c["row"] + c["rowSpan"], nrow) - 1
             # 병합 셀이 페이지 점프에 걸치면 연속 구간(조각)으로 분해 —
             # 한컴의 병합 셀 페이지 분할 재현. 조각마다 박스를 따로 그리고,
             # 셀 내용 줄은 조각을 잇는 연속 오프셋 공간에 매핑한다.
-            frags = []           # [(y_top, height)] 페이지별 연속 구간
+            frags = []  # [(y_top, height)] 페이지별 연속 구간
             _fs = c["row"]
             for r2 in range(c["row"], _last + 1):
-                if (r2 < _last
-                        and abs(row_abs[r2 + 1] - row_bot[r2]) > 0.5):
+                if r2 < _last and abs(row_abs[r2 + 1] - row_bot[r2]) > 0.5:
                     frags.append((row_abs[_fs], row_bot[r2] - row_abs[_fs]))
                     _fs = r2 + 1
             frags.append((row_abs[_fs], row_bot[_last] - row_abs[_fs]))
-            ch = sum(f[1] for f in frags)      # 가시 높이(페이지 갭 제외)
+            ch = sum(f[1] for f in frags)  # 가시 높이(페이지 갭 제외)
 
             def _y_at(off, lh=0.0, _frags=frags):
                 """셀 내용 오프셋 → 절대 y (조각 경계를 건너 연속 매핑).
@@ -443,6 +462,7 @@ def _extract_section(path, secname, row_scale=1.0):
                         return fy + max(0.0, off - cum)
                     cum += fh
                 return _frags[-1][0] + max(0.0, off - cum)
+
             # 이 셀 직속 문단만 (중첩표 안 문단 제외)
             cell_lines = []
             for cp in c["tc"].iter():
@@ -461,25 +481,23 @@ def _extract_section(path, secname, row_scale=1.0):
                 if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
                     pp = _nearest_p(nt)
                     nsegs = direct_linesegs(pp) if pp is not None else []
-                    nvpos = (float(nsegs[0].get("vertpos", "0")) * HU
-                             if nsegs else 0.0)
-                    nsz = next((x.attrib for x in nt
-                                if ln(x.tag) == "sz"), {})
+                    nvpos = float(nsegs[0].get("vertpos", "0")) * HU if nsegs else 0.0
+                    nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
                     nh = sane_hu(nsz.get("height", "0"))
                     nested.append((nt, nvpos, nh))
             # α 압축 시 줄 위치 보간 — 각 줄을 [원 ry ↔ 글리프-밀착 스택]
             # 사이에서 α 만큼 이동(줄간격만 줄고 글리프는 유지 → 물림 없음).
             # 행별 α 배열이면 이 셀 span 의 최대 α 를 사용.
             if isinstance(alpha, list):
-                _a = max((alpha[r] for r in range(
-                    c["row"], min(c["row"] + c["rowSpan"], nrow))),
-                    default=0.0)
+                _a = max(
+                    (alpha[r] for r in range(c["row"], min(c["row"] + c["rowSpan"], nrow))),
+                    default=0.0,
+                )
             else:
                 _a = alpha
             mt_eff = c["mt"] * (1.0 - 0.5 * _a)
             if _a > 0 and cell_lines:
-                order = sorted(range(len(cell_lines)),
-                               key=lambda i: cell_lines[i]["ry"])
+                order = sorted(range(len(cell_lines)), key=lambda i: cell_lines[i]["ry"])
                 cum = 0.0
                 for i in order:
                     cl = cell_lines[i]
@@ -491,12 +509,18 @@ def _extract_section(path, secname, row_scale=1.0):
             # 내용 총 높이 = 본문 줄 + 중첩표 하단 중 최대
             text_h = max(
                 [cl["ryEff"] + cl["h"] for cl in cell_lines]
-                + [nv + nh for _, nv, nh in nested] + [0.0])
+                + [nv + nh for _, nv, nh in nested]
+                + [0.0]
+            )
             avail = ch - mt_eff * 2
             va = c["vAlign"]
-            voff = (max(0.0, (avail - text_h) / 2) if va == "CENTER"
-                    else max(0.0, avail - text_h) if va == "BOTTOM"
-                    else 0.0)
+            voff = (
+                max(0.0, (avail - text_h) / 2)
+                if va == "CENTER"
+                else max(0.0, avail - text_h)
+                if va == "BOTTOM"
+                else 0.0
+            )
             for cl in cell_lines:
                 line_x = cx + c["ml"] + cl["rx"]
                 # 줄 폭을 셀 오른쪽 경계까지로 제한 — horzsize 가 셀보다 넓어도
@@ -509,11 +533,13 @@ def _extract_section(path, secname, row_scale=1.0):
                     "text": cl["text"],
                     "segments": cl.get("segments", []),
                     "x": round(line_x, 1),
-                    "y": round(_y_at(mt_eff + voff + cl["ryEff"],
-                                     cl["h"]), 1),
-                    "w": round(wpx, 1), "h": round(cl["h"], 1),
+                    "y": round(_y_at(mt_eff + voff + cl["ryEff"], cl["h"]), 1),
+                    "w": round(wpx, 1),
+                    "h": round(cl["h"], 1),
                     "baseline": round(cl.get("baseline", 0), 1),
-                    "cell": True, "cellId": cid}
+                    "cell": True,
+                    "cellId": cid,
+                }
                 if c.get("vertical"):
                     cline["vertical"] = True
                 if cl.get("align"):
@@ -521,11 +547,15 @@ def _extract_section(path, secname, row_scale=1.0):
                 lines.append(cline)
             bf = border_fills.get(c["bfRef"])
             for _fi, (fy, fh) in enumerate(frags):
-                box = {"x": round(cx, 1), "y": round(fy, 1),
-                       "w": round(cw, 1), "h": round(fh, 1),
-                       "cellId": cid}
+                box = {
+                    "x": round(cx, 1),
+                    "y": round(fy, 1),
+                    "w": round(cw, 1),
+                    "h": round(fh, 1),
+                    "cellId": cid,
+                }
                 if _fi > 0:
-                    box["frag"] = _fi   # 병합 셀의 다음 페이지 연속 조각
+                    box["frag"] = _fi  # 병합 셀의 다음 페이지 연속 조각
                 if bf:
                     box["border"] = border_sides_css(bf["sides"])
                     if bf.get("fill"):
@@ -536,8 +566,7 @@ def _extract_section(path, secname, row_scale=1.0):
             # α 압축 시 여백 절반화 근사(다중페이지 표 안 중첩표는 코퍼스에
             # 드묾; 위치만 완만히 당긴다)
             for nt, nvpos, _ in nested:
-                walk_table(nt, cx + c["ml"],
-                           _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * _a)))
+                walk_table(nt, cx + c["ml"], _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * _a)))
             table_bottom = max(table_bottom, row_bot[_last])
         st["flow_y"] = table_bottom + 4
         st["max_y"] = max(st["max_y"], table_bottom)
@@ -590,8 +619,7 @@ def _extract_section(path, secname, row_scale=1.0):
         out = []
         for i, s in enumerate(segs):
             a = int(s.get("textpos", "0") or "0")
-            b = (int(segs[i + 1].get("textpos", "0") or "0")
-                 if i + 1 < len(segs) else len(txt))
+            b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
             out.append({
                 "rx": float(s.get("horzpos", "0")) * HU,
                 "ry": float(s.get("vertpos", "0")) * HU,
@@ -600,7 +628,8 @@ def _extract_section(path, secname, row_scale=1.0):
                 "baseline": float(s.get("baseline", "0")) * HU,
                 "text": txt[a:b],
                 "align": align,
-                "segments": slice_segments(txt, spans, a, b)})
+                "segments": slice_segments(txt, spans, a, b),
+            })
         return out
 
     def _para_top_y(p):
@@ -632,8 +661,7 @@ def _extract_section(path, secname, row_scale=1.0):
                     st["prev_vpos"] = -1
                     st["flow_y"] = st["page_idx"] * page_h + m_top
             # 이 문단의 최상위 표만(중첩표는 walk_table 이 재귀 배치)
-            top_tbls = [t for t in child.iter()
-                        if ln(t.tag) == "tbl" and _nearest_tbl(t) is None]
+            top_tbls = [t for t in child.iter() if ln(t.tag) == "tbl" and _nearest_tbl(t) is None]
             if top_tbls:
                 # 표를 flow 위치(직전 내용 아래)에 순차 배치. 다중 표가 각기
                 # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
@@ -658,11 +686,10 @@ def _extract_section(path, secname, row_scale=1.0):
                 for sib in el:
                     if seen and ln(sib.tag) == "p":
                         if any(ln(t.tag) == "tbl" for t in sib.iter()):
-                            break        # 다음 표 그룹 — 앵커 아님
+                            break  # 다음 표 그룹 — 앵커 아님
                         sgs = direct_linesegs(sib)
                         if sgs and own_text(sib).strip():
-                            anchor_vpos = float(
-                                sgs[0].get("vertpos", "0")) * HU
+                            anchor_vpos = float(sgs[0].get("vertpos", "0")) * HU
                             break
                     if sib is child:
                         seen = True
@@ -671,8 +698,7 @@ def _extract_section(path, secname, row_scale=1.0):
                 # 표끼리 겹쳐 쪽수가 왜곡되는 회귀가 실사례로 확인됨(마커
                 # 문서 7→5쪽). 앵커는 흐름 위치보다 뒤로 당길 수만 있고
                 # (전진), 이미 채워진 flow_y 이전으로 되돌리지 않는다.
-                base_y = (max(_anchor_top, st["flow_y"])
-                          if _anchor_top is not None else st["flow_y"])
+                base_y = max(_anchor_top, st["flow_y"]) if _anchor_top is not None else st["flow_y"]
                 if _anchor_top is not None and _anchor_top < st["flow_y"] - 0.5:
                     # 가드 발동 로그 — 무음이면 진짜 앵커 계산 버그가 가드에
                     # 가려져 diff 만 미세하게 나빠지는 원인추적 불가 상태가
@@ -680,29 +706,28 @@ def _extract_section(path, secname, row_scale=1.0):
                     # 가드가 정당한 규칙인지 임시방편인지 판별하는 근거.
                     warnings.append({
                         "code": "ANCHOR_CLAMPED",
-                        "message": (f"table anchor {_anchor_top:.1f}px < "
-                                    f"flow_y {st['flow_y']:.1f}px — "
-                                    "anchor 무시하고 flow_y 사용"),
+                        "message": (
+                            f"table anchor {_anchor_top:.1f}px < "
+                            f"flow_y {st['flow_y']:.1f}px — "
+                            "anchor 무시하고 flow_y 사용"
+                        ),
                         "anchorTop": round(_anchor_top, 1),
-                        "flowY": round(st["flow_y"], 1)})
+                        "flowY": round(st["flow_y"], 1),
+                    })
                 for ti, t in enumerate(top_tbls):
-                    walk_table(t, m_left, base_y,
-                               anchor_vpos if ti == len(top_tbls) - 1
-                               else None)
+                    walk_table(t, m_left, base_y, anchor_vpos if ti == len(top_tbls) - 1 else None)
                     base_y = st["flow_y"]
             else:
                 emit_para(child, this_block_idx)
 
     walk(root)
-    total_pages = max(st["page_idx"] + 1,
-                      int(math.ceil(st["max_y"] / page_h)) if page_h else 1)
+    total_pages = max(st["page_idx"] + 1, int(math.ceil(st["max_y"] / page_h)) if page_h else 1)
     # 페이지별 복구·출력 — 전역 y 를 페이지-로컬 좌표로 재조립한다.
     # 렌더러는 각 페이지를 독립 단위로 그리므로 전역 y 슬라이싱(경계 번짐·
     # 갭 흡수류 결함의 뿌리)이 사라진다. 잔여 걸침 박스(페이지보다 큰
     # 블록)는 여기서 페이지별 조각으로 최종 분할한다. 전역 lines/boxes 는
     # 감사·회귀 호환을 위해 병행 유지.
-    pages_detail = [{"no": i + 1, "lines": [], "boxes": []}
-                    for i in range(total_pages)]
+    pages_detail = [{"no": i + 1, "lines": [], "boxes": []} for i in range(total_pages)]
     if page_h > 0:
         for l in lines:
             p = int(l["y"] // page_h)
@@ -745,13 +770,10 @@ def extract(path, row_scale=1.0):
     내용이 사라지지 않도록(표시/편집 누락 방지) 표준 처리한다.
     row_scale: 공장 캘리브레이션 행높이 배율(기본 1.0 = 무변화)."""
     z = zipfile.ZipFile(path)
-    sec_files = [n for n in z.namelist()
-                 if re.search(r"section\d+\.xml$", n.lower())]
-    sec_files.sort(key=lambda n: int(re.search(r"section(\d+)",
-                                                n.lower()).group(1)))
+    sec_files = [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())]
+    sec_files.sort(key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)))
     if not sec_files:
-        sec_files = [n for n in z.namelist()
-                     if "section0" in n.lower() and n.endswith(".xml")][:1]
+        sec_files = [n for n in z.namelist() if "section0" in n.lower() and n.endswith(".xml")][:1]
     if len(sec_files) <= 1:
         return _extract_section(path, sec_files[0], row_scale)
 
@@ -776,12 +798,17 @@ def extract(path, row_scale=1.0):
         merged_warnings.extend(r.get("warnings", []))
         page_base += r["pages"]
     out = dict(first)
-    out.update(pages=page_base, lines=merged_lines, boxes=merged_boxes,
-               pagesDetail=merged_pd, warnings=merged_warnings)
+    out.update(
+        pages=page_base,
+        lines=merged_lines,
+        boxes=merged_boxes,
+        pagesDetail=merged_pd,
+        warnings=merged_warnings,
+    )
     return out
 
 
-import pathlib as _pathlib  # noqa: E402
+import pathlib as _pathlib  # ruff: ignore[module-import-not-at-top-of-file]
 
 PROJECT_ROOT = _pathlib.Path(__file__).resolve().parents[3]
 
@@ -809,16 +836,16 @@ def layout_quality(layout):
         for l in pd["lines"]:
             cid = l.get("cellId")
             if cid and cid in pb:
-                if not any(b["y"] - 1.5 <= l["y"]
-                           and l["y"] + l["h"] <= b["y"] + b["h"] + 1.5
-                           for b in pb[cid]):
+                if not any(
+                    b["y"] - 1.5 <= l["y"] and l["y"] + l["h"] <= b["y"] + b["h"] + 1.5
+                    for b in pb[cid]
+                ):
                     viol += 1
-                    max_over = max(max_over, min(
-                        abs(l["y"] + l["h"] - (b["y"] + b["h"]))
-                        for b in pb[cid]))
+                    max_over = max(
+                        max_over, min(abs(l["y"] + l["h"] - (b["y"] + b["h"])) for b in pb[cid])
+                    )
             elif not l.get("cell") and (l.get("text") or "").strip():
-                if any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13
-                       for b in pd["boxes"]):
+                if any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13 for b in pd["boxes"]):
                     ovl += 1
     return {
         "cellOverflow": viol,
@@ -839,7 +866,8 @@ def _table_id_sequence(path):
     z = zipfile.ZipFile(path)
     sec_files = sorted(
         [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())],
-        key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)))
+        key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)),
+    )
     out = []
     for sec in sec_files:
         m = re.search(r"section(\d+)", sec.lower())
@@ -860,9 +888,9 @@ def _remap_cell_ids_to_source(layout, source_path, extracted_path):
     """
     orig = _table_id_sequence(source_path)
     norm = _table_id_sequence(extracted_path)
-    if len(orig) != len(norm) or any(a[1] != b[1] for a, b in zip(orig, norm)):
+    if len(orig) != len(norm) or any(a[1] != b[1] for a, b in zip(orig, norm, strict=True)):
         return False
-    remap = {b[0]: a[0] for a, b in zip(orig, norm) if a[0] != b[0]}
+    remap = {b[0]: a[0] for a, b in zip(orig, norm, strict=True) if a[0] != b[0]}
     if not remap:
         return False
     pat = re.compile(r"^cell_(t_s\d+_\d+)_")
@@ -873,7 +901,7 @@ def _remap_cell_ids_to_source(layout, source_path, extracted_path):
         colls.append(pd.get("boxes", []))
     for coll in colls:
         for it in coll:
-            if id(it) in seen:          # 동일 dict 공유 대비(이중 치환 방지)
+            if id(it) in seen:  # 동일 dict 공유 대비(이중 치환 방지)
                 continue
             seen.add(id(it))
             cid = it.get("cellId")
@@ -915,6 +943,7 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
     normalization_discarded = None
     try:
         from .hancom_layout_refresh import normalize_for_layout
+
         norm = normalize_for_layout(cand, project_root=root)
         if norm != cand and norm.is_file():
             # 안전장치 — 한컴 재저장이 표 구조를 파괴하는 실사례 확인
@@ -925,24 +954,34 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
             try:
                 orig_tbls = _table_id_sequence(str(cand))
                 norm_tbls = _table_id_sequence(str(norm))
-            except Exception:
-                orig_tbls, norm_tbls = [], []
-            if orig_tbls and len(norm_tbls) < len(orig_tbls) * 0.5:
-                # 정규화 폐기 — extract_from 은 cand 유지. 발동 로그 필수
-                # (대표님 지적) — 무음이면 진짜 정규화 회귀가 조용히 쌓여
-                # 원인추적 불가 상태가 된다.
-                normalization_discarded = {
-                    "origTables": len(orig_tbls), "normTables": len(norm_tbls)}
+            except Exception as exc:  # noqa: BLE001 — fail-safe(아래 설명), 원인은 로그에 남김
+                # 표 소실 확인 로직 자체가 실패하면 "확인 안 됐으니 정규화본을
+                # 믿는다"가 아니라 fail-safe — 원본 유지 + 로그(대표님 지적,
+                # 아래 count 기반 폐기와 같은 원칙: 무음이면 원인추적 불가).
+                normalization_discarded = {"reason": "table_check_failed", "error": str(exc)}
             else:
-                extract_from = norm
-                normalized = True
-    except Exception:
-        pass
+                if orig_tbls and len(norm_tbls) < len(orig_tbls) * 0.5:
+                    # 정규화 폐기 — extract_from 은 cand 유지. 발동 로그 필수
+                    # (대표님 지적) — 무음이면 진짜 정규화 회귀가 조용히 쌓여
+                    # 원인추적 불가 상태가 된다.
+                    normalization_discarded = {
+                        "reason": "table_loss",
+                        "origTables": len(orig_tbls),
+                        "normTables": len(norm_tbls),
+                    }
+                else:
+                    extract_from = norm
+                    normalized = True
+    except Exception as exc:  # noqa: BLE001 — fail-safe: extract_from 은 이미 cand(원본)
+        # 이 블록(모듈 import·normalize_for_layout 호출) 전체가 실패해도
+        # 위와 같은 원칙으로 로그를 남긴다(무음이면 원인추적 불가).
+        normalization_discarded = {"reason": "normalize_block_failed", "error": str(exc)}
     _rs = 1.0
     try:
         from .hancom_layout_refresh import get_row_scale
+
         _rs = get_row_scale(cand, project_root=root)
-    except Exception:
+    except Exception:  # noqa: BLE001 — 캘리브레이션 실패 시 배율 없음(1.0)으로 안전 폴백
         _rs = 1.0
     layout = extract(str(extract_from), row_scale=_rs)
     if abs(_rs - 1.0) > 1e-3:
@@ -959,43 +998,63 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
         # (편집·입력칸 연결은 원본 문서모델 cellId 기준).
         try:
             layout["cellIdRemapped"] = _remap_cell_ids_to_source(
-                layout, str(cand), str(extract_from))
-        except Exception:
+                layout, str(cand), str(extract_from)
+            )
+        except Exception as exc:  # noqa: BLE001 — fail-safe: 재매핑 확인 실패 시 정규화 폐기
+            # 재매핑 실패를 모른 채 넘어가면 뒤쪽 표들의 입력칸·편집 연결이
+            # 통째로 끊길 수 있다(위 docstring 참고) — 정규화를 버리고 원본
+            # 레이아웃으로 재추출한다(무음이면 원인추적 불가 원칙은 동일).
+            layout = extract(str(cand), row_scale=_rs)
             layout["cellIdRemapped"] = False
+            normalized = False
+            normalization_discarded = {"reason": "cell_id_remap_failed", "error": str(exc)}
     layout.setdefault("warnings", [])
     if normalization_discarded is not None:
-        layout["warnings"].append({
-            "code": "NORMALIZATION_DISCARDED",
-            "message": (
+        _reason = normalization_discarded.get("reason")
+        if _reason == "table_loss":
+            _msg = (
                 f"한컴 재저장 표 수 {normalization_discarded['normTables']} "
                 f"< 원본 {normalization_discarded['origTables']}*0.5 — "
-                "정규화 폐기, 원본으로 폴백"),
-            **normalization_discarded})
-        print(f"[COORD_WARN] NORMALIZATION_DISCARDED: {sp} "
-              f"({normalization_discarded})", file=sys.stderr)
+                "정규화 폐기, 원본으로 폴백"
+            )
+        else:
+            _msg = (
+                f"정규화 안전성 확인 실패({_reason}: {normalization_discarded.get('error')}) "
+                "— 정규화 폐기, 원본으로 폴백"
+            )
+        layout["warnings"].append({
+            "code": "NORMALIZATION_DISCARDED",
+            "message": _msg,
+            **normalization_discarded,
+        })
+        print(
+            f"[COORD_WARN] NORMALIZATION_DISCARDED: {sp} ({normalization_discarded})",
+            file=sys.stderr,
+        )
     for w in layout["warnings"]:
         if w.get("code") == "ANCHOR_CLAMPED":
-            print(f"[COORD_WARN] ANCHOR_CLAMPED: {sp} "
-                  f"anchor={w['anchorTop']} flow_y={w['flowY']}",
-                  file=sys.stderr)
+            print(
+                f"[COORD_WARN] ANCHOR_CLAMPED: {sp} anchor={w['anchorTop']} flow_y={w['flowY']}",
+                file=sys.stderr,
+            )
     layout["verdict"] = "PASS"
     layout["sourcePath"] = cand.relative_to(root).as_posix()
     layout["hancomNormalized"] = normalized
-    layout["quality"] = layout_quality(layout)   # 로드 자가진단(상태줄 표시)
+    layout["quality"] = layout_quality(layout)  # 로드 자가진단(상태줄 표시)
     # 실렌더 배경 정합 스냅 — truth 캐시가 있으면 편집 오버레이(셀 박스)를
     # 배경의 실제 격자선에 흡착(클릭 타깃 픽셀 정렬). 품질 계산 뒤에 수행
     # (품질은 스냅 전 자체 렌더 기준 유지).
     try:
-        from .hancom_layout_refresh import snap_layout_to_truth, _truth_dir
         import hashlib as _hl
-        layout["truthAligned"] = snap_layout_to_truth(
-            layout, cand, project_root=root)
+
+        from .hancom_layout_refresh import _truth_dir, snap_layout_to_truth
+
+        layout["truthAligned"] = snap_layout_to_truth(layout, cand, project_root=root)
         # 한컴 실제 쪽수(캐시 존재 시) — 뷰어가 배경 모드 안전 여부 판단
         _dig = _hl.sha256(cand.read_bytes()).hexdigest()[:16]
         _done = _truth_dir(root) / _dig / "DONE"
-        layout["hancomPages"] = (int(_done.read_text(encoding="ascii"))
-                                 if _done.is_file() else None)
-    except Exception:
+        layout["hancomPages"] = int(_done.read_text(encoding="ascii")) if _done.is_file() else None
+    except Exception:  # noqa: BLE001 — 배경 정합은 표시 품질 보조 기능, 실패 시 안전 기본값
         layout["truthAligned"] = False
         layout["hancomPages"] = None
     return layout
@@ -1004,11 +1063,19 @@ def build_layout(request, *, project_root=PROJECT_ROOT):
 if __name__ == "__main__":
     out = extract(sys.argv[1])
     if len(sys.argv) > 2:
-        with open(sys.argv[2], "w", encoding="utf-8") as f:
+        with _pathlib.Path(sys.argv[2]).open("w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
-    print(json.dumps({
-        "pageWidthPx": out["pageWidthPx"], "pageHeightPx": out["pageHeightPx"],
-        "pages": out["pages"], "lineCount": len(out["lines"]),
-        "boxCount": len(out["boxes"]),
-        "sampleLines": out["lines"][:4],
-    }, ensure_ascii=False, indent=1))
+    print(
+        json.dumps(
+            {
+                "pageWidthPx": out["pageWidthPx"],
+                "pageHeightPx": out["pageHeightPx"],
+                "pages": out["pages"],
+                "lineCount": len(out["lines"]),
+                "boxCount": len(out["boxes"]),
+                "sampleLines": out["lines"][:4],
+            },
+            ensure_ascii=False,
+            indent=1,
+        )
+    )

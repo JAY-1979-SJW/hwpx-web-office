@@ -21,8 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.hwpx.web_office.ai_field_interpretation import (  # noqa: E402
-    should_demote, should_promote_to_user)
+from scripts.hwpx.web_office.ai_field_interpretation import should_demote, should_promote_to_user  # ruff: ignore[module-import-not-at-top-of-file]
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -31,7 +30,8 @@ PROMOTE_MIN_OK_RATIO = 0.90
 
 CONSTRUCTION_DOC_RE = re.compile(
     r"(검측|시공|감리|공사|착공|준공|기성|공정|안전관리|품질관리"
-    r"|자재승인|하도급|설계변경|현장대리인|건설기술|시방)")
+    r"|자재승인|하도급|설계변경|현장대리인|건설기술|시방)"
+)
 
 
 def _log(m):
@@ -51,8 +51,9 @@ def promote_scoped():
 
     rows = con.execute(
         f"SELECT status, COUNT(*) FROM {STAGING} WHERE form_id IN"
-        f" ({','.join('?'*len(scope_ids))}) GROUP BY status",
-        tuple(scope_ids)).fetchall()
+        f" ({','.join('?' * len(scope_ids))}) GROUP BY status",
+        tuple(scope_ids),
+    ).fetchall()
     staged = sum(n for _, n in rows)
     ok = dict(rows).get("OK", 0)
     if not staged:
@@ -66,12 +67,13 @@ def promote_scoped():
 
     verified_by_form = {}
     for fid, agreed in con.execute(
-            f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
-            f" WHERE status='OK' AND author_agreed IS NOT NULL"):
+        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
+        f" WHERE status='OK' AND author_agreed IS NOT NULL"
+    ):
         if fid in scope_ids:
             try:
                 verified_by_form[fid] = set(json.loads(agreed))
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
                 pass
     if verified_by_form:
         _log(f"2차 검증 반영 대상: {len(verified_by_form)}건")
@@ -79,13 +81,15 @@ def promote_scoped():
     updated = demoted = tagged = revived = revived_forms = 0
     pending = []
     for form_id, interp_json in con.execute(
-            f"SELECT form_id, interpretations FROM {STAGING}"
-            f" WHERE status='OK' AND interpretations IS NOT NULL"
-            f" AND form_id IN ({','.join('?'*len(scope_ids))})",
-            tuple(scope_ids)):
+        f"SELECT form_id, interpretations FROM {STAGING}"
+        f" WHERE status='OK' AND interpretations IS NOT NULL"
+        f" AND form_id IN ({','.join('?' * len(scope_ids))})",
+        tuple(scope_ids),
+    ):
         row = con.execute(
-            "SELECT input_schema, doc_type, form_kind, applicant_count"
-            " FROM forms WHERE form_id=?", (form_id,)).fetchone()
+            "SELECT input_schema, doc_type, form_kind, applicant_count FROM forms WHERE form_id=?",
+            (form_id,),
+        ).fetchone()
         if not row or not row[0]:
             continue
         schema = json.loads(row[0])
@@ -97,16 +101,21 @@ def promote_scoped():
             it = by_key.get(f.get("paragraphId"))
             if not it:
                 continue
-            judged = {**it, "label": it.get("label") or f.get("label") or "",
-                      "ruleRole": it.get("ruleRole") or f.get("role") or ""}
+            judged = {
+                **it,
+                "label": it.get("label") or f.get("label") or "",
+                "ruleRole": it.get("ruleRole") or f.get("role") or "",
+            }
             if f.get("role") == "applicant" and should_demote(judged):
                 f["role"] = "noise"
                 demoted += 1
             elif f.get("role") == "office" and should_promote_to_user(
-                    judged, doc_type=doc_type, form_kind=form_kind,
-                    form_applicant_count=app_before,
-                    verified=(it.get("key") in agreed
-                              if agreed is not None else None)):
+                judged,
+                doc_type=doc_type,
+                form_kind=form_kind,
+                form_applicant_count=app_before,
+                verified=(it.get("key") in agreed if agreed is not None else None),
+            ):
                 f["role"] = "applicant"
                 revived_here += 1
             if not (f.get("semantic") or "").strip() and it["semantic"]:
@@ -120,26 +129,35 @@ def promote_scoped():
                 f["aiProfileKey"] = it["profileKey"]
         inputs = [f for f in schema if f.get("role") != "noise"]
         app = sum(1 for f in inputs if f.get("role") == "applicant")
-        pending.append((json.dumps(schema, ensure_ascii=False), len(inputs),
-                        app, len(inputs) - app, form_id))
+        pending.append((
+            json.dumps(schema, ensure_ascii=False),
+            len(inputs),
+            app,
+            len(inputs) - app,
+            form_id,
+        ))
         updated += 1
         revived += revived_here
         if revived_here:
             revived_forms += 1
 
     for i in range(0, len(pending), 200):
-        chunk = pending[i:i + 200]
+        chunk = pending[i : i + 200]
         con.execute("BEGIN IMMEDIATE")
         con.executemany(
             "UPDATE forms SET input_schema=?, input_count=?,"
-            " applicant_count=?, office_count=? WHERE form_id=?", chunk)
+            " applicant_count=?, office_count=? WHERE form_id=?",
+            chunk,
+        )
         con.execute("COMMIT")
 
-    _log(f"PROMOTED(건축건설 범위): 서식 {updated} · 오염제거(noise 강등) {demoted}"
-         f" · semantic 신규부여 {tagged}"
-         f" · 역할교정(죽은 서식 되살림) {revived}칸/{revived_forms}서식")
+    _log(
+        f"PROMOTED(건축건설 범위): 서식 {updated} · 오염제거(noise 강등) {demoted}"
+        f" · semantic 신규부여 {tagged}"
+        f" · 역할교정(죽은 서식 되살림) {revived}칸/{revived_forms}서식"
+    )
     con.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     promote_scoped()

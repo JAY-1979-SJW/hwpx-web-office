@@ -5,22 +5,50 @@ kpi.or.kr 종합물가정보 PDF 파서
 - 방식: PyMuPDF dict(span) 기반 좌표 매핑 테이블 파싱
 """
 
-import fitz, re, csv, sqlite3
-from pathlib import Path
+import csv
+import re
+import sqlite3
 from collections import defaultdict
+from pathlib import Path
+
+import fitz
 
 PDF_DIR = Path.home() / "Downloads/kpi_pdf"
 OUT_DIR = Path.home() / "Downloads/kpi_pdf/result"
-DB_PATH  = OUT_DIR / "kpi_prices.db"
+DB_PATH = OUT_DIR / "kpi_prices.db"
 CSV_PATH = OUT_DIR / "kpi_prices.csv"
 
 REGIONS = {"서울", "인천", "수원", "부산", "대구", "대전", "광주", "전주", "강원", "제주"}
 PRICE_PAT = re.compile(r"^\d[\d,]+$")
-FILE_PAT  = re.compile(r"(\d{4})년(\d{2})월_(.+?)_(.+?)\.pdf$")
-DITTO     = {"〃", "″", "//"}
-UNIT_SET  = {
-    "M/T", "m", "개", "㎡", "㎥", "㎏", "본", "롤", "장", "매", "EA", "SET", "Set",
-    "TON", "KG", "L", "ℓ", "개소", "식", "대", "조", "㎜", "m2", "m3", "포", "톤",
+FILE_PAT = re.compile(r"(\d{4})년(\d{2})월_(.+?)_(.+?)\.pdf$")
+DITTO = {"〃", "″", "//"}
+UNIT_SET = {
+    "M/T",
+    "m",
+    "개",
+    "㎡",
+    "㎥",
+    "㎏",
+    "본",
+    "롤",
+    "장",
+    "매",
+    "EA",
+    "SET",
+    "Set",
+    "TON",
+    "KG",
+    "L",
+    "ℓ",
+    "개소",
+    "식",
+    "대",
+    "조",
+    "㎜",
+    "m2",
+    "m3",
+    "포",
+    "톤",
 }
 # 공사비(일위대가) 전용 단위 — 단위 컬럼 위치(±20px)에서만 판정
 ILWI_EXTRA_UNITS = {"hr", "인"}
@@ -28,16 +56,29 @@ KOREAN_RE = re.compile(r"[가-힣]{2,}")
 KOREAN_FIRST_RE = re.compile(r"^[가-힣]")
 # 규격·치수 전용 한글 접두어 (품목명으로 쓰지 않음)
 SPEC_PREFIXES = (
-    "외경", "내경", "두께", "직경", "관경", "파경", "호칭경", "규격",
-    "길이", "폭", "높이", "두께", "반경", "반지름",
+    "외경",
+    "내경",
+    "두께",
+    "직경",
+    "관경",
+    "파경",
+    "호칭경",
+    "규격",
+    "길이",
+    "폭",
+    "높이",
+    "두께",
+    "반경",
+    "반지름",
 )
 
 
 # ── 텍스트 정규화 ─────────────────────────────────────────────────────────────
 
+
 def norm(s: str) -> str:
-    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", s)   # 제어문자 제거
-    s = re.sub(r"\s+", " ", s).strip()             # 공백 통합
+    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", s)  # 제어문자 제거
+    s = re.sub(r"\s+", " ", s).strip()  # 공백 통합
     return s
 
 
@@ -60,6 +101,7 @@ def is_number_only(s: str) -> bool:
 
 
 # ── span → 행 그룹 ───────────────────────────────────────────────────────────
+
 
 def page_spans(page):
     """→ [(y, x, text)]"""
@@ -84,6 +126,7 @@ def group_rows(spans, tol=5):
 
 
 # ── 컬럼 맵 탐지 ─────────────────────────────────────────────────────────────
+
 
 def detect_region_header(sorted_rows):
     """
@@ -149,6 +192,7 @@ def nearest_col(x, col_map, tol=30):
 
 # ── 단위 헤더 x 좌표 탐지 ────────────────────────────────────────────────────
 
+
 def find_unit_col_x(sorted_rows, around_y):
     """헤더 행 근방에서 '단위' 텍스트의 x 좌표 반환. 없으면 None.
     '단'과 '위'가 인접 두 행에 분리된 경우도 인식한다.
@@ -179,12 +223,13 @@ def find_unit_col_x(sorted_rows, around_y):
 
 _UNIT_PAREN_RE = re.compile(r"[（(]\s*단\s*위\s*[：:]\s*([^)）]+)[)）]")
 
+
 def find_unit_from_paren_header(sorted_rows, around_y):
     """'(단위 : 대)' 형태 헤더에서 단위 추출. unit_x=None인 경우 보조 사용."""
     for y, row in sorted_rows:
         if not (around_y - 60 <= y <= around_y + 20):
             continue
-        for x, t in row:
+        for _x, t in row:
             m = _UNIT_PAREN_RE.search(t)
             if m:
                 for u in re.split(r"[,，\s]+", m.group(1).strip()):
@@ -196,6 +241,7 @@ def find_unit_from_paren_header(sorted_rows, around_y):
 
 # ── price_x_min 보정: 단위 열이 경계 우측으로 밀리는 것 방지 ─────────────────
 
+
 def calc_price_x_min(col_map_min_x, unit_col_x):
     """
     col_map 최솟값 기반 기본 경계를 계산하되,
@@ -203,14 +249,17 @@ def calc_price_x_min(col_map_min_x, unit_col_x):
     단위 헤더가 col_map 최솟값보다 우측이면 다른 컬럼의 헤더로 보고 무시한다.
     """
     base = col_map_min_x - 40
-    if (unit_col_x is not None
-            and unit_col_x < col_map_min_x   # 가격 컬럼 왼쪽에 있어야 유효
-            and unit_col_x + 20 > base):
+    if (
+        unit_col_x is not None
+        and unit_col_x < col_map_min_x  # 가격 컬럼 왼쪽에 있어야 유효
+        and unit_col_x + 20 > base
+    ):
         return unit_col_x + 20
     return base
 
 
 # ── 일위대가형 헤더 탐지 ──────────────────────────────────────────────────────
+
 
 def detect_ilwidaega_header(sorted_rows):
     """
@@ -227,18 +276,15 @@ def detect_ilwidaega_header(sorted_rows):
         # 지역명이 같은 행에 있으면 제외
         if any(t.replace(" ", "") in REGIONS for _, t in row):
             continue
-        danwon_x = next(
-            (x for x, t in row if "단가" in t.replace(" ", "")), None
-        )
-        unit_x = next(
-            (x for x, t in row if t.replace(" ", "") == "단위"), None
-        )
+        danwon_x = next((x for x, t in row if "단가" in t.replace(" ", "")), None)
+        unit_x = next((x for x, t in row if t.replace(" ", "") == "단위"), None)
         if danwon_x is not None and unit_x is not None:
             return y, danwon_x, unit_x
     return None
 
 
 # ── 품목명 추출 ───────────────────────────────────────────────────────────────
+
 
 def extract_item(tokens, prev_item, prev_unit):
     """
@@ -248,7 +294,7 @@ def extract_item(tokens, prev_item, prev_unit):
     # 단위 탐지: UNIT_SET 정확 매칭 우선, 〃/ditto는 prev_unit 유지 신호
     unit = prev_unit
     for t in reversed(tokens):
-        tn = norm_region(t)   # 공백 제거
+        tn = norm_region(t)  # 공백 제거
         if tn in DITTO:
             # 〃가 단위 위치에 있으면 prev_unit 상속 (이미 unit=prev_unit이므로 break)
             break
@@ -262,17 +308,17 @@ def extract_item(tokens, prev_item, prev_unit):
         if t in DITTO:
             continue
         if "," in t and any(c.isdigit() for c in t):
-            continue           # 가격 문자열
+            continue  # 가격 문자열
         if is_number_only(t):
             continue
         if t.startswith("("):
-            continue           # 괄호형 주석/규격 상세
+            continue  # 괄호형 주석/규격 상세
         if not KOREAN_FIRST_RE.match(t):
-            continue           # 한글 시작이 아니면 제외 (숫자·영문·특수문자 시작)
+            continue  # 한글 시작이 아니면 제외 (숫자·영문·특수문자 시작)
         if not has_korean(t):
             continue
         if len(norm_region(t)) < 2:
-            continue           # 한 글자 잔재
+            continue  # 한 글자 잔재
         # 규격 전용 접두어로 시작하는 경우 품목명 아님
         if t.startswith(SPEC_PREFIXES):
             continue
@@ -294,6 +340,7 @@ def extract_item(tokens, prev_item, prev_unit):
 
 # ── 세로 분산 품목명 사전 스캔 ───────────────────────────────────────────────
 
+
 def scan_vertical_names(sorted_rows) -> list[tuple]:
     """
     왼쪽 여백(x<82)에 한 글자씩 세로로 배치된 품목명 클러스터를 탐지.
@@ -302,7 +349,7 @@ def scan_vertical_names(sorted_rows) -> list[tuple]:
     # 단일 한글 글자가 x<82에 있는 행 수집
     char_rows = []  # [(y, chars_joined)]
     for y, row in sorted_rows:
-        chars = [t for x, t in row if x < 82 and len(t) == 1 and '가' <= t <= '힣']
+        chars = [t for x, t in row if x < 82 and len(t) == 1 and "가" <= t <= "힣"]
         if chars:
             char_rows.append((y, "".join(chars)))
 
@@ -329,12 +376,13 @@ def scan_vertical_names(sorted_rows) -> list[tuple]:
 def lookup_vertical_name(y: float, clusters: list[tuple]) -> str:
     """price row Y에 해당하는 수직 품목명 반환."""
     for start_y, end_y, name in clusters:
-        if start_y - 5 <= y <= end_y + 60:   # 아래로 여유 60px
+        if start_y - 5 <= y <= end_y + 60:  # 아래로 여유 60px
             return name
     return ""
 
 
 # ── 페이지 파싱 ──────────────────────────────────────────────────────────────
+
 
 def parse_page(page, meta, stats=None):
     spans = page_spans(page)
@@ -373,12 +421,14 @@ def parse_page(page, meta, stats=None):
             if y <= header_y + 15:
                 continue
 
-            left  = [(x, t) for x, t in row if x < price_x_min]
+            left = [(x, t) for x, t in row if x < price_x_min]
             right = [(x, t) for x, t in row if x >= price_x_min]
             # 가격/규격 혼입 차단: 규격 열 좌표(x<160)의 짧은 숫자는 가격 후보 제외
             prices = [
-                (x, t) for x, t in right
-                if PRICE_PAT.match(t) and len(t) > 4
+                (x, t)
+                for x, t in right
+                if PRICE_PAT.match(t)
+                and len(t) > 4
                 and not (x < 160 and len(t.replace(",", "")) <= 5)
             ]
             if not prices:
@@ -403,7 +453,7 @@ def parse_page(page, meta, stats=None):
                     continue
                 try:
                     pv = parse_price(pt)
-                except Exception:
+                except (ValueError, AttributeError):
                     continue
                 if pv:
                     rows_out.append({
@@ -424,7 +474,7 @@ def parse_page(page, meta, stats=None):
                     if stage_y is None:  # 첫 번째 ①②③만 사용 — 다중 섹션 덮어쓰기 방지
                         col_map[x] = t
                         stage_y = y
-                    elif y == stage_y:   # 같은 행의 다른 ①②③은 포함
+                    elif y == stage_y:  # 같은 행의 다른 ①②③은 포함
                         col_map[x] = t
 
         # 일위대가형 분기: ①②③가 없거나 있어도 지역 헤더가 없으면 시도
@@ -441,13 +491,13 @@ def parse_page(page, meta, stats=None):
                 if y <= header_y + 10:
                     continue
 
-                left  = [(x, t) for x, t in row if x < price_x_min]
+                left = [(x, t) for x, t in row if x < price_x_min]
                 right = [(x, t) for x, t in row if x >= price_x_min]
                 # 단가 열 값만 가격 후보: danwon_x 기준 ±45px 이내 정수
                 prices = [
-                    (x, t) for x, t in right
-                    if PRICE_PAT.match(t) and len(t) > 4
-                    and abs(x - danwon_x) <= 45
+                    (x, t)
+                    for x, t in right
+                    if PRICE_PAT.match(t) and len(t) > 4 and abs(x - danwon_x) <= 45
                 ]
                 if not prices:
                     continue
@@ -459,7 +509,8 @@ def parse_page(page, meta, stats=None):
                 # 구분 열 경계 이전 단글자 한글 수집 — x>=40 으로 좌측 구분기호 제외
                 # 연속된 첫 클러스터만 사용: 간격 >50px이면 다음 품목 시작으로 판단
                 _cpairs = sorted(
-                    (x, t) for x, t in row
+                    (x, t)
+                    for x, t in row
                     if x >= 40 and x < item_boundary and len(t) == 1 and "가" <= t <= "힣"
                 )
                 if _cpairs:
@@ -505,10 +556,10 @@ def parse_page(page, meta, stats=None):
                             pass  # prev_unit 유지
                         break
 
-                for px, pt in prices:
+                for _px, pt in prices:
                     try:
                         pv = parse_price(pt)
-                    except Exception:
+                    except (ValueError, AttributeError):
                         continue
                     if pv:
                         rows_out.append({
@@ -539,7 +590,7 @@ def parse_page(page, meta, stats=None):
             if paren_unit and stats is not None:
                 stats["paren_header_fallback"] += 1
         # ①② → 기준①, 기준② 로 재매핑
-        col_map = {x: f"기준{v}" if v in ("①","②","③") else v for x, v in col_map.items()}
+        col_map = {x: f"기준{v}" if v in ("①", "②", "③") else v for x, v in col_map.items()}
         prev_item = prev_unit = ""
         if paren_unit:
             prev_unit = paren_unit
@@ -547,12 +598,14 @@ def parse_page(page, meta, stats=None):
         for y, row in sorted_rows:
             if y <= stage_y:
                 continue
-            left  = [(x, t) for x, t in row if x < price_x_min]
+            left = [(x, t) for x, t in row if x < price_x_min]
             right = [(x, t) for x, t in row if x >= price_x_min]
             # 가격/규격 혼입 차단
             prices = [
-                (x, t) for x, t in right
-                if PRICE_PAT.match(t) and len(t) > 4
+                (x, t)
+                for x, t in right
+                if PRICE_PAT.match(t)
+                and len(t) > 4
                 and not (x < 160 and len(t.replace(",", "")) <= 5)
             ]
             if not prices:
@@ -571,7 +624,7 @@ def parse_page(page, meta, stats=None):
                 label = nearest_col(px, col_map, tol=35) or "기준가"
                 try:
                     pv = parse_price(pt)
-                except Exception:
+                except (ValueError, AttributeError):
                     continue
                 if pv:
                     rows_out.append({
@@ -615,13 +668,15 @@ def parse_pdf(pdf_path: Path, stats=None):
     for pi in range(doc.page_count):
         try:
             rows.extend(parse_page(doc[pi], meta, stats=stats))
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 — 이 페이지만 건너뛰고 나머지 페이지 계속 파싱
+            if stats is not None:
+                stats["parse_crash_pages"] = stats.get("parse_crash_pages", 0) + 1
     doc.close()
     return rows
 
 
 # ── DB / CSV ─────────────────────────────────────────────────────────────────
+
 
 def init_db(conn):
     conn.executescript("""
@@ -654,7 +709,7 @@ def save_csv(rows, path):
     if not rows:
         return
     fields = ["연도", "월", "책명", "분류", "품목명", "단위", "지역", "가격"]
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+    with Path(path).open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
@@ -662,8 +717,10 @@ def save_csv(rows, path):
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────
 
+
 def main():
     import sys
+
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -692,70 +749,82 @@ def main():
     # 런타임 품질 통계 저장
     rt_stats_path = OUT_DIR / "runtime_stats.json"
     import json as _json
+
     rt_stats_path.write_text(_json.dumps(rt_stats, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"런타임 통계 저장: {rt_stats_path}")
 
     # ── 결과 리포트 ────────────────────────────────────────────────────────
-    from datetime import datetime
     from collections import Counter
+    from datetime import datetime
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    total   = len(all_rows)
-    items   = {r["품목명"] for r in all_rows}
-    regions = {r["지역"]   for r in all_rows}
-    books   = Counter(r["책명"] for r in all_rows)
-    cats    = Counter(r["분류"] for r in all_rows)
-    years   = sorted({r["연도"] for r in all_rows})
+    total = len(all_rows)
+    items = {r["품목명"] for r in all_rows}
+    regions = {r["지역"] for r in all_rows}
+    books = Counter(r["책명"] for r in all_rows)
+    cats = Counter(r["분류"] for r in all_rows)
+    years = sorted({r["연도"] for r in all_rows})
 
-    skipped = [pdf.name for pdf in sorted(PDF_DIR.rglob("*.pdf"))
-               if any(b in pdf.name for b in SKIP_BOOKS)]
+    skipped = [
+        pdf.name for pdf in sorted(PDF_DIR.rglob("*.pdf")) if any(b in pdf.name for b in SKIP_BOOKS)
+    ]
 
     lines = [
         "=" * 60,
-        f"  KPI 물가정보 PDF 파싱 결과 리포트",
+        "  KPI 물가정보 PDF 파싱 결과 리포트",
         f"  생성: {now}",
         "=" * 60,
-        f"",
-        f"[수집 범위]",
+        "",
+        "[수집 범위]",
         f"  대상 PDF    : {len(pdfs)}개",
         f"  스킵 PDF    : {len(skipped)}개  ({', '.join(sorted({n.split('_')[2] for n in skipped})[:5])} ...)",
         f"  파싱 연도   : {years[0]}년 ~ {years[-1]}년",
-        f"",
-        f"[추출 결과]",
+        "",
+        "[추출 결과]",
         f"  총 행 수    : {total:,}행",
         f"  고유 품목   : {len(items):,}개",
         f"  지역 종류   : {len(regions)}개  {sorted(regions)}",
-        f"",
-        f"[책명별 행 수]",
+        "",
+        "[책명별 행 수]",
     ]
     for book, cnt in books.most_common():
         lines.append(f"  {book:<20} : {cnt:>10,}행")
 
     lines += [
-        f"",
-        f"[분류(섹션)별 행 수 TOP 15]",
+        "",
+        "[분류(섹션)별 행 수 TOP 15]",
     ]
     for cat, cnt in cats.most_common(15):
         lines.append(f"  {cat:<20} : {cnt:>10,}행")
 
     lines += [
-        f"",
-        f"[주요 품목 가격 샘플 - 서울 2026년 4월]",
+        "",
+        "[주요 품목 가격 샘플 - 서울 2026년 4월]",
     ]
     sample_targets = [
-        "고장력철근", "이형철근", "시멘트", "레미콘", "H형강",
-        "형강", "강관", "합판", "전기동", "아스팔트",
+        "고장력철근",
+        "이형철근",
+        "시멘트",
+        "레미콘",
+        "H형강",
+        "형강",
+        "강관",
+        "합판",
+        "전기동",
+        "아스팔트",
     ]
     april26 = [r for r in all_rows if r["연도"] == 2026 and r["월"] == 4 and "서울" in r["지역"]]
     for tgt in sample_targets:
         hits = [r for r in april26 if tgt in r["품목명"]]
         if hits:
             r = hits[0]
-            lines.append(f"  {r['품목명'][:25]:<25} | {r['지역']:<8} | {r['가격']:>12,}원 | {r['단위']}")
+            lines.append(
+                f"  {r['품목명'][:25]:<25} | {r['지역']:<8} | {r['가격']:>12,}원 | {r['단위']}"
+            )
 
     lines += [
-        f"",
-        f"[출력 파일]",
+        "",
+        "[출력 파일]",
         f"  DB  : {DB_PATH}",
         f"  CSV : {CSV_PATH}",
         "=" * 60,

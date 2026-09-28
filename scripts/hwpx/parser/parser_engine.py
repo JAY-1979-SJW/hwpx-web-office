@@ -13,26 +13,32 @@ parse_hwpx_v2(path) → ParserV2Result
 
 원칙: read-only, fail-fast 금지, crash 최소화.
 """
+
 from __future__ import annotations
 
 import hashlib
 from pathlib import Path
 
-from .parser_contract import (
-    ParserV2Result, DocumentInfo, SemanticHints,
-    ParserWarning, ParserError, make_request_id,
-)
-from .package_reader import read_package_info, read_header_xml, read_section_xmls
-from .style_parser import (
-    parse_style_summary, enrich_style_info,
-)
 from .block_parser import parse_blocks_from_section
-from .table_parser import parse_tables_from_section
-from .layout_classifier import enrich_table_layout
-from .input_slot_detector import detect_input_slots
-from .schedule_detector import detect_schedule_structure
-from .object_parser import parse_objects_from_section, parse_bin_data_from_header
 from .errors import ErrCode, WarnCode
+from .input_slot_detector import detect_input_slots
+from .layout_classifier import enrich_table_layout
+from .object_parser import parse_bin_data_from_header, parse_objects_from_section
+from .package_reader import read_header_xml, read_package_info, read_section_xmls
+from .parser_contract import (
+    DocumentInfo,
+    ParserError,
+    ParserV2Result,
+    ParserWarning,
+    SemanticHints,
+    make_request_id,
+)
+from .schedule_detector import detect_schedule_structure
+from .style_parser import (
+    enrich_style_info,
+    parse_style_summary,
+)
+from .table_parser import parse_tables_from_section
 
 
 def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
@@ -46,7 +52,7 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
         pkg_info, pkg_warns = read_package_info(path)
         result.package = pkg_info
         result.warnings.extend(pkg_warns)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 error 기록 후 최대한 구조 반환
         result.errors.append(ParserError(ErrCode.ZIP_OPEN_FAIL, str(exc)))
         return result
 
@@ -61,9 +67,11 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
             style_info = parse_style_summary(header_raw)
         else:
             from .parser_contract import StyleInfo
+
             style_info = StyleInfo()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 기본 StyleInfo로 계속
         from .parser_contract import StyleInfo
+
         style_info = StyleInfo()
         result.warnings.append(ParserWarning(WarnCode.SECTION_PARSE_WARN, f"header.xml: {exc}"))
 
@@ -79,21 +87,21 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
     try:
         section_xmls_map = read_section_xmls(path)
         result.sections = sorted(section_xmls_map.keys())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 error 기록 후 계속
         result.errors.append(ParserError(ErrCode.SECTION_READ_FAIL, str(exc)))
 
     # style 보강 (section refs)
     try:
         enrich_style_info(style_info, list(section_xmls_map.values()))
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 — 형제 블록들과 동일하게 원인 무관 warning 기록
+        result.warnings.append(ParserWarning(WarnCode.SECTION_PARSE_WARN, f"style_enrich: {exc}"))
     result.styles = style_info
 
     # ── 3.5 binData 파싱 (header.xml) ─────────────────────────────────────────
     try:
         if header_raw:
             result.binData = parse_bin_data_from_header(header_raw)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
         result.warnings.append(ParserWarning(WarnCode.SECTION_PARSE_WARN, f"binData: {exc}"))
 
     # ── 4. block + table + object 파싱 ───────────────────────────────────────
@@ -106,24 +114,27 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
         try:
             blocks = parse_blocks_from_section(raw, si, source_path=section_path)
             all_blocks.extend(blocks)
-        except Exception as exc:
-            result.warnings.append(ParserWarning(WarnCode.SECTION_PARSE_WARN,
-                                                  f"{section_path}: {exc}"))
+        except Exception as exc:  # noqa: BLE001 — 이 섹션만 warning, 나머지 섹션 계속 파싱
+            result.warnings.append(
+                ParserWarning(WarnCode.SECTION_PARSE_WARN, f"{section_path}: {exc}")
+            )
         try:
             tables = parse_tables_from_section(
                 raw, si, start_block_index=block_offset, style_defs=_style_defs
             )
             all_tables.extend(tables)
             block_offset += len(tables)
-        except Exception as exc:
-            result.warnings.append(ParserWarning(WarnCode.TABLE_PARSE_WARN,
-                                                  f"{section_path}: {exc}"))
+        except Exception as exc:  # noqa: BLE001 — 이 섹션만 warning, 나머지 섹션 계속 파싱
+            result.warnings.append(
+                ParserWarning(WarnCode.TABLE_PARSE_WARN, f"{section_path}: {exc}")
+            )
         try:
             objs = parse_objects_from_section(raw, si, source_path=section_path)
             all_objects.extend(objs)
-        except Exception as exc:
-            result.warnings.append(ParserWarning(WarnCode.SECTION_PARSE_WARN,
-                                                  f"object_parser {section_path}: {exc}"))
+        except Exception as exc:  # noqa: BLE001 — 이 섹션만 warning, 나머지 섹션 계속 파싱
+            result.warnings.append(
+                ParserWarning(WarnCode.SECTION_PARSE_WARN, f"object_parser {section_path}: {exc}")
+            )
 
     result.objects = all_objects
 
@@ -131,7 +142,7 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
     for table in all_tables:
         try:
             enrich_table_layout(table)
-        except Exception:
+        except Exception:  # noqa: BLE001 — 이 표만 classifier_error 로 기록, 나머지 표 계속 분류
             table.layoutGuess = "unknown"
             table.classificationEvidence = ["classifier_error"]
 
@@ -139,7 +150,7 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
     try:
         slots = detect_input_slots(all_tables)
         result.inputSlotCandidates = slots
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
         result.warnings.append(ParserWarning(WarnCode.LOW_CONFIDENCE_SLOT, str(exc)))
 
     # ── 7. schedule 구조 탐지 ────────────────────────────────────────────────
@@ -150,8 +161,10 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
             tables = all_tables
 
         result.schedules = detect_schedule_structure(_TableHolder())
-    except Exception as exc:
-        result.warnings.append(ParserWarning(WarnCode.LOW_CONFIDENCE_SLOT, f"schedule_detector: {exc}"))
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
+        result.warnings.append(
+            ParserWarning(WarnCode.LOW_CONFIDENCE_SLOT, f"schedule_detector: {exc}")
+        )
 
     # ── 8. document 요약 ────────────────────────────────────────────────────
     para_blocks = [b for b in all_blocks if b.type in ("paragraph", "page_marker")]

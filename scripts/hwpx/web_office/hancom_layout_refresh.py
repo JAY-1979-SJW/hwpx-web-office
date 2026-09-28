@@ -13,6 +13,7 @@
 - COM 은 서브프로세스에서 실행(타임아웃 격리 — API 서버 행 방지).
 - 한컴 미설치/실패 시 원본 경로 반환(현행 동작 폴백).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,14 +25,13 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CACHE_DIR_ENV = "HWPX_WEB_OFFICE_NORMALIZED_DIR"
-DISABLE_ENV = "HWPX_WEB_OFFICE_HANCOM_REFRESH"   # "0" 이면 비활성
+DISABLE_ENV = "HWPX_WEB_OFFICE_HANCOM_REFRESH"  # "0" 이면 비활성
 TIMEOUT_SEC = 90
 
 
 def _cache_dir(project_root: Path) -> Path:
     configured = os.environ.get(CACHE_DIR_ENV)
-    d = (Path(configured) if configured
-         else project_root / "tmp" / "web_office_normalized")
+    d = Path(configured) if configured else project_root / "tmp" / "web_office_normalized"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -41,9 +41,10 @@ def hancom_available() -> bool:
         return False
     try:
         import winreg
+
         winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "HWPFrame.HwpObject")
         return True
-    except Exception:
+    except (ImportError, OSError):
         return False
 
 
@@ -84,16 +85,15 @@ def _resave_subprocess(src: Path, dst: Path) -> bool:
     try:
         r = subprocess.run(
             [sys.executable, "-c", code, str(src), str(dst)],
-            capture_output=True, timeout=TIMEOUT_SEC)
+            capture_output=True,
+            timeout=TIMEOUT_SEC,
+        )
         return r.returncode == 0 and dst.is_file()
-    except subprocess.TimeoutExpired:
-        return False
-    except Exception:
+    except (subprocess.TimeoutExpired, OSError):
         return False
 
 
-def normalize_for_layout(source_path: Path,
-                         project_root: Path = PROJECT_ROOT) -> Path:
+def normalize_for_layout(source_path: Path, project_root: Path = PROJECT_ROOT) -> Path:
     """표시용 정규화 사본 경로 반환. 실패/비가용 시 원본 경로 그대로."""
     src = Path(source_path)
     if not src.is_file() or src.suffix.lower() != ".hwpx":
@@ -125,8 +125,7 @@ TRUTH_DIR_ENV = "HWPX_WEB_OFFICE_TRUTH_DIR"
 
 def _truth_dir(project_root: Path) -> Path:
     configured = os.environ.get(TRUTH_DIR_ENV)
-    d = (Path(configured) if configured
-         else project_root / "tmp" / "web_office_truth")
+    d = Path(configured) if configured else project_root / "tmp" / "web_office_truth"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -168,15 +167,17 @@ def _pdf_subprocess(src: Path, dst_pdf: Path) -> bool:
     try:
         r = subprocess.run(
             [sys.executable, "-c", code, str(src), str(dst_pdf)],
-            capture_output=True, timeout=TIMEOUT_SEC)
+            capture_output=True,
+            timeout=TIMEOUT_SEC,
+        )
         return r.returncode == 0 and dst_pdf.is_file()
-    except Exception:
+    except (subprocess.TimeoutExpired, OSError):
         return False
 
 
-def render_truth_pages(source_path: Path,
-                       project_root: Path = PROJECT_ROOT,
-                       width_px: int = 794) -> Path | None:
+def render_truth_pages(
+    source_path: Path, project_root: Path = PROJECT_ROOT, width_px: int = 794
+) -> Path | None:
     """한컴 실렌더 페이지 이미지 생성(내용해시 캐시) → 디렉터리 경로.
 
     '원본 그대로' 표시 모드의 배경: 한컴이 그린 페이지를 그대로 쓰므로
@@ -204,6 +205,7 @@ def render_truth_pages(source_path: Path,
         return None
     try:
         import fitz
+
         doc = fitz.open(str(pdf))
         for i, page in enumerate(doc):
             z = float(width_px) / page.rect.width
@@ -211,7 +213,7 @@ def render_truth_pages(source_path: Path,
             pix.save(str(out_dir / f"p{i + 1}.png"))
         (out_dir / "DONE").write_text(str(doc.page_count), encoding="ascii")
         return out_dir
-    except Exception:
+    except Exception:  # noqa: BLE001 — fitz(C 확장) 예외 표면이 넓음, 실패 시 로직 렌더 폴백(None)
         return None
 
 
@@ -219,6 +221,7 @@ def _detect_grid(png_path: Path):
     """실렌더 PNG 에서 표 격자선(가로/세로) 픽셀 좌표 검출."""
     import numpy as np
     from PIL import Image
+
     im = np.asarray(Image.open(png_path).convert("L"))
     dark = im < 176
 
@@ -236,9 +239,13 @@ def _detect_grid(png_path: Path):
     return ys, xs
 
 
-def snap_layout_to_truth(layout: dict, source_path: Path,
-                         project_root: Path = PROJECT_ROOT,
-                         tol_y: float = 12.0, tol_x: float = 6.0) -> bool:
+def snap_layout_to_truth(
+    layout: dict,
+    source_path: Path,
+    project_root: Path = PROJECT_ROOT,
+    tol_y: float = 12.0,
+    tol_x: float = 6.0,
+) -> bool:
     """편집 오버레이(셀 박스)를 실렌더 배경의 실제 격자선에 스냅.
 
     배경은 한컴 픽셀, 오버레이는 우리 좌표라 수 px~수십 px 어긋날 수 있다
@@ -284,13 +291,13 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
 
     changed = False
     for pi, pd in enumerate(layout.get("pagesDetail", [])):
-        pd["truthOk"] = True   # 기본: 배경 사용(측정 실패 페이지 포함)
+        pd["truthOk"] = True  # 기본: 배경 사용(측정 실패 페이지 포함)
         png = tdir / f"p{pi + 1}.png"
         if not png.is_file():
             continue
         try:
             ys, xs = _detect_grid(png)
-        except Exception:
+        except Exception:  # noqa: BLE001 — numpy/PIL 예외 표면이 넓음, 이 페이지만 스냅 생략
             continue
         # 검출 신뢰 가드 — 격자선이 희박한 페이지(그래프·목록 등)는 스냅
         # 생략(무관한 선에 끌려 오정렬되는 것 방지).
@@ -304,8 +311,7 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
         # 칸이 +19px 이동했는데 그 줄은 안 옮겨져 왼쪽 이웃 칸 글자와
         # 겹쳐 보임). 스냅이 끝난 뒤 칸별 이동량(dx,dy)만큼 그 칸 소속
         # 줄도 같이 옮겨 박스-줄 정합을 유지한다.
-        _orig_box_pos = {id(b): (b["x"], b["y"])
-                          for b in pd["boxes"] if b.get("cellId")}
+        _orig_box_pos = {id(b): (b["x"], b["y"]) for b in pd["boxes"] if b.get("cellId")}
         # 1단: 표 단위 정합등록 — 페이지 안에서도 표마다 흐름 누적 오차가
         # 달라(위 표 0px·아래 표 20px 등) 페이지 단일 보정으론 부족하다.
         # cellId 의 표 접두(cell_t_sX_TTT)로 묶어 표별 계통 이동(dy/dx)을
@@ -345,8 +351,7 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
             x0 = snap(b["x"], xs, tol_x)
             x1 = snap(b["x"] + b["w"], xs, tol_x)
             if y1 - y0 > 4 and x1 - x0 > 4:
-                if (y0, y1 - y0, x0, x1 - x0) != (b["y"], b["h"],
-                                                  b["x"], b["w"]):
+                if (y0, y1 - y0, x0, x1 - x0) != (b["y"], b["h"], b["x"], b["w"]):
                     b["y"], b["h"] = round(y0, 1), round(y1 - y0, 1)
                     b["x"], b["w"] = round(x0, 1), round(x1 - x0, 1)
                     changed = True
@@ -373,16 +378,26 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                 lo = max((t for t in ys if t <= cyc), default=None)
                 hi = min((t for t in ys if t >= cyc), default=None)
                 new_h = (hi - lo) if (lo is not None and hi is not None) else 0
-                if (lo is not None and hi is not None and new_h > 8
-                        and new_h >= 20 and new_h >= 0.7 * b["h"]):
+                if (
+                    lo is not None
+                    and hi is not None
+                    and new_h > 8
+                    and new_h >= 20
+                    and new_h >= 0.7 * b["h"]
+                ):
                     b["y"], b["h"] = round(lo, 1), round(new_h, 1)
                     changed = True
             if in_x:
                 lo = max((t for t in xs if t <= cxc), default=None)
                 hi = min((t for t in xs if t >= cxc), default=None)
                 new_w = (hi - lo) if (lo is not None and hi is not None) else 0
-                if (lo is not None and hi is not None and new_w > 8
-                        and new_w >= 20 and new_w >= 0.7 * b["w"]):
+                if (
+                    lo is not None
+                    and hi is not None
+                    and new_w > 8
+                    and new_w >= 20
+                    and new_w >= 0.7 * b["w"]
+                ):
                     b["x"], b["w"] = round(lo, 1), round(new_w, 1)
                     changed = True
         # 인접 행 겹침 봉합 — 위 세 단계(계통이동·개별스냅·재봉합)는 박스를
@@ -403,31 +418,35 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
             m = _row_re.search(cid)
             if not m:
                 continue
-            key = cid[:m.start()]
-            tbl_groups.setdefault(key, {}).setdefault(int(m.group(1)), []) \
-                .append(b)
+            key = cid[: m.start()]
+            tbl_groups.setdefault(key, {}).setdefault(int(m.group(1)), []).append(b)
         for rows in tbl_groups.values():
             row_idxs = sorted(rows)
             for i in range(len(row_idxs) - 1):
                 r0, r1 = row_idxs[i], row_idxs[i + 1]
                 if r1 != r0 + 1:
-                    continue   # 병합으로 행 번호가 안 이어지면 스킵(안전)
+                    continue  # 병합으로 행 번호가 안 이어지면 스킵(안전)
                 boxes0, boxes1 = rows[r0], rows[r1]
                 bottom0 = max(b["y"] + b["h"] for b in boxes0)
                 top1 = min(b["y"] for b in boxes1)
                 overlap = bottom0 - top1
                 if overlap <= 0.3:
-                    continue   # 겹침 없음(또는 오차 이내) — 손대지 않음
+                    continue  # 겹침 없음(또는 오차 이내) — 손대지 않음
                 # 실제 테두리로 스냅된 쪽(더 신뢰) 경계를 우선 채택 — 겹치는
                 # 그 변(위 행의 아래쪽 / 아래 행의 위쪽)에 정확히 테두리가
                 # 있는 경우만 "그 변이 실측됨"으로 인정한다(그 칸에 다른
                 # 변 테두리만 있는 경우까지 신뢰하면 안 됨).
-                bordered0 = [b for b in boxes0
-                             if (b.get("border") or {}).get("b", "none") != "none"
-                             and b["y"] + b["h"] == bottom0]
-                bordered1 = [b for b in boxes1
-                             if (b.get("border") or {}).get("t", "none") != "none"
-                             and b["y"] == top1]
+                bordered0 = [
+                    b
+                    for b in boxes0
+                    if (b.get("border") or {}).get("b", "none") != "none"
+                    and b["y"] + b["h"] == bottom0
+                ]
+                bordered1 = [
+                    b
+                    for b in boxes1
+                    if (b.get("border") or {}).get("t", "none") != "none" and b["y"] == top1
+                ]
                 if bordered0 and not bordered1:
                     shared = bottom0
                 elif bordered1 and not bordered0:
@@ -449,20 +468,26 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                 # 정확한 하한/상한이 나온다.
                 cids0 = {b.get("cellId") for b in boxes0}
                 cids1 = {b.get("cellId") for b in boxes1}
-                dy0 = (boxes0[0]["y"] - _orig_box_pos[id(boxes0[0])][1]
-                       if id(boxes0[0]) in _orig_box_pos else 0.0)
-                dy1 = (boxes1[0]["y"] - _orig_box_pos[id(boxes1[0])][1]
-                       if id(boxes1[0]) in _orig_box_pos else 0.0)
+                dy0 = (
+                    boxes0[0]["y"] - _orig_box_pos[id(boxes0[0])][1]
+                    if id(boxes0[0]) in _orig_box_pos
+                    else 0.0
+                )
+                dy1 = (
+                    boxes1[0]["y"] - _orig_box_pos[id(boxes1[0])][1]
+                    if id(boxes1[0]) in _orig_box_pos
+                    else 0.0
+                )
                 content_bottom0 = max(
-                    (l["y"] + l["h"] + dy0 for l in pd["lines"]
-                     if l.get("cellId") in cids0), default=None)
+                    (l["y"] + l["h"] + dy0 for l in pd["lines"] if l.get("cellId") in cids0),
+                    default=None,
+                )
                 content_top1 = min(
-                    (l["y"] + dy1 for l in pd["lines"]
-                     if l.get("cellId") in cids1), default=None)
+                    (l["y"] + dy1 for l in pd["lines"] if l.get("cellId") in cids1), default=None
+                )
                 if content_bottom0 is not None and shared < content_bottom0:
                     shared = content_bottom0
-                if (content_top1 is not None and shared > content_top1
-                        and content_top1 >= (content_bottom0 or 0)):
+                if content_top1 is not None and shared > content_top1 >= (content_bottom0 or 0):
                     shared = content_top1
                 # 안전장치 — 여러 행 쌍을 순차 처리하다 보면(예: r8-r9 처리
                 # 직후 r9-r10 처리) 앞선 조정이 뒤 계산의 전제를 바꿔,
@@ -473,8 +498,9 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
                 # 건드리지 않는다(잔여 겹침이 뒤집힌 박스보다 안전).
                 new_h0 = {id(b): shared - b["y"] for b in boxes0}
                 new_h1 = {id(b): b["y"] + b["h"] - shared for b in boxes1}
-                if (all(h >= 0.5 for h in new_h0.values())
-                        and all(h >= 0.5 for h in new_h1.values())):
+                if all(h >= 0.5 for h in new_h0.values()) and all(
+                    h >= 0.5 for h in new_h1.values()
+                ):
                     for b in boxes0:
                         if b["y"] + b["h"] > shared:
                             b["h"] = round(new_h0[id(b)], 1)
@@ -524,26 +550,24 @@ def snap_layout_to_truth(layout: dict, source_path: Path,
     return changed
 
 
-def get_row_scale(source_path: Path,
-                  project_root: Path = PROJECT_ROOT) -> float:
+def get_row_scale(source_path: Path, project_root: Path = PROJECT_ROOT) -> float:
     """공장 캘리브레이션 배율 조회(truth 캐시의 calib.json, 없으면 1.0)."""
     src = Path(source_path)
     try:
         digest = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
         import json as _json
+
         cj = _truth_dir(Path(project_root)) / digest / "calib.json"
         if cj.is_file():
-            v = float(_json.loads(cj.read_text(encoding="utf-8"))
-                      .get("rowScale", 1.0))
+            v = float(_json.loads(cj.read_text(encoding="utf-8")).get("rowScale", 1.0))
             if 0.85 <= v <= 1.15:
                 return v
-    except Exception:
+    except (OSError, ValueError, TypeError):
         pass
     return 1.0
 
 
-def calibrate_row_scale(source_path: Path,
-                        project_root: Path = PROJECT_ROOT) -> float | None:
+def calibrate_row_scale(source_path: Path, project_root: Path = PROJECT_ROOT) -> float | None:
     """±1쪽 캘리브레이션 — 한컴 실제 쪽수에 우리 쪽수가 일치하는 행높이
     배율 k 를 1.0 에서 가까운 순으로 탐색해 truth 캐시에 저장한다.
 
@@ -571,17 +595,18 @@ def calibrate_row_scale(source_path: Path,
     except ImportError:
         from coordinate_layout import extract as _extract
     cands = [1.0]
-    for step in (0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06,
-                 0.08, 0.10, 0.12):
+    for step in (0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.12):
         cands.extend([1.0 - step, 1.0 + step])
     for k in cands:
         try:
             if _extract(str(target), row_scale=k).get("pages") == hancom_pages:
                 import json as _json
+
                 (tdir / "calib.json").write_text(
-                    _json.dumps({"rowScale": round(k, 4)}), encoding="utf-8")
+                    _json.dumps({"rowScale": round(k, 4)}), encoding="utf-8"
+                )
                 return k
-        except Exception:
+        except Exception:  # noqa: BLE001 — 배율 후보 하나가 깨져도 나머지 후보 탐색 계속
             continue
     return None
 

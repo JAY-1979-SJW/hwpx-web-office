@@ -10,6 +10,7 @@ HWPX-CORPUS-PROFILER-LOCAL-INVENTORY-01
 - 실패 파일이 있어도 전체 스캔은 중단되지 않음
 - 절대경로는 pathHash로 익명화, relativePath는 root 기준 상대값만 노출
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,14 +21,13 @@ import re
 import sys
 import traceback
 import unicodedata
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
-
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -38,12 +38,28 @@ NS_OCF = "urn:oasis:names:tc:opendocument:xmlns:container"
 
 SCHEDULE_FILENAME_KEYWORDS = ("공정표", "예정공정", "일정표", "공정관리", "schedule", "gantt")
 SCHEDULE_HEADER_KEYWORDS = (
-    "공종", "작업명", "공사명", "시작일", "착수일", "종료일", "완료일", "준공일",
-    "기간", "공기", "진행률", "진도율", "예정", "실적", "task", "start", "end", "duration",
+    "공종",
+    "작업명",
+    "공사명",
+    "시작일",
+    "착수일",
+    "종료일",
+    "완료일",
+    "준공일",
+    "기간",
+    "공기",
+    "진행률",
+    "진도율",
+    "예정",
+    "실적",
+    "task",
+    "start",
+    "end",
+    "duration",
 )
 DATE_HEADER_PATTERNS = [
     re.compile(r"^\d{4}[-./]\d{1,2}[-./]\d{1,2}"),
-    re.compile(r"^\d{4}[-./]\d{1,2}$"),   # 연-월 형식 (2026-01)
+    re.compile(r"^\d{4}[-./]\d{1,2}$"),  # 연-월 형식 (2026-01)
     re.compile(r"^\d{1,2}[-./]\d{1,2}"),
     re.compile(r"^\d{1,2}월"),
     re.compile(r"^\d{1,2}주차?"),
@@ -57,43 +73,74 @@ NUMERIC_HEADER_PATTERNS = [
 
 # 헤더 사전 추정용 필드 매핑 (정규화된 헤더 텍스트 일부 매칭 기준)
 FIELD_HINTS: list[tuple[str, tuple[str, ...]]] = [
-    ("projectName",   ("공사명", "사업명", "프로젝트명")),
-    ("siteName",      ("현장명", "현장",)),
-    ("contractorName",("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
-    ("reportDate",    ("작성일", "보고일", "제출일")),
+    ("projectName", ("공사명", "사업명", "프로젝트명")),
+    (
+        "siteName",
+        (
+            "현장명",
+            "현장",
+        ),
+    ),
+    ("contractorName", ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
+    ("reportDate", ("작성일", "보고일", "제출일")),
     ("receiptNumber", ("접수번호", "접수번", "문서번호", "접수")),
-    ("number",        ("번호",)),
-    ("trade",         ("공종", "공정", "trade")),
-    ("taskName",      ("작업명", "task", "내용", "항목")),
-    ("startDate",     ("시작일", "착수일", "착공일", "start")),
-    ("endDate",       ("종료일", "완료일", "준공일", "end")),
-    ("durationDays",  ("기간", "공기", "duration")),
-    ("responsiblePerson",("담당자", "책임자", "성명", "지정자")),
-    ("progressRate",  ("진행률", "진도율", "달성률", "progress")),
-    ("materialStatus",("자재", "재료", "material")),
-    ("inspectionStatus",("검측", "검사", "inspection")),
-    ("remarks",       ("비고", "참고", "remark", "note")),
-    ("quantity",      ("수량", "량")),
-    ("unit",          ("단위", "unit")),
-    ("spec",          ("규격", "사양", "spec")),
-    ("amount",        ("금액", "단가", "amount", "price")),
-    ("gasName",       ("가스명", "가스종류", "gas")),
-    ("pressure",      ("압력", "설계압력", "최고허용압력")),
-    ("material",      ("재질", "배관재질")),
-    ("nominalDiameter",("호칭지름", "호칭경", "관경")),
-    ("length",        ("연장", "길이", "length")),
-    ("location",      ("위치", "장소", "구간")),
+    ("number", ("번호",)),
+    ("trade", ("공종", "공정", "trade")),
+    ("taskName", ("작업명", "task", "내용", "항목")),
+    ("startDate", ("시작일", "착수일", "착공일", "start")),
+    ("endDate", ("종료일", "완료일", "준공일", "end")),
+    ("durationDays", ("기간", "공기", "duration")),
+    ("responsiblePerson", ("담당자", "책임자", "성명", "지정자")),
+    ("progressRate", ("진행률", "진도율", "달성률", "progress")),
+    ("materialStatus", ("자재", "재료", "material")),
+    ("inspectionStatus", ("검측", "검사", "inspection")),
+    ("remarks", ("비고", "참고", "remark", "note")),
+    ("quantity", ("수량", "량")),
+    ("unit", ("단위", "unit")),
+    ("spec", ("규격", "사양", "spec")),
+    ("amount", ("금액", "단가", "amount", "price")),
+    ("gasName", ("가스명", "가스종류", "gas")),
+    ("pressure", ("압력", "설계압력", "최고허용압력")),
+    ("material", ("재질", "배관재질")),
+    ("nominalDiameter", ("호칭지름", "호칭경", "관경")),
+    ("length", ("연장", "길이", "length")),
+    ("location", ("위치", "장소", "구간")),
 ]
 
 # 양식 표 식별용 라벨 키워드 (form_table / metadata_table)
 FORM_LABEL_KEYWORDS = (
-    "공사명", "현장명", "사업명", "시공사", "감리자",
-    "접수번호", "접수일", "발신", "수신", "문서번호", "보고일",
-    "작성자", "작성일", "승인자", "검토자", "제출일", "수신처",
+    "공사명",
+    "현장명",
+    "사업명",
+    "시공사",
+    "감리자",
+    "접수번호",
+    "접수일",
+    "발신",
+    "수신",
+    "문서번호",
+    "보고일",
+    "작성자",
+    "작성일",
+    "승인자",
+    "검토자",
+    "제출일",
+    "수신처",
 )
 METADATA_LABEL_KEYWORDS = (
-    "공사명", "현장명", "사업명", "접수번호", "작성일", "신청인",
-    "시공사", "발주처", "주소", "전화번호", "위치", "착공일", "준공일",
+    "공사명",
+    "현장명",
+    "사업명",
+    "접수번호",
+    "작성일",
+    "신청인",
+    "시공사",
+    "발주처",
+    "주소",
+    "전화번호",
+    "위치",
+    "착공일",
+    "준공일",
 )
 STAMP_KEYWORDS = ("직인", "서명", "날인", "결재", "승인", "인장", "검토", "확인인")
 PAGE_MARKER_RE = re.compile(
@@ -128,6 +175,7 @@ class CorpusContext:
 
 # ── ID/path helpers ────────────────────────────────────────────────────────────
 
+
 def make_file_id(path_hash: str, index: int) -> str:
     return f"f{index:05d}_{path_hash[:10]}"
 
@@ -145,6 +193,7 @@ def rel_path(path: Path, root: Path) -> str:
 
 
 # ── inventory / discovery ─────────────────────────────────────────────────────
+
 
 def discover_hwpx(root: Path, include_hidden: bool, max_files: int) -> list[Path]:
     if not root.exists():
@@ -167,6 +216,7 @@ def discover_hwpx(root: Path, include_hidden: bool, max_files: int) -> list[Path
 
 # ── package structure inspection ───────────────────────────────────────────────
 
+
 def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
     names = zf.namelist()
     has_mimetype = "mimetype" in names
@@ -176,7 +226,7 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
         try:
             mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
             mt_compress = zf.getinfo("mimetype").compress_type
-        except Exception:
+        except (KeyError, OSError):
             pass
     has_content_hpf = "Contents/content.hpf" in names
     has_container = "META-INF/container.xml" in names
@@ -196,7 +246,7 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
             opf = ET.fromstring(zf.read("Contents/content.hpf"))
             manifest_count = len(opf.findall(f".//{{{NS_OPF}}}item"))
             spine_count = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
             warnings.append(f"content.hpf parse failed: {exc}")
             xml_decode_ok = False
 
@@ -206,7 +256,7 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
             char_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
             para_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
             border_fill_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
             warnings.append(f"header.xml parse failed: {exc}")
             xml_decode_ok = False
 
@@ -244,6 +294,7 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
 
 
 # ── parse / tables / scheduling ───────────────────────────────────────────────
+
 
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
@@ -387,11 +438,20 @@ def _compute_table_scores(
     total_cells = sum(len(r) for r in grid)
     if total_cells == 0:
         return {
-            "text_cell_ratio": 0.0, "merge_ratio": 0.0, "page_marker_score": 0.0,
-            "stamp_score": 0.0, "label_value_pair_score": 0.0, "metadata_score": 0.0,
-            "legal_form_score": 0.0, "approval_stamp_score": 0.0,
-            "nested_table_count": 0, "max_col_span": 1, "max_row_span": 1,
-            "row_count": row_count, "col_count": col_count, "total_cells": 0,
+            "text_cell_ratio": 0.0,
+            "merge_ratio": 0.0,
+            "page_marker_score": 0.0,
+            "stamp_score": 0.0,
+            "label_value_pair_score": 0.0,
+            "metadata_score": 0.0,
+            "legal_form_score": 0.0,
+            "approval_stamp_score": 0.0,
+            "nested_table_count": 0,
+            "max_col_span": 1,
+            "max_row_span": 1,
+            "row_count": row_count,
+            "col_count": col_count,
+            "total_cells": 0,
         }
 
     text_cells = 0
@@ -484,9 +544,7 @@ def classify_table_layout(
         return "page_marker_table", min(0.7 + scores["page_marker_score"], 0.95), evidence
 
     # ── 2. stamp_or_approval_table ───────────────────────────────────────────
-    if scores["stamp_score"] >= 0.15 or (
-        scores["stamp_score"] > 0 and total_cells <= 12
-    ):
+    if scores["stamp_score"] >= 0.15 or (scores["stamp_score"] > 0 and total_cells <= 12):
         conf = min(0.6 + scores["stamp_score"] * 2, 0.92)
         evidence.append(f"stamp/approval keywords (score={scores['stamp_score']:.2f})")
         return "stamp_or_approval_table", conf, evidence
@@ -573,7 +631,12 @@ def detect_schedule_candidate(
     body_hit = any(kw in body_blob for kw in SCHEDULE_FILENAME_KEYWORDS)
     for t in tables_info:
         layout = t.get("layoutGuess", "unknown")
-        if layout in ("gantt_like_table", "vertical_schedule", "horizontal_schedule", "calendar_like_table"):
+        if layout in (
+            "gantt_like_table",
+            "vertical_schedule",
+            "horizontal_schedule",
+            "calendar_like_table",
+        ):
             cand_type = {
                 "gantt_like_table": "gantt_bar_schedule",
                 "vertical_schedule": "vertical_schedule",
@@ -612,6 +675,7 @@ def detect_schedule_candidate(
 
 # ── per-file processing ────────────────────────────────────────────────────────
 
+
 def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
     ph = path_hash(path)
     file_id = make_file_id(ph, index)
@@ -619,12 +683,16 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
     try:
         stat = path.stat()
         size = stat.st_size
-        mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+        mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
     except OSError as exc:
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "FILE_DISCOVERY",
-            "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-            "tracebackShort": "", "recoverable": False, "suggestedFix": "check file access",
+            "fileId": file_id,
+            "stage": "FILE_DISCOVERY",
+            "errorType": exc.__class__.__name__,
+            "errorMessage": str(exc),
+            "tracebackShort": "",
+            "recoverable": False,
+            "suggestedFix": "check file access",
             "fixturePriority": "low",
         })
         return
@@ -662,19 +730,26 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
             record["hasContainerXml"] = pkg["hasContainerXml"]
             record["hasHeaderXml"] = pkg["hasHeaderXml"]
             record["sectionFileCount"] = pkg["sectionFileCount"]
-            ctx.package_records.append({"fileId": file_id, **{k: v for k, v in pkg.items() if k != "sectionFiles"}})
+            ctx.package_records.append({
+                "fileId": file_id,
+                **{k: v for k, v in pkg.items() if k != "sectionFiles"},
+            })
 
             # parse summary
             try:
                 _parse_and_catalog(ctx, file_id, path.name, zf, pkg)
                 record["status"] = "PASS"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — 원인 상세(traceback) 기록 후 다음 파일 계속
                 tb = traceback.format_exc(limit=3)
                 ctx.failure_records.append({
-                    "fileId": file_id, "stage": "SECTION_PARSE",
-                    "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-                    "tracebackShort": tb[-400:], "recoverable": True,
-                    "suggestedFix": "harden parse_summary path", "fixturePriority": "medium",
+                    "fileId": file_id,
+                    "stage": "SECTION_PARSE",
+                    "errorType": exc.__class__.__name__,
+                    "errorMessage": str(exc),
+                    "tracebackShort": tb[-400:],
+                    "recoverable": True,
+                    "suggestedFix": "harden parse_summary path",
+                    "fixturePriority": "medium",
                 })
                 record["status"] = "PARTIAL"
                 record["errorMessage"] = f"parse: {exc}"
@@ -682,9 +757,13 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
         record["status"] = "FAIL"
         record["errorMessage"] = f"BadZipFile: {exc}"
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "ZIP_OPEN",
-            "errorType": "BadZipFile", "errorMessage": str(exc),
-            "tracebackShort": "", "recoverable": False, "suggestedFix": "re-export from Hancom",
+            "fileId": file_id,
+            "stage": "ZIP_OPEN",
+            "errorType": "BadZipFile",
+            "errorMessage": str(exc),
+            "tracebackShort": "",
+            "recoverable": False,
+            "suggestedFix": "re-export from Hancom",
             "fixturePriority": "high",
         })
     except Exception as exc:
@@ -692,10 +771,14 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
         record["errorMessage"] = str(exc)
         tb = traceback.format_exc(limit=3)
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "PACKAGE_STRUCTURE",
-            "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-            "tracebackShort": tb[-400:], "recoverable": False,
-            "suggestedFix": "check package structure", "fixturePriority": "medium",
+            "fileId": file_id,
+            "stage": "PACKAGE_STRUCTURE",
+            "errorType": exc.__class__.__name__,
+            "errorMessage": str(exc),
+            "tracebackShort": tb[-400:],
+            "recoverable": False,
+            "suggestedFix": "check package structure",
+            "fixturePriority": "medium",
         })
         if ctx.fail_fast:
             raise
@@ -729,16 +812,19 @@ def _parse_and_catalog(
     for sec_idx, sec_name in enumerate(section_entries):
         try:
             raw = zf.read(sec_name)
-        except Exception as exc:
+        except (KeyError, zipfile.BadZipFile, OSError) as exc:
             parser_warnings.append(f"section read failed {sec_name}: {exc}")
             continue
         root = parse_section_xml(raw)
         if root is None:
             parser_warnings.append(f"section parse failed {sec_name}")
             ctx.failure_records.append({
-                "fileId": file_id, "stage": "XML_DECODE",
-                "errorType": "ParseError", "errorMessage": f"section {sec_name}",
-                "tracebackShort": "", "recoverable": True,
+                "fileId": file_id,
+                "stage": "XML_DECODE",
+                "errorType": "ParseError",
+                "errorMessage": f"section {sec_name}",
+                "tracebackShort": "",
+                "recoverable": True,
                 "suggestedFix": "investigate non-utf8 or malformed XML",
                 "fixturePriority": "high",
             })
@@ -797,7 +883,9 @@ def _parse_and_catalog(
             numeric_headers = [t for t in header_texts if is_numeric_like(t)]
             if date_headers:
                 has_date_axis = True
-            schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts))
+            schedule_hits = sum(
+                1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts)
+            )
             if schedule_hits >= 2:
                 has_schedule_keyword = True
 
@@ -811,9 +899,7 @@ def _parse_and_catalog(
             left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
 
             table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
-            text_cell_count = sum(
-                1 for row in grid for c in row if normalize_header(cell_text(c))
-            )
+            text_cell_count = sum(1 for row in grid for c in row if normalize_header(cell_text(c)))
             table_record = {
                 "fileId": file_id,
                 "tableId": table_id,
@@ -835,9 +921,7 @@ def _parse_and_catalog(
                     text_cell_count / cells_total_local if cells_total_local else 0.0, 3
                 ),
                 "labelValuePairScore": round(tbl_scores["label_value_pair_score"], 3),
-                "dateAxisScore": round(
-                    len(date_headers) / max(cols, 1), 3
-                ),
+                "dateAxisScore": round(len(date_headers) / max(cols, 1), 3),
                 "approvalStampScore": round(tbl_scores["approval_stamp_score"], 3),
                 "pageMarkerScore": round(tbl_scores["page_marker_score"], 3),
                 "headerRowCandidates": header_rows,
@@ -876,11 +960,14 @@ def _parse_and_catalog(
     ctx.parse_records.append(parse_record)
 
     # schedule candidates per file
-    sch = detect_schedule_candidate(file_id, file_name, paragraphs_for_schedule, tables_for_schedule)
+    sch = detect_schedule_candidate(
+        file_id, file_name, paragraphs_for_schedule, tables_for_schedule
+    )
     ctx.schedule_records.extend(sch)
 
 
 # ── fixture candidate selection ───────────────────────────────────────────────
+
 
 def select_fixture_candidates(ctx: CorpusContext) -> None:
     by_file_parse = {p["fileId"]: p for p in ctx.parse_records}
@@ -935,7 +1022,9 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
             break
 
     # 7. many_tables_document
-    for fid, parse in sorted(by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True):
+    for fid, parse in sorted(
+        by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True
+    ):
         if fid in used:
             continue
         if parse.get("tableCount", 0) >= 5:
@@ -965,6 +1054,7 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
 
 # ── report writers ────────────────────────────────────────────────────────────
 
+
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
@@ -978,7 +1068,10 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) ->
         w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for r in rows:
-            row = {k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v) for k, v in r.items()}
+            row = {
+                k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v)
+                for k, v in r.items()
+            }
             w.writerow(row)
 
 
@@ -986,10 +1079,25 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
     out = ctx.out_dir
     paths = {}
 
-    inv_fields = ["fileId", "relativePath", "pathHash", "fileName", "sizeBytes", "modifiedTime",
-                  "zipOpenOk", "entryCount", "hasMimetype", "mimetypeValue", "mimetypeCompressType",
-                  "hasContentHpf", "hasContainerXml", "hasHeaderXml", "sectionFileCount",
-                  "status", "errorMessage"]
+    inv_fields = [
+        "fileId",
+        "relativePath",
+        "pathHash",
+        "fileName",
+        "sizeBytes",
+        "modifiedTime",
+        "zipOpenOk",
+        "entryCount",
+        "hasMimetype",
+        "mimetypeValue",
+        "mimetypeCompressType",
+        "hasContentHpf",
+        "hasContainerXml",
+        "hasHeaderXml",
+        "sectionFileCount",
+        "status",
+        "errorMessage",
+    ]
     if ctx.anonymize:
         inv_rows = [{**r, "relativePath": ""} for r in ctx.file_records]
     else:
@@ -1002,11 +1110,25 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
     _write_jsonl(out / "package_summary.jsonl", ctx.package_records)
     paths["package_summary"] = out / "package_summary.jsonl"
 
-    parse_fields = ["fileId", "documentTitleCandidate", "paragraphCount", "blockCount",
-                    "tableCount", "imageCount", "drawingCount", "totalCellCount",
-                    "mergedCellCount", "emptyCellCount", "maxTableRows", "maxTableCols",
-                    "hasScheduleKeyword", "hasDateAxisCandidate", "hasGanttCandidate",
-                    "parserStatus", "parserWarnings"]
+    parse_fields = [
+        "fileId",
+        "documentTitleCandidate",
+        "paragraphCount",
+        "blockCount",
+        "tableCount",
+        "imageCount",
+        "drawingCount",
+        "totalCellCount",
+        "mergedCellCount",
+        "emptyCellCount",
+        "maxTableRows",
+        "maxTableCols",
+        "hasScheduleKeyword",
+        "hasDateAxisCandidate",
+        "hasGanttCandidate",
+        "parserStatus",
+        "parserWarnings",
+    ]
     _write_csv(out / "parse_summary.csv", ctx.parse_records, parse_fields)
     _write_jsonl(out / "parse_summary.jsonl", ctx.parse_records)
     paths["parse_summary"] = out / "parse_summary.jsonl"
@@ -1042,9 +1164,21 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
             "documentTypeHints": type_hints,
         })
     header_rows.sort(key=lambda r: r["count"], reverse=True)
-    _write_csv(out / "header_dictionary.csv", header_rows,
-               ["normalizedHeader", "originalSamples", "count", "fileCount", "tableCount",
-                "commonColIndexes", "guessedField", "fieldConfidence", "documentTypeHints"])
+    _write_csv(
+        out / "header_dictionary.csv",
+        header_rows,
+        [
+            "normalizedHeader",
+            "originalSamples",
+            "count",
+            "fileCount",
+            "tableCount",
+            "commonColIndexes",
+            "guessedField",
+            "fieldConfidence",
+            "documentTypeHints",
+        ],
+    )
     paths["header_dictionary"] = out / "header_dictionary.csv"
 
     _write_jsonl(out / "schedule_candidates.jsonl", ctx.schedule_records)
@@ -1099,8 +1233,10 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
     out_lines.append("")
     out_lines.append("## 가장 자주 나온 헤더 TOP 50")
     for r in header_rows[:50]:
-        out_lines.append(f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
-                         f"guess={r['guessedField']}@{r['fieldConfidence']})")
+        out_lines.append(
+            f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
+            f"guess={r['guessedField']}@{r['fieldConfidence']})"
+        )
     out_lines.append("")
     out_lines.append("## 실패 유형 TOP 20")
     for et, cnt in failure_counter.most_common(20):
@@ -1108,7 +1244,9 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
     out_lines.append("")
     out_lines.append("## fixture 후보")
     for f in ctx.fixture_records:
-        out_lines.append(f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})")
+        out_lines.append(
+            f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})"
+        )
     out_lines.append("")
     out_lines.append("## 다음 파서 개선 우선순위")
     priorities = []
@@ -1127,6 +1265,7 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
 
 # ── CLI entry ─────────────────────────────────────────────────────────────────
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="HWPX corpus profiler (read-only)")
     p.add_argument("--root", required=True, help="scan root directory")
@@ -1136,8 +1275,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--no-anonymize-paths", dest="anonymize", action="store_false")
     p.add_argument("--fail-fast", action="store_true", default=False)
     p.add_argument("--include-hidden", action="store_true", default=False)
-    p.add_argument("--copy-fixtures", action="store_true", default=False,
-                   help="reserved; not used in this stage")
+    p.add_argument(
+        "--copy-fixtures",
+        action="store_true",
+        default=False,
+        help="reserved; not used in this stage",
+    )
     return p.parse_args(argv)
 
 
@@ -1168,10 +1311,14 @@ def run_profiler(args: argparse.Namespace) -> dict[str, Any]:
         except Exception as exc:
             tb = traceback.format_exc(limit=3)
             ctx.failure_records.append({
-                "fileId": f"unknown_{i}", "stage": "FILE_DISCOVERY",
-                "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-                "tracebackShort": tb[-400:], "recoverable": False,
-                "suggestedFix": "investigate", "fixturePriority": "high",
+                "fileId": f"unknown_{i}",
+                "stage": "FILE_DISCOVERY",
+                "errorType": exc.__class__.__name__,
+                "errorMessage": str(exc),
+                "tracebackShort": tb[-400:],
+                "recoverable": False,
+                "suggestedFix": "investigate",
+                "fixturePriority": "high",
             })
             if args.fail_fast:
                 raise

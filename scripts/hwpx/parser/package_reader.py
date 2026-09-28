@@ -2,15 +2,16 @@
 
 HWPX ZIP 패키지 구조를 읽는다. 원본 수정 없음.
 """
+
 from __future__ import annotations
 
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
+from .errors import ErrCode, WarnCode
 from .parser_contract import PackageInfo, ParserWarning
-from .errors import WarnCode, ErrCode
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_OPF = "http://www.idpf.org/2007/opf/"
@@ -34,29 +35,26 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
                 try:
                     mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
                     mt_compress = zf.getinfo("mimetype").compress_type
-                except Exception as exc:
-                    warnings.append(ParserWarning(WarnCode.PACKAGE_STRUCTURE_WARN,
-                                                  f"mimetype read error: {exc}"))
+                except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
+                    warnings.append(
+                        ParserWarning(
+                            WarnCode.PACKAGE_STRUCTURE_WARN, f"mimetype read error: {exc}"
+                        )
+                    )
 
             has_content_hpf = "Contents/content.hpf" in names
             has_container = "META-INF/container.xml" in names
             has_header = "Contents/header.xml" in names
             section_files = [n for n in names if re.match(r"Contents/section\d+\.xml$", n)]
 
-            char_pr_count = 0
-            para_pr_count = 0
-            border_fill_count = 0
             xml_decode_ok = True
             pkg_warnings: list[str] = []
 
             if has_header:
                 try:
                     header_raw = zf.read("Contents/header.xml")
-                    header = ET.fromstring(header_raw)
-                    char_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
-                    para_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
-                    border_fill_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
-                except Exception as exc:
+                    ET.fromstring(header_raw)
+                except Exception as exc:  # noqa: BLE001 — 원인 무관하게 warning 기록 후 계속
                     pkg_warnings.append(f"header.xml parse failed: {exc}")
                     xml_decode_ok = False
 
@@ -87,19 +85,19 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
             )
             return info, warnings
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 원인 무관하게 ZIP_OPEN_FAIL 로 기록 후 폴백
         return PackageInfo(), [ParserWarning(ErrCode.ZIP_OPEN_FAIL, str(exc))]
+
+
+_ZIP_READ_ERRORS = (KeyError, zipfile.BadZipFile, OSError, RuntimeError)
 
 
 def list_section_files(path: Path) -> list[str]:
     """section XML 파일 목록을 반환."""
     try:
         with zipfile.ZipFile(path, "r") as zf:
-            return sorted(
-                n for n in zf.namelist()
-                if re.match(r"Contents/section\d+\.xml$", n)
-            )
-    except Exception:
+            return sorted(n for n in zf.namelist() if re.match(r"Contents/section\d+\.xml$", n))
+    except _ZIP_READ_ERRORS:
         return []
 
 
@@ -113,7 +111,7 @@ def read_header_xml(path: Path) -> bytes | None:
     """header.xml 내용 반환."""
     try:
         return read_xml_entry(path, "Contents/header.xml")
-    except Exception:
+    except _ZIP_READ_ERRORS:
         return None
 
 
@@ -123,6 +121,6 @@ def read_section_xmls(path: Path) -> dict[str, bytes]:
     for entry in list_section_files(path):
         try:
             result[entry] = read_xml_entry(path, entry)
-        except Exception:
+        except _ZIP_READ_ERRORS:
             pass
     return result

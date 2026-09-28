@@ -17,6 +17,7 @@ Writer Executor live mode — **sandbox 사본 한정** 첫 실 writer 호출 �
 이 모듈은 사본 파일에 한해 writer를 호출하지만, 원본 파일에 대해서는 절대로
 호출하지 않으며 시스템 어디에도 원본을 덮어쓰지 않는다.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -46,16 +47,25 @@ ALLOWED_LIVE_OPERATION_TYPES: frozenset[str] = frozenset({
 
 # align 허용값 (HWPX convention — 대소문자 무관 입력 허용, 내부 표준화)
 ALLOWED_HORIZONTAL_ALIGN_VALUES: frozenset[str] = frozenset({
-    "LEFT", "CENTER", "RIGHT", "JUSTIFY",
+    "LEFT",
+    "CENTER",
+    "RIGHT",
+    "JUSTIFY",
 })
 ALLOWED_VERTICAL_ALIGN_VALUES: frozenset[str] = frozenset({
-    "TOP", "CENTER", "BOTTOM",
+    "TOP",
+    "CENTER",
+    "BOTTOM",
 })
 
 _OVERWRITE_OPS: frozenset[str] = frozenset({
-    "setCellText", "setParagraphText",
-    "setCellHorizontalAlign", "setCellVerticalAlign",
-    "setCellFillColor", "setCellTextStyle", "replaceTextRun",
+    "setCellText",
+    "setParagraphText",
+    "setCellHorizontalAlign",
+    "setCellVerticalAlign",
+    "setCellFillColor",
+    "setCellTextStyle",
+    "replaceTextRun",
 })
 
 # 네임스페이스 prefix 등록 (재직렬화 시 보존)
@@ -64,6 +74,7 @@ ET.register_namespace("hh", NS_HH)
 
 
 # ── dataclass ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class AppliedCall:
@@ -114,8 +125,7 @@ class LiveFinding:
     operationId: str | None = None
 
     def to_dict(self) -> dict:
-        return {"code": self.code, "detail": self.detail,
-                "operationId": self.operationId}
+        return {"code": self.code, "detail": self.detail, "operationId": self.operationId}
 
 
 @dataclass
@@ -138,8 +148,7 @@ class ReadbackResult:
     def to_dict(self) -> dict:
         return {
             "targetCellsVerified": self.targetCellsVerified,
-            "untouchedCellNormalizedTextPreserved":
-                self.untouchedCellNormalizedTextPreserved,
+            "untouchedCellNormalizedTextPreserved": self.untouchedCellNormalizedTextPreserved,
             "tableCountPreserved": self.tableCountPreserved,
             "cellCountPreserved": self.cellCountPreserved,
             "rowSpanSumPreserved": self.rowSpanSumPreserved,
@@ -191,6 +200,7 @@ class LiveSandboxResult:
 
 # ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 
+
 def _parser_normalize(text: str) -> str:
     """parser table_parser._normalize와 동일한 정규화 (한글 사이 공백 제거 포함)."""
     if not text:
@@ -204,7 +214,7 @@ def _parser_normalize(text: str) -> str:
 
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -222,8 +232,7 @@ def _parse_table_id(table_id: str) -> tuple[int, int] | None:
 
 
 def _section_xml_name_for_index(zip_names: list[str], section_index: int) -> str | None:
-    sec_paths = sorted(n for n in zip_names
-                          if "section" in n and n.endswith(".xml"))
+    sec_paths = sorted(n for n in zip_names if "section" in n and n.endswith(".xml"))
     if 0 <= section_index < len(sec_paths):
         return sec_paths[section_index]
     return None
@@ -284,6 +293,7 @@ def _section_root_top_level_paragraphs(root) -> list:
 def _paragraph_visible_text(p_elem) -> str:
     """문단의 visible text 추출. 중첩 tbl 내부는 제외."""
     parts: list[str] = []
+
     def walk(e):
         if e.tag == _TAG_TBL_FULL:
             return
@@ -291,6 +301,7 @@ def _paragraph_visible_text(p_elem) -> str:
             parts.append(e.text)
         for c in list(e):
             walk(c)
+
     for c in list(p_elem):
         walk(c)
     return "".join(parts)
@@ -299,6 +310,7 @@ def _paragraph_visible_text(p_elem) -> str:
 def _paragraph_text_run_elements(p_elem) -> list:
     """문단 내 (중첩 tbl 제외) <hp:t> 요소 목록."""
     ts: list = []
+
     def walk(e):
         if e.tag == _TAG_TBL_FULL:
             return
@@ -306,6 +318,7 @@ def _paragraph_text_run_elements(p_elem) -> list:
             ts.append(e)
         for c in list(e):
             walk(c)
+
     for c in list(p_elem):
         walk(c)
     return ts
@@ -323,10 +336,9 @@ def _section_paragraph_text_map(section_xml: bytes, section_idx: int) -> dict:
     return result
 
 
-def _modify_paragraph_text_in_section_xml(section_xml: bytes,
-                                                paragraph_idx: int,
-                                                new_value: str,
-                                                expected_before) -> tuple[bytes, bool, str | None]:
+def _modify_paragraph_text_in_section_xml(
+    section_xml: bytes, paragraph_idx: int, new_value: str, expected_before
+) -> tuple[bytes, bool, str | None]:
     """setParagraphText 적용. return (xml_bytes, modified, failure_reason)."""
     try:
         root = ET.fromstring(section_xml)
@@ -354,11 +366,9 @@ def _modify_paragraph_text_in_section_xml(section_xml: bytes,
     return new_bytes, True, None
 
 
-def _replace_text_run_in_section_xml(section_xml: bytes,
-                                            paragraph_idx: int,
-                                            find_str: str,
-                                            replace_str: str,
-                                            expected_before) -> tuple[bytes, bool, str | None]:
+def _replace_text_run_in_section_xml(
+    section_xml: bytes, paragraph_idx: int, find_str: str, replace_str: str, expected_before
+) -> tuple[bytes, bool, str | None]:
     """replaceTextRun 적용. return (xml_bytes, modified, failure_reason)."""
     if find_str is None or find_str == "":
         return section_xml, False, "invalid_find_text"
@@ -421,9 +431,9 @@ def _find_cell_element(root, table_index: int, row: int, col: int):
     return None
 
 
-def _modify_cell_halign_in_section_xml(section_xml: bytes, table_index: int,
-                                            row: int, col: int,
-                                            new_value: str) -> tuple[bytes, bool]:
+def _modify_cell_halign_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """대상 셀의 hAlign 속성을 new_value로 설정 (대문자 정규화).
 
     parser는 tc[@hAlign] 또는 tc[@horizontalAlign]을 먼저 읽으므로 tc 속성에 직접 기록한다.
@@ -444,9 +454,9 @@ def _modify_cell_halign_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _modify_cell_valign_in_section_xml(section_xml: bytes, table_index: int,
-                                            row: int, col: int,
-                                            new_value: str) -> tuple[bytes, bool]:
+def _modify_cell_valign_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """대상 셀의 vertAlign을 new_value로 설정.
 
     parser 우선순위: <hp:subList vertAlign=...> 가 있으면 그 값. 그 외 tc[@vAlign] 폴백.
@@ -471,9 +481,9 @@ def _modify_cell_valign_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _modify_cell_text_in_section_xml(section_xml: bytes, table_index: int,
-                                          row: int, col: int,
-                                          new_value: str) -> tuple[bytes, bool]:
+def _modify_cell_text_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """section XML에서 (table_index, row, col) 셀의 텍스트만 수정.
 
     구조(charPr/borderFill/run/p) 보존, 첫 번째 <hp:t>에 new_value 기록, 나머지 <hp:t>은 비움.
@@ -528,12 +538,12 @@ def _modify_cell_text_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _write_sandbox_zip(source_path: Path, output_path: Path,
-                          section_modifications: dict[str, bytes]) -> None:
+def _write_sandbox_zip(
+    source_path: Path, output_path: Path, section_modifications: dict[str, bytes]
+) -> None:
     """원본 zip을 사본으로 복사하되 section_modifications에 있는 항목은 새 바이트로 교체."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(source_path, "r") as zin, \
-         zipfile.ZipFile(output_path, "w") as zout:
+    with zipfile.ZipFile(source_path, "r") as zin, zipfile.ZipFile(output_path, "w") as zout:
         infos = zin.infolist()
         ordered = sorted(infos, key=lambda i: 0 if i.filename == "mimetype" else 1)
         for info in ordered:
@@ -541,8 +551,7 @@ def _write_sandbox_zip(source_path: Path, output_path: Path,
                 data = section_modifications[info.filename]
             else:
                 data = zin.read(info.filename)
-            new_info = zipfile.ZipInfo(filename=info.filename,
-                                          date_time=info.date_time)
+            new_info = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
             new_info.compress_type = info.compress_type
             new_info.external_attr = info.external_attr
             zout.writestr(new_info, data)
@@ -572,30 +581,33 @@ def _snapshot(parser_result, hwpx_path: Path | None = None) -> dict:
         try:
             with zipfile.ZipFile(hwpx_path) as zf:
                 sec_names = sorted(
-                    n for n in zf.namelist()
-                    if "section" in n and n.endswith(".xml")
+                    n for n in zf.namelist() if "section" in n and n.endswith(".xml")
                 )
                 for sec_idx, name in enumerate(sec_names):
                     snap["paragraphText"].update(
                         _section_paragraph_text_map(zf.read(name), sec_idx)
                     )
-        except Exception:
+        except (KeyError, zipfile.BadZipFile, OSError, ET.ParseError):
             pass
     return snap
 
 
 # ── 메인 함수 ────────────────────────────────────────────────────────────────
 
-def execute_writer_call_plan_live_sandbox(writer_call_plan,
-                                                source_path: Path,
-                                                sandbox_output_path: Path) -> LiveSandboxResult:
+
+def execute_writer_call_plan_live_sandbox(
+    writer_call_plan, source_path: Path, sandbox_output_path: Path
+) -> LiveSandboxResult:
     """sandbox 사본에 한해 writerCallPlan을 실제 적용한다.
 
     원본 파일은 절대 수정되지 않는다 (sha256/mtime 검증).
     setCellText 외 operation은 이번 공정에서 차단된다.
     """
-    wcp = writer_call_plan.to_dict() if hasattr(writer_call_plan, "to_dict") \
-            else dict(writer_call_plan or {})
+    wcp = (
+        writer_call_plan.to_dict()
+        if hasattr(writer_call_plan, "to_dict")
+        else dict(writer_call_plan or {})
+    )
     source_path = Path(source_path)
     sandbox_output_path = Path(sandbox_output_path)
     plan_id = wcp.get("planId", "")
@@ -609,9 +621,12 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
     # 1) 원본 sha256 기록 (변경 검증용)
     if not source_path.exists():
         result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "SOURCE_NOT_FOUND", f"source={source_path}",
-        ))
+        result.safetyFindings.append(
+            LiveFinding(
+                "SOURCE_NOT_FOUND",
+                f"source={source_path}",
+            )
+        )
         return result
     source_sha_before = _sha256(source_path)
     source_mtime_before = source_path.stat().st_mtime
@@ -620,38 +635,45 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
     # 2) sandbox path가 원본을 덮어쓰면 즉시 차단
     try:
         same_path = source_path.resolve() == sandbox_output_path.resolve()
-    except Exception:
+    except OSError:
         same_path = str(source_path) == str(sandbox_output_path)
     if same_path:
         result.verdict = "BLOCKED_UNSAFE_OUTPUT_PATH"
-        result.safetyFindings.append(LiveFinding(
-            "OUTPUT_OVERWRITES_SOURCE",
-            f"sandbox output path equals source path={source_path}",
-        ))
+        result.safetyFindings.append(
+            LiveFinding(
+                "OUTPUT_OVERWRITES_SOURCE",
+                f"sandbox output path equals source path={source_path}",
+            )
+        )
         result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
+        result.originalUnmodified = result.sourceSha256After == source_sha_before
         return result
 
     # 3) adapter readiness
     if not wcp.get("readyForWriter") or wcp.get("verdict") != "READY_FOR_WRITER":
         result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "ADAPTER_NOT_READY",
-            f"writer adapter verdict={wcp.get('verdict')!r} "
-            f"readyForWriter={wcp.get('readyForWriter')}",
-        ))
+        result.safetyFindings.append(
+            LiveFinding(
+                "ADAPTER_NOT_READY",
+                f"writer adapter verdict={wcp.get('verdict')!r} "
+                f"readyForWriter={wcp.get('readyForWriter')}",
+            )
+        )
         result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
+        result.originalUnmodified = result.sourceSha256After == source_sha_before
         return result
 
     calls = wcp.get("writerCalls", []) or []
     if not calls:
         result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "NO_WRITER_CALLS", "writerCalls is empty",
-        ))
+        result.safetyFindings.append(
+            LiveFinding(
+                "NO_WRITER_CALLS",
+                "writerCalls is empty",
+            )
+        )
         result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
+        result.originalUnmodified = result.sourceSha256After == source_sha_before
         return result
 
     # 4) 각 call 검증 + setCellText만 적용 후보로 분리
@@ -667,45 +689,78 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         op_type = c.get("operationType", "")
 
         if method not in valid_methods:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "writer_method_not_whitelisted",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "WRITER_METHOD_NOT_WHITELISTED",
-                f"writerMethod={method!r}", op_id,
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    cmd_id,
+                    op_id,
+                    method,
+                    "writer_method_not_whitelisted",
+                )
+            )
+            result.safetyFindings.append(
+                LiveFinding(
+                    "WRITER_METHOD_NOT_WHITELISTED",
+                    f"writerMethod={method!r}",
+                    op_id,
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_UNSAFE_WRITER_METHOD"
             continue
 
         if op_type in _OVERWRITE_OPS and "expectedBefore" not in c:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "expected_before_missing",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "EXPECTED_BEFORE_MISSING", "", op_id,
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    cmd_id,
+                    op_id,
+                    method,
+                    "expected_before_missing",
+                )
+            )
+            result.safetyFindings.append(
+                LiveFinding(
+                    "EXPECTED_BEFORE_MISSING",
+                    "",
+                    op_id,
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_EXPECTED_BEFORE_MISSING"
             continue
 
         if not c.get("sourceDocumentHash"):
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "source_document_hash_missing",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "SOURCE_HASH_MISSING", "", op_id,
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    cmd_id,
+                    op_id,
+                    method,
+                    "source_document_hash_missing",
+                )
+            )
+            result.safetyFindings.append(
+                LiveFinding(
+                    "SOURCE_HASH_MISSING",
+                    "",
+                    op_id,
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_SOURCE_HASH_MISSING"
             continue
 
         if op_type not in ALLOWED_LIVE_OPERATION_TYPES:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "unsupported_live_operation",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "UNSUPPORTED_LIVE_OPERATION",
-                f"operationType={op_type!r} not in {sorted(ALLOWED_LIVE_OPERATION_TYPES)}",
-                op_id,
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    cmd_id,
+                    op_id,
+                    method,
+                    "unsupported_live_operation",
+                )
+            )
+            result.safetyFindings.append(
+                LiveFinding(
+                    "UNSUPPORTED_LIVE_OPERATION",
+                    f"operationType={op_type!r} not in {sorted(ALLOWED_LIVE_OPERATION_TYPES)}",
+                    op_id,
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_UNSUPPORTED_LIVE_OPERATION"
             continue
 
@@ -714,7 +769,7 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
     if fatal_verdict and not accepted_calls:
         result.verdict = fatal_verdict
         result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
+        result.originalUnmodified = result.sourceSha256After == source_sha_before
         return result
 
     # 5) 사본 작성: section 단위 수정 누적
@@ -727,7 +782,7 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
                 section_xml_bytes_by_name[name] = zf.read(name)
 
     section_modifications: dict[str, bytes] = {}
-    applied_with_target_info: list[tuple[dict, str]] = []   # (call, section_name)
+    applied_with_target_info: list[tuple[dict, str]] = []  # (call, section_name)
 
     _PARAGRAPH_OP_TYPES = {"setParagraphText", "replaceTextRun"}
     _PARAGRAPH_FAILURE_TO_VERDICT = {
@@ -756,35 +811,47 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         if op_type in _PARAGRAPH_OP_TYPES:
             resolved = _resolve_paragraph_target(target)
             if resolved is None:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "paragraph_target_unparseable",
-                ))
-                result.safetyFindings.append(LiveFinding(
-                    "TARGET_NOT_FOUND",
-                    "paragraph target lacks paragraphKey or (sectionIndex+paragraphIndex)",
-                    c.get("operationId", ""),
-                ))
+                result.skippedCalls.append(
+                    SkippedCall(
+                        c.get("commandId", ""),
+                        c.get("operationId", ""),
+                        c.get("writerMethod", ""),
+                        "paragraph_target_unparseable",
+                    )
+                )
+                result.safetyFindings.append(
+                    LiveFinding(
+                        "TARGET_NOT_FOUND",
+                        "paragraph target lacks paragraphKey or (sectionIndex+paragraphIndex)",
+                        c.get("operationId", ""),
+                    )
+                )
                 fatal_verdict = fatal_verdict or "BLOCKED_TARGET_NOT_FOUND"
                 continue
             section_idx, paragraph_idx = resolved
             section_name = _section_xml_name_for_index(zip_names, section_idx)
             if section_name is None:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "section_not_found",
-                ))
+                result.skippedCalls.append(
+                    SkippedCall(
+                        c.get("commandId", ""),
+                        c.get("operationId", ""),
+                        c.get("writerMethod", ""),
+                        "section_not_found",
+                    )
+                )
                 fatal_verdict = fatal_verdict or "BLOCKED_TARGET_NOT_FOUND"
                 continue
-            current_xml = section_modifications.get(section_name) \
-                            or section_xml_bytes_by_name.get(section_name, b"")
+            current_xml = section_modifications.get(section_name) or section_xml_bytes_by_name.get(
+                section_name, b""
+            )
             if op_type == "setParagraphText":
                 new_xml, modified, failure = _modify_paragraph_text_in_section_xml(
-                    current_xml, paragraph_idx,
+                    current_xml,
+                    paragraph_idx,
                     str(new_value) if new_value is not None else "",
                     c.get("expectedBefore"),
                 )
-            else:   # replaceTextRun
+            else:  # replaceTextRun
                 # find/replace는 op 상단 또는 op.value(dict)에서 추출
                 val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
                 find_str = c.get("find")
@@ -794,28 +861,41 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
                 if replace_str is None:
                     replace_str = val_dict.get("replace") if isinstance(val_dict, dict) else None
                 new_xml, modified, failure = _replace_text_run_in_section_xml(
-                    current_xml, paragraph_idx, find_str, replace_str,
+                    current_xml,
+                    paragraph_idx,
+                    find_str,
+                    replace_str,
                     c.get("expectedBefore"),
                 )
             if failure:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), failure,
-                ))
-                result.safetyFindings.append(LiveFinding(
-                    _PARAGRAPH_FAILURE_TO_FINDING.get(failure, failure.upper()),
-                    f"operationType={op_type!r} reason={failure}",
-                    c.get("operationId", ""),
-                ))
-                fatal_verdict = (fatal_verdict
-                                  or _PARAGRAPH_FAILURE_TO_VERDICT.get(failure,
-                                                                            "BLOCKED_NOT_READY_FOR_WRITER"))
+                result.skippedCalls.append(
+                    SkippedCall(
+                        c.get("commandId", ""),
+                        c.get("operationId", ""),
+                        c.get("writerMethod", ""),
+                        failure,
+                    )
+                )
+                result.safetyFindings.append(
+                    LiveFinding(
+                        _PARAGRAPH_FAILURE_TO_FINDING.get(failure, failure.upper()),
+                        f"operationType={op_type!r} reason={failure}",
+                        c.get("operationId", ""),
+                    )
+                )
+                fatal_verdict = fatal_verdict or _PARAGRAPH_FAILURE_TO_VERDICT.get(
+                    failure, "BLOCKED_NOT_READY_FOR_WRITER"
+                )
                 continue
             if not modified:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "paragraph_not_modified",
-                ))
+                result.skippedCalls.append(
+                    SkippedCall(
+                        c.get("commandId", ""),
+                        c.get("operationId", ""),
+                        c.get("writerMethod", ""),
+                        "paragraph_not_modified",
+                    )
+                )
                 continue
             section_modifications[section_name] = new_xml
             applied_with_target_info.append((c, section_name))
@@ -827,46 +907,67 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         col = target.get("col")
         parsed = _parse_table_id(table_id)
         if parsed is None or row is None or col is None:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "target_unparseable",
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    c.get("commandId", ""),
+                    c.get("operationId", ""),
+                    c.get("writerMethod", ""),
+                    "target_unparseable",
+                )
+            )
             continue
         section_idx, table_idx = parsed
         section_name = _section_xml_name_for_index(zip_names, section_idx)
         if section_name is None:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "section_not_found",
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    c.get("commandId", ""),
+                    c.get("operationId", ""),
+                    c.get("writerMethod", ""),
+                    "section_not_found",
+                )
+            )
             continue
 
-        current_xml = section_modifications.get(section_name) \
-                        or section_xml_bytes_by_name.get(section_name, b"")
+        current_xml = section_modifications.get(section_name) or section_xml_bytes_by_name.get(
+            section_name, b""
+        )
         if op_type == "setCellText":
             new_xml, modified = _modify_cell_text_in_section_xml(
-                current_xml, table_idx, row, col, str(new_value or ""),
+                current_xml,
+                table_idx,
+                row,
+                col,
+                str(new_value or ""),
             )
             invalid_align = False
         elif op_type == "setCellHorizontalAlign":
-            normalized = (str(new_value or "").strip().upper())
+            normalized = str(new_value or "").strip().upper()
             invalid_align = normalized not in ALLOWED_HORIZONTAL_ALIGN_VALUES
             if invalid_align:
                 modified = False
                 new_xml = current_xml
             else:
                 new_xml, modified = _modify_cell_halign_in_section_xml(
-                    current_xml, table_idx, row, col, normalized,
+                    current_xml,
+                    table_idx,
+                    row,
+                    col,
+                    normalized,
                 )
         elif op_type == "setCellVerticalAlign":
-            normalized = (str(new_value or "").strip().upper())
+            normalized = str(new_value or "").strip().upper()
             invalid_align = normalized not in ALLOWED_VERTICAL_ALIGN_VALUES
             if invalid_align:
                 modified = False
                 new_xml = current_xml
             else:
                 new_xml, modified = _modify_cell_valign_in_section_xml(
-                    current_xml, table_idx, row, col, normalized,
+                    current_xml,
+                    table_idx,
+                    row,
+                    col,
+                    normalized,
                 )
         else:
             # 방어선 (ALLOWED_LIVE_OPERATION_TYPES 외 — 위에서 이미 차단되지만 한번 더)
@@ -875,23 +976,33 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
             invalid_align = False
 
         if invalid_align:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "invalid_align_value",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "INVALID_ALIGN_VALUE",
-                f"operationType={op_type!r} value={new_value!r}",
-                c.get("operationId", ""),
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    c.get("commandId", ""),
+                    c.get("operationId", ""),
+                    c.get("writerMethod", ""),
+                    "invalid_align_value",
+                )
+            )
+            result.safetyFindings.append(
+                LiveFinding(
+                    "INVALID_ALIGN_VALUE",
+                    f"operationType={op_type!r} value={new_value!r}",
+                    c.get("operationId", ""),
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_INVALID_ALIGN_VALUE"
             continue
 
         if not modified:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "target_cell_not_found_in_section",
-            ))
+            result.skippedCalls.append(
+                SkippedCall(
+                    c.get("commandId", ""),
+                    c.get("operationId", ""),
+                    c.get("writerMethod", ""),
+                    "target_cell_not_found_in_section",
+                )
+            )
             continue
         section_modifications[section_name] = new_xml
         applied_with_target_info.append((c, section_name))
@@ -900,12 +1011,14 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         # invalid align이 우선 사유면 그것을 verdict로 보고
         result.verdict = fatal_verdict or "BLOCKED_NOT_READY_FOR_WRITER"
         if result.verdict != "BLOCKED_INVALID_ALIGN_VALUE":
-            result.safetyFindings.append(LiveFinding(
-                "NO_APPLICABLE_CALLS",
-                "no accepted call resulted in a section modification",
-            ))
+            result.safetyFindings.append(
+                LiveFinding(
+                    "NO_APPLICABLE_CALLS",
+                    "no accepted call resulted in a section modification",
+                )
+            )
         result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
+        result.originalUnmodified = result.sourceSha256After == source_sha_before
         return result
 
     # 6) 사본 작성 (이 시점이 유일한 writer 호출 — 사본 경로에 한해)
@@ -918,19 +1031,21 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
     source_mtime_after = source_path.stat().st_mtime
     result.sourceSha256After = source_sha_after
     result.originalUnmodified = (
-        source_sha_after == source_sha_before
-        and source_mtime_after == source_mtime_before
+        source_sha_after == source_sha_before and source_mtime_after == source_mtime_before
     )
     if not result.originalUnmodified:
         result.verdict = "FAIL_ORIGINAL_MUTATED"
-        result.safetyFindings.append(LiveFinding(
-            "ORIGINAL_MUTATED",
-            f"sha_before={source_sha_before} sha_after={source_sha_after}",
-        ))
+        result.safetyFindings.append(
+            LiveFinding(
+                "ORIGINAL_MUTATED",
+                f"sha_before={source_sha_before} sha_after={source_sha_after}",
+            )
+        )
         return result
 
     # 8) readback: 원본 + 사본 모두 파싱하여 비교
     from ..parser.parser_engine import parse_hwpx_v2
+
     before = parse_hwpx_v2(source_path)
     after = parse_hwpx_v2(sandbox_output_path)
     snap_before = _snapshot(before, source_path)
@@ -958,21 +1073,25 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
             actual_after = snap_after["paragraphText"].get(paragraph_key, "")
             if op_type == "setParagraphText":
                 new_value = str(c.get("value") or "")
-                ok = (actual_after == new_value)
+                ok = actual_after == new_value
                 value_written = new_value
-            else:   # replaceTextRun
+            else:  # replaceTextRun
                 val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
-                find_str = c.get("find") if c.get("find") is not None else (
-                    val_dict.get("find") if isinstance(val_dict, dict) else None
+                find_str = (
+                    c.get("find")
+                    if c.get("find") is not None
+                    else (val_dict.get("find") if isinstance(val_dict, dict) else None)
                 )
-                replace_str = c.get("replace") if c.get("replace") is not None else (
-                    val_dict.get("replace") if isinstance(val_dict, dict) else ""
+                replace_str = (
+                    c.get("replace")
+                    if c.get("replace") is not None
+                    else (val_dict.get("replace") if isinstance(val_dict, dict) else "")
                 )
                 before_raw = snap_before["paragraphText"].get(paragraph_key, "")
-                expected_text = before_raw.replace(find_str or "",
-                                                       replace_str if replace_str is not None else "",
-                                                       1)
-                ok = (actual_after == expected_text)
+                expected_text = before_raw.replace(
+                    find_str or "", replace_str if replace_str is not None else "", 1
+                )
+                ok = actual_after == expected_text
                 value_written = {"find": find_str, "replace": replace_str}
             if ok:
                 rb.targetCellsVerified += 1
@@ -980,17 +1099,19 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
                 rb.divergences.append(
                     f"target_{op_type}_not_applied {paragraph_key}: actual={actual_after!r}"
                 )
-            result.appliedCalls.append(AppliedCall(
-                commandId=c.get("commandId", ""),
-                operationId=c.get("operationId", ""),
-                operationType=op_type,
-                writerMethod=c.get("writerMethod", ""),
-                target=dict(target),
-                valueWritten=value_written,
-                expectedBefore=c.get("expectedBefore"),
-                actualAfter=actual_after,
-                note="sandbox_paragraph_applied",
-            ))
+            result.appliedCalls.append(
+                AppliedCall(
+                    commandId=c.get("commandId", ""),
+                    operationId=c.get("operationId", ""),
+                    operationType=op_type,
+                    writerMethod=c.get("writerMethod", ""),
+                    target=dict(target),
+                    valueWritten=value_written,
+                    expectedBefore=c.get("expectedBefore"),
+                    actualAfter=actual_after,
+                    note="sandbox_paragraph_applied",
+                )
+            )
             continue
 
         # cell ops
@@ -1004,18 +1125,19 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         if op_type == "setCellText":
             actual_after = snap_after["cellNormText"].get(cell_id, "")
             normalized_expected = _parser_normalize(str(c.get("value") or ""))
-            ok = (actual_after == normalized_expected
-                  or (normalized_expected and normalized_expected in actual_after))
+            ok = actual_after == normalized_expected or (
+                normalized_expected and normalized_expected in actual_after
+            )
             attr_bucket.add("text")
         elif op_type == "setCellHorizontalAlign":
             normalized_expected = str(c.get("value") or "").strip().upper()
             actual_after = snap_after["cellHAlign"].get(cell_id, "")
-            ok = (actual_after.upper() == normalized_expected)
+            ok = actual_after.upper() == normalized_expected
             attr_bucket.add("halign")
         elif op_type == "setCellVerticalAlign":
             normalized_expected = str(c.get("value") or "").strip().upper()
             actual_after = snap_after["cellVAlign"].get(cell_id, "")
-            ok = (actual_after.upper() == normalized_expected)
+            ok = actual_after.upper() == normalized_expected
             attr_bucket.add("valign")
         else:
             actual_after = ""
@@ -1028,29 +1150,30 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
                 f"target_{op_type}_not_applied {cell_id}: "
                 f"expected~{c.get('value')!r}, actual={actual_after!r}"
             )
-        result.appliedCalls.append(AppliedCall(
-            commandId=c.get("commandId", ""),
-            operationId=c.get("operationId", ""),
-            operationType=op_type,
-            writerMethod=c.get("writerMethod", ""),
-            target=dict(c.get("target") or {}),
-            valueWritten=c.get("value"),
-            expectedBefore=c.get("expectedBefore"),
-            actualAfter=actual_after,
-            note="sandbox_applied",
-        ))
+        result.appliedCalls.append(
+            AppliedCall(
+                commandId=c.get("commandId", ""),
+                operationId=c.get("operationId", ""),
+                operationType=op_type,
+                writerMethod=c.get("writerMethod", ""),
+                target=dict(c.get("target") or {}),
+                valueWritten=c.get("value"),
+                expectedBefore=c.get("expectedBefore"),
+                actualAfter=actual_after,
+                note="sandbox_applied",
+            )
+        )
 
     # 8-2) 비대상 셀: 3개 속성 (text/halign/valign) 모두 보존
     #      대상 셀: 변경되지 않은 속성은 보존되어야 함
     for cid, text_before in snap_before["cellNormText"].items():
         touched = touched_attrs_by_cell.get(cid, set())
-        if "text" not in touched:
-            if snap_after["cellNormText"].get(cid) != text_before:
-                rb.untouchedCellNormalizedTextPreserved = False
-                rb.divergences.append(
-                    f"non_target_text_changed {cid}: "
-                    f"before={text_before!r}, after={snap_after['cellNormText'].get(cid)!r}"
-                )
+        if "text" not in touched and snap_after["cellNormText"].get(cid) != text_before:
+            rb.untouchedCellNormalizedTextPreserved = False
+            rb.divergences.append(
+                f"non_target_text_changed {cid}: "
+                f"before={text_before!r}, after={snap_after['cellNormText'].get(cid)!r}"
+            )
         if "halign" not in touched:
             if snap_after["cellHAlign"].get(cid, "") != snap_before["cellHAlign"].get(cid, ""):
                 rb.divergences.append(
@@ -1092,11 +1215,19 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
     rb.fontNameCountPreserved = _eq("cells_with_fontName")
     rb.fontSizeCountPreserved = _eq("cells_with_fontSizePt")
     rb.textColorCountPreserved = _eq("cells_with_textColor")
-    for k in ("tableCount", "cellCount", "rowSpanSum", "colSpanSum",
-                "objectCount", "binDataCount",
-                "cells_with_horizontalAlign", "cells_with_verticalAlign",
-                "cells_with_fontName", "cells_with_fontSizePt",
-                "cells_with_textColor"):
+    for k in (
+        "tableCount",
+        "cellCount",
+        "rowSpanSum",
+        "colSpanSum",
+        "objectCount",
+        "binDataCount",
+        "cells_with_horizontalAlign",
+        "cells_with_verticalAlign",
+        "cells_with_fontName",
+        "cells_with_fontSizePt",
+        "cells_with_textColor",
+    ):
         if snap_before[k] != snap_after[k]:
             rb.divergences.append(f"{k} before={snap_before[k]} after={snap_after[k]}")
 

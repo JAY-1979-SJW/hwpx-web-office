@@ -12,16 +12,17 @@
 
 공개적으로 내려받도록 제공되는 빈 서식 템플릿만 대상. rate-limit 준수.
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
+import http.cookiejar
 import json
 import re
 import time
 import urllib.parse
 import urllib.request
-import http.cookiejar
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +31,8 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 HWP_OLE = bytes.fromhex("D0CF11E0A1B11AE1")
 
 
-def _log(m): print(m, flush=True)
+def _log(m):
+    print(m, flush=True)
 
 
 def _safe(name: str, n: int = 80) -> str:
@@ -47,7 +49,7 @@ def _fname_from_cd(cd: str) -> str:
     raw = m.group(1)
     try:
         name = urllib.parse.unquote(raw)
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
         name = raw
     # http.client 는 헤더를 latin-1 로 디코드한다. 서버가 UTF-8 파일명을
     # 퍼센트인코딩 없이 그대로 보내면 모지바케가 되므로 되돌린다.
@@ -80,12 +82,13 @@ def http_get(opener, url: str, retries: int = 3):
             if e.code in (404, 500, 403):
                 return None, {}
             time.sleep(1.2 * (attempt + 1))
-        except Exception:
+        except OSError:
             time.sleep(1.2 * (attempt + 1))
     return None, {}
 
 
 # ── 기관별 링크 생성기(다운로드 URL 목록) ────────────────────────────
+
 
 def links_nhis(opener) -> list[str]:
     """건보: articleLimit 큰 값 1회 → 목록 HTML 내 mode=download 링크 전량."""
@@ -124,7 +127,8 @@ def links_comwel(opener, max_pages: int = 70) -> list[str]:
         for i in ids:
             if i in seen:
                 continue
-            seen.add(i); new += 1
+            seen.add(i)
+            new += 1
             urls.append(f"{base}/_custom/kcom/_common/board/download.jsp?attach_no={i}")
         if new == 0:
             break
@@ -149,7 +153,8 @@ def links_nps(opener, max_pages: int = 40) -> list[str]:
             k = (aid, sn)
             if k in seen:
                 continue
-            seen.add(k); new += 1
+            seen.add(k)
+            new += 1
             urls.append(dl.format(aid, sn))
         if new == 0:
             break
@@ -160,7 +165,7 @@ def links_kogas(opener) -> list[str]:
     """한국가스: 게시판 목록(boardNo=56) → /mgr/fileDownload.do?boardIdx&fileNo (세션쿠키)."""
     base = "https://www.kogas.or.kr"
     listurl = base + "/site/koGas/goBoard.do?boardNo=56&Key=1020409000000"
-    http_get(opener, listurl)   # 익명 세션쿠키 확보
+    http_get(opener, listurl)  # 익명 세션쿠키 확보
     html, _ = http_get(opener, listurl)
     if not html:
         return []
@@ -212,7 +217,8 @@ def links_kodit(opener, max_pages: int = 15) -> list[str]:
         for k in keys:
             if k in seen:
                 continue
-            seen.add(k); new += 1
+            seen.add(k)
+            new += 1
             urls.append(dl.format(k))
         if new == 0:
             break
@@ -238,7 +244,8 @@ def links_kosaf(opener, max_pages: int = 45) -> list[str]:
             k = (seq, fno)
             if k in seen:
                 continue
-            seen.add(k); new += 1
+            seen.add(k)
+            new += 1
             urls.append(dl.format(seq, fno))
         if new == 0:
             break
@@ -264,7 +271,8 @@ def links_hira(opener, max_pages: int = 40) -> list[str]:
             k = (a, b, c, d)
             if k in seen:
                 continue
-            seen.add(k); new += 1
+            seen.add(k)
+            new += 1
             urls.append(dl.format(a, b, c, d))
         if new == 0:
             break
@@ -274,10 +282,12 @@ def links_hira(opener, max_pages: int = 40) -> list[str]:
 def links_kibo(opener) -> list[str]:
     """기술보증기금: 4개 서식게시판의 file-down-btn(data-file-id/data-file-vl) → attchLocalFileDownload.do."""
     base = "https://www.kibo.or.kr"
-    boards = ["/dbranch/fomt/fomt01/warrantyAppForm.do?mode=list",
-              "/dbranch/fomt/fomt01/technologyEvForm.do?mode=list",
-              "/dbranch/fomt/fomt01/fomt0107.do?mode=list",
-              "/main/board/boardType308.do?mode=list"]
+    boards = [
+        "/dbranch/fomt/fomt01/warrantyAppForm.do?mode=list",
+        "/dbranch/fomt/fomt01/technologyEvForm.do?mode=list",
+        "/dbranch/fomt/fomt01/fomt0107.do?mode=list",
+        "/main/board/boardType308.do?mode=list",
+    ]
     dl = base + "/COMN0201/attchLocalFileDownload.do?attchFileDiv={}&attchFileId={}"
     seen, urls = set(), []
     for b in boards:
@@ -315,7 +325,8 @@ def links_cak(opener, max_pages: int = 8) -> list[str]:
         for u in m:
             if u in seen:
                 continue
-            seen.add(u); new += 1
+            seen.add(u)
+            new += 1
             urls.append(f"{base}/download.do?uuid={u}")
         if new == 0:
             break
@@ -355,12 +366,15 @@ def links_koelsa(opener, detail_delay: float = 1.5) -> list[str]:
         if not fresh:
             break
         for i in fresh:
-            seen_idx.add(i); idxs.append(i)
+            seen_idx.add(i)
+            idxs.append(i)
         time.sleep(detail_delay)
     urls, seen = [], set()
     for idx in idxs:
-        html, _ = http_get(opener, f"{base}/BoardExecute.do?pageid=BOARD00004&command=View&idx={idx}")
-        time.sleep(detail_delay)   # 수동식: 상세 하나 열 때마다 쉼
+        html, _ = http_get(
+            opener, f"{base}/BoardExecute.do?pageid=BOARD00004&command=View&idx={idx}"
+        )
+        time.sleep(detail_delay)  # 수동식: 상세 하나 열 때마다 쉼
         if not html:
             continue
         txt = html.decode("utf-8", "replace")
@@ -368,7 +382,8 @@ def links_koelsa(opener, detail_delay: float = 1.5) -> list[str]:
             u = base + m.replace("&amp;", "&")
             if u in seen:
                 continue
-            seen.add(u); urls.append(u)
+            seen.add(u)
+            urls.append(u)
     return urls
 
 
@@ -384,7 +399,7 @@ def links_kgs(opener) -> list[str]:
         if p in seen:
             continue
         seen.add(p)
-        urls.append(base + urllib.parse.quote(p, safe="/"))   # 한글 경로 인코딩
+        urls.append(base + urllib.parse.quote(p, safe="/"))  # 한글 경로 인코딩
     return urls
 
 
@@ -406,40 +421,96 @@ def links_kalis(opener, max_pages: int = 20) -> list[str]:
             break
         for s in fresh:
             seen_seq.add(s)
-            for fseq in (1, 2, 3):   # 게시글당 첨부 1~3
+            for fseq in (1, 2, 3):  # 게시글당 첨부 1~3
                 urls.append(dl.format(brd, s, fseq))
     return urls
 
 
 COLLECTORS = {
-    "koelsa": {"name": "한국승강기안전공단", "dir": "koelsa_forms",
-               "gen": links_koelsa, "referer": "https://minwon.koelsa.or.kr/BoardExecute.do?pageid=BOARD00004"},
-    "kgs":    {"name": "한국가스안전공사", "dir": "kgs_forms",
-               "gen": links_kgs, "referer": "https://www.kgs.or.kr/kgs/aceb/tab.do"},
-    "kalis":  {"name": "국토안전관리원", "dir": "kalis_forms",
-               "gen": links_kalis, "referer": "https://www.kalis.or.kr/www/brd/m_435/list.do"},
-    "cak":    {"name": "대한건설협회", "dir": "cak_forms",
-               "gen": links_cak, "referer": "https://seoul.cak.or.kr/lay1/bbs/S340T771C1459/A/72/list.do"},
-    "cu":     {"name": "신협중앙회", "dir": "cu_forms",
-               "gen": links_cu, "referer": "https://www.cu.co.kr/cu/cm/cntnts/cntntsView.do?mi=100450&cntntsId=1187"},
-    "kibo":   {"name": "기술보증기금", "dir": "kibo_forms",
-               "gen": links_kibo, "referer": "https://www.kibo.or.kr/dbranch/fomt/fomt01/warrantyAppForm.do?mode=list"},
-    "hira":   {"name": "건강보험심사평가원", "dir": "hira_forms",
-               "gen": links_hira, "referer": "https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA070001000220"},
-    "kodit":  {"name": "신용보증기금", "dir": "kodit_forms",
-               "gen": links_kodit, "referer": "https://www.kodit.or.kr/kodit/na/ntt/selectNttList.do?mi=2663&bbsId=264"},
-    "kosaf":  {"name": "한국장학재단", "dir": "kosaf_forms",
-               "gen": links_kosaf, "referer": "https://www.kosaf.go.kr/ko/data.do"},
-    "lh":     {"name": "한국토지주택공사(LH)", "dir": "lh_forms",
-               "gen": links_lh, "referer": "https://www.lh.or.kr/menu.es?mid=a10102040000"},
-    "nhis":   {"name": "국민건강보험공단", "dir": "nhis_forms",
-               "gen": links_nhis, "referer": "https://www.nhis.or.kr/nhis/minwon/wbhaba03900m01.do"},
-    "comwel": {"name": "근로복지공단", "dir": "comwel_forms",
-               "gen": links_comwel, "referer": "https://www.comwel.or.kr/comwel/info/data/papr/papr_lst.jsp"},
-    "nps":    {"name": "국민연금공단", "dir": "nps_forms",
-               "gen": links_nps, "referer": "https://www.nps.or.kr/pnsinfo/databbs/getOHAF0279M0List.do"},
-    "kogas":  {"name": "한국가스공사", "dir": "kogas_forms",
-               "gen": links_kogas, "referer": "https://www.kogas.or.kr/site/koGas/goBoard.do?boardNo=56&Key=1020409000000"},
+    "koelsa": {
+        "name": "한국승강기안전공단",
+        "dir": "koelsa_forms",
+        "gen": links_koelsa,
+        "referer": "https://minwon.koelsa.or.kr/BoardExecute.do?pageid=BOARD00004",
+    },
+    "kgs": {
+        "name": "한국가스안전공사",
+        "dir": "kgs_forms",
+        "gen": links_kgs,
+        "referer": "https://www.kgs.or.kr/kgs/aceb/tab.do",
+    },
+    "kalis": {
+        "name": "국토안전관리원",
+        "dir": "kalis_forms",
+        "gen": links_kalis,
+        "referer": "https://www.kalis.or.kr/www/brd/m_435/list.do",
+    },
+    "cak": {
+        "name": "대한건설협회",
+        "dir": "cak_forms",
+        "gen": links_cak,
+        "referer": "https://seoul.cak.or.kr/lay1/bbs/S340T771C1459/A/72/list.do",
+    },
+    "cu": {
+        "name": "신협중앙회",
+        "dir": "cu_forms",
+        "gen": links_cu,
+        "referer": "https://www.cu.co.kr/cu/cm/cntnts/cntntsView.do?mi=100450&cntntsId=1187",
+    },
+    "kibo": {
+        "name": "기술보증기금",
+        "dir": "kibo_forms",
+        "gen": links_kibo,
+        "referer": "https://www.kibo.or.kr/dbranch/fomt/fomt01/warrantyAppForm.do?mode=list",
+    },
+    "hira": {
+        "name": "건강보험심사평가원",
+        "dir": "hira_forms",
+        "gen": links_hira,
+        "referer": "https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA070001000220",
+    },
+    "kodit": {
+        "name": "신용보증기금",
+        "dir": "kodit_forms",
+        "gen": links_kodit,
+        "referer": "https://www.kodit.or.kr/kodit/na/ntt/selectNttList.do?mi=2663&bbsId=264",
+    },
+    "kosaf": {
+        "name": "한국장학재단",
+        "dir": "kosaf_forms",
+        "gen": links_kosaf,
+        "referer": "https://www.kosaf.go.kr/ko/data.do",
+    },
+    "lh": {
+        "name": "한국토지주택공사(LH)",
+        "dir": "lh_forms",
+        "gen": links_lh,
+        "referer": "https://www.lh.or.kr/menu.es?mid=a10102040000",
+    },
+    "nhis": {
+        "name": "국민건강보험공단",
+        "dir": "nhis_forms",
+        "gen": links_nhis,
+        "referer": "https://www.nhis.or.kr/nhis/minwon/wbhaba03900m01.do",
+    },
+    "comwel": {
+        "name": "근로복지공단",
+        "dir": "comwel_forms",
+        "gen": links_comwel,
+        "referer": "https://www.comwel.or.kr/comwel/info/data/papr/papr_lst.jsp",
+    },
+    "nps": {
+        "name": "국민연금공단",
+        "dir": "nps_forms",
+        "gen": links_nps,
+        "referer": "https://www.nps.or.kr/pnsinfo/databbs/getOHAF0279M0List.do",
+    },
+    "kogas": {
+        "name": "한국가스공사",
+        "dir": "kogas_forms",
+        "gen": links_kogas,
+        "referer": "https://www.kogas.or.kr/site/koGas/goBoard.do?boardNo=56&Key=1020409000000",
+    },
 }
 
 
@@ -451,7 +522,7 @@ def load_done_hashes(index: Path) -> set[str]:
                 r = json.loads(line)
                 if r.get("sha256"):
                     hs.add(r["sha256"])
-            except Exception:
+            except (json.JSONDecodeError, KeyError, TypeError):
                 pass
     return hs
 
@@ -475,31 +546,59 @@ def harvest(key: str, delay: float) -> None:
             data, hdrs = http_get(opener, url)
             if not data or len(data) < 100:
                 fail += 1
-                time.sleep(delay); continue
+                time.sleep(delay)
+                continue
             digest = hashlib.sha256(data).hexdigest()
             if digest in seen_hash:
                 dup += 1
-                time.sleep(delay); continue
+                time.sleep(delay)
+                continue
             cd = hdrs.get("Content-Disposition", "")
             name = _fname_from_cd(cd) or f"{key}_{i}"
             ext = Path(name).suffix.lower().lstrip(".") or (
-                "hwp" if data[:8] == HWP_OLE else "hwpx" if data[:2] == b"PK" else
-                "pdf" if data[:4] == b"%PDF" else "bin")
-            if ext == "hwp": hwp += 1
-            elif ext == "pdf": pdf += 1
-            else: other += 1
+                "hwp"
+                if data[:8] == HWP_OLE
+                else "hwpx"
+                if data[:2] == b"PK"
+                else "pdf"
+                if data[:4] == b"%PDF"
+                else "bin"
+            )
+            if ext == "hwp":
+                hwp += 1
+            elif ext == "pdf":
+                pdf += 1
+            else:
+                other += 1
             fname = f"{i}_{_safe(Path(name).stem)}.{ext}"
             (out_dir / fname).write_bytes(data)
-            seen_hash.add(digest); saved += 1
-            idx.write(json.dumps({"seq": i, "name": name, "file": fname, "ext": ext,
-                                  "sizeBytes": len(data), "sha256": digest}, ensure_ascii=False) + "\n")
+            seen_hash.add(digest)
+            saved += 1
+            idx.write(
+                json.dumps(
+                    {
+                        "seq": i,
+                        "name": name,
+                        "file": fname,
+                        "ext": ext,
+                        "sizeBytes": len(data),
+                        "sha256": digest,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
             idx.flush()
             if saved % 20 == 0:
-                _log(f"  … {i}/{len(urls)} · 저장 {saved} (hwp {hwp} pdf {pdf}) 중복 {dup} 실패 {fail}")
+                _log(
+                    f"  … {i}/{len(urls)} · 저장 {saved} (hwp {hwp} pdf {pdf}) 중복 {dup} 실패 {fail}"
+                )
             time.sleep(delay)
 
     el = time.time() - t0
-    _log(f"[{key}] 저장 {saved} (hwp {hwp} · pdf {pdf} · 기타 {other}) · 중복 {dup} · 실패 {fail} · {el/60:.1f}분")
+    _log(
+        f"[{key}] 저장 {saved} (hwp {hwp} · pdf {pdf} · 기타 {other}) · 중복 {dup} · 실패 {fail} · {el / 60:.1f}분"
+    )
     _log(f"[{key}] out={out_dir}")
 
 

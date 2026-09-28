@@ -13,6 +13,7 @@ corpus DB ingest 가능 여부를 사전 분류한다.
 - 원본 파일명 그대로 저장 없음
 - 개인정보 원문 출력 없음
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,12 +22,12 @@ import hashlib
 import json
 import re
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -52,11 +53,12 @@ LARGE_THRESHOLD_PARAGRAPHS = 3000
 
 # PII 탐지 패턴 (보고서 포함 여부 체크용 — 원문 저장 금지)
 _PII_PATTERNS = [
-    re.compile(r"\d{2,3}-\d{3,4}-\d{4}"),           # 전화번호
-    re.compile(r"\d{3}-\d{2}-\d{5}"),                # 사업자번호
-    re.compile(r"\d{6}-[1-4]\d{6}"),                  # 주민번호 패턴
+    re.compile(r"\d{2,3}-\d{3,4}-\d{4}"),  # 전화번호
+    re.compile(r"\d{3}-\d{2}-\d{5}"),  # 사업자번호
+    re.compile(r"\d{6}-[1-4]\d{6}"),  # 주민번호 패턴
     re.compile(r"[가-힣]{2,4}\s*\d{3}-\d{3,4}-\d{4}"),  # 이름+전화
 ]
+
 
 # 파일명 PII 마스킹: sha256(절대경로) 기반
 def mask_filename(path: Path) -> str:
@@ -78,6 +80,7 @@ def file_hash(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Profile record
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ProfileRecord:
@@ -117,16 +120,14 @@ class ProfileRecord:
 # Core profiling logic
 # ---------------------------------------------------------------------------
 
+
 def _count_paragraphs(section_root: ET.Element) -> int:
     return sum(1 for _ in section_root.iter(f"{{{NS_HP}}}p"))
 
 
 def _count_tables_cells(section_root: ET.Element) -> tuple[int, int]:
     tables = list(section_root.iter(f"{{{NS_HP}}}tbl"))
-    cells = sum(
-        sum(1 for _ in tbl.iter(f"{{{NS_HP}}}tc"))
-        for tbl in tables
-    )
+    cells = sum(sum(1 for _ in tbl.iter(f"{{{NS_HP}}}tc")) for tbl in tables)
     return len(tables), cells
 
 
@@ -149,14 +150,12 @@ def _count_label_candidates(section_root: ET.Element) -> int:
 
 
 def _has_pii_in_content(section_root: ET.Element) -> bool:
-    all_text = " ".join(
-        t.text for t in section_root.iter(f"{{{NS_HP}}}t") if t.text
-    )
+    all_text = " ".join(t.text for t in section_root.iter(f"{{{NS_HP}}}t") if t.text)
     return any(p.search(all_text) for p in _PII_PATTERNS)
 
 
 def profile_one(path: Path) -> ProfileRecord:
-    now = datetime.now(tz=timezone.utc).isoformat()
+    now = datetime.now(tz=UTC).isoformat()
     rec = ProfileRecord(
         fileHash=file_hash(path),
         maskedFileName=mask_filename(path),
@@ -172,11 +171,7 @@ def profile_one(path: Path) -> ProfileRecord:
     # ZIP open
     try:
         zf = zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
-        rec.status = STATUS_BROKEN_ZIP
-        rec.blockedReason = str(exc)
-        return rec
-    except Exception as exc:
+    except (zipfile.BadZipFile, OSError) as exc:
         rec.status = STATUS_BROKEN_ZIP
         rec.blockedReason = str(exc)
         return rec
@@ -215,7 +210,7 @@ def profile_one(path: Path) -> ProfileRecord:
             except ET.ParseError as exc:
                 parse_errors.append(f"{sec_name}: XML parse error: {exc}")
                 continue
-            except Exception as exc:
+            except (KeyError, zipfile.BadZipFile, OSError) as exc:
                 parse_errors.append(f"{sec_name}: read error: {exc}")
                 continue
 
@@ -228,8 +223,11 @@ def profile_one(path: Path) -> ProfileRecord:
             if not pii_found:
                 try:
                     pii_found = _has_pii_in_content(root)
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001 — fail-safe: 탐지 자체가
+                    # 실패하면 "PII 없음"이 아니라 "있을 수 있음"으로 간주해
+                    # 사람 검토로 보낸다(무음이면 PII 유출을 놓칠 수 있음).
+                    pii_found = True
+                    parse_errors.append(f"{sec_name}: pii_check_failed: {exc}")
 
         rec.paragraphCount = total_paragraphs
         rec.tableCount = total_tables
@@ -270,6 +268,7 @@ def profile_one(path: Path) -> ProfileRecord:
 # ---------------------------------------------------------------------------
 # Batch profiling
 # ---------------------------------------------------------------------------
+
 
 def discover_files(
     input_dir: Path,
@@ -316,6 +315,7 @@ def profile_all(
 
 def _build_summary(records: list[ProfileRecord], input_dir: Path) -> dict[str, Any]:
     from collections import Counter
+
     status_counts: Counter = Counter(r.status for r in records)
     return {
         "total": len(records),
@@ -329,7 +329,7 @@ def _build_summary(records: list[ProfileRecord], input_dir: Path) -> dict[str, A
         STATUS_LARGE: status_counts.get(STATUS_LARGE, 0),
         STATUS_DUPLICATE: status_counts.get(STATUS_DUPLICATE, 0),
         STATUS_UNKNOWN: status_counts.get(STATUS_UNKNOWN, 0),
-        "profiledAt": datetime.now(tz=timezone.utc).isoformat(),
+        "profiledAt": datetime.now(tz=UTC).isoformat(),
     }
 
 
@@ -374,14 +374,16 @@ def _write_reports(
     (output_dir / "profile_candidates.json").write_text(
         json.dumps(
             [d for d in all_dicts if d["status"] == STATUS_READY],
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         ),
         encoding="utf-8",
     )
     (output_dir / "profile_blocked.json").write_text(
         json.dumps(
             [d for d in all_dicts if d["status"] != STATUS_READY],
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         ),
         encoding="utf-8",
     )
@@ -403,22 +405,41 @@ def _write_reports(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="HWPX corpus candidate profiler (read-only)")
     p.add_argument("--input-dir", required=True, help="root directory to scan for HWPX files")
     p.add_argument("--output-dir", required=True, help="directory for report output")
     p.add_argument("--limit", type=int, default=0, help="max files to scan (0=no limit)")
-    p.add_argument("--dry-run", action="store_true", default=False,
-                   help="scan only, do not write output files")
-    p.add_argument("--mask-pii", action="store_true", default=True,
-                   help="mask filenames and paths in output (default: on)")
+    p.add_argument(
+        "--dry-run", action="store_true", default=False, help="scan only, do not write output files"
+    )
+    p.add_argument(
+        "--mask-pii",
+        action="store_true",
+        default=True,
+        help="mask filenames and paths in output (default: on)",
+    )
     p.add_argument("--no-mask-pii", dest="mask_pii", action="store_false")
-    p.add_argument("--include-pattern", default="*.hwpx",
-                   help="glob pattern for file discovery (default: *.hwpx)")
-    p.add_argument("--json", dest="output_json", action="store_true", default=False,
-                   help="print summary JSON to stdout")
-    p.add_argument("--markdown", dest="output_markdown", action="store_true", default=False,
-                   help="print summary markdown to stdout")
+    p.add_argument(
+        "--include-pattern",
+        default="*.hwpx",
+        help="glob pattern for file discovery (default: *.hwpx)",
+    )
+    p.add_argument(
+        "--json",
+        dest="output_json",
+        action="store_true",
+        default=False,
+        help="print summary JSON to stdout",
+    )
+    p.add_argument(
+        "--markdown",
+        dest="output_markdown",
+        action="store_true",
+        default=False,
+        help="print summary markdown to stdout",
+    )
     return p.parse_args(argv)
 
 

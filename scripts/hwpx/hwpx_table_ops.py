@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import copy
 import math
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any
 
+from hwpx_element_factory import append_generated_table as append_generated_table_to_package
+from hwpx_element_factory import next_paragraph_id
 from hwpx_package import HwpxPackage, local_name, text_nodes
-from hwpx_element_factory import append_generated_table as append_generated_table_to_package, next_paragraph_id
 from hwpx_special_text import sanitize_hwpx_text
 
 
@@ -17,7 +18,7 @@ def table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Eleme
     for entry in package.section_entries():
         try:
             root = package.read_xml(entry)
-        except Exception:
+        except (KeyError, ET.ParseError, UnicodeDecodeError, ValueError):
             continue
         for elem in root.iter():
             name = local_name(elem.tag).lower()
@@ -173,7 +174,9 @@ def _next_char_pr_id(container: ET.Element) -> str:
     return str((max(ids) + 1) if ids else 0)
 
 
-def clone_char_pr_with_height(package: HwpxPackage, source_char_pr_id: str, target_height: int) -> dict[str, Any]:
+def clone_char_pr_with_height(
+    package: HwpxPackage, source_char_pr_id: str, target_height: int
+) -> dict[str, Any]:
     header = _header_root(package)
     if header is None:
         return {"status": "HEADER_NOT_FOUND"}
@@ -183,14 +186,20 @@ def clone_char_pr_with_height(package: HwpxPackage, source_char_pr_id: str, targ
         return {"status": "CHAR_PROPERTIES_NOT_FOUND", "entry": entry}
     source = _find_char_pr(root, str(source_char_pr_id))
     if source is None:
-        return {"status": "CHAR_PR_NOT_FOUND", "entry": entry, "charPrIDRef": str(source_char_pr_id)}
+        return {
+            "status": "CHAR_PR_NOT_FOUND",
+            "entry": entry,
+            "charPrIDRef": str(source_char_pr_id),
+        }
     original_height = int(source.attrib.get("height", "1000") or 1000)
     clone = copy.deepcopy(source)
     new_id = _next_char_pr_id(container)
     clone.attrib["id"] = new_id
     clone.attrib["height"] = str(int(target_height))
     container.append(clone)
-    container.attrib["itemCnt"] = str(len([child for child in list(container) if local_name(child.tag) == "charPr"]))
+    container.attrib["itemCnt"] = str(
+        len([child for child in list(container) if local_name(child.tag) == "charPr"])
+    )
     package.write_xml(entry, root)
     return {
         "status": "CHAR_PR_CLONE_PASS",
@@ -244,7 +253,9 @@ def _ancestor(cell: ET.Element, target: ET.Element, local: str) -> ET.Element | 
     return None
 
 
-def _style_reference_for_text_node(cell: ET.Element, text_node: ET.Element, source: str, text_node_index: int) -> dict[str, Any]:
+def _style_reference_for_text_node(
+    cell: ET.Element, text_node: ET.Element, source: str, text_node_index: int
+) -> dict[str, Any]:
     run = _ancestor(cell, text_node, "run")
     paragraph = _ancestor(cell, text_node, "p")
     return {
@@ -278,8 +289,12 @@ def find_cell_text_style_reference(cell: ET.Element) -> dict[str, Any]:
                 "run": _element_style_snapshot(elem),
                 "paragraph": _element_style_snapshot(_ancestor(cell, elem, "p")),
                 "charPrIDRef": elem.attrib.get("charPrIDRef"),
-                "paraPrIDRef": _ancestor(cell, elem, "p").attrib.get("paraPrIDRef") if _ancestor(cell, elem, "p") is not None else None,
-                "styleIDRef": _ancestor(cell, elem, "p").attrib.get("styleIDRef") if _ancestor(cell, elem, "p") is not None else None,
+                "paraPrIDRef": _ancestor(cell, elem, "p").attrib.get("paraPrIDRef")
+                if _ancestor(cell, elem, "p") is not None
+                else None,
+                "styleIDRef": _ancestor(cell, elem, "p").attrib.get("styleIDRef")
+                if _ancestor(cell, elem, "p") is not None
+                else None,
             }
     return {
         "source": "no_text_or_run_node",
@@ -336,14 +351,12 @@ def find_tables(package: HwpxPackage) -> list[dict[str, Any]]:
     result = []
     for index, (entry, _root, table) in enumerate(table_elements(package)):
         rows = row_elements(table)
-        result.append(
-            {
-                "table_index": index,
-                "entry": entry,
-                "row_count": len(rows),
-                "text_node_count": len(text_nodes(table)),
-            }
-        )
+        result.append({
+            "table_index": index,
+            "entry": entry,
+            "row_count": len(rows),
+            "text_node_count": len(text_nodes(table)),
+        })
     return result
 
 
@@ -386,9 +399,7 @@ def get_table_cell_matrix(package: HwpxPackage, table_index: int) -> dict[str, A
                 "font_height": char_pr_height(package, style_reference.get("charPrIDRef")),
             }
             cell_info["fit_check"] = estimate_text_fit(cell_info["text"], cell_info)
-            cells.append(
-                cell_info
-            )
+            cells.append(cell_info)
         rows.append({"row_index": row_index, "cells": cells})
     return {"status": "PASS", "table_index": table_index, "entry": entry, "rows": rows}
 
@@ -461,7 +472,9 @@ def set_table_cell_text(
     }
 
 
-def _find_cell_by_visual_address(table: ET.Element, visual_row: int, visual_col: int) -> tuple[int, int, ET.Element] | None:
+def _find_cell_by_visual_address(
+    table: ET.Element, visual_row: int, visual_col: int
+) -> tuple[int, int, ET.Element] | None:
     for row_index, row in enumerate(row_elements(table)):
         for col_index, cell in enumerate(cell_elements(row)):
             visual = cell_visual_address(row_index, col_index, cell)
@@ -547,12 +560,22 @@ def shrink_table_visual_cell_text_to_fit(
     entry, root, table = found
     located = _find_cell_by_visual_address(table, visual_row, visual_col)
     if located is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
     row_index, col_index, cell = located
     style = find_cell_text_style_reference(cell)
     source_char_pr_id = style.get("charPrIDRef")
     if not source_char_pr_id:
-        return {"status": "CELL_CHAR_STYLE_NOT_FOUND", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "CELL_CHAR_STYLE_NOT_FOUND",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
 
     cell_info = {
         "cell_width": _int_attr(_first_direct_child(cell, "cellSz"), "width", 0),
@@ -571,7 +594,10 @@ def shrink_table_visual_cell_text_to_fit(
     text_length = max(int(before_fit.get("text_length") or 0), 1)
     estimated_max = max(int(before_fit.get("estimated_max_chars_single_line") or 0), 1)
     original_height = int(cell_info["font_height"])
-    target_height = max(min_height, min(original_height, math.floor(original_height * (estimated_max / text_length))))
+    target_height = max(
+        min_height,
+        min(original_height, math.floor(original_height * (estimated_max / text_length))),
+    )
     clone_result = clone_char_pr_with_height(package, str(source_char_pr_id), target_height)
     if clone_result.get("status") != "CHAR_PR_CLONE_PASS":
         return clone_result
@@ -579,7 +605,12 @@ def shrink_table_visual_cell_text_to_fit(
     _entry2, root2, table2 = find_table(package, table_index)  # type: ignore[misc]
     located2 = _find_cell_by_visual_address(table2, visual_row, visual_col)
     if located2 is None:
-        return {"status": "CELL_NOT_FOUND_AFTER_STYLE_CLONE", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "CELL_NOT_FOUND_AFTER_STYLE_CLONE",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
     _row_index2, _col_index2, cell2 = located2
     updated_runs = 0
     for elem in cell2.iter():
@@ -618,7 +649,12 @@ def set_table_visual_cell_vertical_align(
     entry, root, table = found
     located = _find_cell_by_visual_address(table, visual_row, visual_col)
     if located is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
     row_index, col_index, cell = located
     sublist = None
     for elem in cell.iter():
@@ -626,7 +662,12 @@ def set_table_visual_cell_vertical_align(
             sublist = elem
             break
     if sublist is None:
-        return {"status": "SUBLIST_NOT_FOUND", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "SUBLIST_NOT_FOUND",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
     before = sublist.attrib.get("vertAlign")
     sublist.attrib["vertAlign"] = vertical_align
     package.write_xml(entry, root)
@@ -701,6 +742,7 @@ def ensure_solid_border_fill(
     - dangling ref 방지: 반드시 header.xml에 정의된 ID만 반환
     """
     import copy as _copy
+
     norm_color = _normalize_hex_color(color)
     if norm_color is None:
         return {"status": "INVALID_COLOR", "color": color}
@@ -748,8 +790,10 @@ def ensure_solid_border_fill(
     _set_fill_color_on_border_fill(cloned, norm_color)
     container.append(cloned)
     try:
-        container.attrib["itemCnt"] = str(len([c for c in list(container) if local_name(c.tag) == "borderFill"]))
-    except Exception:
+        container.attrib["itemCnt"] = str(
+            len([c for c in list(container) if local_name(c.tag) == "borderFill"])
+        )
+    except (AttributeError, TypeError):
         pass
     package.write_xml(entry, root)
     return {
@@ -775,7 +819,12 @@ def set_table_visual_cell_solid_fill(
     """
     bf_result = ensure_solid_border_fill(package, color)
     if bf_result.get("status") not in ("REUSED_EXISTING", "CREATED_NEW"):
-        return {**bf_result, "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            **bf_result,
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
 
     new_id = bf_result["borderFillIDRef"]
     found = find_table(package, table_index)
@@ -784,7 +833,12 @@ def set_table_visual_cell_solid_fill(
     entry, root, table = found
     located = _find_cell_by_visual_address(table, visual_row, visual_col)
     if located is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "visual_row": visual_row, "visual_col": visual_col}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "visual_row": visual_row,
+            "visual_col": visual_col,
+        }
     row_index, col_index, cell = located
     before_id = cell.attrib.get("borderFillIDRef", "")
     cell.attrib["borderFillIDRef"] = str(new_id)
@@ -803,7 +857,9 @@ def set_table_visual_cell_solid_fill(
     }
 
 
-def update_table_cell_matrix(package: HwpxPackage, table_index: int, updates: list[dict[str, Any]]) -> dict[str, Any]:
+def update_table_cell_matrix(
+    package: HwpxPackage, table_index: int, updates: list[dict[str, Any]]
+) -> dict[str, Any]:
     results = []
     status = "PASS"
     for update in updates:
@@ -818,17 +874,24 @@ def update_table_cell_matrix(package: HwpxPackage, table_index: int, updates: li
         results.append(result)
         if result.get("status") != "PASS":
             status = "FAIL"
-    return {"status": status, "table_index": table_index, "updated_cells": sum(1 for r in results if r.get("status") == "PASS"), "results": results}
+    return {
+        "status": status,
+        "table_index": table_index,
+        "updated_cells": sum(1 for r in results if r.get("status") == "PASS"),
+        "results": results,
+    }
 
 
-def update_table_cells(package: HwpxPackage, table_index: int, values: list[str], clear_remaining: bool = False) -> dict:
+def update_table_cells(
+    package: HwpxPackage, table_index: int, values: list[str], clear_remaining: bool = False
+) -> dict:
     found = find_table(package, table_index)
     if not found:
         return {"status": "TABLE_NOT_FOUND", "table_index": table_index}
     entry, root, table = found
     nodes = text_nodes(table)
     updated = 0
-    for node, value in zip(nodes, values):
+    for node, value in zip(nodes, values, strict=False):
         node.text = value
         updated += 1
     if clear_remaining:
@@ -838,7 +901,11 @@ def update_table_cells(package: HwpxPackage, table_index: int, values: list[str]
     if len(values) > len(nodes):
         warnings.append({"type": "EXTRA_VALUES_IGNORED", "extra_count": len(values) - len(nodes)})
     if len(values) != len(nodes):
-        warnings.append({"type": "CELL_COUNT_MISMATCH", "cell_count": len(nodes), "value_count": len(values)})
+        warnings.append({
+            "type": "CELL_COUNT_MISMATCH",
+            "cell_count": len(nodes),
+            "value_count": len(values),
+        })
     package.write_xml(entry, root)
     return {
         "status": "PASS",
@@ -850,7 +917,9 @@ def update_table_cells(package: HwpxPackage, table_index: int, values: list[str]
     }
 
 
-def append_table_row(package: HwpxPackage, table_index: int, row_values: list[str], clear_remaining: bool = True) -> dict:
+def append_table_row(
+    package: HwpxPackage, table_index: int, row_values: list[str], clear_remaining: bool = True
+) -> dict:
     found = find_table(package, table_index)
     if not found:
         return {"status": "TABLE_NOT_FOUND", "table_index": table_index}
@@ -861,7 +930,11 @@ def append_table_row(package: HwpxPackage, table_index: int, row_values: list[st
     source_row = rows[-1]
     parent = parent_map(root).get(source_row)
     if parent is None:
-        return {"status": "ROW_NOT_FOUND", "table_index": table_index, "reason": "row_parent_not_found"}
+        return {
+            "status": "ROW_NOT_FOUND",
+            "table_index": table_index,
+            "reason": "row_parent_not_found",
+        }
     clone = copy.deepcopy(source_row)
     cells = cell_elements(clone)
     # 셀 단위 순회. set_cell_single_text가 빈 셀이면 ensure_cell_text_node로
@@ -869,19 +942,26 @@ def append_table_row(package: HwpxPackage, table_index: int, row_values: list[st
     # 이전 구현은 text_nodes(clone)을 사용해 빈 t 노드를 가진 셀이 누락되어
     # row_values 일부만 매핑되는 한계가 있었다 (HWPX-EDITOR-APPEND-ROW-EMPTY-CELL-TEXTNODE-FIX-01).
     updated = 0
-    for cell, value in zip(cells, row_values):
+    for cell, value in zip(cells, row_values, strict=False):
         if set_cell_single_text(cell, str(value)) is not None:
             updated += 1
     if clear_remaining:
-        for cell in cells[len(row_values):]:
+        for cell in cells[len(row_values) :]:
             set_cell_single_text(cell, "")
     parent.append(clone)
     package.write_xml(entry, root)
     warnings = []
     if len(row_values) > len(cells):
-        warnings.append({"type": "EXTRA_VALUES_IGNORED", "extra_count": len(row_values) - len(cells)})
+        warnings.append({
+            "type": "EXTRA_VALUES_IGNORED",
+            "extra_count": len(row_values) - len(cells),
+        })
     if len(row_values) != len(cells):
-        warnings.append({"type": "CELL_COUNT_MISMATCH", "cell_count": len(cells), "value_count": len(row_values)})
+        warnings.append({
+            "type": "CELL_COUNT_MISMATCH",
+            "cell_count": len(cells),
+            "value_count": len(row_values),
+        })
     return {
         "status": "APPEND_ROW_PASS",
         "table_index": table_index,
@@ -894,20 +974,36 @@ def append_table_row(package: HwpxPackage, table_index: int, row_values: list[st
     }
 
 
-def delete_table_row(package: HwpxPackage, table_index: int, row_index: int, protect_header: bool = True) -> dict:
+def delete_table_row(
+    package: HwpxPackage, table_index: int, row_index: int, protect_header: bool = True
+) -> dict:
     if protect_header and row_index == 0:
-        return {"status": "HEADER_ROW_DELETE_BLOCKED", "table_index": table_index, "row_index": row_index}
+        return {
+            "status": "HEADER_ROW_DELETE_BLOCKED",
+            "table_index": table_index,
+            "row_index": row_index,
+        }
     found = find_table(package, table_index)
     if not found:
         return {"status": "TABLE_NOT_FOUND", "table_index": table_index}
     entry, root, table = found
     rows = row_elements(table)
     if row_index < 0 or row_index >= len(rows):
-        return {"status": "ROW_NOT_FOUND", "table_index": table_index, "row_index": row_index, "row_count": len(rows)}
+        return {
+            "status": "ROW_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "row_count": len(rows),
+        }
     row = rows[row_index]
     parent = parent_map(root).get(row)
     if parent is None:
-        return {"status": "ROW_NOT_FOUND", "table_index": table_index, "row_index": row_index, "reason": "row_parent_not_found"}
+        return {
+            "status": "ROW_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "reason": "row_parent_not_found",
+        }
     removed_text = [node.text or "" for node in text_nodes(row)]
     parent.remove(row)
     renumbered_cells = 0
@@ -940,7 +1036,11 @@ def clone_table(package: HwpxPackage, table_index: int) -> dict:
     entry, root, table = found
     parent = parent_map(root).get(table)
     if parent is None:
-        return {"status": "TABLE_NOT_FOUND", "table_index": table_index, "reason": "table_parent_not_found"}
+        return {
+            "status": "TABLE_NOT_FOUND",
+            "table_index": table_index,
+            "reason": "table_parent_not_found",
+        }
     parent.append(copy.deepcopy(table))
     package.write_xml(entry, root)
     return {"status": "CLONE_TABLE_PASS", "table_index": table_index, "entry": entry}
@@ -959,10 +1059,18 @@ def append_cloned_table_to_section(
     source_entry, source_root, source_table = found
     source_paragraph = _ancestor(source_root, source_table, "p")
     if source_paragraph is None:
-        return {"status": "TABLE_PARAGRAPH_NOT_FOUND", "table_index": source_table_index, "entry": source_entry}
+        return {
+            "status": "TABLE_PARAGRAPH_NOT_FOUND",
+            "table_index": source_table_index,
+            "entry": source_entry,
+        }
     sections = package.section_entries()
     if section_index < 0 or section_index >= len(sections):
-        return {"status": "SECTION_NOT_FOUND", "section_index": section_index, "section_count": len(sections)}
+        return {
+            "status": "SECTION_NOT_FOUND",
+            "section_index": section_index,
+            "section_count": len(sections),
+        }
     target_entry = sections[section_index]
     target_root = package.read_xml(target_entry)
     clone = copy.deepcopy(source_paragraph)
@@ -1007,13 +1115,15 @@ def append_cloned_table_to_section(
     }
 
 
-def replace_table_placeholder(package: HwpxPackage, table_id: str | None, headers: list[str], rows: list[list[str]]) -> dict:
+def replace_table_placeholder(
+    package: HwpxPackage, table_id: str | None, headers: list[str], rows: list[list[str]]
+) -> dict:
     del table_id  # Current samples do not expose stable table ids.
     values = headers + [cell for row in rows for cell in row]
     for entry in package.section_entries():
         try:
             root = package.read_xml(entry)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             return {"status": "XML_PARSE_ERROR", "entry": entry, "error": str(exc)}
         for elem in root.iter():
             name = local_name(elem.tag).lower()
@@ -1023,7 +1133,7 @@ def replace_table_placeholder(package: HwpxPackage, table_id: str | None, header
             if not nodes:
                 continue
             changed = 0
-            for node, value in zip(nodes, values):
+            for node, value in zip(nodes, values, strict=False):
                 node.text = value
                 changed += 1
             if changed:
@@ -1060,7 +1170,9 @@ def render_tables(editor: Any, tables: list[dict[str, Any]]) -> dict[str, Any]:
             [[str(cell) for cell in row] for row in table.get("rows", [])],
         )
         if before_values:
-            result["overwritten_text_values"] = before_values[: int(result.get("cell_text_nodes_updated", 0))]
+            result["overwritten_text_values"] = before_values[
+                : int(result.get("cell_text_nodes_updated", 0))
+            ]
         if result.get("status") == "PASS":
             report["updated_tables"] += 1
             report["updated_cells"] += int(result.get("cell_text_nodes_updated", 0))
@@ -1092,9 +1204,7 @@ def validate_table_config(tables: list[dict[str, Any]]) -> None:
 def table_values_from_ops(operations: list[dict[str, Any]]) -> list[str]:
     values = []
     for op in operations:
-        if op.get("op") == "update_cells":
-            values.extend(str(value) for value in op.get("values", []))
-        elif op.get("op") == "append_row":
+        if op.get("op") == "update_cells" or op.get("op") == "append_row":
             values.extend(str(value) for value in op.get("values", []))
     unique = []
     seen = set()
@@ -1187,9 +1297,23 @@ def apply_table_operations(editor: Any, operations: list[dict[str, Any]]) -> dic
         if result.get("warnings"):
             report["warnings"].extend(result["warnings"])
         status = result.get("status")
-        if status in {"TABLE_NOT_FOUND", "ROW_NOT_FOUND", "CELL_NOT_FOUND", "UNSUPPORTED_TABLE_OPERATION"}:
+        if status in {
+            "TABLE_NOT_FOUND",
+            "ROW_NOT_FOUND",
+            "CELL_NOT_FOUND",
+            "UNSUPPORTED_TABLE_OPERATION",
+        }:
             report["status"] = "FAIL"
-        elif status in {"HEADER_ROW_DELETE_BLOCKED", "MERGE_SPAN_NOOP", "UNMERGE_NOOP", "SET_CELL_LAYOUT_NOOP"} and report["status"] != "FAIL":
+        elif (
+            status
+            in {
+                "HEADER_ROW_DELETE_BLOCKED",
+                "MERGE_SPAN_NOOP",
+                "UNMERGE_NOOP",
+                "SET_CELL_LAYOUT_NOOP",
+            }
+            and report["status"] != "FAIL"
+        ):
             report["status"] = "WARN"
     report["final_tables"] = editor.find_tables()
     return report

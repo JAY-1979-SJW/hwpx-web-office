@@ -14,6 +14,7 @@ ID를 1..MAX 로 열거해 전량(서식 HWP/HWPX + 약관·규정 PDF)을 확�
 법제처와 달리 공식 OpenAPI가 없어 공개 다운로드 엔드포인트를 열거하는 방식.
 공개적으로 내려받도록 제공되는 고객 서식·약관 문서만 대상으로 한다.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,12 +31,16 @@ LIB = PROJECT_ROOT / "data" / "drafts" / "form_library"
 OUT_DIR = LIB / "kepco_forms"
 INDEX = LIB / "kepco_forms_index.jsonl"
 BASE = "https://online.kepco.co.kr/form/file/down/"
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-           "Referer": "https://online.kepco.co.kr/", "Accept": "*/*"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Referer": "https://online.kepco.co.kr/",
+    "Accept": "*/*",
+}
 HWP_OLE = bytes.fromhex("D0CF11E0A1B11AE1")
 
 
-def _log(m): print(m, flush=True)
+def _log(m):
+    print(m, flush=True)
 
 
 def _safe(name: str, n: int = 70) -> str:
@@ -52,7 +57,7 @@ def _filename_from_cd(cd: str) -> str:
     raw = m.group(1)
     try:
         name = urllib.parse.unquote(raw)
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
         name = raw
     # http.client 는 헤더를 latin-1 로 디코드한다. 서버가 UTF-8 파일명을
     # 퍼센트인코딩 없이 그대로 보내면 모지바케가 되므로 되돌린다.
@@ -77,7 +82,7 @@ def load_done() -> set[int]:
                 r = json.loads(line)
                 if "id" in r:
                     done.add(int(r["id"]))
-            except Exception:
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 continue
     return done
 
@@ -94,9 +99,9 @@ def fetch(fid: int, retries: int = 3):
                 return data, cd, ct
         except urllib.error.HTTPError as e:
             if e.code in (404, 500):
-                return None, "", ""       # 무효 ID
+                return None, "", ""  # 무효 ID
             time.sleep(1.2 * (attempt + 1))
-        except Exception:
+        except OSError:
             time.sleep(1.2 * (attempt + 1))
     return None, "", ""
 
@@ -117,7 +122,7 @@ def main():
                 r = json.loads(line)
                 if r.get("sha256"):
                     seen_hash.add(r["sha256"])
-            except Exception:
+            except (json.JSONDecodeError, KeyError, TypeError):
                 pass
 
     _log(f"[start] ID 1..{args.max_id} 스캔 · 이미처리 {len(done)}")
@@ -135,12 +140,16 @@ def main():
             digest = hashlib.sha256(data).hexdigest()
             if digest in seen_hash:
                 dup += 1
-                idx.write(json.dumps({"id": fid, "sha256": digest, "status": "DUP"}, ensure_ascii=False) + "\n")
+                idx.write(
+                    json.dumps({"id": fid, "sha256": digest, "status": "DUP"}, ensure_ascii=False)
+                    + "\n"
+                )
                 time.sleep(args.delay)
                 continue
             name = _filename_from_cd(cd) or f"kepco_{fid}"
             ext = Path(name).suffix.lower().lstrip(".") or (
-                "hwp" if data[:8] == HWP_OLE else "hwpx" if data[:2] == b"PK" else "bin")
+                "hwp" if data[:8] == HWP_OLE else "hwpx" if data[:2] == b"PK" else "bin"
+            )
             if ext == "hwp":
                 hwp += 1
             elif ext == "hwpx":
@@ -152,19 +161,35 @@ def main():
             stem = _safe(Path(name).stem)
             fname = f"{fid}_{stem}.{ext}"
             (OUT_DIR / fname).write_bytes(data)
-            seen_hash.add(digest); saved += 1
-            idx.write(json.dumps({
-                "id": fid, "name": name, "file": fname, "ext": ext,
-                "sizeBytes": len(data), "sha256": digest, "status": "SAVED",
-            }, ensure_ascii=False) + "\n")
+            seen_hash.add(digest)
+            saved += 1
+            idx.write(
+                json.dumps(
+                    {
+                        "id": fid,
+                        "name": name,
+                        "file": fname,
+                        "ext": ext,
+                        "sizeBytes": len(data),
+                        "sha256": digest,
+                        "status": "SAVED",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
             idx.flush()
             if saved % 20 == 0:
-                _log(f"  … id{fid} · 저장 {saved} (hwp {hwp} hwpx {hwpx} pdf {pdf}) 중복 {dup} 무효 {miss}")
+                _log(
+                    f"  … id{fid} · 저장 {saved} (hwp {hwp} hwpx {hwpx} pdf {pdf}) 중복 {dup} 무효 {miss}"
+                )
             time.sleep(args.delay)
 
     el = time.time() - t0
-    _log(f"[done] 저장 {saved} (hwp {hwp} · hwpx {hwpx} · pdf {pdf} · 기타 {other}) · "
-         f"중복 {dup} · 무효 {miss} · {el/60:.1f}분")
+    _log(
+        f"[done] 저장 {saved} (hwp {hwp} · hwpx {hwpx} · pdf {pdf} · 기타 {other}) · "
+        f"중복 {dup} · 무효 {miss} · {el / 60:.1f}분"
+    )
     _log(f"[out] {OUT_DIR}")
     _log(f"[index] {INDEX}")
 
