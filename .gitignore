@@ -40,7 +40,12 @@ generate_test_report.py
 inspect_detailed_hwpx.py
 inspect_saved_hwpx.py
 reparse_supervision_forms.py
-test_*.py
+# 루트 전용(앵커 /) — 앵커 없이 쓰면 tests/ 안의 정식 테스트 파일까지
+# 가려 git add 가 막힌다(2026-09-29 실측 확인: 새로 만든
+# tests/test_hwpx_recognition_corpus_results_analysis.py 가 이 규칙에
+# 걸려 "ignored by .gitignore" 로 거부됨 — 알아채기 쉬운 경고는 뜨지만,
+# 놓치면 새 테스트가 그대로 커밋에서 빠질 수 있다).
+/test_*.py
 test-results/
 playwright-report/
 

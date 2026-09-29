@@ -313,6 +313,11 @@ _ZONE_TOKEN_RULES: list[tuple[str, tuple[str, ...]]] = [
             "index_and_recommend",
             "type_classification",
             "construction_work_design",
+            # 2026-09-29: recognition_corpus 신규 테스트(예: results_analysis)가
+            # 이 토큰 없이 "unassigned" 로 빠져 새 파일 분류 게이트가 막았다.
+            # 이미 tracked 인 test_hwpx_recognition_corpus_db_build.py 등도
+            # 같은 공백이었으나 grandfather 돼 안 걸렸을 뿐이다.
+            "recognition_corpus",
         ),
     ),
     ("review_approval", ("review_panel", "approval_gate", "human_approval")),
