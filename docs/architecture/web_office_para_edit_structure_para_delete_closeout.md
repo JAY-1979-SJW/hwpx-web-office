@@ -138,3 +138,5 @@
 > **baseline 갱신**: 9d201a3 (paragraph_writer_adapter.py ET 미정의 참조 수정, 2026-09-29) — audit-kit run(ruff F821)으로 발견: 모듈 최상단에 xml.etree.ElementTree import 가 없어 함수 시그니처(ET.Element)가 미정의 이름을 참조했다(지연평가 어노테이션이라 당장 크래시는 없었음). 상단에 import 추가, 가려져 있던 중복 지역 import 2곳 제거. 동작 변경 없음, 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
 
 > **baseline 갱신**: 84f6345 (웹뷰어 JS/HTML 코드 품질검사 도구 신설, 2026-09-29) — ESLint(flat config)+html-validate 최초 도입 중 para_edit_apply_format_smoke.mjs/para_edit_runtime.mjs/para_edit_state.mjs/para_edit_structure_smoke.mjs 에서 안 쓰는 import/변수 제거(동작 변경 없음, node 자체 테스트 전부 재통과 확인). 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+> **baseline 갱신**: 3114298 (bandit B608/B324/B314 치명 보안수정 + 9단계 AI 리뷰, 2026-09-30) — SQL 인젝션 오탐 34건 억제 확인 + 실제 취약점 1건(verify_schema_addresses.py --scope) 매개변수화 수정, SHA1 비보안 해시 2건 usedforsecurity=False, XML 엔티티확장 DoS(B314) 방어를 위해 paragraph_writer_adapter.py/paragraph_save_verify7.py 포함 39개 파일의 ET.fromstring 을 defusedxml 로 교체(billion-laughs 페이로드 차단 + 정상 문서 파싱 유지 직접 테스트 확인). 동작 변경 없음(파싱 엔진만 교체), 잠금 파일 정당 변경 확인 후 베이스라인 갱신.

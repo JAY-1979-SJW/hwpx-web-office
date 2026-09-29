@@ -22,7 +22,7 @@ sys.path.insert(0, str(PR))
 MATCHER_MJS = PR / "frontend/web_office_viewer/format_charpr_matcher.mjs"
 TOOLBAR_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatToolbar.tsx"
 SMOKE_JS = PR / "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs"
-BASELINE_COMMIT = "84f6345"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (9d201a3 → 84f6345)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 
 def _node_ok() -> bool:
