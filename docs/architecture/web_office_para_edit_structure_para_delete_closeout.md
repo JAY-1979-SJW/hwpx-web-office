@@ -134,3 +134,5 @@
 ## 재고정 이력 (append-only)
 
 - 2026-07-24: baseline → `f119308` (lineseg 추정 보정 로그 + 페이지 초과 가드 준공)
+
+> **baseline 갱신**: 9d201a3 (paragraph_writer_adapter.py ET 미정의 참조 수정, 2026-09-29) — audit-kit run(ruff F821)으로 발견: 모듈 최상단에 xml.etree.ElementTree import 가 없어 함수 시그니처(ET.Element)가 미정의 이름을 참조했다(지연평가 어노테이션이라 당장 크래시는 없었음). 상단에 import 추가, 가려져 있던 중복 지역 import 2곳 제거. 동작 변경 없음, 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
