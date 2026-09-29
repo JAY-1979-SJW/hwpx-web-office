@@ -95,10 +95,8 @@ def _check_required_state() -> list[dict]:
         findings.append({"code": "STATE_MJS_MISSING", "level": "FAIL"})
         return findings
     src = STATE_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_STATE_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "STATE_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "STATE_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_STATE_PATTERNS if not re.search(pat, src))
     return findings
 
 
@@ -108,10 +106,8 @@ def _check_required_command() -> list[dict]:
         findings.append({"code": "CMD_MJS_MISSING", "level": "FAIL"})
         return findings
     src = CMD_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_CMD_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "CMD_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "CMD_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_CMD_PATTERNS if not re.search(pat, src))
     # makeApplyFormatCommand 1개만 정의되어야 한다 (factory 재정의 금지)
     defs = re.findall(
         r"export\s+function\s+makeApplyFormatCommand\b", src)
@@ -129,14 +125,10 @@ def _check_required_preview() -> list[dict]:
                           "level": "FAIL"})
         return findings
     src = PREVIEW_TSX.read_text(encoding="utf-8")
-    for pat in REQUIRED_PREVIEW_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "PREVIEW_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_PREVIEW_PATTERNS:
-        if re.search(pat, src):
-            findings.append({"code": "PREVIEW_FORBIDDEN_CALL",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "PREVIEW_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_PREVIEW_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "PREVIEW_FORBIDDEN_CALL",
+                              "level": "FAIL", "detail": pat} for pat in FORBIDDEN_PREVIEW_PATTERNS if re.search(pat, src))
     return findings
 
 
@@ -152,11 +144,9 @@ def _check_no_backend_call_in_frontend() -> list[dict]:
         if not p.is_file():
             continue
         src = p.read_text(encoding="utf-8")
-        for pat in FORBIDDEN_FRONTEND_BACKEND_CALLS:
-            if re.search(pat, src):
-                findings.append({"code": "BACKEND_CALL_IN_FRONTEND",
+        findings.extend({"code": "BACKEND_CALL_IN_FRONTEND",
                                   "level": "FAIL",
-                                  "detail": f"{rel}: {pat}"})
+                                  "detail": f"{rel}: {pat}"} for pat in FORBIDDEN_FRONTEND_BACKEND_CALLS if re.search(pat, src))
     return findings
 
 
@@ -182,12 +172,9 @@ def _check_locked_files() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

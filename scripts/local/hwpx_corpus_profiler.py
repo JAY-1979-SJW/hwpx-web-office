@@ -907,9 +907,7 @@ def _process_one_table(
 
     layout, conf, evidence = classify_table_layout(grid, header_texts, paragraphs[:5])
 
-    first_rows_preview = []
-    for r in grid[:3]:
-        first_rows_preview.append([normalize_header(cell_text(c))[:40] for c in r])
+    first_rows_preview = [[normalize_header(cell_text(c))[:40] for c in r] for r in grid[:3]]
     left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
 
     table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
@@ -1360,21 +1358,15 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
         out_lines.append(f"- {layout}: {cnt}")
     out_lines.append("")
     out_lines.append("## 가장 자주 나온 헤더 TOP 50")
-    for r in header_rows[:50]:
-        out_lines.append(
-            f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
-            f"guess={r['guessedField']}@{r['fieldConfidence']})"
-        )
+    out_lines.extend(f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
+            f"guess={r['guessedField']}@{r['fieldConfidence']})" for r in header_rows[:50])
     out_lines.append("")
     out_lines.append("## 실패 유형 TOP 20")
     for et, cnt in failure_counter.most_common(20):
         out_lines.append(f"- {et}: {cnt}")
     out_lines.append("")
     out_lines.append("## fixture 후보")
-    for f in ctx.fixture_records:
-        out_lines.append(
-            f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})"
-        )
+    out_lines.extend(f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})" for f in ctx.fixture_records)
     out_lines.append("")
     out_lines.append("## 다음 파서 개선 우선순위")
     priorities = []

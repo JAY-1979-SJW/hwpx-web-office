@@ -195,8 +195,7 @@ def run_audit() -> dict:
         "| check | ok | detail |",
         "|---|---|---|",
     ]
-    for f in findings:
-        md.append(f"| {f['check']} | {'PASS' if f['ok'] else 'FAIL'} | {f['detail']} |")
+    md.extend(f"| {f['check']} | {'PASS' if f['ok'] else 'FAIL'} | {f['detail']} |" for f in findings)
     (OUTPUT_DIR / "audit.md").write_text("\n".join(md), encoding="utf-8")
     return summary
 

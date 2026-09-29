@@ -56,13 +56,11 @@ def _check_static() -> list[dict]:
             })
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_PY:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_PY_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in FORBIDDEN_PY if tok in src)
     for p in JS_FILES:
         if not p.is_file():
             findings.append({
@@ -72,13 +70,11 @@ def _check_static() -> list[dict]:
             })
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_JS:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_JS_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in FORBIDDEN_JS if tok in src)
     return findings
 
 
@@ -252,12 +248,11 @@ def audit() -> dict:
     # 본 공정 디렉토리에 .hwpx 0건
     for d in [VIEWER_DIR, PR / "scripts/hwpx/web_office"]:
         if d.is_dir():
-            for f in d.glob("*.hwpx"):
-                findings.append({
+            findings.extend({
                     "code": "UNEXPECTED_HWPX_OUTPUT",
                     "level": "FAIL",
                     "detail": str(f.relative_to(PR)),
-                })
+                } for f in d.glob("*.hwpx"))
 
     return {
         "task": "WEB-OFFICE-PARA-EDIT-MODEL-01",

@@ -382,11 +382,8 @@ ALLOWED_DECISIONS = ("APPROVE", "REJECT", "HOLD")
 
 
 def _validate_top_level_fields(approval: dict) -> list[dict]:
-    errors: list[dict] = []
     must = ("schemaVersion", "approvedBy", "decidedAt", "decisions")
-    for k in must:
-        if k not in approval:
-            errors.append({"code": "MISSING_FIELD", "field": k})
+    errors: list[dict] = [{"code": "MISSING_FIELD", "field": k} for k in must if k not in approval]
     if approval.get("schemaVersion") != APPROVAL_INPUT_SCHEMA_VERSION:
         errors.append({"code": "INVALID_SCHEMA_VERSION", "field": "schemaVersion"})
     if not (approval.get("approvedBy") or "").strip():

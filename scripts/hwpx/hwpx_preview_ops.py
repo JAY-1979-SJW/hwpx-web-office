@@ -22,9 +22,7 @@ def _section_text(package: HwpxPackage) -> list[str]:
             root = package.read_xml(entry)
         except Exception:
             continue
-        for elem in root.iter():
-            if local_name(elem.tag) == "t" and elem.text and elem.text.strip():
-                values.append(_clean(elem.text))
+        values.extend(_clean(elem.text) for elem in root.iter() if local_name(elem.tag) == "t" and elem.text and elem.text.strip())
     return values
 
 
@@ -32,13 +30,8 @@ def _metadata_text(package: HwpxPackage) -> list[str]:
     report = inspect_document_metadata(package)
     if report.get("status") != "PASS":
         return []
-    values: list[str] = []
-    for value in report.get("metadata", {}).values():
-        if value:
-            values.append(_clean(str(value)))
-    for value in report.get("meta", {}).values():
-        if value:
-            values.append(_clean(str(value)))
+    values: list[str] = [_clean(str(value)) for value in report.get("metadata", {}).values() if value]
+    values.extend(_clean(str(value)) for value in report.get("meta", {}).values() if value)
     return values
 
 

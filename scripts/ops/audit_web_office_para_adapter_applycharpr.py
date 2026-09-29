@@ -225,13 +225,11 @@ def _check_applied_entries(sc: dict, applied: list, findings: list[dict]) -> Non
 def _check_readback_regressions(sc: dict, findings: list[dict]) -> None:
     v17 = sc.get("v17") or {}
     rb = sc.get("readback") or {}
-    for k in ("V1_RANGE_POSITION_OK", "V7_READBACK_MATCH"):
-        if rb.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "V1_V7_REGRESSION",
                 "level": "FAIL",
                 "detail": (f"{sc['name']}: {k}={rb.get(k)}"),
-            })
+            } for k in ("V1_RANGE_POSITION_OK", "V7_READBACK_MATCH") if rb.get(k) != "PASS")
     for k in ("V4_CHARPR_PRESERVED",):
         if v17.get(k) != "PASS":
             findings.append({

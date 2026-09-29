@@ -278,7 +278,7 @@ def _stage_mapping() -> dict:
         domain="소방",
         formKind="신청서",
         extractedFields=[
-            ExtractedField(**{k: v for k, v in f.items()}) for f in _SYNTHETIC_PARSE_FIELDS
+            ExtractedField(**dict(f.items())) for f in _SYNTHETIC_PARSE_FIELDS
         ],
     )
     mapping = map_fields(parse_result, _SYNTHETIC_CATALOG)
@@ -332,12 +332,9 @@ def _stage_human_approval(panel) -> dict:
         result_to_dict,
     )
 
-    decisions = []
-    for item in panel.autoFillReady:
-        decisions.append(FieldDecision(fieldKey=item.fieldKey, action=ACTION_CONFIRM))
-    for item in panel.needsReview:
-        # synthetic: HOLD for needs-review items
-        decisions.append(FieldDecision(fieldKey=item.fieldKey, action=ACTION_HOLD))
+    decisions = [FieldDecision(fieldKey=item.fieldKey, action=ACTION_CONFIRM) for item in panel.autoFillReady]
+    # synthetic: HOLD for needs-review items
+    decisions.extend(FieldDecision(fieldKey=item.fieldKey, action=ACTION_HOLD) for item in panel.needsReview)
 
     approval = apply_decisions_from_panel(panel, decisions)
     approval_dict = result_to_dict(approval)

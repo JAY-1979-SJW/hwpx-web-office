@@ -80,13 +80,11 @@ def _static_command_js(findings: list[dict]) -> None:
 
 def _static_self_test_js(findings: list[dict]) -> None:
     src = SELF_TEST_JS.read_text(encoding="utf-8")
-    for key in (
+    findings.extend({"code": "SELF_TEST_CHECK_MISSING", "level": "FAIL", "detail": key} for key in (
         "containerScopePropagation",
         "requiresReviewWhenNoContainerScope",
         "blockContainerScopeAccepted",
-    ):
-        if key not in src:
-            findings.append({"code": "SELF_TEST_CHECK_MISSING", "level": "FAIL", "detail": key})
+    ) if key not in src)
 
 
 def _static_para_model(findings: list[dict]) -> None:
@@ -141,13 +139,11 @@ def _static_writer_tokens(findings: list[dict]) -> None:
     ]
     for p in targets:
         src = p.read_text(encoding="utf-8")
-        for tok in forbidden:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_WRITER_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in forbidden if tok in src)
 
 
 @dataclass
@@ -387,13 +383,11 @@ def _run_js_self_test(findings: list[dict], summary: dict) -> None:
         last = r.stdout.strip().splitlines()[-1]
         parsed = json.loads(last)
         summary["jsChecks"] = parsed.get("checks", {})
-        for key in (
+        findings.extend({"code": "JS_NEW_CHECK_NOT_PASS", "level": "FAIL", "detail": key} for key in (
             "containerScopePropagation",
             "requiresReviewWhenNoContainerScope",
             "blockContainerScopeAccepted",
-        ):
-            if not parsed.get("checks", {}).get(key):
-                findings.append({"code": "JS_NEW_CHECK_NOT_PASS", "level": "FAIL", "detail": key})
+        ) if not parsed.get("checks", {}).get(key))
     except (ValueError, IndexError) as e:
         findings.append({"code": "JS_SELF_TEST_PARSE_FAIL", "level": "FAIL", "detail": str(e)})
 

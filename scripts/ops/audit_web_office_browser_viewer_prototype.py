@@ -77,10 +77,7 @@ def _resolve_fixtures(limit: int = 3) -> list[Path]:
 
 
 def _check_html(html: str) -> list[dict]:
-    findings: list[dict] = []
-    for tok in FORBIDDEN_HTML_TOKENS:
-        if tok.lower() in html.lower():
-            findings.append({"code": "FORBIDDEN_HTML_TOKEN", "level": "FAIL", "detail": tok})
+    findings: list[dict] = [{"code": "FORBIDDEN_HTML_TOKEN", "level": "FAIL", "detail": tok} for tok in FORBIDDEN_HTML_TOKENS if tok.lower() in html.lower()]
     # 필수: data-editable="false" 최소 1개
     if 'data-editable="false"' not in html:
         findings.append({"code": "EDITABLE_FALSE_MISSING", "level": "FAIL", "detail": None})
@@ -133,13 +130,11 @@ def _audit_source_files() -> list[dict]:
             })
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_SRC_TOKENS:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_SRC_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in FORBIDDEN_SRC_TOKENS if tok in src)
     return findings
 
 
@@ -205,8 +200,7 @@ def audit() -> dict:
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
-        for f in fixtures:
-            per_file.append(_audit_one_fixture(f, td_path))
+        per_file.extend(_audit_one_fixture(f, td_path) for f in fixtures)
 
     all_findings = src_findings + [f for r in per_file for f in r["findings"]]
     fails = sum(1 for f in all_findings if f["level"] == "FAIL")

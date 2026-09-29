@@ -140,14 +140,10 @@ def _check_required_doc() -> list[dict]:
                           "detail": str(CLOSEOUT_DOC.relative_to(PR))})
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in REQUIRED_DOC_PHRASES_IN_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in REQUIRED_DOC_PHRASES_OUT_OF_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
+    findings.extend({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in REQUIRED_DOC_PHRASES_IN_SCOPE if phrase not in src)
+    findings.extend({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in REQUIRED_DOC_PHRASES_OUT_OF_SCOPE if phrase not in src)
     if BASELINE_COMMIT not in src:
         findings.append({"code": "DOC_BASELINE_MISSING",
                           "level": "FAIL",
@@ -162,11 +158,8 @@ def _check_required_doc() -> list[dict]:
 
 
 def _check_required_tests() -> list[dict]:
-    findings: list[dict] = []
-    for rel in REQUIRED_TESTS:
-        if not (PR / rel).is_file():
-            findings.append({"code": "MISSING_TEST", "level": "FAIL",
-                              "detail": rel})
+    findings: list[dict] = [{"code": "MISSING_TEST", "level": "FAIL",
+                              "detail": rel} for rel in REQUIRED_TESTS if not (PR / rel).is_file()]
     return findings
 
 
@@ -199,12 +192,10 @@ def _check_required_source_patterns() -> list[dict]:
                               "detail": str(path.relative_to(PR))})
             continue
         src = path.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({"code": "REQUIRED_PATTERN_MISSING",
+        findings.extend({"code": "REQUIRED_PATTERN_MISSING",
                                   "level": "FAIL",
                                   "detail":
-                                      f"{path.relative_to(PR)}: {pat}"})
+                                      f"{path.relative_to(PR)}: {pat}"} for pat in patterns if not re.search(pat, src))
     return findings
 
 
@@ -225,12 +216,9 @@ def _check_forbidden_source_patterns() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

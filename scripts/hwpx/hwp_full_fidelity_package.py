@@ -336,9 +336,7 @@ def _shape_layout_rectangles(analysis: dict[str, Any]) -> list[dict[str, Any]]:
         section_rectangles = (
             section.get("rectangles") if isinstance(section.get("rectangles"), list) else []
         )
-        for row in section_rectangles:
-            if isinstance(row, dict):
-                rectangles.append(row)
+        rectangles.extend(row for row in section_rectangles if isinstance(row, dict))
     return rectangles
 
 
@@ -354,9 +352,7 @@ def _shape_layout_pictures(analysis: dict[str, Any]) -> list[dict[str, Any]]:
         section_pictures = (
             section.get("pictures") if isinstance(section.get("pictures"), list) else []
         )
-        for row in section_pictures:
-            if isinstance(row, dict):
-                pictures.append(row)
+        pictures.extend(row for row in section_pictures if isinstance(row, dict))
     return pictures
 
 

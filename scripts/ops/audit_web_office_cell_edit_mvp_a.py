@@ -58,13 +58,11 @@ def _check_static_forbidden() -> list[dict]:
             })
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_TOKENS_PY:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_PY_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in FORBIDDEN_TOKENS_PY if tok in src)
     for p in JS_FILES:
         if not p.is_file():
             findings.append({
@@ -74,13 +72,11 @@ def _check_static_forbidden() -> list[dict]:
             })
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_TOKENS_JS:
-            if tok in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_JS_TOKEN",
                     "level": "FAIL",
                     "detail": f"{p.name}: {tok}",
-                })
+                } for tok in FORBIDDEN_TOKENS_JS if tok in src)
     return findings
 
 

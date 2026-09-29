@@ -262,9 +262,7 @@ def audit() -> dict:  # ruff: ignore[complex-structure, too-many-branches, too-m
 
         # 텍스트 컨텐츠 토큰 검사
         text = html.lower()
-        for tok in FORBIDDEN_DOM_TOKENS:
-            if tok in text:
-                findings.append({"code": "FORBIDDEN_DOM_TEXT", "level": "FAIL", "detail": tok})
+        findings.extend({"code": "FORBIDDEN_DOM_TEXT", "level": "FAIL", "detail": tok} for tok in FORBIDDEN_DOM_TOKENS if tok in text)
 
     # 원본 fixture 무변경
     if src_hwpx is not None and src_sha_before is not None:

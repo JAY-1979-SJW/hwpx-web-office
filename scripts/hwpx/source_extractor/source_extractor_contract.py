@@ -53,18 +53,13 @@ FORBIDDEN_SOURCE_FIELDS: tuple[str, ...] = (
 
 
 def validate_source_descriptor(s: dict) -> list[str]:
-    errs: list[str] = []
     if not isinstance(s, dict):
         return ["SOURCE_NOT_OBJECT"]
-    for k in REQUIRED_SOURCE_FIELDS:
-        if k not in s:
-            errs.append(f"MISSING_FIELD:{k}")
+    errs: list[str] = [f"MISSING_FIELD:{k}" for k in REQUIRED_SOURCE_FIELDS if k not in s]
     st = s.get("sourceType")
     if st is not None and st not in ALLOWED_SOURCE_TYPES:
         errs.append(f"UNKNOWN_SOURCE_TYPE:{st}")
-    for forbidden in FORBIDDEN_SOURCE_FIELDS:
-        if forbidden in s:
-            errs.append(f"FORBIDDEN_FIELD:{forbidden}")
+    errs.extend(f"FORBIDDEN_FIELD:{forbidden}" for forbidden in FORBIDDEN_SOURCE_FIELDS if forbidden in s)
     return errs
 
 
@@ -95,12 +90,9 @@ EXTRACTED_REQUIRED: tuple[str, ...] = (
 
 
 def validate_extracted_value(v: dict) -> list[str]:
-    errs: list[str] = []
     if not isinstance(v, dict):
         return ["EXTRACTED_NOT_OBJECT"]
-    for k in EXTRACTED_REQUIRED:
-        if k not in v:
-            errs.append(f"MISSING_FIELD:{k}")
+    errs: list[str] = [f"MISSING_FIELD:{k}" for k in EXTRACTED_REQUIRED if k not in v]
     c = v.get("confidence")
     if c is not None:
         if not isinstance(c, (int, float)):
@@ -208,16 +200,14 @@ def to_evidence_inputs(extracted_values: list[dict]) -> list[dict]:
 
     표준 입력은 운영동 evidence_ingestion이 받을 수 있는 dict 리스트.
     """
-    out: list[dict] = []
-    for v in extracted_values or []:
-        out.append({
+    out: list[dict] = [{
             "evidenceId": f"src-{v.get('sourceId')}-{v.get('label')}",
             "sourceType": v.get("evidenceType"),
             "sourceRef": v.get("sourceRef"),
             "label": v.get("label"),
             "value": v.get("value"),
             "confidence": v.get("confidence"),
-        })
+        } for v in extracted_values or []]
     return out
 
 
@@ -254,11 +244,9 @@ def audit_source_extractor_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_SOURCE_EXTRACTOR_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_SOURCE_EXTRACTOR_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations,
               "filesChecked": checked}

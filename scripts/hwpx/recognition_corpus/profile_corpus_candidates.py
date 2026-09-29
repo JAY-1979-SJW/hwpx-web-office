@@ -386,8 +386,7 @@ def _build_markdown(summary: dict[str, Any], records: list[ProfileRecord]) -> st
     blocked = [r for r in records if r.status != STATUS_READY]
     if blocked:
         lines.append("## Blocked / Review Required")
-        for r in blocked[:50]:
-            lines.append(f"- [{r.status}] {r.maskedFileName}: {r.blockedReason}")
+        lines.extend(f"- [{r.status}] {r.maskedFileName}: {r.blockedReason}" for r in blocked[:50])
         lines.append("")
     return "\n".join(lines)
 

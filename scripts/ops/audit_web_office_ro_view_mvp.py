@@ -90,14 +90,11 @@ def _stable_id_uniqueness(doc) -> dict[str, bool]:
 
 
 def _table_editable_findings(payload: dict) -> list[dict]:
-    findings: list[dict] = []
-    for tbl in payload.get("tables", []):
-        if tbl.get("editable") is not False:
-            findings.append({
+    findings: list[dict] = [{
                 "code": "TABLE_EDITABLE_NOT_FALSE",
                 "level": "FAIL",
                 "detail": tbl.get("tableId"),
-            })
+            } for tbl in payload.get("tables", []) if tbl.get("editable") is not False]
     return findings
 
 
@@ -127,13 +124,11 @@ def audit_one(path: Path) -> dict:
     # editable=False 고정 확인
     if payload.get("editable") is not False:
         findings.append({"code": "PAYLOAD_EDITABLE_NOT_FALSE", "level": "FAIL", "detail": "root"})
-    for tbl in payload.get("tables", []):
-        if tbl.get("editable") is not False:
-            findings.append({
+    findings.extend({
                 "code": "TABLE_EDITABLE_NOT_FALSE",
                 "level": "FAIL",
                 "detail": tbl.get("tableId"),
-            })
+            } for tbl in payload.get("tables", []) if tbl.get("editable") is not False)
 
     # 표 있는 문서면 cell payload 비어있지 않아야 함
     if doc.tables and not doc.cells:

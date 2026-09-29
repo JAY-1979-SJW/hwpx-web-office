@@ -56,9 +56,7 @@ def _output_under_sandbox(out: Path, project_root: Path) -> bool:
 def _read_blob(zip_path: Path) -> str:
     blob_parts: list[str] = []
     with zipfile.ZipFile(str(zip_path)) as z:
-        for name in z.namelist():
-            if name.endswith(".xml") or name.endswith(".hpf"):
-                blob_parts.append(z.read(name).decode("utf-8", "ignore"))
+        blob_parts.extend(z.read(name).decode("utf-8", "ignore") for name in z.namelist() if name.endswith(".xml") or name.endswith(".hpf"))
     return "".join(blob_parts)
 
 

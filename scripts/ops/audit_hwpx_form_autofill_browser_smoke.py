@@ -257,8 +257,7 @@ def audit() -> dict[str, Any]:
         "",
         "## Checks",
     ]
-    for item in checks:
-        md.append(f"- {item['status']} {item['code']} {item['desc']}")
+    md.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in checks)
     (REPORT_DIR / "browser_smoke_summary.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
     return summary

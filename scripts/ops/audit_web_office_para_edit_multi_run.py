@@ -85,13 +85,8 @@ def _pattern_findings(
     forbidden: tuple[str, ...] = (),
     forbidden_code: str = "",
 ) -> list[dict]:
-    findings: list[dict] = []
-    for pat in required:
-        if not re.search(pat, src):
-            findings.append({"code": required_code, "level": "FAIL", "detail": pat})
-    for pat in forbidden:
-        if re.search(pat, src):
-            findings.append({"code": forbidden_code, "level": "FAIL", "detail": pat})
+    findings: list[dict] = [{"code": required_code, "level": "FAIL", "detail": pat} for pat in required if not re.search(pat, src)]
+    findings.extend({"code": forbidden_code, "level": "FAIL", "detail": pat} for pat in forbidden if re.search(pat, src))
     return findings
 
 
@@ -124,11 +119,8 @@ def _check_static() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -239,9 +231,7 @@ def _run_dynamic() -> dict[str, Any]:
             continue
         sha_b = hashlib.sha256(fx.read_bytes()).hexdigest()
         mt_b = fx.stat().st_mtime_ns
-        results = []
-        for scn in ("REPLACE", "DELETE"):
-            results.append(_run_one(fx, par, scn))
+        results = [_run_one(fx, par, scn) for scn in ("REPLACE", "DELETE")]
         sha_ok = hashlib.sha256(fx.read_bytes()).hexdigest() == sha_b
         mt_ok = fx.stat().st_mtime_ns == mt_b
         out["byScope"][scope_kind] = {

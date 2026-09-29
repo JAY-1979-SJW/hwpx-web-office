@@ -204,10 +204,8 @@ def audit_master_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_MASTER_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_MASTER_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations, "filesChecked": checked}

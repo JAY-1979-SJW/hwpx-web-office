@@ -324,15 +324,9 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Areas",
     ]
-    for area in payload["areaMatrix"]:
-        lines.append(
-            f"- {area['id']}: files={area['fileCount']} action={area['action']} move={area['movePolicy']}"
-        )
+    lines.extend(f"- {area['id']}: files={area['fileCount']} action={area['action']} move={area['movePolicy']}" for area in payload["areaMatrix"])
     lines.extend(["", "## Zone Gates"])
-    for zone in payload["zoneSeparationMatrix"]:
-        lines.append(
-            f"- {zone['zone']}: files={zone['fileCount']} gate={zone['releaseGate']} readiness={zone['splitReadiness']}"
-        )
+    lines.extend(f"- {zone['zone']}: files={zone['fileCount']} gate={zone['releaseGate']} readiness={zone['splitReadiness']}" for zone in payload["zoneSeparationMatrix"])
     lines.extend(["", "## Next Work"])
     lines.append("- no file move/delete before owner review")
     lines.append("- wire detailed modules only after zone gate remains green")

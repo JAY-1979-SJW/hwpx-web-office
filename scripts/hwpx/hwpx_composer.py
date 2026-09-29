@@ -255,11 +255,8 @@ def _apply_document_metadata_step(
         return None, []
     result = apply_document_metadata(package, job.get("document_metadata"))
     step = {"step": "document_metadata", "status": result.get("status"), "result": result}
-    expected_values: list[str] = []
     metadata_values = job.get("document_metadata", {})
-    for field in ("title", "language", "creator", "subject", "description", "date"):
-        if metadata_values.get(field):
-            expected_values.append(str(metadata_values[field]))
+    expected_values: list[str] = [str(metadata_values[field]) for field in ("title", "language", "creator", "subject", "description", "date") if metadata_values.get(field)]
     keywords = metadata_values.get("keywords", metadata_values.get("keyword"))
     if isinstance(keywords, list):
         expected_values.extend(str(item) for item in keywords)

@@ -36,10 +36,7 @@ LOCKED_FILES_VS_BASELINE = [
 
 
 def _check_required_files() -> list[dict]:
-    findings = []
-    for rel in REQUIRED_FILES:
-        if not (PR / rel).exists():
-            findings.append({"code": "REQUIRED_FILE_MISSING", "file": rel, "level": "FAIL"})
+    findings = [{"code": "REQUIRED_FILE_MISSING", "file": rel, "level": "FAIL"} for rel in REQUIRED_FILES if not (PR / rel).exists()]
     return findings
 
 
@@ -76,10 +73,7 @@ def _check_js_implementation(cmd_src: str, state_src: str) -> list[dict]:
 
 
 def _check_safety_gate(adapter_src: str) -> list[dict]:
-    findings = []
-    for sym in ["_apply_para_delete_cell", "TABLE_CELL_MERGE"]:
-        if sym in adapter_src:
-            findings.append({"code": "FORBIDDEN_CELL_MERGE_FOUND", "symbol": sym, "level": "FAIL"})
+    findings = [{"code": "FORBIDDEN_CELL_MERGE_FOUND", "symbol": sym, "level": "FAIL"} for sym in ["_apply_para_delete_cell", "TABLE_CELL_MERGE"] if sym in adapter_src]
     if "def create_char_pr" in adapter_src:
         findings.append({"code": "FORBIDDEN_CREATE_CHARPR", "level": "FAIL"})
     return findings

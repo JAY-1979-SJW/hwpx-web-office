@@ -49,8 +49,7 @@ def _resolve_fixture() -> Path | None:
 
 
 def _verify7_failures(v7: dict) -> list[dict]:
-    findings = []
-    for k in (
+    findings = [{"code": f"{k}_FAIL", "level": "FAIL", "detail": v7.get(k)} for k in (
         "V1_POSITION_OK",
         "V2_NO_CROSS_LEAK",
         "V3_UNTOUCHED_PRESERVED",
@@ -58,9 +57,7 @@ def _verify7_failures(v7: dict) -> list[dict]:
         "V5_EXPECTED_BEFORE_OK",
         "V6_OUTPUT_ISOLATED",
         "V7_READBACK_MATCH",
-    ):
-        if v7.get(k) != "PASS":
-            findings.append({"code": f"{k}_FAIL", "level": "FAIL", "detail": v7.get(k)})
+    ) if v7.get(k) != "PASS"]
     return findings
 
 

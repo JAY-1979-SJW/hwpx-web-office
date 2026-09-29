@@ -548,9 +548,7 @@ def _body_text_paragraphs(body_layout: dict[str, Any] | None) -> list[dict[str, 
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for paragraph in section.get("paragraphs") or []:
-            if isinstance(paragraph, dict) and paragraph.get("has_para_text"):
-                paragraphs.append(paragraph)
+        paragraphs.extend(paragraph for paragraph in section.get("paragraphs") or [] if isinstance(paragraph, dict) and paragraph.get("has_para_text"))
     return paragraphs
 
 
@@ -1065,9 +1063,7 @@ def _table_rows_from_layout(table_layout: dict[str, Any] | None) -> list[dict[st
         if not isinstance(section, dict):
             continue
         section_index = section.get("section_index")
-        for table in section.get("tables") or []:
-            if isinstance(table, dict):
-                rows.append({**table, "_section_index": section_index})
+        rows.extend({**table, "_section_index": section_index} for table in section.get("tables") or [] if isinstance(table, dict))
     return rows
 
 
@@ -1389,9 +1385,7 @@ def _equation_rows(equation_layout: dict[str, Any] | None) -> list[dict[str, Any
         if not isinstance(section, dict):
             continue
         section_index = section.get("section_index")
-        for row in section.get("equations") or []:
-            if isinstance(row, dict):
-                rows.append({**row, "section_index": section_index})
+        rows.extend({**row, "section_index": section_index} for row in section.get("equations") or [] if isinstance(row, dict))
     return rows
 
 
@@ -1459,9 +1453,7 @@ def _shape_layout_pictures(shape_layout: dict[str, Any] | None) -> list[dict[str
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("pictures") or []:
-            if isinstance(row, dict):
-                pictures.append(row)
+        pictures.extend(row for row in section.get("pictures") or [] if isinstance(row, dict))
     return pictures
 
 
@@ -1622,9 +1614,7 @@ def _shape_layout_rectangles(shape_layout: dict[str, Any] | None) -> list[dict[s
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("rectangles") or []:
-            if isinstance(row, dict):
-                rectangles.append(row)
+        rectangles.extend(row for row in section.get("rectangles") or [] if isinstance(row, dict))
     return rectangles
 
 
@@ -1638,9 +1628,7 @@ def _shape_layout_components(shape_layout: dict[str, Any] | None) -> list[dict[s
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("components") or []:
-            if isinstance(row, dict):
-                components.append(row)
+        components.extend(row for row in section.get("components") or [] if isinstance(row, dict))
     return components
 
 

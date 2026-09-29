@@ -201,9 +201,7 @@ def _validate_target(op_type: str, target: dict) -> list[str]:
         return ["target_must_be_object"]
     missing: list[str] = []
     if op_type in _CELL_OPS:
-        for k in ("tableId", "row", "col"):
-            if k not in target or target[k] is None:
-                missing.append(f"target.{k}")
+        missing.extend(f"target.{k}" for k in ("tableId", "row", "col") if k not in target or target[k] is None)
     elif op_type in _PARAGRAPH_OPS and (
         target.get("paragraphIndex") is None
         and target.get("paragraphKey") is None
@@ -215,15 +213,13 @@ def _validate_target(op_type: str, target: dict) -> list[str]:
 
 def _validate_operation(op: dict, idx: int) -> tuple[list[ValidationIssue], str]:
     """operation 1건 검증. (issues, bucket) — bucket은 auto/review/blocked."""
-    issues: list[ValidationIssue] = []
     op_id = op.get("operationId") if isinstance(op, dict) else None
 
     if not isinstance(op, dict):
         return [ValidationIssue("OP_NOT_OBJECT", f"operations[{idx}] is not an object")], "blocked"
 
     missing = _missing_fields(op, REQUIRED_OPERATION_FIELDS)
-    for k in missing:
-        issues.append(ValidationIssue("OP_MISSING_FIELD", f"operations[{idx}].{k}", op_id))
+    issues: list[ValidationIssue] = [ValidationIssue("OP_MISSING_FIELD", f"operations[{idx}].{k}", op_id) for k in missing]
 
     op_type = op.get("operationType", "")
     if op_type in BLOCKED_OPERATION_TYPES:
@@ -248,8 +244,7 @@ def _validate_operation(op: dict, idx: int) -> tuple[list[ValidationIssue], str]
 
     # target 검증
     target = op.get("target", {})
-    for t_miss in _validate_target(op_type, target):
-        issues.append(ValidationIssue("OP_TARGET_MISSING", t_miss, op_id))
+    issues.extend(ValidationIssue("OP_TARGET_MISSING", t_miss, op_id) for t_miss in _validate_target(op_type, target))
 
     # riskLevel
     risk = op.get("riskLevel", "")

@@ -85,17 +85,12 @@ def _validate_string_fields(p: dict) -> list[str]:
 
 
 def validate_proposal_envelope(p: dict) -> list[str]:
-    errs: list[str] = []
     if not isinstance(p, dict):
         return ["PROPOSAL_NOT_OBJECT"]
-    for k in REQUIRED_PROPOSAL_FIELDS:
-        if k not in p:
-            errs.append(f"MISSING_FIELD:{k}")
+    errs: list[str] = [f"MISSING_FIELD:{k}" for k in REQUIRED_PROPOSAL_FIELDS if k not in p]
     errs.extend(_validate_confidence_field(p))
     errs.extend(_validate_string_fields(p))
-    for forbidden in FORBIDDEN_PROPOSAL_FIELDS:
-        if forbidden in p:
-            errs.append(f"FORBIDDEN_FIELD:{forbidden}")
+    errs.extend(f"FORBIDDEN_FIELD:{forbidden}" for forbidden in FORBIDDEN_PROPOSAL_FIELDS if forbidden in p)
     return errs
 
 
@@ -190,10 +185,8 @@ def audit_ai_proposal_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_AI_PROPOSAL_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_AI_PROPOSAL_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations, "filesChecked": checked}

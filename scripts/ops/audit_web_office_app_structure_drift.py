@@ -148,8 +148,7 @@ def audit() -> dict[str, Any]:
         _check(findings, "ENDPOINT_NOT_IMPLEMENTED", endpoint in routes, endpoint)
 
     unexpected_routes = sorted(route for route in routes if route not in REQUIRED_ENDPOINTS)
-    for route in unexpected_routes:
-        findings.append({"code": "UNEXPECTED_ENDPOINT_IMPLEMENTED", "detail": route})
+    findings.extend({"code": "UNEXPECTED_ENDPOINT_IMPLEMENTED", "detail": route} for route in unexpected_routes)
 
     _check(findings, "STATIC_MOUNT_MISSING", 'app.mount(' in api_source and '"/web-office"' in api_source, "app.mount /web-office")
     _check(findings, "MODE_NOT_SANDBOX_ONLY", 'MODE = "SANDBOX_ONLY"' in api_source, _rel(API_ROUTE))

@@ -89,11 +89,8 @@ def validate_promotion_evidence(
             "path": evidence.get("path"),
         }
 
-    errors: list[str] = []
     warnings: list[str] = []
-    for field in REQUIRED_FIELDS:
-        if field not in evidence:
-            errors.append(f"MISSING_FIELD:{field}")
+    errors: list[str] = [f"MISSING_FIELD:{field}" for field in REQUIRED_FIELDS if field not in evidence]
 
     evidence_provider = str(evidence.get("provider") or "")
     if provider_name and evidence_provider and evidence_provider != provider_name:

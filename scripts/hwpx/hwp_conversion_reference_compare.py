@@ -429,8 +429,7 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
     if missing_samples:
         lines.append("### Reference-only samples")
         lines.append("")
-        for sample in missing_samples[:20]:
-            lines.append(f"- `{sample}`")
+        lines.extend(f"- `{sample}`" for sample in missing_samples[:20])
         lines.append("")
     lines.extend([
         "## Features",

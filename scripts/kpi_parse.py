@@ -134,9 +134,7 @@ def _find_stage_xs(y, sorted_rows) -> dict:
     for y2, row2 in sorted_rows:
         if not (y < y2 <= y + 40):
             continue
-        for x2, t2 in row2:
-            if t2 in ("①", "②", "③"):
-                stage_xs[x2] = t2
+        stage_xs.update({x2: t2 for x2, t2 in row2 if t2 in ("①", "②", "③")})
     return stage_xs
 
 

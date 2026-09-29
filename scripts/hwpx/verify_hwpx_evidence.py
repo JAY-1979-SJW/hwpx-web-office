@@ -143,10 +143,7 @@ def verify_evidence(inventory_path, batch_summary_path, sample_dir):
         validation_result["checks"]["table_count"] = f"TABLES_FOUND({total_tables})"
 
     # Check 9: Sample files exist
-    missing_sample_files = []
-    for sample in real_samples:
-        if not Path(sample["path"]).exists():
-            missing_sample_files.append(sample["filename"])
+    missing_sample_files = [sample["filename"] for sample in real_samples if not Path(sample["path"]).exists()]
 
     if not missing_sample_files:
         validation_result["checks"]["sample_files_exist"] = "PASS"

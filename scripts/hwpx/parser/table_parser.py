@@ -209,9 +209,7 @@ def _parse_table_element(tbl: ET.Element, section_index: int,
     rows_raw = [c for c in tbl if c.tag == _TAG_TR]
 
     cells: list[CellInfo] = []
-    raw_rows: list[list[ET.Element]] = []
-    for tr in rows_raw:
-        raw_rows.append([c for c in tr if c.tag == _TAG_TC])
+    raw_rows: list[list[ET.Element]] = [[c for c in tr if c.tag == _TAG_TC] for tr in rows_raw]
 
     row_count = len(raw_rows)
     col_count = max((len(r) for r in raw_rows), default=0)

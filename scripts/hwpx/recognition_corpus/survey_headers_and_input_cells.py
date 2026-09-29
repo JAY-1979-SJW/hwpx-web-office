@@ -783,9 +783,7 @@ def _build_input_cell_dict(
         e["occurrences"] += 1
         e["layoutCounter"][ic.tableLayout] += 1
 
-    rows = []
-    for e in label_map.values():
-        rows.append({
+    rows = [{
             "adjacentLabel": e["adjacentLabel"],
             "inputCellType": e["inputCellType"],
             "guessedField": e["guessedField"],
@@ -793,7 +791,7 @@ def _build_input_cell_dict(
             "fileCount": len(e["fileCount"]),
             "occurrences": e["occurrences"],
             "layoutDistribution": dict(e["layoutCounter"].most_common()),
-        })
+        } for e in label_map.values()]
     rows.sort(key=lambda r: r["occurrences"], reverse=True)
     return rows
 
@@ -846,11 +844,8 @@ def _build_summary_md(
         "| 헤더 | 파일수 | 발생횟수 | 추정 필드 | 신뢰도 |",
         "|------|--------|----------|-----------|--------|",
     ]
-    for r in hdr_dict[:50]:
-        lines.append(
-            f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
-            f" | {r['guessedField']} | {r['fieldConfidence']} |"
-        )
+    lines.extend(f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
+            f" | {r['guessedField']} | {r['fieldConfidence']} |" for r in hdr_dict[:50])
     lines += [
         "",
         "## 입력셀 라벨 빈도 TOP 50",

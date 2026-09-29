@@ -147,10 +147,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Packets",
     ]
-    for packet in payload["ownerReviewPackets"]:
-        lines.append(
-            f"- {packet['packetId']}: track={packet['reviewTrack']} status={packet['approvalStatus']} files={packet['fileCount']}"
-        )
+    lines.extend(f"- {packet['packetId']}: track={packet['reviewTrack']} status={packet['approvalStatus']} files={packet['fileCount']}" for packet in payload["ownerReviewPackets"])
     lines.extend(["", "## Guardrails"])
     lines.append("- this report does not approve move/delete/archive")
     lines.append("- all packages remain pending until explicit owner review")

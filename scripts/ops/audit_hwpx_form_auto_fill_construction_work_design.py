@@ -226,8 +226,7 @@ def _write_reports(summary: dict[str, Any]) -> None:
         "",
         "## Checks",
     ]
-    for item in summary["checks"]:
-        lines.append(f"- {item['status']} {item['code']} {item['desc']}")
+    lines.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in summary["checks"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")

@@ -300,7 +300,12 @@ def _validate_document_metadata_field(
             )
         )
         return
-    for field in (
+    errors.extend(_error(
+                    f"$.document_metadata.{field}",
+                    "DOCUMENT_METADATA_FIELD_NOT_STRING",
+                    f"{field} must be a string",
+                    document_metadata[field],
+                ) for field in (
         "title",
         "language",
         "creator",
@@ -309,16 +314,7 @@ def _validate_document_metadata_field(
         "created_date",
         "modified_date",
         "date",
-    ):
-        if field in document_metadata and not isinstance(document_metadata[field], str):
-            errors.append(
-                _error(
-                    f"$.document_metadata.{field}",
-                    "DOCUMENT_METADATA_FIELD_NOT_STRING",
-                    f"{field} must be a string",
-                    document_metadata[field],
-                )
-            )
+    ) if field in document_metadata and not isinstance(document_metadata[field], str))
     keywords = document_metadata.get("keywords", document_metadata.get("keyword"))
     if keywords is not None and not isinstance(keywords, (str, list)):
         errors.append(
@@ -576,16 +572,12 @@ def _validate_style_spec_entry(
                 preset,
             )
         )
-    for field in ("start_number", "continue_from"):
-        if field in spec and (not isinstance(spec[field], int) or spec[field] < 0):
-            errors.append(
-                _error(
+    errors.extend(_error(
                     f"$.style_definitions.list_styles.{name}.{field}",
                     "LIST_START_INVALID",
                     f"{field} must be a non-negative integer",
                     spec[field],
-                )
-            )
+                ) for field in ("start_number", "continue_from") if field in spec and (not isinstance(spec[field], int) or spec[field] < 0))
     levels = spec.get("levels")
     if levels is None:
         return
@@ -695,15 +687,12 @@ def _validate_one_paragraph(
             )
         )
     _style_refs, style_warnings = normalize_paragraph_style(paragraph.get("style"))
-    for warning in style_warnings:
-        warnings.append(
-            _warning(
+    warnings.extend(_warning(
                 path + ".style",
                 warning["type"],
                 warning.get("message", "style warning"),
                 warning,
-            )
-        )
+            ) for warning in style_warnings)
     style = paragraph.get("style", {})
     if not isinstance(style, dict):
         return
@@ -932,20 +921,16 @@ def _validate_cell_border_fill_map(
 def _validate_table_layout_maps(
     style: dict[str, Any], path: str, errors: list[dict[str, Any]]
 ) -> None:
-    for field in (
+    errors.extend(_error(
+                    path + f".style.{field}",
+                    "CELL_LAYOUT_MAP_NOT_OBJECT",
+                    f"{field} must be an object",
+                ) for field in (
         "cell_vertical_align_map",
         "cell_text_direction_map",
         "cell_line_wrap_map",
         "cell_margin_map",
-    ):
-        if field in style and not isinstance(style[field], dict):
-            errors.append(
-                _error(
-                    path + f".style.{field}",
-                    "CELL_LAYOUT_MAP_NOT_OBJECT",
-                    f"{field} must be an object",
-                )
-            )
+    ) if field in style and not isinstance(style[field], dict))
 
 
 def _validate_table_cell_margin(
@@ -960,17 +945,13 @@ def _validate_table_cell_margin(
             )
         )
     if isinstance(style.get("cell_margin"), dict):
-        for margin_field in ("left", "right", "top", "bottom"):
-            if margin_field in style["cell_margin"] and not isinstance(
-                style["cell_margin"][margin_field], int
-            ):
-                errors.append(
-                    _error(
+        errors.extend(_error(
                         path + f".style.cell_margin.{margin_field}",
                         "CELL_MARGIN_NOT_INT",
                         f"{margin_field} must be an integer",
-                    )
-                )
+                    ) for margin_field in ("left", "right", "top", "bottom") if margin_field in style["cell_margin"] and not isinstance(
+                style["cell_margin"][margin_field], int
+            ))
 
 
 def _validate_table_style(
@@ -1024,15 +1005,12 @@ def _validate_one_table(
             )
         )
     _style_refs, style_warnings = normalize_table_style(table.get("style"))
-    for warning in style_warnings:
-        warnings.append(
-            _warning(
+    warnings.extend(_warning(
                 path + ".style",
                 warning["type"],
                 warning.get("message", "table style warning"),
                 warning,
-            )
-        )
+            ) for warning in style_warnings)
     style = table.get("style", {})
     if isinstance(style, dict):
         _validate_table_style(path, style, style_definitions, errors, warnings)
@@ -1056,15 +1034,11 @@ def _validate_tables_field(
 def _validate_merge_or_unmerge_operation(
     path: str, op: str, operation: dict[str, Any], errors: list[dict[str, Any]]
 ) -> None:
-    for field in ("row_index", "col_index"):
-        if not isinstance(operation.get(field), int):
-            errors.append(
-                _error(
+    errors.extend(_error(
                     path + f".{field}",
                     "TABLE_CELL_ADDRESS_NOT_INT",
                     f"{field} must be an integer",
-                )
-            )
+                ) for field in ("row_index", "col_index") if not isinstance(operation.get(field), int))
     if op != "merge_cells":
         return
     for field in ("row_span", "col_span"):
@@ -1089,15 +1063,11 @@ def _validate_merge_or_unmerge_operation(
 def _validate_set_cell_layout_operation(
     path: str, operation: dict[str, Any], errors: list[dict[str, Any]]
 ) -> None:
-    for field in ("row_index", "col_index"):
-        if not isinstance(operation.get(field), int):
-            errors.append(
-                _error(
+    errors.extend(_error(
                     path + f".{field}",
                     "TABLE_CELL_ADDRESS_NOT_INT",
                     f"{field} must be an integer",
-                )
-            )
+                ) for field in ("row_index", "col_index") if not isinstance(operation.get(field), int))
     layout = operation.get("layout")
     if not isinstance(layout, dict):
         errors.append(
@@ -1230,10 +1200,7 @@ def _validate_one_image(
     if require_external_files:
         _validate_image_external_files(path, image, base_dir, errors)
     _layout, layout_warnings = normalize_image_layout(image)
-    for warning in layout_warnings:
-        warnings.append(
-            _warning(path, warning["type"], "image layout warning", warning)
-        )
+    warnings.extend(_warning(path, warning["type"], "image layout warning", warning) for warning in layout_warnings)
 
 
 def _validate_images_field(

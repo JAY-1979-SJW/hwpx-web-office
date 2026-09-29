@@ -618,9 +618,7 @@ def map_objects_to_cells_with_geometry(source_path: Path) -> ObjectCellMappingRe
     doc_hash = hashlib.sha256(raw).hexdigest()
     section_xmls: list[bytes] = []
     with zipfile.ZipFile(source_path) as zf:
-        for n in sorted(zf.namelist()):
-            if "section" in n and n.endswith(".xml"):
-                section_xmls.append(zf.read(n))
+        section_xmls.extend(zf.read(n) for n in sorted(zf.namelist()) if "section" in n and n.endswith(".xml"))
     base = _map_from_section_xmls(
         section_xmls,
         document_hash=doc_hash,

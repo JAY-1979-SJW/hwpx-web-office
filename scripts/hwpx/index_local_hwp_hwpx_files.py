@@ -143,8 +143,7 @@ def iter_target_files(
             return
         root, current = stack.pop()
         child_dirs, target_files = _scan_directory_entries(current, skip_names)
-        for child in child_dirs:
-            stack.append((root, child))
+        stack.extend((root, child) for child in child_dirs)
         for path in target_files:
             yield root, path
 

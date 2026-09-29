@@ -730,8 +730,7 @@ def build_section_xml(paragraphs: list[str], blocks: list[dict[str, Any]] | None
                 body.append(_paragraph_xml(str(block.get("text") or "")))
             paragraph_id += 1
     else:
-        for paragraph in paragraphs or [""]:
-            body.append(_paragraph_xml(paragraph))
+        body.extend(_paragraph_xml(paragraph) for paragraph in paragraphs or [""])
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         f'<hs:sec xmlns:hp="{HP_NS}" xmlns:hs="{HS_NS}">' + "".join(body) + "</hs:sec>"
@@ -2463,16 +2462,13 @@ def build_markdown_report(report: dict[str, Any]) -> str:
             "| Status | Input | Output | Gate | Error |",
             "| --- | --- | --- | --- | --- |",
         ])
-        for row in rows:
-            lines.append(
-                "| {status} | {input} | {output} | {gate} | {error} |".format(
+        lines.extend("| {status} | {input} | {output} | {gate} | {error} |".format(
                     status=row.get("status") or "",
                     input=row.get("input") or "",
                     output=row.get("output") or "",
                     gate=row.get("gate_status") or "",
                     error=row.get("error") or "",
-                )
-            )
+                ) for row in rows)
         lines.append("")
     failed_checks = gate.get("failed_checks") if isinstance(gate.get("failed_checks"), list) else []
     if failed_checks:

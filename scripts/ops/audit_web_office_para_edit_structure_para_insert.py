@@ -35,12 +35,9 @@ def _find(code: str, level: str, detail: str) -> dict[str, Any]:
 
 
 def audit() -> dict[str, Any]:
-    findings: list[dict] = []
 
     # 1. 필수 파일 존재
-    for rel in REQUIRED_PY + REQUIRED_JS + REQUIRED_TESTS:
-        if not (PR / rel).is_file():
-            findings.append(_find("REQUIRED_FILE_MISSING", "FAIL", rel))
+    findings: list[dict] = [_find("REQUIRED_FILE_MISSING", "FAIL", rel) for rel in REQUIRED_PY + REQUIRED_JS + REQUIRED_TESTS if not (PR / rel).is_file()]
 
     # 2. CT_PARA_INSERT 선언 확인
     model_src = (PR / "scripts/hwpx/web_office/para_edit_model.py"

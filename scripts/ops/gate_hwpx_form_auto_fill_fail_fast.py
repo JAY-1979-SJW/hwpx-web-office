@@ -534,8 +534,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Steps",
     ]
-    for step in payload["steps"]:
-        lines.append(f"- {step['status']} {step['name']} {step['verdict']}")
+    lines.extend(f"- {step['status']} {step['name']} {step['verdict']}" for step in payload["steps"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe fail-fast markdown")

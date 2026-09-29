@@ -113,14 +113,11 @@ READBACK_REQUIRED_SCENARIOS = {
 
 
 def _check_files_exist() -> list[dict]:
-    findings: list[dict] = []
-    for p in REQUIRED_FILES:
-        if not p.is_file():
-            findings.append({
+    findings: list[dict] = [{
                 "code": "MISSING_FILE",
                 "level": "FAIL",
                 "detail": str(p.relative_to(PR)),
-            })
+            } for p in REQUIRED_FILES if not p.is_file()]
     return findings
 
 
@@ -129,13 +126,11 @@ def _check_pipeline_no_writer_defs() -> list[dict]:
     if not PIPELINE_FILE.is_file():
         return findings
     src = PIPELINE_FILE.read_text(encoding="utf-8")
-    for pat in FORBIDDEN_DEFS:
-        if re.search(pat, src, flags=re.MULTILINE):
-            findings.append({
+    findings.extend({
                 "code": "FORBIDDEN_WRITER_DEF",
                 "level": "FAIL",
                 "detail": f"para_edit_e2e_pipeline.py: {pat}",
-            })
+            } for pat in FORBIDDEN_DEFS if re.search(pat, src, flags=re.MULTILINE))
     return findings
 
 
@@ -303,13 +298,11 @@ def _scenario_findings(sc: dict) -> tuple[list[dict], bool]:
             "detail": f"{sc['name']}",
         })
     v17 = sc["v17"] or {}
-    for k in REQUIRED_V_GATES:
-        if v17.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "REQUIRED_GATE_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{sc['name']}: {k}={v17.get(k)}",
-            })
+            } for k in REQUIRED_V_GATES if v17.get(k) != "PASS")
     # DEFERRED 게이트는 partialCompletion 신호로만 적재
     for k in DEFERRED_V_GATES:
         if v17.get(k) != "PASS":
@@ -323,13 +316,11 @@ def _scenario_findings(sc: dict) -> tuple[list[dict], bool]:
     # 은 e2e_pipeline.readback gate 로 PASS 요구.
     if sc["name"] in READBACK_REQUIRED_SCENARIOS:
         rb = sc.get("readback") or {}
-        for k in REQUIRED_READBACK_GATES:
-            if rb.get(k) != "PASS":
-                findings.append({
+        findings.extend({
                     "code": "READBACK_GATE_NOT_PASS",
                     "level": "FAIL",
                     "detail": (f"{sc['name']}: {k}={rb.get(k)} notes={rb.get('notes')}"),
-                })
+                } for k in REQUIRED_READBACK_GATES if rb.get(k) != "PASS")
     return findings, partial
 
 

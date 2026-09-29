@@ -103,12 +103,8 @@ def _check_matcher_static() -> list[dict]:
         findings.append({"code": "MATCHER_MISSING", "level": "FAIL"})
         return findings
     src = MATCHER_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_MATCHER_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "MATCHER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_MATCHER_PATTERNS:
-        if re.search(pat, src, re.IGNORECASE):
-            findings.append({"code": "MATCHER_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat})
+    findings.extend({"code": "MATCHER_PATTERN_MISSING", "level": "FAIL", "detail": pat} for pat in REQUIRED_MATCHER_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "MATCHER_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat} for pat in FORBIDDEN_MATCHER_PATTERNS if re.search(pat, src, re.IGNORECASE))
     return findings
 
 
@@ -118,12 +114,8 @@ def _check_toolbar_static() -> list[dict]:
         findings.append({"code": "TOOLBAR_MISSING", "level": "FAIL"})
         return findings
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
-    for pat in REQUIRED_TOOLBAR_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "TOOLBAR_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_TOOLBAR_PATTERNS:
-        if re.search(pat, src):
-            findings.append({"code": "TOOLBAR_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat})
+    findings.extend({"code": "TOOLBAR_PATTERN_MISSING", "level": "FAIL", "detail": pat} for pat in REQUIRED_TOOLBAR_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "TOOLBAR_FORBIDDEN_PATTERN", "level": "FAIL", "detail": pat} for pat in FORBIDDEN_TOOLBAR_PATTERNS if re.search(pat, src))
     return findings
 
 
@@ -156,11 +148,8 @@ def _check_locked_files() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -214,7 +203,7 @@ def _axis_toggle_hits(defs: dict) -> tuple[bool, bool, bool]:
     gB: dict = {}
     gI: dict = {}
     gU: dict = {}
-    for _cid, d in defs.items():
+    for d in defs.values():
         kB = (
             d.get("fontName"),
             d.get("fontSizePt"),

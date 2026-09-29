@@ -202,7 +202,7 @@ def _input_fields(doc_model: dict, render_payload: dict) -> list[str]:
     seen: set[str] = set()
     for ti, table in enumerate(render_payload.get("tables", [])):
         grid = _grid(table)
-        for (r, c), _cell in grid.items():
+        for (r, c) in grid.keys():
             if (ti, r, c) not in empty:
                 continue
             label = _label_for_cell(grid, r, c)

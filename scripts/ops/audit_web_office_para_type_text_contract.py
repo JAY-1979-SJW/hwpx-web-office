@@ -211,21 +211,17 @@ def _check_scenario(sc: dict) -> list[dict]:
     if sc["rejectedCount"]:
         findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
     v7 = sc["verify7"]
-    for k in REQUIRED_V7:
-        if v7.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "V7_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={v7.get(k)}",
-            })
+            } for k in REQUIRED_V7 if v7.get(k) != "PASS")
     rb = sc["readback"]
-    for k in REQUIRED_RB:
-        if rb.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "READBACK_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={rb.get(k)}",
-            })
+            } for k in REQUIRED_RB if rb.get(k) != "PASS")
     return findings
 
 

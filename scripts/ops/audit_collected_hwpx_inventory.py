@@ -249,8 +249,7 @@ def build_inventory(skip_hash: bool = False) -> dict:  # ruff: ignore[complex-st
         "| path | exists | sourceKind |",
         "|---|---|---|",
     ]
-    for dp in discovered_paths:
-        md_lines.append(f"| {dp['path']} | {dp['exists']} | {dp['sourceKind']} |")
+    md_lines.extend(f"| {dp['path']} | {dp['exists']} | {dp['sourceKind']} |" for dp in discovered_paths)
     md_lines.append("")
     md_lines.append("## Source kind breakdown")
     md_lines.append(f"- collected: {collected_count}")

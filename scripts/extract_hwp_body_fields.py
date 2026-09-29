@@ -611,9 +611,7 @@ def extract_fields_from_text(text: str) -> list[str]:
     fields = []
     lines = split_candidate_lines(text)
     for line in lines:
-        for keyword in FIELD_KEYWORDS:
-            if keyword in line:
-                fields.append(keyword)
+        fields.extend(keyword for keyword in FIELD_KEYWORDS if keyword in line)
         if re.fullmatch(r"[가-힣A-Za-z0-9ㆍ·()/ ]{2,20}", line) and any(
             hint in line
             for hint in [
@@ -655,9 +653,7 @@ def extract_attachments_from_text(text: str) -> list[str]:
                 attachments.append(line)
         if capture and any(term in line for term in ["처리절차", "작성방법", "유의사항"]):
             capture = False
-    for line in lines:
-        if any(keyword in line for keyword in ATTACHMENT_KEYWORDS):
-            attachments.append(line)
+    attachments.extend(line for line in lines if any(keyword in line for keyword in ATTACHMENT_KEYWORDS))
     result = []
     for item in attachments:
         item = re.sub(r"\s+", " ", item).strip()
@@ -776,11 +772,8 @@ def write_outputs(package_dir: Path, rows: list[dict[str, Any]]) -> None:
         "| No | 공종 | 서식 | 본문라벨 | 첨부후보 | 본문텍스트 |",
         "| ---: | --- | --- | ---: | ---: | --- |",
     ])
-    for row in rows:
-        lines.append(
-            f"| {row['no']} | {row['trade']} | {row['title']} | {row['body_field_count']} | "
-            f"{row['body_attachment_count']} | `{row['text_path']}` |"
-        )
+    lines.extend(f"| {row['no']} | {row['trade']} | {row['title']} | {row['body_field_count']} | "
+            f"{row['body_attachment_count']} | `{row['text_path']}` |" for row in rows)
     (out_dir / "본문기반_입력항목_보고서.md").write_text("\n".join(lines), encoding="utf-8")
 
 

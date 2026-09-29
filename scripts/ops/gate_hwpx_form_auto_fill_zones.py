@@ -105,8 +105,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Zones",
     ]
-    for item in payload["zoneResults"]:
-        lines.append(f"- {item['status']} {item['id']} - modules={','.join(item['modules'])}")
+    lines.extend(f"- {item['status']} {item['id']} - modules={','.join(item['modules'])}" for item in payload["zoneResults"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")

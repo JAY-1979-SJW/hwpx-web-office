@@ -50,10 +50,7 @@ _ATTACHMENT_KEYWORDS: list[str] = [
 
 def _extract_attachment_types(hint: str) -> list[str]:
     """evidenceHint 문자열에서 필요 첨부서류 종류 추출."""
-    found = []
-    for kw in _ATTACHMENT_KEYWORDS:
-        if kw in hint:
-            found.append(kw)
+    found = [kw for kw in _ATTACHMENT_KEYWORDS if kw in hint]
     return found
 
 

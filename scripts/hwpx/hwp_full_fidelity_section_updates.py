@@ -1182,12 +1182,10 @@ def _apply_char_pr_refs(
         elif parsed is not None:
             unresolved_char_pr_refs.append({"target_index": target_index, "char_shape_id": parsed})
     if not applied_char_shape_ids:
-        for char_shape_id in _char_shape_refs_for_source(source):
-            if refs.validate_char_refs and char_shape_id not in refs.char_shape_ids:
-                unresolved_char_pr_refs.append({
+        unresolved_char_pr_refs.extend({
                     "target_index": target_index,
                     "char_shape_id": char_shape_id,
-                })
+                } for char_shape_id in _char_shape_refs_for_source(source) if refs.validate_char_refs and char_shape_id not in refs.char_shape_ids)
     return {
         "applied_char_pr_refs": applied_char_pr_refs,
         "unresolved_char_pr_refs": unresolved_char_pr_refs,

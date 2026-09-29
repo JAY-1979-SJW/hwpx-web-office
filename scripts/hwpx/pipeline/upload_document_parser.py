@@ -88,18 +88,12 @@ class ParseResult:
 
 
 def _cell_text(cell: ET.Element) -> str:
-    parts = []
-    for t in cell.iter(f"{{{NS_HP}}}t"):
-        if t.text:
-            parts.append(t.text)
+    parts = [t.text for t in cell.iter(f"{{{NS_HP}}}t") if t.text]
     return "".join(parts).strip()
 
 
 def _para_text(para: ET.Element) -> str:
-    parts = []
-    for t in para.iter(f"{{{NS_HP}}}t"):
-        if t.text:
-            parts.append(t.text)
+    parts = [t.text for t in para.iter(f"{{{NS_HP}}}t") if t.text]
     return "".join(parts).strip()
 
 

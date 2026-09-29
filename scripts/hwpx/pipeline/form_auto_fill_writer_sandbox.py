@@ -289,8 +289,7 @@ def _do_write(
         sec_roots[sec_name] = root
         tables = root.findall(f".//{{{NS_HP}}}tbl")
 
-        for mod in mods:
-            write_results.append(_write_one_field(tables, mod, targets))
+        write_results.extend(_write_one_field(tables, mod, targets) for mod in mods)
 
     # 수정된 섹션 재직렬화
     for sec_name, root in sec_roots.items():

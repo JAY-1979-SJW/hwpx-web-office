@@ -296,8 +296,7 @@ def main() -> int:
     results = []
     with tempfile.TemporaryDirectory() as td:
         wd = Path(td)
-        for p in files:
-            results.append(compare_one(p, chrome, wd, rjs, ROOT))
+        results.extend(compare_one(p, chrome, wd, rjs, ROOT) for p in files)
 
     from collections import Counter
 

@@ -502,8 +502,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
     for name, count in payload["summary"]["zones"].items():
         lines.append(f"- {name}: {count}")
     lines.extend(["", "## Next Separation"])
-    for value in payload["separationRecommendations"].values():
-        lines.append(f"- {value}")
+    lines.extend(f"- {value}" for value in payload["separationRecommendations"].values())
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe inventory markdown")

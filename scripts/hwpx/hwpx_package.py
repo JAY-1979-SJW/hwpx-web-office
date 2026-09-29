@@ -348,28 +348,21 @@ def _content_manifest(
     items = []
     itemrefs = []
     if manifest is not None:
-        for child in list(manifest):
-            if local_name(child.tag) == "item":
-                items.append({
+        items.extend({
                     "id": child.attrib.get("id", ""),
                     "href": child.attrib.get("href", ""),
                     "media_type": child.attrib.get("media-type", ""),
-                })
+                } for child in list(manifest) if local_name(child.tag) == "item")
     if spine is not None:
-        for child in list(spine):
-            if local_name(child.tag) == "itemref":
-                itemrefs.append({"idref": child.attrib.get("idref", "")})
+        itemrefs.extend({"idref": child.attrib.get("idref", "")} for child in list(spine) if local_name(child.tag) == "itemref")
     return items, itemrefs
 
 
 def _container_rootfiles(container_root: ET.Element) -> list[dict[str, str]]:
-    rootfiles = []
-    for child in container_root.iter():
-        if local_name(child.tag) == "rootfile":
-            rootfiles.append({
+    rootfiles = [{
                 "full_path": child.attrib.get("full-path", ""),
                 "media_type": child.attrib.get("media-type", ""),
-            })
+            } for child in container_root.iter() if local_name(child.tag) == "rootfile"]
     return rootfiles
 
 

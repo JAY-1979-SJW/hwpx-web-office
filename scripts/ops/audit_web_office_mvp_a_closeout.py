@@ -78,10 +78,9 @@ def _no_new_hwpx_outputs() -> list[dict]:
     for p in scan:
         if not p.is_dir():
             continue
-        for f in p.glob("**/*.hwpx"):
-            findings.append({"code": "UNEXPECTED_HWPX_OUTPUT",
+        findings.extend({"code": "UNEXPECTED_HWPX_OUTPUT",
                                       "level": "FAIL",
-                                      "detail": str(f.relative_to(PR))})
+                                      "detail": str(f.relative_to(PR))} for f in p.glob("**/*.hwpx"))
     return findings
 
 
@@ -109,20 +108,14 @@ def audit() -> dict:
                                   "level": "FAIL",
                                   "detail": str(RISK_DOC.relative_to(PR))})
 
-    for sec in REQUIRED_CLOSEOUT_SECTIONS:
-        if sec not in co:
-            findings.append({"code": "CLOSEOUT_SECTION_MISSING",
-                                      "level": "FAIL", "detail": sec})
+    findings.extend({"code": "CLOSEOUT_SECTION_MISSING",
+                                      "level": "FAIL", "detail": sec} for sec in REQUIRED_CLOSEOUT_SECTIONS if sec not in co)
 
-    for tok in REQUIRED_CLOSEOUT_TOKENS:
-        if tok not in co:
-            findings.append({"code": "CLOSEOUT_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "CLOSEOUT_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_CLOSEOUT_TOKENS if tok not in co)
 
-    for tok in REQUIRED_RISK_TOKENS:
-        if tok not in rl:
-            findings.append({"code": "RISK_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "RISK_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_RISK_TOKENS if tok not in rl)
 
     # commit anchor 가 실제 reachable 인지 확인
     if not _commit_is_reachable(MVP_A_COMMIT):

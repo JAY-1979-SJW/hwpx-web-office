@@ -131,14 +131,10 @@ def _check_required_doc() -> list[dict]:
                           "detail": str(CLOSEOUT_DOC.relative_to(PR))})
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in DOC_REQUIRED_PHRASES_IN_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_PHRASES_OUT_OF_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
+    findings.extend({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in DOC_REQUIRED_PHRASES_IN_SCOPE if phrase not in src)
+    findings.extend({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in DOC_REQUIRED_PHRASES_OUT_OF_SCOPE if phrase not in src)
     if BASELINE_COMMIT not in src:
         findings.append({"code": "DOC_BASELINE_MISSING",
                           "level": "FAIL",
@@ -199,12 +195,9 @@ def _check_forbidden_features() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -247,11 +240,9 @@ def _check_coverage_probes() -> list[dict]:
                               "level": "FAIL", "detail": rel})
             continue
         src = p.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({"code": "COVERAGE_PROBE_MISSING",
+        findings.extend({"code": "COVERAGE_PROBE_MISSING",
                                   "level": "FAIL",
-                                  "detail": f"{rel}: {pat}"})
+                                  "detail": f"{rel}: {pat}"} for pat in patterns if not re.search(pat, src))
     return findings
 
 

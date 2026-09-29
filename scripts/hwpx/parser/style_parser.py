@@ -311,17 +311,11 @@ def detect_dangling_refs(style_info: StyleInfo, referenced_ids: dict[str, list[s
     border_defs = set(style_info.borderFill.keys())
 
     if char_defs:
-        for rid in referenced_ids.get("charPrIDRefs", []):
-            if rid not in char_defs:
-                dangling.append(f"charPr:{rid}")
+        dangling.extend(f"charPr:{rid}" for rid in referenced_ids.get("charPrIDRefs", []) if rid not in char_defs)
     if para_defs:
-        for rid in referenced_ids.get("paraPrIDRefs", []):
-            if rid not in para_defs:
-                dangling.append(f"paraPr:{rid}")
+        dangling.extend(f"paraPr:{rid}" for rid in referenced_ids.get("paraPrIDRefs", []) if rid not in para_defs)
     if border_defs:
-        for rid in referenced_ids.get("borderFillIDRefs", []):
-            if rid not in border_defs:
-                dangling.append(f"borderFill:{rid}")
+        dangling.extend(f"borderFill:{rid}" for rid in referenced_ids.get("borderFillIDRefs", []) if rid not in border_defs)
     return dangling
 
 

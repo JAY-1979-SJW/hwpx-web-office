@@ -124,9 +124,7 @@ def _check_fixture_minimal() -> list[dict]:
                 pii_found: list[str] = []
                 for row in conn.execute("SELECT source_path, document_id FROM hwpx_documents"):
                     text = " ".join(str(v) for v in row if v)
-                    for pattern in PII_PATTERNS:
-                        if re.search(pattern, text):
-                            pii_found.append(f"pattern={pattern} row={row}")
+                    pii_found.extend(f"pattern={pattern} row={row}" for pattern in PII_PATTERNS if re.search(pattern, text))
                 checks.append(_check("A09_no_pii_in_fixture", not pii_found, str(pii_found)))
                 conn.close()
             except Exception as exc:  # ruff: ignore[blind-except] -- report-and-continue
@@ -134,12 +132,11 @@ def _check_fixture_minimal() -> list[dict]:
                 checks.append(_check("A08_audit_log_tables_exist", False, str(exc)))
                 checks.append(_check("A09_no_pii_in_fixture", False, str(exc)))
         else:
-            for name in (
+            checks.extend(_check(name, False, "DB not created") for name in (
                 "A07_required_tables_exist",
                 "A08_audit_log_tables_exist",
                 "A09_no_pii_in_fixture",
-            ):
-                checks.append(_check(name, False, "DB not created"))
+            ))
     return checks
 
 

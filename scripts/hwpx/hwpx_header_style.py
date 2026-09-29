@@ -144,8 +144,7 @@ def create_char_property(
     if "bold" in spec:
         _set_child_presence(char_pr, "bold", bool(spec["bold"]))
     unsupported = sorted(set(spec) - {"height", "text_color", "shade_color", "bold"})
-    for field in unsupported:
-        warnings.append({"type": "CHAR_STYLE_FIELD_PENDING", "name": name, "field": field})
+    warnings.extend({"type": "CHAR_STYLE_FIELD_PENDING", "name": name, "field": field} for field in unsupported)
     container.append(char_pr)
     _bump_item_count(container)
     return next_id, warnings
@@ -173,8 +172,7 @@ def create_para_property(
             "value": spec.get("line_spacing"),
         })
     unsupported = sorted(set(spec) - {"align", "line_spacing"})
-    for field in unsupported:
-        warnings.append({"type": "PARA_STYLE_FIELD_PENDING", "name": name, "field": field})
+    warnings.extend({"type": "PARA_STYLE_FIELD_PENDING", "name": name, "field": field} for field in unsupported)
     container.append(para_pr)
     _bump_item_count(container)
     return next_id, warnings

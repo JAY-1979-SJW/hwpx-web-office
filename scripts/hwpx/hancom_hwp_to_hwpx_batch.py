@@ -496,13 +496,11 @@ def main() -> int:
     if not args.dry_run:
         conversions = [_convert_one(hwp, output_dir, diag_dir, args) for hwp in hwp_targets]
 
-    valid_hwpx = []
-    for path in inv["hwpx"]:
-        valid_hwpx.append({
+    valid_hwpx = [{
             "path": str(path),
             "size": path.stat().st_size,
             "is_hwpx_zip": is_hwpx_zip(path),
-        })
+        } for path in inv["hwpx"]]
 
     report = {
         "executed_at": datetime.now(UTC).isoformat(),

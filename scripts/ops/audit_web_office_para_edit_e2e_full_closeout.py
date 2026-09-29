@@ -105,14 +105,11 @@ FORBIDDEN_WRITER_SYMBOLS = [
 
 
 def _check_required_docs() -> list[dict]:
-    findings: list[dict] = []
-    for p in REQUIRED_DOCS:
-        if not p.is_file():
-            findings.append({
+    findings: list[dict] = [{
                 "code": "MISSING_DOC",
                 "level": "FAIL",
                 "detail": str(p.relative_to(PR)),
-            })
+            } for p in REQUIRED_DOCS if not p.is_file()]
     return findings
 
 
@@ -121,9 +118,7 @@ def _check_closeout_doc_phrases() -> list[dict]:
     if not CLOSEOUT_DOC.is_file():
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in DOC_REQUIRED_PHRASES:
-        if phrase not in src:
-            findings.append({"code": "DOC_PHRASE_MISSING", "level": "FAIL", "detail": phrase})
+    findings.extend({"code": "DOC_PHRASE_MISSING", "level": "FAIL", "detail": phrase} for phrase in DOC_REQUIRED_PHRASES if phrase not in src)
     return findings
 
 
@@ -138,23 +133,18 @@ def _check_safety_gate_patterns() -> list[dict]:
             })
             continue
         src = path.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({
+        findings.extend({
                     "code": "SAFETY_GATE_PATTERN_MISSING",
                     "level": "FAIL",
                     "detail": f"{path.relative_to(PR)}: {pat}",
-                })
+                } for pat in patterns if not re.search(pat, src))
     return findings
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
     """본 audit 모듈 자체가 writer 호출/import 를 하지 않음을 보장."""
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -308,21 +298,17 @@ def _check_one_dynamic_scenario(sc: dict) -> list[dict]:
     if sc["rejectedCount"]:
         findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
     v7 = sc["verify7"]
-    for k in REQUIRED_V7:
-        if v7.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "V7_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={v7.get(k)}",
-            })
+            } for k in REQUIRED_V7 if v7.get(k) != "PASS")
     rb = sc["readback"]
-    for k in REQUIRED_RB:
-        if rb.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "READBACK_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={rb.get(k)}",
-            })
+            } for k in REQUIRED_RB if rb.get(k) != "PASS")
     return findings
 
 

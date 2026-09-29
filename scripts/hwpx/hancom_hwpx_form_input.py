@@ -246,8 +246,7 @@ def missing_request_markdown(report: dict[str, Any]) -> str:
         "아래 값은 원본 문서에서 확인되지 않아 사용자 입력이 필요합니다.",
         "",
     ]
-    for item in report.get("missing_user_inputs", []):
-        lines.append(f"- {item['label']} (table={item['table']}, row={item['row']}, col={item['col']})")
+    lines.extend(f"- {item['label']} (table={item['table']}, row={item['row']}, col={item['col']})" for item in report.get("missing_user_inputs", []))
     lines.append("")
     lines.append("JSON으로 제공할 경우 예:")
     lines.append("")

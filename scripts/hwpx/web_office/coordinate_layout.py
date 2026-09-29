@@ -119,9 +119,7 @@ def _extract_section(path, secname, row_scale=1.0):
     m_sec = re.search(r"section(\d+)", secname)
     if m_sec:
         _sec_idx = int(m_sec.group(1))
-    tbl_order = {}
-    for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
-        tbl_order[_t] = _i
+    tbl_order = {_t: _i for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl")}
 
     border_fills = parse_border_fills(z)
     char_prs = parse_char_prs(z)

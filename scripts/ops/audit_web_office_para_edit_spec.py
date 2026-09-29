@@ -93,10 +93,9 @@ def _no_code_or_hwpx_outputs() -> list[dict]:
         d = PR / sub
         if not d.is_dir():
             continue
-        for f in d.glob("**/*.hwpx"):
-            findings.append({"code": "UNEXPECTED_HWPX_OUTPUT",
+        findings.extend({"code": "UNEXPECTED_HWPX_OUTPUT",
                                       "level": "FAIL",
-                                      "detail": str(f.relative_to(PR))})
+                                      "detail": str(f.relative_to(PR))} for f in d.glob("**/*.hwpx"))
     return findings
 
 
@@ -111,16 +110,13 @@ def _no_para_edit_impl_code_present() -> list[dict]:
     # SAVE-VERIFY7-01 부분 준공 공정 진입 후 paragraph_edit_plan.py /
     # paragraph_save_pipeline.py 는 정식 산출물이므로 잠금 대상에서 제외.
     # 잔여 잠금 대상은 본 공정에서도 생성하지 않는 후속 자재.
-    findings: list[dict] = []
     forbidden_impl = [
         PR / "scripts/hwpx/web_office/cell_para_save_pipeline.py",
         PR / "frontend/web_office_viewer/para_edit_save_runtime.mjs",
     ]
-    for p in forbidden_impl:
-        if p.is_file():
-            findings.append({"code": "PARA_EDIT_IMPL_PRESENT",
+    findings: list[dict] = [{"code": "PARA_EDIT_IMPL_PRESENT",
                                       "level": "FAIL",
-                                      "detail": str(p.relative_to(PR))})
+                                      "detail": str(p.relative_to(PR))} for p in forbidden_impl if p.is_file()]
     return findings
 
 
@@ -136,20 +132,14 @@ def audit() -> dict:
         findings.append({"code": "RISK_DOC_MISSING", "level": "FAIL",
                                   "detail": str(RISK_DOC.relative_to(PR))})
 
-    for sec in REQUIRED_SPEC_SECTIONS:
-        if sec not in spec:
-            findings.append({"code": "SPEC_SECTION_MISSING",
-                                      "level": "FAIL", "detail": sec})
+    findings.extend({"code": "SPEC_SECTION_MISSING",
+                                      "level": "FAIL", "detail": sec} for sec in REQUIRED_SPEC_SECTIONS if sec not in spec)
 
-    for tok in REQUIRED_SPEC_TOKENS:
-        if tok not in spec:
-            findings.append({"code": "SPEC_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "SPEC_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_SPEC_TOKENS if tok not in spec)
 
-    for tok in REQUIRED_RISK_TOKENS:
-        if tok not in risk:
-            findings.append({"code": "RISK_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "RISK_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_RISK_TOKENS if tok not in risk)
 
     findings.extend(_no_code_or_hwpx_outputs())
     findings.extend(_no_para_edit_impl_code_present())

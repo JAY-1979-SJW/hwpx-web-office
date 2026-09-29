@@ -24,10 +24,7 @@ def _int_attr(value: str | None, default: int = 0) -> int:
 
 
 def next_paragraph_id(root: ET.Element) -> str:
-    ids = []
-    for elem in root.iter():
-        if local_name(elem.tag) == "p" and "id" in elem.attrib:
-            ids.append(_int_attr(elem.attrib.get("id"), 0))
+    ids = [_int_attr(elem.attrib.get("id"), 0) for elem in root.iter() if local_name(elem.tag) == "p" and "id" in elem.attrib]
     return str((max(ids) + 1) if ids else 0)
 
 

@@ -115,12 +115,8 @@ def _check_preview_static() -> list[dict]:
         })
         return findings
     src = PREVIEW_TSX.read_text(encoding="utf-8")
-    for pat in PREVIEW_REQUIRED_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "PREVIEW_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in PREVIEW_FORBIDDEN_PATTERNS:
-        if re.search(pat, src):
-            findings.append({"code": "PREVIEW_FORBIDDEN_CALL", "level": "FAIL", "detail": pat})
+    findings.extend({"code": "PREVIEW_PATTERN_MISSING", "level": "FAIL", "detail": pat} for pat in PREVIEW_REQUIRED_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "PREVIEW_FORBIDDEN_CALL", "level": "FAIL", "detail": pat} for pat in PREVIEW_FORBIDDEN_PATTERNS if re.search(pat, src))
     return findings
 
 
@@ -130,9 +126,7 @@ def _check_render_payload_static() -> list[dict]:
         findings.append({"code": "RENDER_PAYLOAD_MISSING", "level": "FAIL"})
         return findings
     src = RENDER_PAYLOAD.read_text(encoding="utf-8")
-    for pat in RENDER_REQUIRED_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "RENDER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
+    findings.extend({"code": "RENDER_PATTERN_MISSING", "level": "FAIL", "detail": pat} for pat in RENDER_REQUIRED_PATTERNS if not re.search(pat, src))
     return findings
 
 
@@ -165,11 +159,8 @@ def _check_locked_files() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

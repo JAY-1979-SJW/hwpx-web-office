@@ -180,10 +180,7 @@ def _check_required_doc() -> list[dict]:
 
 
 def _check_required_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in REQUIRED_FILES:
-        if not (PR / rel).is_file():
-            findings.append({"code": "MISSING_FILE", "level": "FAIL", "detail": rel})
+    findings: list[dict] = [{"code": "MISSING_FILE", "level": "FAIL", "detail": rel} for rel in REQUIRED_FILES if not (PR / rel).is_file()]
     return findings
 
 
@@ -198,13 +195,11 @@ def _check_source_patterns() -> list[dict]:
             })
             continue
         src = path.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({
+        findings.extend({
                     "code": "REQUIRED_PATTERN_MISSING",
                     "level": "FAIL",
                     "detail": f"{path.name}: {pat}",
-                })
+                } for pat in patterns if not re.search(pat, src))
     return findings
 
 

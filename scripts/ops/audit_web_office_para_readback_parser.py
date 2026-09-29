@@ -96,13 +96,11 @@ def _check_pipeline_helpers() -> list[dict]:
         })
         return findings
     src = PIPELINE_FILE.read_text(encoding="utf-8")
-    for pat in REQUIRED_HELPERS:
-        if not re.search(pat, src, flags=re.MULTILINE):
-            findings.append({
+    findings.extend({
                 "code": "READBACK_HELPER_MISSING",
                 "level": "FAIL",
                 "detail": pat,
-            })
+            } for pat in REQUIRED_HELPERS if not re.search(pat, src, flags=re.MULTILINE))
     return findings
 
 
@@ -258,15 +256,13 @@ def audit() -> dict[str, Any]:
                     "level": "FAIL", "detail": sc["name"]})
                 continue
             rb = sc["readback"] or {}
-            for gate in ("V1_RANGE_POSITION_OK",
-                         "V7_READBACK_MATCH"):
-                if rb.get(gate) != "PASS":
-                    findings.append({
+            findings.extend({
                         "code": "READBACK_GATE_FAIL",
                         "level": "FAIL",
                         "detail": (f"{sc['name']}: {gate}="
                                    f"{rb.get(gate)} "
-                                   f"notes={rb.get('notes')}")})
+                                   f"notes={rb.get('notes')}")} for gate in ("V1_RANGE_POSITION_OK",
+                         "V7_READBACK_MATCH") if rb.get(gate) != "PASS")
             if rb.get("matchedBy") not in (
                     "paragraphId", "containerScope"):
                 findings.append({

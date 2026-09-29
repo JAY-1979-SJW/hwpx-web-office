@@ -18,10 +18,7 @@ from hwpx_package_audit import audit_hwpx_package
 
 
 def _expected_from_metadata(metadata: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    for field in ("title", "creator", "subject", "description", "date"):
-        if metadata.get(field):
-            values.append(str(metadata[field]))
+    values: list[str] = [str(metadata[field]) for field in ("title", "creator", "subject", "description", "date") if metadata.get(field)]
     keywords = metadata.get("keywords", metadata.get("keyword"))
     if isinstance(keywords, list):
         values.extend(str(item) for item in keywords)

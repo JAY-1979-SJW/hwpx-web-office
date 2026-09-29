@@ -104,12 +104,10 @@ def _resolve_checked_in_fixtures(limit: int) -> list[Path]:
 
 def _static_checks(findings: list[dict]) -> None:
     importer_src = (PR / "scripts/hwpx/web_office/ro_view_importer.py").read_text(encoding="utf-8")
-    for tok in FORBIDDEN_TOKENS_IMPORTER:
-        if tok in importer_src:
-            findings.append({
+    findings.extend({
                 "code": "FORBIDDEN_TOKEN_IN_IMPORTER",
                 "token": tok,
-            })
+            } for tok in FORBIDDEN_TOKENS_IMPORTER if tok in importer_src)
 
     # document_model: containerScope 필드 존재 + baseline 대비 추가 변경 없음
     doc_model_path = PR / "scripts/hwpx/web_office/document_model.py"

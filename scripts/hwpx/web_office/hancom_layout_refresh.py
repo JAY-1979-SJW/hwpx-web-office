@@ -520,8 +520,7 @@ def _page_truth_ok(boxes: list[dict], ys: list[float]) -> bool:
     for b in boxes:
         if not _has_border(b):
             continue
-        for e in (b["y"], b["y"] + b["h"]):
-            res.append(min(abs(e - t) for t in ys))
+        res.extend(min(abs(e - t) for t in ys) for e in (b["y"], b["y"] + b["h"]))
     if len(res) >= 8:
         res.sort()
         if res[len(res) // 2] > 3.0:

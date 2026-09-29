@@ -611,9 +611,7 @@ def to_backlog_records(
 ) -> list[dict]:
     """diagnose_session()이 만든 flag dict들을 D동
     xml_deep_analyzer_need_flags 행 dict로 변환."""
-    out: list[dict] = []
-    for f in flags:
-        out.append({
+    out: list[dict] = [{
             "session_id": session_id,
             "document_id": document_id,
             "reason_code": f["reason_code"],
@@ -623,7 +621,7 @@ def to_backlog_records(
             "severity": f["severity"],
             "created_at": created_at,
             "_context": f.get("context") or {},
-        })
+        } for f in flags]
     return out
 
 
@@ -652,12 +650,10 @@ def audit_analyzer_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_ANALYZER_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_ANALYZER_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations, "filesChecked": checked}
 
 

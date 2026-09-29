@@ -507,10 +507,8 @@ def audit_production_snapshot_isolation() -> dict:
         if not p.is_file():
             continue
         text = p.read_text(encoding="utf-8", errors="ignore")
-        for n in PROD_SNAPSHOT_FORBIDDEN_IMPORTS:
-            if n in text:
-                violations.append({
+        violations.extend({
                     "file": str(p.relative_to(cs.PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": n,
-                })
+                } for n in PROD_SNAPSHOT_FORBIDDEN_IMPORTS if n in text)
     return {"ok": not violations, "violations": violations}

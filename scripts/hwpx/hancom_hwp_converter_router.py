@@ -759,14 +759,12 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
     if not rows:
         path.write_text("", encoding="utf-8")
         return
-    normalized_rows = []
-    for row in rows:
-        normalized_rows.append({
+    normalized_rows = [{
             key: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
             if isinstance(value, (dict, list))
             else value
             for key, value in row.items()
-        })
+        } for row in rows]
     with path.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(normalized_rows[0]))
         writer.writeheader()

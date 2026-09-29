@@ -174,9 +174,7 @@ def validate_command_envelope(cmd: dict) -> list[str]:
         errors.append("INVALID_ARTIFACT_ID_FORMAT")
     if "dryRun" in cmd and not isinstance(cmd["dryRun"], bool):
         errors.append("DRY_RUN_NOT_BOOL")
-    for forbidden in FORBIDDEN_REQUEST_FIELDS:
-        if _contains_key_deep(cmd, forbidden):
-            errors.append(f"FORBIDDEN_FIELD:{forbidden}")
+    errors.extend(f"FORBIDDEN_FIELD:{forbidden}" for forbidden in FORBIDDEN_REQUEST_FIELDS if _contains_key_deep(cmd, forbidden))
     return errors
 
 
@@ -198,12 +196,8 @@ def validate_command_body(cmd: dict) -> list[str]:
     if not isinstance(payload, dict):
         errors.append("PAYLOAD_NOT_OBJECT")
         payload = {}
-    for k in spec["required_target"]:
-        if k not in target or target.get(k) is None:
-            errors.append(f"MISSING_TARGET:{k}")
-    for k in spec["required_payload"]:
-        if k not in payload or payload.get(k) is None:
-            errors.append(f"MISSING_PAYLOAD:{k}")
+    errors.extend(f"MISSING_TARGET:{k}" for k in spec["required_target"] if k not in target or target.get(k) is None)
+    errors.extend(f"MISSING_PAYLOAD:{k}" for k in spec["required_payload"] if k not in payload or payload.get(k) is None)
     return errors
 
 
@@ -222,12 +216,9 @@ def validate_command(cmd: dict) -> dict:
 
 
 def validate_response(resp: dict) -> dict:
-    errors: list[str] = []
     if not isinstance(resp, dict):
         return {"ok": False, "errors": ["RESPONSE_NOT_OBJECT"]}
-    for k in REQUIRED_RESPONSE_KEYS:
-        if k not in resp:
-            errors.append(f"MISSING_RESPONSE_KEY:{k}")
+    errors: list[str] = [f"MISSING_RESPONSE_KEY:{k}" for k in REQUIRED_RESPONSE_KEYS if k not in resp]
     sv = resp.get("schemaVersion")
     if sv is not None and sv != EXPECTED_SCHEMA_VERSION:
         errors.append(f"SCHEMA_VERSION_MISMATCH:{sv}")
@@ -316,12 +307,10 @@ def audit_api_contract_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations, "filesChecked": checked}
 
 

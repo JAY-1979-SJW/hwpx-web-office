@@ -206,7 +206,7 @@ def _record_writer_operations(
     ops = plan.get("operations") or []
     writer_status_summary = pipeline_result.get("writerResult") or {}
     writer_op_results = writer_status_summary.get("operationResults") or []
-    op_results_by_index = {i: r for i, r in enumerate(writer_op_results)}
+    op_results_by_index = dict(enumerate(writer_op_results))
 
     op_log_ids: list[int] = []
     count = 0
@@ -371,10 +371,7 @@ def _record_xml_backlog_flags(
     readback_op_results: list[dict],
 ) -> int:
     """readback mismatch + warnings 기반 XML deep analyzer backlog 기록. count 반환."""
-    flags_input: list[dict] = []
-    for r in readback_op_results:
-        if r.get("status") == "MISMATCH":
-            flags_input.append({
+    flags_input: list[dict] = [{
                 "session_id": ctx.session_id,
                 "document_id": ctx.document_id,
                 "reason_code": "READBACK_MISMATCH",
@@ -383,7 +380,7 @@ def _record_xml_backlog_flags(
                 "context_json": None,
                 "severity": "HIGH",
                 "created_at": ctx.now,
-            })
+            } for r in readback_op_results if r.get("status") == "MISMATCH"]
     for warn in pipeline_result.get("warnings") or []:
         code = (warn.get("code") or "").upper()
         if code == "RUN_BOUNDARY_UNSUPPORTED":
@@ -596,10 +593,8 @@ def audit_orchestration_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_ORCHESTRATION_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_ORCHESTRATION_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations, "filesChecked": checked}

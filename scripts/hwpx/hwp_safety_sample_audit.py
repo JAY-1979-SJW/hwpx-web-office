@@ -192,8 +192,7 @@ def main() -> int:
         for row in audited:
             writer.writerow({key: row.get(key, "") for key in fieldnames})
     lines = ["# Safety HWP Sample Audit", "", f"- Samples: {len(audited)}", "", "## Top Decoder Targets"]
-    for item in report["aggregate"]["next_decoder_targets"][:15]:
-        lines.append(f"- {item['tag']}: {item['count']}")
+    lines.extend(f"- {item['tag']}: {item['count']}" for item in report["aggregate"]["next_decoder_targets"][:15])
     lines += ["", "## Coverage Blockers"]
     for key, value in report["aggregate"]["coverage_blockers"].items():
         lines.append(f"- {key}: {value}")

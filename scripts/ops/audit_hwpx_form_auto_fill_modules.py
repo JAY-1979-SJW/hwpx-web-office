@@ -325,8 +325,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Modules",
     ]
-    for item in payload["moduleResults"]:
-        lines.append(f"- {item['status']} {item['id']} - {item['pytest']['summary']}")
+    lines.extend(f"- {item['status']} {item['id']} - {item['pytest']['summary']}" for item in payload["moduleResults"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")

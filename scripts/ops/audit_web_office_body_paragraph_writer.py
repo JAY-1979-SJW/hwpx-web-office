@@ -66,16 +66,12 @@ def _check_static() -> list[dict]:
         findings.append({"code": "ADAPTER_MISSING", "level": "FAIL", "detail": str(ADAPTER)})
         return findings
     src = ADAPTER.read_text(encoding="utf-8")
-    for pat in REQUIRED_ADAPTER_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "ADAPTER_PATTERN_MISSING", "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_ADAPTER_PATTERNS:
-        if re.search(pat, src):
-            findings.append({
+    findings.extend({"code": "ADAPTER_PATTERN_MISSING", "level": "FAIL", "detail": pat} for pat in REQUIRED_ADAPTER_PATTERNS if not re.search(pat, src))
+    findings.extend({
                 "code": "ADAPTER_UNCONDITIONAL_BODY_REJECT_PRESENT",
                 "level": "FAIL",
                 "detail": pat,
-            })
+            } for pat in FORBIDDEN_ADAPTER_PATTERNS if re.search(pat, src))
     # multi-run reject 는 유지되어야 한다 (회귀 잠금)
     if "REASON_MULTI_RUN_RANGE_NOT_SUPPORTED" not in src:
         findings.append({
@@ -87,11 +83,8 @@ def _check_static() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -210,21 +203,17 @@ def _check_dynamic_scenario(sc: dict) -> list[dict]:
     if sc["rejectedCount"]:
         findings.append({"code": "REJECTED_NOT_EMPTY", "level": "FAIL", "detail": name})
     v7 = sc["verify7"]
-    for k in REQUIRED_V7:
-        if v7.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "V7_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={v7.get(k)}",
-            })
+            } for k in REQUIRED_V7 if v7.get(k) != "PASS")
     rb = sc["readback"]
-    for k in REQUIRED_RB:
-        if rb.get(k) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": "READBACK_NOT_PASS",
                 "level": "FAIL",
                 "detail": f"{name}: {k}={rb.get(k)}",
-            })
+            } for k in REQUIRED_RB if rb.get(k) != "PASS")
     return findings
 
 

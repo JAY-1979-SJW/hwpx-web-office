@@ -137,9 +137,7 @@ def build_fill_commands(plan: dict, answers: dict[str, str] | None = None
     바뀌지 않는다(§4 — 신규 charPr 생성 금지).
     """
     answers = answers or {}
-    out: list[dict] = []
-    for f in plan.get("autoFill", []):
-        out.append(_cmd(f, f["value"], f.get("source", "profile")))
+    out: list[dict] = [_cmd(f, f["value"], f.get("source", "profile")) for f in plan.get("autoFill", [])]
     for q in plan.get("questions", []):
         val = answers.get(q["label"])
         if val is None or val == "":

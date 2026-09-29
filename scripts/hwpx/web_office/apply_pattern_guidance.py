@@ -65,7 +65,7 @@ def main():
     total_fields = 0
     flagged = Counter()
 
-    for doc_id, form in spec.items():
+    for form in spec.values():
         for field in form['fields']:
             total_fields += 1
             if 'ai_fillable' in field:

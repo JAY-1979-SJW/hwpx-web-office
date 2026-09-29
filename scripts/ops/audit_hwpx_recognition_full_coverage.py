@@ -151,13 +151,12 @@ def _fill_requirement_smoke(rec_out: dict, item: dict, r) -> tuple[dict, list] |
 
         synth_cells = []
         for t in r.tables:
-            for c in t.cells:
-                synth_cells.append({
+            synth_cells.extend({
                     "cellKey": c.cellId,
                     "normalizedText": c.normalizedText,
                     "rowIndex": c.row,
                     "cellIndex": c.col,
-                })
+                } for c in t.cells)
         synth_paragraphs = []
         # paragraph placeholders는 거의 없으므로 skip
         rec_dict = fr.make_document_recognition_result(

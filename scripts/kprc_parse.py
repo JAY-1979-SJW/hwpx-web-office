@@ -125,9 +125,7 @@ def _rows_from_items(items: list[dict], source: str) -> list[dict]:
     """OCR 품목 목록을 연도/월 컷오프 적용한 가격 행으로 펼친다."""
     rows = []
     for item in items:
-        for p in item.get("가격", []):
-            if p.get("연도", 0) >= YEAR_MIN and p.get("가격") is not None:
-                rows.append({
+        rows.extend({
                     "품목명": item.get("품목명", ""),
                     "규격": item.get("규격", ""),
                     "단위": item.get("단위", ""),
@@ -135,7 +133,7 @@ def _rows_from_items(items: list[dict], source: str) -> list[dict]:
                     "월": p["월"],
                     "가격": p["가격"],
                     "출처": source,
-                })
+                } for p in item.get("가격", []) if p.get("연도", 0) >= YEAR_MIN and p.get("가격") is not None)
     return rows
 
 

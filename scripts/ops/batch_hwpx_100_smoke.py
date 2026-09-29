@@ -57,14 +57,12 @@ def parser_to_master_slot_detect(path: Path):
 
     def _fn(rec: dict) -> list[dict]:
         result = parse_hwpx_v2(path)
-        slots: list[dict] = []
-        for s in result.inputSlotCandidates:
-            slots.append({
+        slots: list[dict] = [{
                 "label": getattr(s, "labelText", "") or "",
                 "type": getattr(s, "slotType", "unknown"),
                 "cellKey": getattr(s, "cellKey", None),
                 "paragraphKey": getattr(s, "paragraphKey", None),
-            })
+            } for s in result.inputSlotCandidates]
         return slots
     return _fn
 

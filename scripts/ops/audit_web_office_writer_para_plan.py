@@ -49,28 +49,23 @@ def _check_known_plan_keys(edit_tool: str) -> list[dict]:
 
 
 def _check_module_exports() -> tuple[list[dict], str, str]:
-    findings: list[dict] = []
-    for rel in (
+    findings: list[dict] = [{"code": "MODULE_MISSING", "path": rel} for rel in (
         "scripts/hwpx/hwpx_paragraph_ops.py",
         "scripts/hwpx/web_office/paragraph_writer_adapter.py",
-    ):
-        if not (_PR / rel).is_file():
-            findings.append({"code": "MODULE_MISSING", "path": rel})
+    ) if not (_PR / rel).is_file()]
 
     ops_src = (
         (_PR / "scripts/hwpx/hwpx_paragraph_ops.py").read_text(encoding="utf-8")
         if (_PR / "scripts/hwpx/hwpx_paragraph_ops.py").is_file()
         else ""
     )
-    for sym in (
+    findings.extend({"code": "OPS_EXPORT_MISSING", "symbol": sym} for sym in (
         "find_paragraph_in_cell",
         "find_run_in_paragraph",
         "paragraph_text",
         "run_text",
         "apply_text_range_edit",
-    ):
-        if f"def {sym}" not in ops_src:
-            findings.append({"code": "OPS_EXPORT_MISSING", "symbol": sym})
+    ) if f"def {sym}" not in ops_src)
 
     adapter_src = (
         (_PR / "scripts/hwpx/web_office/paragraph_writer_adapter.py").read_text(encoding="utf-8")
@@ -91,13 +86,11 @@ def _check_forbidden_cell_mutation(adapter_src: str, ops_src: str) -> list[dict]
         "set_table_visual_cell_text(",
     )
     for src_name, src in (("adapter", adapter_src), ("ops", ops_src)):
-        for f in forbidden:
-            if f in src:
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_CELL_MUTATION_CALL",
                     "module": src_name,
                     "symbol": f,
-                })
+                } for f in forbidden if f in src)
     return findings
 
 

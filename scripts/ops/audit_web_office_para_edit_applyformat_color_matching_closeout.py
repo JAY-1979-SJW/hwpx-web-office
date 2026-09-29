@@ -147,10 +147,7 @@ def _check_required_doc() -> list[dict]:
 
 
 def _check_required_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES:
-        if not (PR / rel).is_file():
-            findings.append({"code": "MISSING_FILE", "level": "FAIL", "detail": rel})
+    findings: list[dict] = [{"code": "MISSING_FILE", "level": "FAIL", "detail": rel} for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES if not (PR / rel).is_file()]
     return findings
 
 
@@ -183,11 +180,8 @@ def _check_locked_files() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

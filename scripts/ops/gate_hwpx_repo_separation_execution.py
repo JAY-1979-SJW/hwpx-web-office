@@ -159,10 +159,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Packages",
     ]
-    for item in payload["executionMatrix"]:
-        lines.append(
-            f"- {item['packageId']}: phase={item['phase']} operation={item['operation']} files={item['fileCount']} dryRun={item['dryRunOnly']}"
-        )
+    lines.extend(f"- {item['packageId']}: phase={item['phase']} operation={item['operation']} files={item['fileCount']} dryRun={item['dryRunOnly']}" for item in payload["executionMatrix"])
     lines.extend(["", "## Guardrails"])
     lines.append("- no file move/delete/archive is performed by this gate")
     lines.append("- owner approval is required before any future execution script")

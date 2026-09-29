@@ -132,11 +132,10 @@ def monthly_schedule_rows(
 def daily_schedule_rows(items: list[ScheduleItem], start: date, day_count: int) -> list[list[str]]:
     days = [start + timedelta(days=index) for index in range(day_count)]
     rows = [["공종", *[str(day.day) for day in days]]]
-    for item in items:
-        rows.append([
+    rows.extend([
             item.name,
             *[WORK_MARK if item.start <= day <= item.end else INACTIVE_MARK for day in days],
-        ])
+        ] for item in items)
     return rows
 
 
@@ -189,8 +188,7 @@ def legend_rows(items: list[ScheduleItem]) -> list[list[str]]:
     rows = [["표시", "의미", "적용"]]
     rows.append(["", "색상 채움", "작업/진행 구간"])
     rows.append(["", "연한 회색", "비작업/미진행 구간"])
-    for item in items:
-        rows.append(["", item.name, f"{item.group} / {item.owner}".strip(" /")])
+    rows.extend(["", item.name, f"{item.group} / {item.owner}".strip(" /")] for item in items)
     return rows
 
 

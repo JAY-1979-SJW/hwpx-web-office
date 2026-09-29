@@ -64,11 +64,8 @@ check("C07", "모든 원본 수정 없음",
 # ── C08: 편집 기능/writer 수정 코드 없음 ─────────────────────────────────────
 import re
 audit_src = audit_script.read_text(encoding="utf-8") if audit_script.exists() else ""
-forbidden = []
-for pat in (r"\bapply_edit_plan\s*\(", r"\bwrite_package\s*\(",
-            r"\bfill_schedule_bars\s*\(", r"\brepair_for_server\s*\("):
-    if re.search(pat, audit_src):
-        forbidden.append(pat)
+forbidden = [pat for pat in (r"\bapply_edit_plan\s*\(", r"\bwrite_package\s*\(",
+            r"\bfill_schedule_bars\s*\(", r"\brepair_for_server\s*\(") if re.search(pat, audit_src)]
 check("C08", "편집/writer 호출 없음",
       len(forbidden) == 0, f"forbidden: {forbidden}")
 

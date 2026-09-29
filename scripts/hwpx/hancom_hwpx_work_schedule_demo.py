@@ -119,8 +119,7 @@ def make_daily_rows(items: list[WorkItem], start: date, day_count: int) -> list[
     rows = [["공종", *[str(day.day) for day in days]]]
     for item in items:
         row = [item.name]
-        for day in days:
-            row.append("■" if item.start <= day <= item.end else "·")
+        row.extend("■" if item.start <= day <= item.end else "·" for day in days)
         rows.append(row)
     return rows
 

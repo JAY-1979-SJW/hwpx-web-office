@@ -421,8 +421,8 @@ def links_kalis(opener, max_pages: int = 20) -> list[str]:
             break
         for s in fresh:
             seen_seq.add(s)
-            for fseq in (1, 2, 3):  # 게시글당 첨부 1~3
-                urls.append(dl.format(brd, s, fseq))
+            # 게시글당 첨부 1~3
+            urls.extend(dl.format(brd, s, fseq) for fseq in (1, 2, 3))
     return urls
 
 

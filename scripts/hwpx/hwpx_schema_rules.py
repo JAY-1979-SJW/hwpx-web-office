@@ -78,12 +78,11 @@ def normalize_paragraph_style(
                 result[target] = normalized
     supported_names = {"char_style", "para_style", "list_style", "list_level", "level"}
     unsupported = sorted(set(style) - set(PARAGRAPH_REF_KEYS) - supported_names)
-    for key in unsupported:
-        warnings.append({
+    warnings.extend({
             "type": "STYLE_ATTRIBUTE_REQUIRES_HEADER_DEFINITION",
             "field": key,
             "message": "Direct writer currently applies existing style references only.",
-        })
+        } for key in unsupported)
     return result, warnings
 
 
@@ -141,12 +140,11 @@ def normalize_table_style(
         "body_border_fill_style",
     }
     unsupported = sorted(set(style) - set(TABLE_REF_KEYS) - supported_names)
-    for key in unsupported:
-        warnings.append({
+    warnings.extend({
             "type": "TABLE_STYLE_ATTRIBUTE_PENDING",
             "field": key,
             "message": "Complex table styling requires header/style definition support.",
-        })
+        } for key in unsupported)
     return result, warnings
 
 

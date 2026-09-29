@@ -59,17 +59,15 @@ def _check_pipeline_result(res: dict) -> list[dict]:
         })
 
     readback = res.get("readback") or {}
-    for gate in (
-        "V1_RANGE_POSITION_OK",
-        "V4_CHARPR_PRESERVED",
-        "V7_READBACK_MATCH",
-    ):
-        if readback.get(gate) != "PASS":
-            findings.append({
+    findings.extend({
                 "code": f"{gate}_FAIL",
                 "level": "FAIL",
                 "detail": readback.get(gate),
-            })
+            } for gate in (
+        "V1_RANGE_POSITION_OK",
+        "V4_CHARPR_PRESERVED",
+        "V7_READBACK_MATCH",
+    ) if readback.get(gate) != "PASS")
     return findings
 
 

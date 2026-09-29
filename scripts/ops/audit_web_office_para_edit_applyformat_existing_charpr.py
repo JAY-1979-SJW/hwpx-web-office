@@ -104,33 +104,26 @@ def _check_static() -> list[dict]:
             })
             continue
         src = path.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({
+        findings.extend({
                     "code": "REQUIRED_PATTERN_MISSING",
                     "level": "FAIL",
                     "detail": f"{path.relative_to(PR)}: {pat}",
-                })
+                } for pat in patterns if not re.search(pat, src))
     for path, patterns in FORBIDDEN_PATTERNS_BY_FILE.items():
         if not path.is_file():
             continue
         src = path.read_text(encoding="utf-8")
-        for pat in patterns:
-            if re.search(pat, src):
-                findings.append({
+        findings.extend({
                     "code": "FORBIDDEN_PATTERN_PRESENT",
                     "level": "FAIL",
                     "detail": f"{path.relative_to(PR)}: {pat}",
-                })
+                } for pat in patterns if re.search(pat, src))
     return findings
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

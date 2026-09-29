@@ -125,19 +125,13 @@ def _check_static() -> list[dict]:
                           "detail": str(INVENTORY_PY)})
         return findings
     src = INVENTORY_PY.read_text(encoding="utf-8")
-    for pat in REQUIRED_INVENTORY_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "INVENTORY_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
-    for field in REQUIRED_INVENTORY_FIELDS:
-        if field not in src:
-            findings.append({"code": "INVENTORY_FIELD_MISSING",
-                              "level": "FAIL", "detail": field})
-    for pat in FORBIDDEN_INVENTORY_PATTERNS:
-        if re.search(pat, src):
-            findings.append({
+    findings.extend({"code": "INVENTORY_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_INVENTORY_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "INVENTORY_FIELD_MISSING",
+                              "level": "FAIL", "detail": field} for field in REQUIRED_INVENTORY_FIELDS if field not in src)
+    findings.extend({
                 "code": "INVENTORY_FORBIDDEN_WRITER_CODE",
-                "level": "FAIL", "detail": pat})
+                "level": "FAIL", "detail": pat} for pat in FORBIDDEN_INVENTORY_PATTERNS if re.search(pat, src))
     return findings
 
 
@@ -169,23 +163,18 @@ def _check_no_applyformat_traces() -> list[dict]:
         if not p.is_file():
             continue
         src = p.read_text(encoding="utf-8")
-        for pat in APPLYFORMAT_FORBIDDEN_TRACES:
-            if re.search(pat, src):
-                findings.append({
+        findings.extend({
                     "code": "APPLYFORMAT_TRACE_PRESENT",
                     "level": "FAIL",
-                    "detail": f"{rel}: {pat}"})
+                    "detail": f"{rel}: {pat}"} for pat in APPLYFORMAT_FORBIDDEN_TRACES if re.search(pat, src))
     return findings
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({
+    findings: list[dict] = [{
                 "code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                "level": "FAIL", "detail": sym})
+                "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 

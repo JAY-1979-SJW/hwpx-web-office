@@ -139,10 +139,9 @@ def run_audit() -> dict:
                 f"verdict: **{summary['auditVerdict']}**  "
                 f"pass={summary['passCount']}/{summary['totalChecks']}",
                 "", "| check | ok | detail |", "|---|---|---|"]
-    for f in findings:
-        md_out.append(f"| {f['check']} | "
+    md_out.extend(f"| {f['check']} | "
                           f"{'PASS' if f['ok'] else 'FAIL'} | "
-                          f"{f['detail']} |")
+                          f"{f['detail']} |" for f in findings)
     (OUTPUT_DIR / "audit.md").write_text("\n".join(md_out),
                                               encoding="utf-8")
     return summary
