@@ -818,10 +818,7 @@ def command_self_test(args: argparse.Namespace) -> int:
     return 0 if summary["status"] in {"PASS", "WARN"} else 1
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="HWPX template engine CLI")
-    sub = parser.add_subparsers(dest="command", required=True)
-
+def _add_render_subparser(sub) -> None:
     render = sub.add_parser("render", help="Render one HWPX template")
     render.add_argument("--template", required=True)
     render.add_argument("--output", required=True)
@@ -832,12 +829,16 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--report-json")
     render.set_defaults(func=command_render)
 
+
+def _add_validate_subparser(sub) -> None:
     validate = sub.add_parser("validate", help="Validate a rendered HWPX")
     validate.add_argument("--input", required=True)
     validate.add_argument("--expected-json")
     validate.add_argument("--report-json")
     validate.set_defaults(func=command_validate)
 
+
+def _add_audit_subparser(sub) -> None:
     audit = sub.add_parser("audit", help="Audit generated HWPX package completeness")
     audit_input = audit.add_mutually_exclusive_group(required=True)
     audit_input.add_argument("--input")
@@ -851,6 +852,8 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--out-csv")
     audit.set_defaults(func=command_audit)
 
+
+def _add_batch_render_subparser(sub) -> None:
     batch = sub.add_parser("batch-render", help="Render a small batch of HWPX jobs")
     batch.add_argument("--job-json", required=True)
     batch.add_argument("--output-dir", required=True)
@@ -858,12 +861,16 @@ def build_parser() -> argparse.ArgumentParser:
     batch.add_argument("--report-json")
     batch.set_defaults(func=command_batch_render)
 
+
+def _add_compose_subparser(sub) -> None:
     compose = sub.add_parser("compose", help="Apply a document composition job JSON")
     compose.add_argument("--job-json", required=True)
     compose.add_argument("--output")
     compose.add_argument("--report-json")
     compose.set_defaults(func=command_compose)
 
+
+def _add_validate_job_subparser(sub) -> None:
     validate_job = sub.add_parser("validate-job", help="Validate a document composition job JSON")
     validate_job.add_argument("--job-json", required=True)
     validate_job.add_argument("--require-template-exists", action="store_true")
@@ -871,6 +878,8 @@ def build_parser() -> argparse.ArgumentParser:
     validate_job.add_argument("--report-json")
     validate_job.set_defaults(func=command_validate_job)
 
+
+def _add_examples_subparser(sub) -> None:
     examples = sub.add_parser("examples", help="Write validated compose job examples")
     examples.add_argument("--out-dir", required=True)
     examples.add_argument("--template", default="smoke-test.hwpx")
@@ -878,11 +887,15 @@ def build_parser() -> argparse.ArgumentParser:
     examples.add_argument("--report-json")
     examples.set_defaults(func=command_examples)
 
+
+def _add_schema_reference_subparser(sub) -> None:
     schema_reference = sub.add_parser("schema-reference", help="Write compose job schema reference")
     schema_reference.add_argument("--out-json")
     schema_reference.add_argument("--out-md")
     schema_reference.set_defaults(func=command_schema_reference)
 
+
+def _add_regression_suite_subparser(sub) -> None:
     regression = sub.add_parser(
         "regression-suite", help="Run golden HWPX compose regression profiles"
     )
@@ -893,6 +906,8 @@ def build_parser() -> argparse.ArgumentParser:
     regression.add_argument("--report-csv")
     regression.set_defaults(func=command_regression_suite)
 
+
+def _add_full_scenario_subparser(sub) -> None:
     full_scenario = sub.add_parser(
         "full-scenario", help="Run full stable HWPX direct writer scenario"
     )
@@ -904,12 +919,16 @@ def build_parser() -> argparse.ArgumentParser:
     full_scenario.add_argument("--report-json")
     full_scenario.set_defaults(func=command_full_scenario)
 
+
+def _add_chart_png_subparser(sub) -> None:
     chart_png = sub.add_parser("chart-png", help="Generate a dependency-free PNG bar chart")
     chart_png.add_argument("--data-json", required=True)
     chart_png.add_argument("--output", required=True)
     chart_png.add_argument("--report-json")
     chart_png.set_defaults(func=command_chart_png)
 
+
+def _add_table_op_subparser(sub) -> None:
     table_op = sub.add_parser("table-op", help="Apply table operations to an existing HWPX table")
     table_op.add_argument("--template", required=True)
     table_op.add_argument("--output", required=True)
@@ -918,6 +937,8 @@ def build_parser() -> argparse.ArgumentParser:
     table_op.add_argument("--report-json")
     table_op.set_defaults(func=command_table_op)
 
+
+def _add_image_replace_subparser(sub) -> None:
     image_replace = sub.add_parser(
         "image-replace", help="Replace an existing BinData image in a HWPX template"
     )
@@ -930,6 +951,8 @@ def build_parser() -> argparse.ArgumentParser:
     image_replace.add_argument("--report-json")
     image_replace.set_defaults(func=command_image_replace)
 
+
+def _add_image_seed_subparser(sub) -> None:
     image_seed = sub.add_parser("image-seed", help="Add a BinData image entry to a HWPX package")
     image_seed.add_argument("--template", required=True)
     image_seed.add_argument("--output", required=True)
@@ -939,6 +962,8 @@ def build_parser() -> argparse.ArgumentParser:
     image_seed.add_argument("--report-json")
     image_seed.set_defaults(func=command_image_seed)
 
+
+def _add_picture_inspect_subparser(sub) -> None:
     picture_inspect = sub.add_parser(
         "picture-inspect", help="Inspect visible picture/control objects"
     )
@@ -946,6 +971,8 @@ def build_parser() -> argparse.ArgumentParser:
     picture_inspect.add_argument("--report-json")
     picture_inspect.set_defaults(func=command_picture_inspect)
 
+
+def _add_picture_rebind_subparser(sub) -> None:
     picture_rebind = sub.add_parser(
         "picture-rebind", help="Rebind an existing visible picture object to a BinData entry"
     )
@@ -958,6 +985,8 @@ def build_parser() -> argparse.ArgumentParser:
     picture_rebind.add_argument("--report-json")
     picture_rebind.set_defaults(func=command_picture_rebind)
 
+
+def _add_picture_clone_rebind_subparser(sub) -> None:
     picture_clone = sub.add_parser(
         "picture-clone-rebind",
         help="Clone an existing visible picture object and rebind it to a BinData entry",
@@ -971,6 +1000,8 @@ def build_parser() -> argparse.ArgumentParser:
     picture_clone.add_argument("--report-json")
     picture_clone.set_defaults(func=command_picture_clone_rebind)
 
+
+def _add_visible_image_insert_subparser(sub) -> None:
     visible_image = sub.add_parser(
         "visible-image-insert",
         help="Add a BinData image and clone an existing visible picture object to show it",
@@ -985,6 +1016,8 @@ def build_parser() -> argparse.ArgumentParser:
     visible_image.add_argument("--report-json")
     visible_image.set_defaults(func=command_visible_image_insert)
 
+
+def _add_png_insert_subparser(sub) -> None:
     png_insert = sub.add_parser(
         "png-insert",
         help="Insert a PNG as a generated HWPX picture object without requiring a picture template",
@@ -1001,6 +1034,8 @@ def build_parser() -> argparse.ArgumentParser:
     png_insert.add_argument("--report-json")
     png_insert.set_defaults(func=command_png_insert)
 
+
+def _add_paragraph_add_subparser(sub) -> None:
     paragraph_add = sub.add_parser(
         "paragraph-add", help="Append a generated paragraph without cloning an existing paragraph"
     )
@@ -1012,6 +1047,8 @@ def build_parser() -> argparse.ArgumentParser:
     paragraph_add.add_argument("--report-json")
     paragraph_add.set_defaults(func=command_paragraph_add)
 
+
+def _add_table_create_subparser(sub) -> None:
     table_create = sub.add_parser(
         "table-create", help="Append a generated table without cloning an existing table"
     )
@@ -1023,12 +1060,42 @@ def build_parser() -> argparse.ArgumentParser:
     table_create.add_argument("--report-json")
     table_create.set_defaults(func=command_table_create)
 
+
+def _add_self_test_subparser(sub) -> None:
     self_test = sub.add_parser("self-test", help="Run render/validate/batch-render hardening flow")
     self_test.add_argument("--template", required=True)
     self_test.add_argument("--out-dir", required=True)
     self_test.add_argument("--roundtrip", action="store_true")
     self_test.add_argument("--report-json")
     self_test.set_defaults(func=command_self_test)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="HWPX template engine CLI")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    _add_render_subparser(sub)
+    _add_validate_subparser(sub)
+    _add_audit_subparser(sub)
+    _add_batch_render_subparser(sub)
+    _add_compose_subparser(sub)
+    _add_validate_job_subparser(sub)
+    _add_examples_subparser(sub)
+    _add_schema_reference_subparser(sub)
+    _add_regression_suite_subparser(sub)
+    _add_full_scenario_subparser(sub)
+    _add_chart_png_subparser(sub)
+    _add_table_op_subparser(sub)
+    _add_image_replace_subparser(sub)
+    _add_image_seed_subparser(sub)
+    _add_picture_inspect_subparser(sub)
+    _add_picture_rebind_subparser(sub)
+    _add_picture_clone_rebind_subparser(sub)
+    _add_visible_image_insert_subparser(sub)
+    _add_png_insert_subparser(sub)
+    _add_paragraph_add_subparser(sub)
+    _add_table_create_subparser(sub)
+    _add_self_test_subparser(sub)
     return parser
 
 
