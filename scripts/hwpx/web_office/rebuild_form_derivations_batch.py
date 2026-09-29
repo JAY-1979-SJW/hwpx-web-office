@@ -183,12 +183,15 @@ def _apply_subject(fields: list[dict]) -> int:
 
 
 def _build_pending_query(shard: int, shards: int) -> str:
+    # shard/shards 는 int() 로 강제 형변환해 보간 — 숫자가 아니면 여기서
+    # ValueError 가 나므로 SQL 텍스트를 끼워넣을 경로가 없다. STAGING 은
+    # 모듈 상수(고정 테이블명).
     shard_sql = ""
     if shards > 1:
-        shard_sql = f" AND (f.form_id % {int(shards)}) = {int(shard)}"
+        shard_sql = f" AND (f.form_id % {int(shards)}) = {int(shard)}"  # nosec B608
     return (
         f"SELECT f.form_id, f.source_path, f.name FROM forms f "
-        f"LEFT JOIN {STAGING} s ON s.form_id = f.form_id "
+        f"LEFT JOIN {STAGING} s ON s.form_id = f.form_id "  # nosec B608
         f"WHERE f.status='OK' AND s.form_id IS NULL{shard_sql} "
         f"ORDER BY f.form_id"
     )
@@ -301,7 +304,7 @@ def run(limit: int = 0, size_cap_mb: float = 3.0, shard: int = 0, shards: int = 
     rows = con.execute(_build_pending_query(shard, shards)).fetchall()
     if limit:
         rows = rows[:limit]
-    done_already = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
+    done_already = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]  # nosec B608
     tag = f"[shard {shard}/{shards}] " if shards > 1 else ""
     _log(f"{tag}[start] 재생성 대상 {len(rows):,}종 (이미 쌓인 {done_already:,}건 제외 — 재개형)")
 
@@ -362,15 +365,16 @@ def status() -> dict:
         con.close()
         return {"staged": 0, "target": 0, "note": "스테이징 테이블 없음"}
     target = con.execute("SELECT COUNT(*) FROM forms WHERE status='OK'").fetchone()[0]
-    staged = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
+    # STAGING 은 모듈 상수(고정 테이블명) — 아래 보간은 전부 이것뿐
+    staged = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]  # nosec B608
     by = dict(
         con.execute(
-            f"SELECT rebuild_status, COUNT(*) FROM {STAGING} GROUP BY 1 ORDER BY 2 DESC"
+            f"SELECT rebuild_status, COUNT(*) FROM {STAGING} GROUP BY 1 ORDER BY 2 DESC"  # nosec B608
         ).fetchall()
     )
-    schema_ok = con.execute(f"SELECT COUNT(*) FROM {STAGING} WHERE schema_status='OK'").fetchone()[
-        0
-    ]
+    schema_ok = con.execute(
+        f"SELECT COUNT(*) FROM {STAGING} WHERE schema_status='OK'"  # nosec B608
+    ).fetchone()[0]
     con.close()
     return {
         "target": target,
@@ -393,36 +397,38 @@ def promote(force: bool = False) -> dict:
     con = _connect()
     con.execute("BEGIN")
     try:
-        con.execute(f"""
-            UPDATE forms SET
-                field_count      = (SELECT s.field_count      FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                doc_type         = (SELECT s.doc_type         FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                fillable         = (SELECT s.fillable         FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                clean_name       = (SELECT s.clean_name       FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                doc_reason       = (SELECT s.doc_reason       FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                form_kind        = (SELECT s.form_kind        FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                input_schema     = (SELECT s.input_schema     FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                input_count      = (SELECT s.input_count      FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                applicant_count  = (SELECT s.applicant_count  FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                office_count     = (SELECT s.office_count     FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                sensitive_count  = (SELECT s.sensitive_count  FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                schema_status    = (SELECT s.schema_status    FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                attachments      = (SELECT s.attachments      FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                attachment_count = (SELECT s.attachment_count FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                processing_time  = (SELECT s.processing_time  FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                fee              = (SELECT s.fee              FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                legal_basis      = (SELECT s.legal_basis      FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                submit_to        = (SELECT s.submit_to        FROM {STAGING} s WHERE s.form_id=forms.form_id),
-                req_status       = (SELECT s.req_status       FROM {STAGING} s WHERE s.form_id=forms.form_id)
-            WHERE EXISTS (SELECT 1 FROM {STAGING} s WHERE s.form_id=forms.form_id)
-        """)
+        # STAGING 은 모듈 상수(고정 테이블명) — 아래 보간은 전부 이것뿐,
+        # form_id 매칭은 서브쿼리 자체 조인이라 외부 입력이 섞이지 않는다
+        con.execute(
+            f"UPDATE forms SET "  # nosec B608
+            f"field_count      = (SELECT s.field_count      FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"doc_type         = (SELECT s.doc_type         FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"fillable         = (SELECT s.fillable         FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"clean_name       = (SELECT s.clean_name       FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"doc_reason       = (SELECT s.doc_reason       FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"form_kind        = (SELECT s.form_kind        FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"input_schema     = (SELECT s.input_schema     FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"input_count      = (SELECT s.input_count      FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"applicant_count  = (SELECT s.applicant_count  FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"office_count     = (SELECT s.office_count     FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"sensitive_count  = (SELECT s.sensitive_count  FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"schema_status    = (SELECT s.schema_status    FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"attachments      = (SELECT s.attachments      FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"attachment_count = (SELECT s.attachment_count FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"processing_time  = (SELECT s.processing_time  FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"fee              = (SELECT s.fee              FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"legal_basis      = (SELECT s.legal_basis      FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"submit_to        = (SELECT s.submit_to        FROM {STAGING} s WHERE s.form_id=forms.form_id),"
+            f"req_status       = (SELECT s.req_status       FROM {STAGING} s WHERE s.form_id=forms.form_id) "
+            f"WHERE EXISTS (SELECT 1 FROM {STAGING} s WHERE s.form_id=forms.form_id)"
+        )
         # 라벨 색인 재구축 — 재생성분이 있는 서식만 갈아끼운다
         con.execute(
-            f"DELETE FROM fields WHERE form_id IN "
+            f"DELETE FROM fields WHERE form_id IN "  # nosec B608 - STAGING 은 모듈 상수
             f"(SELECT form_id FROM {STAGING} WHERE labels IS NOT NULL)"
         )
         for fid, raw in con.execute(
-            f"SELECT form_id, labels FROM {STAGING} WHERE labels IS NOT NULL"
+            f"SELECT form_id, labels FROM {STAGING} WHERE labels IS NOT NULL"  # nosec B608
         ).fetchall():
             try:
                 labels = json.loads(raw)

@@ -31,6 +31,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 # ── namespaces ────────────────────────────────────────────────────────────────
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_OPF = "http://www.idpf.org/2007/opf/"
@@ -680,7 +684,7 @@ def _survey_file(
         for sec_idx, sec_name in enumerate(section_files):
             try:
                 raw = zf.read(sec_name)
-                root = ET.fromstring(raw)
+                root = _dx_fromstring(raw)
             except ET.ParseError as exc:
                 warnings.append(f"{sec_name}: XML parse error: {exc}")
                 continue
@@ -783,7 +787,8 @@ def _build_input_cell_dict(
         e["occurrences"] += 1
         e["layoutCounter"][ic.tableLayout] += 1
 
-    rows = [{
+    rows = [
+        {
             "adjacentLabel": e["adjacentLabel"],
             "inputCellType": e["inputCellType"],
             "guessedField": e["guessedField"],
@@ -791,7 +796,9 @@ def _build_input_cell_dict(
             "fileCount": len(e["fileCount"]),
             "occurrences": e["occurrences"],
             "layoutDistribution": dict(e["layoutCounter"].most_common()),
-        } for e in label_map.values()]
+        }
+        for e in label_map.values()
+    ]
     rows.sort(key=lambda r: r["occurrences"], reverse=True)
     return rows
 
@@ -844,8 +851,11 @@ def _build_summary_md(
         "| 헤더 | 파일수 | 발생횟수 | 추정 필드 | 신뢰도 |",
         "|------|--------|----------|-----------|--------|",
     ]
-    lines.extend(f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
-            f" | {r['guessedField']} | {r['fieldConfidence']} |" for r in hdr_dict[:50])
+    lines.extend(
+        f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
+        f" | {r['guessedField']} | {r['fieldConfidence']} |"
+        for r in hdr_dict[:50]
+    )
     lines += [
         "",
         "## 입력셀 라벨 빈도 TOP 50",

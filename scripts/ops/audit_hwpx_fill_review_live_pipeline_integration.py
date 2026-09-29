@@ -10,6 +10,10 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -26,7 +30,7 @@ def _build_fixture_with_paragraphs(tmp_path: Path, paragraph_texts: list[str]):
         for info in zin.infolist():
             data = zin.read(info.filename)
             if info.filename == "Contents/section0.xml":
-                root = ET.fromstring(data)
+                root = _dx_fromstring(data)
                 for text in paragraph_texts:
                     p = ET.SubElement(root, f"{{{NS_HP}}}p")
                     run = ET.SubElement(p, f"{{{NS_HP}}}run")

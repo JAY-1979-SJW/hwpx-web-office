@@ -29,6 +29,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_HS = "http://www.hancom.co.kr/hwpml/2011/section"
@@ -232,7 +236,7 @@ def _inspect_package_xml_health(
 
     if has_content_hpf:
         try:
-            opf = ET.fromstring(zf.read("Contents/content.hpf"))
+            opf = _dx_fromstring(zf.read("Contents/content.hpf"))
             counts["manifest_count"] = len(opf.findall(f".//{{{NS_OPF}}}item"))
             counts["spine_count"] = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
         except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
@@ -241,7 +245,7 @@ def _inspect_package_xml_health(
 
     if has_header:
         try:
-            header = ET.fromstring(zf.read("Contents/header.xml"))
+            header = _dx_fromstring(zf.read("Contents/header.xml"))
             counts["char_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
             counts["para_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
             counts["border_fill_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
@@ -362,7 +366,7 @@ def is_numeric_like(text: str) -> bool:
 
 def parse_section_xml(raw: bytes) -> ET.Element | None:
     try:
-        return ET.fromstring(raw)
+        return _dx_fromstring(raw)
     except ET.ParseError:
         return None
 
@@ -1358,15 +1362,21 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
         out_lines.append(f"- {layout}: {cnt}")
     out_lines.append("")
     out_lines.append("## 가장 자주 나온 헤더 TOP 50")
-    out_lines.extend(f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
-            f"guess={r['guessedField']}@{r['fieldConfidence']})" for r in header_rows[:50])
+    out_lines.extend(
+        f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
+        f"guess={r['guessedField']}@{r['fieldConfidence']})"
+        for r in header_rows[:50]
+    )
     out_lines.append("")
     out_lines.append("## 실패 유형 TOP 20")
     for et, cnt in failure_counter.most_common(20):
         out_lines.append(f"- {et}: {cnt}")
     out_lines.append("")
     out_lines.append("## fixture 후보")
-    out_lines.extend(f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})" for f in ctx.fixture_records)
+    out_lines.extend(
+        f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})"
+        for f in ctx.fixture_records
+    )
     out_lines.append("")
     out_lines.append("## 다음 파서 개선 우선순위")
     priorities = []

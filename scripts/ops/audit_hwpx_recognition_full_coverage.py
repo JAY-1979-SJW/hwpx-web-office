@@ -24,6 +24,10 @@ import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -151,12 +155,15 @@ def _fill_requirement_smoke(rec_out: dict, item: dict, r) -> tuple[dict, list] |
 
         synth_cells = []
         for t in r.tables:
-            synth_cells.extend({
+            synth_cells.extend(
+                {
                     "cellKey": c.cellId,
                     "normalizedText": c.normalizedText,
                     "rowIndex": c.row,
                     "cellIndex": c.col,
-                } for c in t.cells)
+                }
+                for c in t.cells
+            )
         synth_paragraphs = []
         # paragraph placeholders는 거의 없으므로 skip
         rec_dict = fr.make_document_recognition_result(
@@ -390,7 +397,7 @@ def _representative_writer_smoke(tmp_dir: Path) -> list[dict]:
         for info in zin.infolist():
             data = zin.read(info.filename)
             if info.filename == "Contents/section0.xml":
-                root = ET.fromstring(data)
+                root = _dx_fromstring(data)
                 p = ET.SubElement(root, f"{{{NS_HP}}}p")
                 run = ET.SubElement(p, f"{{{NS_HP}}}run")
                 t = ET.SubElement(run, f"{{{NS_HP}}}t")

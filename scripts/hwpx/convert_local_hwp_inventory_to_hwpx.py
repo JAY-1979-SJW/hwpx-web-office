@@ -58,7 +58,9 @@ def target_path_for(output_dir: Path, root: Path, relative: Path, source: Path) 
     candidate = (target_root / relative).with_suffix(".hwpx")
     if len(str(candidate)) < 240 and all(len(part) < 120 for part in candidate.parts):
         return candidate
-    digest = hashlib.sha1(str(source).encode("utf-8", errors="replace")).hexdigest()[:16]
+    digest = hashlib.sha1(
+        str(source).encode("utf-8", errors="replace"), usedforsecurity=False
+    ).hexdigest()[:16]
     name = safe_filename(source.with_suffix("").name, max_chars=70)
     return target_root / "_longpath" / f"{digest}_{name}.hwpx"
 

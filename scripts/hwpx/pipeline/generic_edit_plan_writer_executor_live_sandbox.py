@@ -30,6 +30,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 from . import generic_edit_plan_writer_adapter as adapter
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -345,7 +349,7 @@ def _paragraph_text_run_elements(p_elem) -> list:
 def _section_paragraph_text_map(section_xml: bytes, section_idx: int) -> dict:
     """section XML에서 {paragraphKey: visibleText} 산출."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return {}
     result: dict[str, str] = {}
@@ -359,7 +363,7 @@ def _modify_paragraph_text_in_section_xml(
 ) -> tuple[bytes, bool, str | None]:
     """setParagraphText 적용. return (xml_bytes, modified, failure_reason)."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False, "parse_error"
     paragraphs = _section_root_top_level_paragraphs(root)
@@ -400,7 +404,7 @@ def _replace_text_run_in_section_xml(
     if find_str is None or find_str == "":
         return section_xml, False, "invalid_find_text"
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False, "parse_error"
     paragraphs = _section_root_top_level_paragraphs(root)
@@ -464,7 +468,7 @@ def _modify_cell_halign_in_section_xml(
     if normalized not in ALLOWED_HORIZONTAL_ALIGN_VALUES:
         return section_xml, False
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
     tc = _find_cell_element(root, table_index, row, col)
@@ -488,7 +492,7 @@ def _modify_cell_valign_in_section_xml(
     if normalized not in ALLOWED_VERTICAL_ALIGN_VALUES:
         return section_xml, False
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
     tc = _find_cell_element(root, table_index, row, col)
@@ -547,7 +551,7 @@ def _modify_cell_text_in_section_xml(
     return (new_xml_bytes, modified)
     """
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
 

@@ -26,6 +26,10 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 ET.register_namespace("hp", NS_HP)
 
@@ -178,7 +182,7 @@ def _resolve_targets(template_path: Path, approved_fields: list) -> dict:
             sec_names = sorted(n for n in z.namelist() if _SECTION_RE.match(n))
             for sec_name in sec_names:
                 try:
-                    root = ET.fromstring(z.read(sec_name).decode("utf-8"))
+                    root = _dx_fromstring(z.read(sec_name).decode("utf-8"))
                 except (ET.ParseError, UnicodeDecodeError):
                     continue
                 tables = root.findall(f".//{{{NS_HP}}}tbl")
@@ -285,7 +289,7 @@ def _do_write(
     for sec_name, mods in write_queue.items():
         if sec_name not in file_bytes:
             continue
-        root = ET.fromstring(file_bytes[sec_name].decode("utf-8"))
+        root = _dx_fromstring(file_bytes[sec_name].decode("utf-8"))
         sec_roots[sec_name] = root
         tables = root.findall(f".//{{{NS_HP}}}tbl")
 
@@ -346,7 +350,7 @@ def _readback_verify(
             sec_roots: dict[str, ET.Element] = {}
             for name in z.namelist():
                 if _SECTION_RE.match(name):
-                    sec_roots[name] = ET.fromstring(z.read(name).decode("utf-8"))
+                    sec_roots[name] = _dx_fromstring(z.read(name).decode("utf-8"))
     except (zipfile.BadZipFile, KeyError, ET.ParseError, UnicodeDecodeError, OSError):
         for r in write_results:
             if r.get("writeStatus") == _STATUS_WRITTEN:

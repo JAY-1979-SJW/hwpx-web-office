@@ -20,6 +20,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
@@ -46,7 +50,9 @@ def local_name(tag: str) -> str:
 
 def safe_report_stem(path: Path, index: int | None = None) -> str:
     prefix = f"{index:04d}_" if index is not None else ""
-    digest = hashlib.sha1(str(path.resolve()).encode("utf-8", errors="ignore")).hexdigest()[:10]
+    digest = hashlib.sha1(
+        str(path.resolve()).encode("utf-8", errors="ignore"), usedforsecurity=False
+    ).hexdigest()[:10]
     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in path.stem).strip("._")
     return f"{prefix}{safe[:80] or 'input'}_{digest}"
 
@@ -102,7 +108,7 @@ def summarize_hwpx(path: Path) -> dict[str, Any]:
 
             for name in section_entries:
                 try:
-                    root = ET.fromstring(zf.read(name))
+                    root = _dx_fromstring(zf.read(name))
                 except ET.ParseError as exc:
                     xml_errors.append({"entry": name, "error": str(exc)})
                     continue

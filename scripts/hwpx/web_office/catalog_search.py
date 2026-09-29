@@ -76,8 +76,10 @@ def by_category(domain: str, *, limit: int = 40) -> dict[str, Any]:
         clause = " OR ".join("name LIKE ?" for _ in kws)
         params = [f"%{k}%" for k in kws] + [limit]
         rows = con.execute(
+            # {clause}는 "name LIKE ?"를 kws 개수만큼 OR 로 이은 것 — 실제
+            # 값은 params 로 바인딩한다(사용자 입력을 SQL 에 직접 넣지 않음)
             f"SELECT form_id,form_type,statute_no,name,field_count,table_count,cell_count,source_path "
-            f"FROM forms WHERE status='OK' AND ({clause}) "
+            f"FROM forms WHERE status='OK' AND ({clause}) "  # nosec B608
             f"ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
             params,
         ).fetchall()
@@ -209,10 +211,12 @@ def search(query: str, *, limit: int = 20, institution: str | None = None) -> di
             params.append(inst)
         params.append(limit)
         rows = con.execute(
+            # where 항목은 고정 문구("status='OK'" 등)이거나 "col = ?" 형태
+            # 플레이스홀더뿐 — 실제 값은 항상 params 로 바인딩한다
             "SELECT form_id,form_type,statute_no,name,field_count,table_count,"
             "cell_count,institution,attachments,attachment_count,processing_time,"
             "fee,legal_basis,submit_to FROM forms WHERE "
-            + " AND ".join(where)
+            + " AND ".join(where)  # nosec B608
             + " ORDER BY (statute_no != '') DESC, field_count DESC LIMIT ?",
             tuple(params),
         ).fetchall()

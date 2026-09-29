@@ -109,7 +109,8 @@ def run_report(
         params.append(month)
     cond = ("WHERE " + " AND ".join(where)) if where else ""
 
-    rows = conn.execute(f"SELECT * FROM prices {cond}", params).fetchall()
+    # cond 는 "연도=?"/"월=?" 고정 문구 조합뿐, 실제 값은 params 로 바인딩한다
+    rows = conn.execute(f"SELECT * FROM prices {cond}", params).fetchall()  # nosec B608
     conn.close()
 
     if not rows:

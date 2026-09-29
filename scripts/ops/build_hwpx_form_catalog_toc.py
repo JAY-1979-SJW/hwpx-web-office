@@ -180,8 +180,7 @@ def _render_viewer_html(items, by_inst, by_doc, by_kind, total, fillable_n) -> s
     groups_json = json.dumps(
         {"발행기관": by_inst, "문서유형": by_doc, "서식종류": by_kind}, ensure_ascii=False
     )
-    return (
-        """<!DOCTYPE html>
+    template = """<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HWPX 서식 카탈로그 목차</title>
@@ -580,6 +579,8 @@ renderTable();
 </script>
 </body></html>
 """
+    return (
+        template
         .replace("__DATA_JSON__", data_json)
         .replace("__GROUPS_JSON__", groups_json)
         .replace("__TOTAL__", str(total))

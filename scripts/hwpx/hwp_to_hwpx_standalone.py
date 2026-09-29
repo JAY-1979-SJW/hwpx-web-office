@@ -29,6 +29,10 @@ from typing import Any
 from uuid import uuid4
 from xml.sax.saxutils import escape
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 THIS_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = THIS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -756,7 +760,7 @@ def read_hwpx_section_text(path: Path) -> dict[str, Any]:
                 entries.append(name)
                 payload = zf.read(name)
                 try:
-                    root = ET.fromstring(payload)
+                    root = _dx_fromstring(payload)
                 except ET.ParseError as exc:
                     xml_errors.append({"entry": name, "error": str(exc)})
                     continue
@@ -893,7 +897,7 @@ def read_hwpx_table_grids(path: Path) -> dict[str, Any]:
                     continue
                 entries.append(name)
                 try:
-                    root = ET.fromstring(zf.read(name))
+                    root = _dx_fromstring(zf.read(name))
                 except ET.ParseError as exc:
                     xml_errors.append({"entry": name, "error": str(exc)})
                     continue
@@ -2462,13 +2466,16 @@ def build_markdown_report(report: dict[str, Any]) -> str:
             "| Status | Input | Output | Gate | Error |",
             "| --- | --- | --- | --- | --- |",
         ])
-        lines.extend("| {status} | {input} | {output} | {gate} | {error} |".format(
-                    status=row.get("status") or "",
-                    input=row.get("input") or "",
-                    output=row.get("output") or "",
-                    gate=row.get("gate_status") or "",
-                    error=row.get("error") or "",
-                ) for row in rows)
+        lines.extend(
+            "| {status} | {input} | {output} | {gate} | {error} |".format(
+                status=row.get("status") or "",
+                input=row.get("input") or "",
+                output=row.get("output") or "",
+                gate=row.get("gate_status") or "",
+                error=row.get("error") or "",
+            )
+            for row in rows
+        )
         lines.append("")
     failed_checks = gate.get("failed_checks") if isinstance(gate.get("failed_checks"), list) else []
     if failed_checks:

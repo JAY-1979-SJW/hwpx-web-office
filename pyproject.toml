@@ -7,3 +7,9 @@
 # audit-kit 쪽 개선 필요 — src/audit_kit/scope.py discover() 의
 # prod_tops 계산이 parts[0] 만 보는 게 원인).
 packages = ["scripts.hwpx"]
+
+# .githooks/*.py 는 폴더 이름이 audit-kit 의 기본 이름 목록
+# (tests/scripts/plugins/migrations)과 안 맞아 매 감사마다 SCOPE-UNASSIGNED
+# 로 보고됨(2026-09-30 9단계 AI 리뷰에서 발견) — support 역할로 명시 지정.
+[tool.audit-kit.support]
+scripts = [".githooks/*"]

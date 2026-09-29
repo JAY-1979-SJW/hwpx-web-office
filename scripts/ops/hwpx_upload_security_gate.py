@@ -16,6 +16,7 @@
   python scripts/ops/hwpx_upload_security_gate.py FILE
   → JSON 보고 + exit 0(PASS) / 1(FAIL)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,8 +26,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-MAX_FILE_SIZE = 100 * 1024 * 1024            # 100 MB
-MAX_ENTRY_UNCOMPRESSED = 500 * 1024 * 1024   # 500 MB per entry
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+MAX_ENTRY_UNCOMPRESSED = 500 * 1024 * 1024  # 500 MB per entry
 MAX_TOTAL_UNCOMPRESSED = 1024 * 1024 * 1024  # 1 GB total
 MAX_COMPRESSION_RATIO = 100
 MAX_ENTRY_COUNT = 10000
@@ -61,8 +62,7 @@ def _g4_zip_integrity(p: Path) -> dict:
     try:
         with zipfile.ZipFile(str(p)) as z:
             bad = z.testzip()
-        return {"gate": "G4_zip_integrity", "ok": bad is None,
-                       "value": bad or "ok"}
+        return {"gate": "G4_zip_integrity", "ok": bad is None, "value": bad or "ok"}
     except zipfile.BadZipFile as e:
         return {"gate": "G4_zip_integrity", "ok": False, "value": str(e)[:120]}
 
@@ -78,10 +78,13 @@ def _g5_g6_g9_g10_zip_walk(p: Path) -> list[dict]:
                 "value": len(infos),
             })
 
-            bad_paths = [i.filename for i in infos
-                                if ".." in i.filename.split("/")
-                                or i.filename.startswith("/")
-                                or i.filename.startswith("\\")]
+            bad_paths = [
+                i.filename
+                for i in infos
+                if ".." in i.filename.split("/")
+                or i.filename.startswith("/")
+                or i.filename.startswith("\\")
+            ]
             results.append({
                 "gate": "G6_path_traversal",
                 "ok": not bad_paths,
@@ -105,19 +108,20 @@ def _g5_g6_g9_g10_zip_walk(p: Path) -> list[dict]:
             results.append({
                 "gate": "G5_zip_bomb_ratio",
                 "ok": worst_ratio <= MAX_COMPRESSION_RATIO,
-                "value": {"ratio": round(worst_ratio, 2),
-                                  "entry": worst_entry},
+                "value": {"ratio": round(worst_ratio, 2), "entry": worst_entry},
             })
             results.append({
                 "gate": "G10_entry_size",
-                "ok": not oversized
-                        and total_uncompressed <= MAX_TOTAL_UNCOMPRESSED,
-                "value": {"totalUncompressed": total_uncompressed,
-                                  "oversizedEntries": oversized[:5]},
+                "ok": not oversized and total_uncompressed <= MAX_TOTAL_UNCOMPRESSED,
+                "value": {
+                    "totalUncompressed": total_uncompressed,
+                    "oversizedEntries": oversized[:5],
+                },
             })
-    except Exception as e:
-        results.append({"gate": "G5_G6_G9_G10_walk_error",
-                              "ok": False, "value": str(e)[:120]})
+    except Exception as e:  # ruff: ignore[blind-except]
+        # 업로드된 신뢰할 수 없는 zip 을 검사하는 보안 게이트 — 손상된
+        # 파일이 어떤 예외를 던지든 게이트 자체가 죽지 않고 FAIL 로 보고한다
+        results.append({"gate": "G5_G6_G9_G10_walk_error", "ok": False, "value": str(e)[:120]})
     return results
 
 
@@ -126,19 +130,23 @@ def _g7_mimetype_first(p: Path) -> dict:
         with zipfile.ZipFile(str(p)) as z:
             names = z.namelist()
             if not names or names[0] != "mimetype":
-                return {"gate": "G7_mimetype_first", "ok": False,
-                              "value": names[:1]}
+                return {"gate": "G7_mimetype_first", "ok": False, "value": names[:1]}
             mt = z.read("mimetype").decode("utf-8", "ignore").strip()
             ok = mt in ALLOWED_MIMETYPES
             return {"gate": "G7_mimetype_first", "ok": ok, "value": mt}
-    except Exception as e:
-        return {"gate": "G7_mimetype_first", "ok": False,
-                       "value": str(e)[:120]}
+    except Exception as e:  # ruff: ignore[blind-except]
+        # 신뢰할 수 없는 zip 검사 — 손상 파일도 게이트를 죽이지 않고 FAIL 보고
+        return {"gate": "G7_mimetype_first", "ok": False, "value": str(e)[:120]}
 
 
 def _g8_xml_xxe_safe(p: Path) -> dict:
     """XXE 방어 — entity·DTD·external 차단 후 파싱 시도."""
     import xml.etree.ElementTree as ET
+
+    # B314 — 원본 바이트 사전검사를 우회하는 변형(인코딩 트릭 등)에 대비해
+    # 파싱 자체도 defusedxml 로 이중 방어한다. entity/DTD 는 ET.ParseError 가
+    # 아니라 EntitiesForbidden/DTDForbidden 으로 나와 바깥 except Exception 이 잡는다.
+    from defusedxml.ElementTree import fromstring as _dx_fromstring
 
     bad_entries: list[str] = []
     try:
@@ -153,15 +161,14 @@ def _g8_xml_xxe_safe(p: Path) -> dict:
                     bad_entries.append(name)
                     continue
                 try:
-                    ET.fromstring(raw)
+                    _dx_fromstring(raw)
                 except ET.ParseError:
                     # 일부 HWPX XML이 ns 선언 누락으로 fail 가능 — 보안 fail로 간주 X
                     pass
-        return {"gate": "G8_xml_xxe_safe", "ok": not bad_entries,
-                       "value": bad_entries[:5]}
-    except Exception as e:
-        return {"gate": "G8_xml_xxe_safe", "ok": False,
-                       "value": str(e)[:120]}
+        return {"gate": "G8_xml_xxe_safe", "ok": not bad_entries, "value": bad_entries[:5]}
+    except Exception as e:  # ruff: ignore[blind-except]
+        # 신뢰할 수 없는 zip/xml 검사 — 손상 파일도 게이트를 죽이지 않고 FAIL 보고
+        return {"gate": "G8_xml_xxe_safe", "ok": False, "value": str(e)[:120]}
 
 
 def inspect(path: Path) -> dict:
@@ -190,20 +197,20 @@ def inspect(path: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("src", help="HWPX 파일")
-    ap.add_argument("--batch", type=int, default=0,
-                          help="corpus N건 일괄 검사")
+    ap.add_argument("--batch", type=int, default=0, help="corpus N건 일괄 검사")
     args = ap.parse_args()
 
     if args.batch > 0:
         import sqlite3
-        conn = sqlite3.connect(
-            str(PROJECT_ROOT / "data/recognition_corpus/corpus.sqlite3"))
-        rows = conn.execute(f"""
-            SELECT d.source_path FROM hwpx_documents d
-            WHERE d.inventory_status='FOUND'
-              AND d.file_size BETWEEN 10000 AND 200000
-            ORDER BY d.first_seen_at LIMIT {int(args.batch)}
-        """).fetchall()
+
+        conn = sqlite3.connect(str(PROJECT_ROOT / "data/recognition_corpus/corpus.sqlite3"))
+        rows = conn.execute(
+            "SELECT d.source_path FROM hwpx_documents d"
+            " WHERE d.inventory_status='FOUND'"
+            " AND d.file_size BETWEEN 10000 AND 200000"
+            # args.batch 는 argparse type=int 로 이미 정수 강제 + int() 재확인
+            f" ORDER BY d.first_seen_at LIMIT {int(args.batch)}"  # nosec B608
+        ).fetchall()
         conn.close()
         counts = {"PASS": 0, "FAIL": 0}
         fails: list[dict] = []
@@ -216,11 +223,17 @@ def main() -> int:
             counts[v] = counts.get(v, 0) + 1
             if v == "FAIL":
                 fails.append({"src": str(full), "failed": r["failedGates"]})
-        print(json.dumps({
-            "totalChecked": counts["PASS"] + counts["FAIL"],
-            "counts": counts,
-            "fails": fails[:10],
-        }, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {
+                    "totalChecked": counts["PASS"] + counts["FAIL"],
+                    "counts": counts,
+                    "fails": fails[:10],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0 if counts["FAIL"] == 0 else 1
 
     r = inspect(Path(args.src))

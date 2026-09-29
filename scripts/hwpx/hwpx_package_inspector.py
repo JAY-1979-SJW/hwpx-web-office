@@ -13,6 +13,10 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 IMAGE_EXTENSIONS = {".bmp", ".gif", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".wmf", ".emf"}
 
 
@@ -79,7 +83,7 @@ def _scan_xml_entries(zf: zipfile.ZipFile, xml_entries: list[str], result: dict)
     for entry in xml_entries:
         try:
             text = _read_text_from_zip(zf, entry)
-            root = ET.fromstring(text.encode("utf-8"))
+            root = _dx_fromstring(text.encode("utf-8"))
         except Exception as exc:  # ruff: ignore[blind-except] - metadata report, not strict parser
             result["xml_parse_errors"].append({"entry": entry, "error": str(exc)})
             continue

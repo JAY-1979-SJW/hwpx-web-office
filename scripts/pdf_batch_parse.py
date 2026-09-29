@@ -48,7 +48,7 @@ def now_iso() -> str:
 
 
 def short_id(path: Path, size: int, mtime: float) -> str:
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(str(path).encode("utf-8", "replace"))
     h.update(f"|{size}|{int(mtime)}".encode())
     return h.hexdigest()[:16]

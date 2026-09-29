@@ -28,6 +28,10 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 ET.register_namespace("hp", NS_HP)
 
@@ -78,7 +82,7 @@ def _load_sections(hwpx_path: Path) -> dict[str, ET.Element | None]:
         with zipfile.ZipFile(hwpx_path) as z:
             for name in sorted(n for n in z.namelist() if _SECTION_RE.match(n)):
                 try:
-                    result[name] = ET.fromstring(z.read(name).decode("utf-8"))
+                    result[name] = _dx_fromstring(z.read(name).decode("utf-8"))
                 except Exception:  # ruff: ignore[blind-except] - 파싱 실패 필드별 None 기록, 호출부가 sectionXmlValid로 감지
                     result[name] = None
     except (zipfile.BadZipFile, OSError):

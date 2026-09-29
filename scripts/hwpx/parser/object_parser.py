@@ -3,11 +3,16 @@
 section XML에서 그림/도형/컨테이너 객체를 ObjectInfo 목록으로 추출하고
 header.xml의 binItem(BinData 참조)을 BinDataInfo 목록으로 추출한다.
 """
+
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from .parser_contract import ObjectInfo, BinDataInfo
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
+from .parser_contract import BinDataInfo, ObjectInfo
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -55,11 +60,12 @@ def _find_bin_data_ref(el: ET.Element) -> str | None:
     return None
 
 
-def parse_objects_from_section(section_xml: bytes, section_index: int,
-                                 source_path: str = "") -> list[ObjectInfo]:
+def parse_objects_from_section(
+    section_xml: bytes, section_index: int, source_path: str = ""
+) -> list[ObjectInfo]:
     """section XML에서 객체(도형/그림/컨테이너) 목록을 ObjectInfo로 반환."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return []
 
@@ -73,18 +79,20 @@ def parse_objects_from_section(section_xml: bytes, section_index: int,
         width, height, pos_x, pos_y = _extract_geom(el)
         obj_id = el.get("id", "") or f"obj_s{section_index}_{counter:04d}"
         bin_ref = _find_bin_data_ref(el)
-        objects.append(ObjectInfo(
-            objectId=obj_id,
-            objectType=obj_type,
-            sectionIndex=section_index,
-            sourcePath=source_path,
-            binDataRef=bin_ref,
-            width=width,
-            height=height,
-            posX=pos_x,
-            posY=pos_y,
-            rawTag=tag,
-        ))
+        objects.append(
+            ObjectInfo(
+                objectId=obj_id,
+                objectType=obj_type,
+                sectionIndex=section_index,
+                sourcePath=source_path,
+                binDataRef=bin_ref,
+                width=width,
+                height=height,
+                posX=pos_x,
+                posY=pos_y,
+                rawTag=tag,
+            )
+        )
         counter += 1
     return objects
 
@@ -92,7 +100,7 @@ def parse_objects_from_section(section_xml: bytes, section_index: int,
 def parse_bin_data_from_header(header_xml: bytes) -> list[BinDataInfo]:
     """header.xml의 binData/binItem 목록을 BinDataInfo로 반환."""
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return []
     result: list[BinDataInfo] = []
@@ -103,10 +111,12 @@ def parse_bin_data_from_header(header_xml: bytes) -> list[BinDataInfo]:
             href = el.get("href", "") or el.get("path", "")
             fmt = el.get("format", "") or el.get("type", "")
             if bin_id or href:
-                result.append(BinDataInfo(
-                    binId=bin_id,
-                    href=href,
-                    format=fmt,
-                    sourceTag=tag,
-                ))
+                result.append(
+                    BinDataInfo(
+                        binId=bin_id,
+                        href=href,
+                        format=fmt,
+                        sourceTag=tag,
+                    )
+                )
     return result

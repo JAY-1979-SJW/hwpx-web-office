@@ -17,13 +17,15 @@ V4/V5/V6 는 정상 검증된다.
 - V6_OUTPUT_ISOLATED           : output != source && sandbox 하위
 - V7_READBACK_MATCH            : V1 PASS && output 존재
 """
+
 from __future__ import annotations
+
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from .para_edit_model import Paragraph
 from .cell_save_verify7 import _output_under_sandbox
+from .para_edit_model import Paragraph
 
 
 def _read_blob(zip_path: Path) -> str:
@@ -37,20 +39,27 @@ def _read_blob(zip_path: Path) -> str:
 
 def _header_para_pr_ids(zip_path: Path) -> set[str]:
     """HWPX 의 Contents/header.xml 에서 <hh:paraPr id> 집합 (신규 도입 탐지용)."""
-    import xml.etree.ElementTree as ET
+    # B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+    from defusedxml.ElementTree import fromstring as _dx_fromstring
+
     if not zip_path.is_file():
         return set()
     try:
         with zipfile.ZipFile(str(zip_path)) as z:
-            name = next((n for n in z.namelist()
-                         if n.replace("\\", "/").endswith("Contents/header.xml")), None)
+            name = next(
+                (n for n in z.namelist() if n.replace("\\", "/").endswith("Contents/header.xml")),
+                None,
+            )
             if name is None:
                 return set()
-            root = ET.fromstring(z.read(name))
-    except Exception:
+            root = _dx_fromstring(z.read(name))
+    except Exception:  # ruff: ignore[blind-except] — 파싱 실패 시 빈 집합(탐지 계속)
         return set()
-    return {str(el.attrib["id"]) for el in root.iter()
-            if el.tag.rsplit("}", 1)[-1] == "paraPr" and "id" in el.attrib}
+    return {
+        str(el.attrib["id"])
+        for el in root.iter()
+        if el.tag.rsplit("}", 1)[-1] == "paraPr" and "id" in el.attrib
+    }
 
 
 def verify7_paragraphs(
@@ -69,16 +78,17 @@ def verify7_paragraphs(
     results: dict[str, str] = {}
 
     # V6 — output 격리 (output 미존재여도 경로 정책은 검증 가능)
-    same_path = (output_path.resolve() == source_path.resolve()
-                              if source_path.is_file() else False)
+    same_path = output_path.resolve() == source_path.resolve() if source_path.is_file() else False
     under_sb = _output_under_sandbox(output_path, project_root)
     v6 = "PASS" if (not same_path and under_sb) else "FAIL"
     results["V6_OUTPUT_ISOLATED"] = v6
     if v6 == "FAIL":
-        findings.append({"code": "V6_OUTPUT_NOT_ISOLATED",
-                                  "samePath": same_path,
-                                  "underSandbox": under_sb,
-                                  "outputPath": str(output_path)})
+        findings.append({
+            "code": "V6_OUTPUT_NOT_ISOLATED",
+            "samePath": same_path,
+            "underSandbox": under_sb,
+            "outputPath": str(output_path),
+        })
 
     # V4 — applyCharPrIDRef 가 원본 paragraph char_pr_set 의 부분집합
     v4 = "PASS"
@@ -87,8 +97,7 @@ def verify7_paragraphs(
         para = paragraphs_by_id.get(pid)
         if para is None:
             v4 = "FAIL"
-            findings.append({"code": "V4_PARAGRAPH_MISSING",
-                                      "paragraphId": pid})
+            findings.append({"code": "V4_PARAGRAPH_MISSING", "paragraphId": pid})
             continue
         apply_pr = entry.get("applyCharPrIDRef")
         # WEB-OFFICE-PARA-EDIT-APPLYFORMAT-EXISTING-CHARPR-01:
@@ -102,21 +111,23 @@ def verify7_paragraphs(
             # None 은 원본 char_pr_set 에 None 이 있어야 PASS
             if None not in para.char_pr_set():
                 v4 = "FAIL"
-                findings.append({"code": "V4_CHARPR_NEW_INTRODUCED",
-                                          "paragraphId": pid,
-                                          "applyCharPrIDRef": None})
+                findings.append({
+                    "code": "V4_CHARPR_NEW_INTRODUCED",
+                    "paragraphId": pid,
+                    "applyCharPrIDRef": None,
+                })
             continue
         if apply_pr not in para.char_pr_set():
             v4 = "FAIL"
-            findings.append({"code": "V4_CHARPR_NEW_INTRODUCED",
-                                      "paragraphId": pid,
-                                      "applyCharPrIDRef": apply_pr,
-                                      "origCharPr": sorted(
-                                          str(x) for x in para.char_pr_set())})
+            findings.append({
+                "code": "V4_CHARPR_NEW_INTRODUCED",
+                "paragraphId": pid,
+                "applyCharPrIDRef": apply_pr,
+                "origCharPr": sorted(str(x) for x in para.char_pr_set()),
+            })
     if not applied_plan_edits:
         v4 = "FAIL"
-        findings.append({"code": "V4_NO_APPLIED",
-                                  "detail": "applied=∅ — vacuous PASS 방지"})
+        findings.append({"code": "V4_NO_APPLIED", "detail": "applied=∅ — vacuous PASS 방지"})
     results["V4_CHARPR_PRESERVED"] = v4
 
     # V5 — parPrIDRef 무변경 (applied paragraphId 의 사전 parPr 와
@@ -127,8 +138,7 @@ def verify7_paragraphs(
         para = paragraphs_by_id.get(pid)
         if para is None:
             v5 = "FAIL"
-            findings.append({"code": "V5_PARAGRAPH_MISSING",
-                                      "paragraphId": pid})
+            findings.append({"code": "V5_PARAGRAPH_MISSING", "paragraphId": pid})
     # WEB-OFFICE-PARA-FORMAT-01(M2): parPr 변경은 APPLY_PARA_FORMAT 명령의
     # 대상 문단에서만 허용하고, 그 값은 반드시 "원본 header 에 이미 있던"
     # paraPr id 여야 한다(신규 paraPr 도입 = header mutation 금지).
@@ -140,26 +150,28 @@ def verify7_paragraphs(
         after = e.get("afterParaPrIDRef", e.get("paraPrIDRef"))
         if tgt is None or str(after) != str(tgt):
             v5 = "FAIL"
-            findings.append({"code": "V5_PARAPR_TARGET_MISMATCH",
-                             "paragraphId": e.get("paragraphId"),
-                             "targetParaPrIDRef": tgt,
-                             "afterParaPrIDRef": after})
+            findings.append({
+                "code": "V5_PARAPR_TARGET_MISMATCH",
+                "paragraphId": e.get("paragraphId"),
+                "targetParaPrIDRef": tgt,
+                "afterParaPrIDRef": after,
+            })
         elif src_para_pr_ids and str(tgt) not in src_para_pr_ids:
             v5 = "FAIL"
-            findings.append({"code": "V5_NEW_PARAPR_INTRODUCED",
-                             "paragraphId": e.get("paragraphId"),
-                             "targetParaPrIDRef": tgt})
+            findings.append({
+                "code": "V5_NEW_PARAPR_INTRODUCED",
+                "paragraphId": e.get("paragraphId"),
+                "targetParaPrIDRef": tgt,
+            })
     if not applied_plan_edits:
         v5 = "FAIL"
-        findings.append({"code": "V5_NO_APPLIED",
-                                  "detail": "applied=∅ — vacuous PASS 방지"})
+        findings.append({"code": "V5_NO_APPLIED", "detail": "applied=∅ — vacuous PASS 방지"})
     results["V5_PARPR_PRESERVED"] = v5
 
     # output 미존재 시 V1/V2/V3/V7 FAIL (vacuous PASS 차단)
     output_exists = output_path.is_file()
     if not output_exists:
-        findings.append({"code": "OUTPUT_MISSING",
-                                  "detail": str(output_path)})
+        findings.append({"code": "OUTPUT_MISSING", "detail": str(output_path)})
 
     # V1 — readback paragraph 슬라이스 매칭
     v1 = "PASS"
@@ -167,8 +179,10 @@ def verify7_paragraphs(
     if output_exists:
         # paragraph parsing 은 본 부분 준공 범위 밖 → readback 불가로 처리
         v1 = "FAIL"
-        findings.append({"code": "V1_READBACK_UNSUPPORTED",
-                                  "detail": "paragraph readback parser 미지원"})
+        findings.append({
+            "code": "V1_READBACK_UNSUPPORTED",
+            "detail": "paragraph readback parser 미지원",
+        })
     else:
         v1 = "FAIL"
     results["V1_RANGE_POSITION_OK"] = v1
@@ -191,9 +205,11 @@ def verify7_paragraphs(
             after = entry.get("afterText", "")
             if after and after not in blob:
                 v2 = "FAIL"
-                findings.append({"code": "V2_AFTER_TEXT_MISSING",
-                                          "paragraphId": entry["paragraphId"],
-                                          "afterText": after})
+                findings.append({
+                    "code": "V2_AFTER_TEXT_MISSING",
+                    "paragraphId": entry["paragraphId"],
+                    "afterText": after,
+                })
     else:
         v2 = "FAIL"
     results["V2_NO_CROSS_PARAGRAPH_LEAK"] = v2
@@ -207,8 +223,7 @@ def verify7_paragraphs(
             after_text = out_paragraphs.get(pid, before_text)
             if after_text != before_text:
                 v3 = "FAIL"
-                findings.append({"code": "V3_UNTOUCHED_CHANGED",
-                                          "paragraphId": pid})
+                findings.append({"code": "V3_UNTOUCHED_CHANGED", "paragraphId": pid})
                 break
     else:
         v3 = "FAIL"
@@ -222,20 +237,19 @@ def verify7_paragraphs(
     # PARA_INSERT 가 적용된 항목에 대해 신규 paragraph id 가 발급되었고
     # before+after 텍스트 합이 원본 paragraph 텍스트와 동일한지 검증.
     v8_findings, v8_results = _verify_v8_para_struct_integrity(
-        applied_plan_edits, pre_save_paragraph_texts)
+        applied_plan_edits, pre_save_paragraph_texts
+    )
     findings.extend(v8_findings)
     results.update(v8_results)
 
-    overall = ("PASS" if all(v == "PASS" for v in results.values())
-                          else "FAIL")
-    return {"results": results, "findings": findings,
-                "verdict": overall}
+    overall = "PASS" if all(v == "PASS" for v in results.values()) else "FAIL"
+    return {"results": results, "findings": findings, "verdict": overall}
 
 
 def _verify_v8_para_struct_integrity(
-        applied_plan_edits: list[dict],
-        pre_save_paragraph_texts: dict[str, str],
-        ) -> tuple[list[dict], dict[str, str]]:
+    applied_plan_edits: list[dict],
+    pre_save_paragraph_texts: dict[str, str],
+) -> tuple[list[dict], dict[str, str]]:
     """V8 — PARA_INSERT 적용 항목 구조 무결성 검증.
 
     - 신규 paragraph id 존재
@@ -244,10 +258,8 @@ def _verify_v8_para_struct_integrity(
     - charPrIDRef / parPrIDRef 상속 일관성
     """
     findings: list[dict] = []
-    insert_items = [e for e in applied_plan_edits
-                              if e.get("commandType") == "PARA_INSERT"]
-    delete_items = [e for e in applied_plan_edits
-                              if e.get("commandType") == "PARA_DELETE"]
+    insert_items = [e for e in applied_plan_edits if e.get("commandType") == "PARA_INSERT"]
+    delete_items = [e for e in applied_plan_edits if e.get("commandType") == "PARA_DELETE"]
     if not insert_items and not delete_items:
         # PARA_INSERT/PARA_DELETE 없는 경우 — V8 미적용 (PASS, vacuous 허용)
         return [], {"V8_PARA_STRUCT_INTEGRITY": "PASS"}
@@ -259,40 +271,46 @@ def _verify_v8_para_struct_integrity(
         after_text = entry.get("afterText", "")
         if not new_pid:
             v8 = "FAIL"
-            findings.append({"code": "V8_NEW_PARAGRAPH_ID_MISSING",
-                                      "paragraphId": orig_pid})
+            findings.append({"code": "V8_NEW_PARAGRAPH_ID_MISSING", "paragraphId": orig_pid})
             continue
         if new_pid == orig_pid:
             v8 = "FAIL"
-            findings.append({"code": "V8_PARAGRAPH_ID_COLLISION",
-                                      "paragraphId": orig_pid,
-                                      "newParagraphId": new_pid})
+            findings.append({
+                "code": "V8_PARAGRAPH_ID_COLLISION",
+                "paragraphId": orig_pid,
+                "newParagraphId": new_pid,
+            })
             continue
         original_text = pre_save_paragraph_texts.get(orig_pid, "")
         if original_text and (before_text + after_text != original_text):
             v8 = "FAIL"
-            findings.append({"code": "V8_TEXT_SUM_MISMATCH",
-                                      "paragraphId": orig_pid,
-                                      "before": before_text,
-                                      "after": after_text,
-                                      "original": original_text})
+            findings.append({
+                "code": "V8_TEXT_SUM_MISMATCH",
+                "paragraphId": orig_pid,
+                "before": before_text,
+                "after": after_text,
+                "original": original_text,
+            })
     # WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-DELETE-01: PARA_DELETE 검증.
     for entry in delete_items:
         removed_pid = entry.get("removedParagraphId") or entry.get("paragraphId")
         prev_pid = entry.get("prevParagraphId")
         if not removed_pid:
             v8 = "FAIL"
-            findings.append({"code": "V8_PARA_DELETE_REMOVED_ID_MISSING",
-                                      "entry": entry})
+            findings.append({"code": "V8_PARA_DELETE_REMOVED_ID_MISSING", "entry": entry})
             continue
         if not prev_pid:
             v8 = "FAIL"
-            findings.append({"code": "V8_PARA_DELETE_PREV_ID_MISSING",
-                                      "removedParagraphId": removed_pid})
+            findings.append({
+                "code": "V8_PARA_DELETE_PREV_ID_MISSING",
+                "removedParagraphId": removed_pid,
+            })
             continue
         # 제거된 paragraph id 가 원본에 존재했는지 (pre_save 에 있어야 함)
         if removed_pid not in pre_save_paragraph_texts:
             v8 = "FAIL"
-            findings.append({"code": "V8_PARA_DELETE_ID_NOT_IN_PRESAVE",
-                                      "removedParagraphId": removed_pid})
+            findings.append({
+                "code": "V8_PARA_DELETE_ID_NOT_IN_PRESAVE",
+                "removedParagraphId": removed_pid,
+            })
     return findings, {"V8_PARA_STRUCT_INTEGRITY": v8}

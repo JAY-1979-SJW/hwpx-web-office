@@ -20,6 +20,10 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 CONTRACT_NAME = "HWPX-XML-DEEP-STRUCTURE-ANALYZER-CONTRACT-01"
 ANALYZER_VERSION = "v2"  # v2: 9 진단실 내부 정밀화 (context detail 풍부화)
 # v1 → v2: 시그니처/enum/반환 키는 동일. context 안에 추가 detail 제공.
@@ -111,7 +115,7 @@ def analyze_run_boundary(
       - text-bearing run이 3개 이상이면 HIGH
     """
     try:
-        root = ET.fromstring(paragraph_xml)
+        root = _dx_fromstring(paragraph_xml)
     except ET.ParseError as e:
         return _make_flag(
             reason_code="RUN_BOUNDARY_UNSUPPORTED",
@@ -168,7 +172,7 @@ def analyze_checkbox_or_shape(
       - shape류 자식이 있고 텍스트 입력 위치로 의심되면 MEDIUM
     """
     try:
-        root = ET.fromstring(element_xml)
+        root = _dx_fromstring(element_xml)
     except ET.ParseError:
         return None
     text_lower = element_xml.lower()
@@ -200,7 +204,7 @@ def analyze_object_anchor(
 ) -> dict | None:
     """객체(이미지/도식/식)의 anchor 결정이 필요한 위치인지 진단."""
     try:
-        root = ET.fromstring(element_xml)
+        root = _dx_fromstring(element_xml)
     except ET.ParseError:
         return None
     objs = [n for n in root.iter() if _local(n.tag) in _HP_OBJECT_LOCALS]
@@ -230,7 +234,7 @@ def analyze_style_resolution(
     writer가 텍스트를 쓰면 어느 스타일을 따를지 모호하므로 진단 필요.
     """
     try:
-        root = ET.fromstring(paragraph_xml)
+        root = _dx_fromstring(paragraph_xml)
     except ET.ParseError:
         return None
     char_ids: set[str] = set()
@@ -279,7 +283,7 @@ def analyze_cell_internal_paragraph(
       - paragraph >= 2개 → 어느 paragraph에 쓸지 모호 (MEDIUM)
     """
     try:
-        root = ET.fromstring(cell_xml)
+        root = _dx_fromstring(cell_xml)
     except ET.ParseError:
         return None
     paras = list(_iter_local(root, _HP_PARA_LOCAL))
@@ -357,7 +361,7 @@ def analyze_merged_cell_geometry(
 ) -> dict | None:
     """병합 셀(rowSpan/colSpan > 1) 또는 hidden cell 진단."""
     try:
-        root = ET.fromstring(cell_xml)
+        root = _dx_fromstring(cell_xml)
     except ET.ParseError:
         return None
 
@@ -611,7 +615,8 @@ def to_backlog_records(
 ) -> list[dict]:
     """diagnose_session()이 만든 flag dict들을 D동
     xml_deep_analyzer_need_flags 행 dict로 변환."""
-    out: list[dict] = [{
+    out: list[dict] = [
+        {
             "session_id": session_id,
             "document_id": document_id,
             "reason_code": f["reason_code"],
@@ -621,7 +626,9 @@ def to_backlog_records(
             "severity": f["severity"],
             "created_at": created_at,
             "_context": f.get("context") or {},
-        } for f in flags]
+        }
+        for f in flags
+    ]
     return out
 
 
@@ -650,10 +657,14 @@ def audit_analyzer_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        violations.extend({
-                    "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
-                    "forbidden": needle,
-                } for needle in FORBIDDEN_ANALYZER_IMPORTS if needle in text)
+        violations.extend(
+            {
+                "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+                "forbidden": needle,
+            }
+            for needle in FORBIDDEN_ANALYZER_IMPORTS
+            if needle in text
+        )
     return {"violations": violations, "ok": not violations, "filesChecked": checked}
 
 

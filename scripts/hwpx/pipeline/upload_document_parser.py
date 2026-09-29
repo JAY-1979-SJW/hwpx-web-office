@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 업로드된 신뢰할 수 없는 문서를 직접 파싱하는 모듈이라 특히 중요.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_HS = "http://www.hancom.co.kr/hwpml/2011/section"
 
@@ -379,7 +384,7 @@ def parse_hwpx(path: Path) -> ParseResult:
             for sec_idx, sec_name in enumerate(section_names):
                 try:
                     xml_bytes = z.read(sec_name)
-                    root = ET.fromstring(xml_bytes.decode("utf-8"))
+                    root = _dx_fromstring(xml_bytes.decode("utf-8"))
                 except Exception as e:  # ruff: ignore[blind-except]
                     result.warnings.append(f"parse_error_{sec_name}: {e}")
                     continue

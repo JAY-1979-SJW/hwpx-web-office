@@ -12,6 +12,10 @@ from typing import Any
 
 import olefile
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 from hwp_full_fidelity_audit import build_original_integrity
 from hwp_full_fidelity_header import (
     build_decoded_header_xml,
@@ -154,7 +158,7 @@ def _rebuild_spine_itemrefs(
 
 def _content_hpf_with_entries(xml_text: str, entries: list[str]) -> str:
     try:
-        root = ET.fromstring(xml_text.encode("utf-8"))
+        root = _dx_fromstring(xml_text.encode("utf-8"))
     except ET.ParseError:
         return xml_text
     manifest, spine = _find_manifest_and_spine(root)
@@ -786,7 +790,7 @@ def build_visual_section_updates(
         }
     entry = section_entries[0]
     try:
-        root = ET.fromstring(existing_entries[entry])
+        root = _dx_fromstring(existing_entries[entry])
     except ET.ParseError as exc:
         return {}, {
             "status": "SECTION_XML_PARSE_FAILED",

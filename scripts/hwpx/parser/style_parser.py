@@ -2,10 +2,15 @@
 
 header.xml에서 charPr / paraPr / borderFill 정의와 참조 정보를 추출한다.
 """
+
 from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 from .parser_contract import StyleInfo
 
@@ -23,7 +28,7 @@ def parse_font_face_table(header_xml: bytes) -> dict[str, dict[str, str]]:
     예: {"HANGUL": {"0": "굴림체", "1": "돋움", ...}, "LATIN": {...}, ...}
     """
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return {}
     result: dict[str, dict[str, str]] = {}
@@ -43,7 +48,7 @@ def parse_font_face_table(header_xml: bytes) -> dict[str, dict[str, str]]:
 def parse_font_face_defs(header_xml: bytes) -> dict[str, dict[str, dict]]:
     """Return header fontface definitions with optional typeInfo attributes."""
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return {}
     result: dict[str, dict[str, dict]] = {}
@@ -76,22 +81,28 @@ def _resolve_font_name(fr_attribs: dict, font_table: dict[str, dict[str, str]]) 
         if fid and fid in font_table.get(lang_key, {}):
             return font_table[lang_key][fid]
     # 모든 lang 순차 fallback
-    for lang_key, attr in (("HANJA", "hanja"), ("JAPANESE", "japanese"),
-                            ("OTHER", "other"), ("SYMBOL", "symbol"), ("USER", "user")):
+    for lang_key, attr in (
+        ("HANJA", "hanja"),
+        ("JAPANESE", "japanese"),
+        ("OTHER", "other"),
+        ("SYMBOL", "symbol"),
+        ("USER", "user"),
+    ):
         fid = fr_attribs.get(attr, "")
         if fid and fid in font_table.get(lang_key, {}):
             return font_table[lang_key][fid]
     return None
 
 
-def parse_char_pr_defs(header_xml: bytes,
-                        font_table: dict[str, dict[str, str]] | None = None) -> dict[str, dict]:
+def parse_char_pr_defs(
+    header_xml: bytes, font_table: dict[str, dict[str, str]] | None = None
+) -> dict[str, dict]:
     """header.xml에서 charPr 정의를 {id: {...}} 형태로 반환.
 
     font_table이 주어지면 fontFace ID를 실제 폰트명(fontName)으로 역참조.
     """
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return {}
     if font_table is None:
@@ -158,7 +169,7 @@ def parse_char_pr_defs(header_xml: bytes,
 def parse_para_pr_defs(header_xml: bytes) -> dict[str, dict]:
     """header.xml에서 paraPr 정의를 {id: {...}} 형태로 반환."""
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return {}
     result: dict[str, dict] = {}
@@ -166,11 +177,13 @@ def parse_para_pr_defs(header_xml: bytes) -> dict[str, dict]:
         pid = el.get("id", "")
         if not pid:
             continue
+
         def _int(v: str) -> int:
             try:
                 return int(v)
             except (ValueError, TypeError):
                 return 0
+
         align_val = el.get("align", "")
         if not align_val:
             ach = el.find(f"{{{NS_HH}}}align")
@@ -219,7 +232,7 @@ def _border_summary(borders: dict[str, dict]) -> str:
 def parse_border_fill_defs(header_xml: bytes) -> dict[str, dict]:
     """header.xml에서 borderFill 정의를 {id: {...}} 형태로 반환."""
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return {}
     result: dict[str, dict] = {}
@@ -248,7 +261,7 @@ def parse_border_fill_defs(header_xml: bytes) -> dict[str, dict]:
 def parse_style_summary(header_xml: bytes) -> StyleInfo:
     """header.xml에서 스타일 정의를 파싱해 StyleInfo로 반환."""
     try:
-        root = ET.fromstring(header_xml)
+        root = _dx_fromstring(header_xml)
     except ET.ParseError:
         return StyleInfo()
 
@@ -290,7 +303,7 @@ def collect_referenced_style_ids(section_xmls: list[bytes]) -> dict[str, list[st
     for raw in section_xmls:
         try:
             text = raw.decode("utf-8", errors="replace")
-        except Exception:
+        except (UnicodeDecodeError, AttributeError):
             continue
         char_refs.extend(_CHARPR_ID_RE.findall(text))
         para_refs.extend(_PARAPR_ID_RE.findall(text))
@@ -311,11 +324,23 @@ def detect_dangling_refs(style_info: StyleInfo, referenced_ids: dict[str, list[s
     border_defs = set(style_info.borderFill.keys())
 
     if char_defs:
-        dangling.extend(f"charPr:{rid}" for rid in referenced_ids.get("charPrIDRefs", []) if rid not in char_defs)
+        dangling.extend(
+            f"charPr:{rid}"
+            for rid in referenced_ids.get("charPrIDRefs", [])
+            if rid not in char_defs
+        )
     if para_defs:
-        dangling.extend(f"paraPr:{rid}" for rid in referenced_ids.get("paraPrIDRefs", []) if rid not in para_defs)
+        dangling.extend(
+            f"paraPr:{rid}"
+            for rid in referenced_ids.get("paraPrIDRefs", [])
+            if rid not in para_defs
+        )
     if border_defs:
-        dangling.extend(f"borderFill:{rid}" for rid in referenced_ids.get("borderFillIDRefs", []) if rid not in border_defs)
+        dangling.extend(
+            f"borderFill:{rid}"
+            for rid in referenced_ids.get("borderFillIDRefs", [])
+            if rid not in border_defs
+        )
     return dangling
 
 

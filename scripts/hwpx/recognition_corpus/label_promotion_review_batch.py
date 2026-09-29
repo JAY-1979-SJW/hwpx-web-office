@@ -163,7 +163,8 @@ def _document_types(conn, doc_ids: list[str]) -> dict[str, int]:
     rows = conn.execute(
         f"SELECT document_type, COUNT(*) "
         f"  FROM document_classifications WHERE document_id IN "
-        f"({placeholders}) GROUP BY document_type",
+        # {placeholders}는 "?" 개수뿐, 실제 값(doc_ids)은 매개변수 바인딩
+        f"({placeholders}) GROUP BY document_type",  # nosec B608
         doc_ids,
     ).fetchall()
     return {r[0]: r[1] for r in rows}

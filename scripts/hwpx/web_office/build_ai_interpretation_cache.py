@@ -206,7 +206,8 @@ def _targets(
     가장 낮다. 이름 키워드가 아니라 스키마 생성 단계가 이미 확정한 실제
     칸 구성을 근거로 삼는다.
     """
-    done = {r[0] for r in con.execute(f"SELECT form_id FROM {STAGING}")}
+    # STAGING/VERIFY_TABLE 은 모듈 상수(고정 테이블명) — 외부 입력이 섞이지 않는다
+    done = {r[0] for r in con.execute(f"SELECT form_id FROM {STAGING}")}  # nosec B608
     rows = con.execute(
         "SELECT form_id, source_path, input_schema, clean_name,"
         " COALESCE(name,''), COALESCE(applicant_count,0) FROM forms"
@@ -327,7 +328,7 @@ def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
     con = _connect()
     con.execute(DDL)
     con.execute(VERIFY_DDL)
-    done = {r[0] for r in con.execute(f"SELECT form_id FROM {VERIFY_TABLE}")}
+    done = {r[0] for r in con.execute(f"SELECT form_id FROM {VERIFY_TABLE}")}  # nosec B608
     # 되살림 후보(죽은 서식 · 보호구역 아님)를 먼저 검증한다 — 살아있는
     # 서식이나 대장·발급증서는 어차피 역할이 안 바뀌므로 검증해도 반영에
     # 영향이 없다. 앞선 표본 12건이 전부 비후보라 되살림 0 으로 나왔다.
@@ -340,7 +341,7 @@ def verify(limit: int = 0, shard: int = 0, shards: int = 1) -> None:
         f"SELECT s.form_id, s.interpretations, f.source_path, f.clean_name,"
         f" f.input_schema, COALESCE(f.applicant_count,0),"
         f" COALESCE(f.doc_type,''), COALESCE(f.form_kind,'')"
-        f" FROM {STAGING} s JOIN forms f ON f.form_id=s.form_id"
+        f" FROM {STAGING} s JOIN forms f ON f.form_id=s.form_id"  # nosec B608
         f" WHERE s.status='OK' AND s.interpretations IS NOT NULL"
         f" ORDER BY s.form_id"
     ).fetchall()
@@ -414,7 +415,7 @@ def status() -> None:
     total = con.execute(
         "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL AND input_schema != ''"
     ).fetchone()[0]
-    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
+    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()  # nosec B608 - STAGING 은 모듈 상수
     staged = sum(n for _, n in rows)
     _log(f"대상 {total} · 스테이징 {staged} ({staged / total * 100:.1f}%)")
     for st, n in rows:
@@ -422,7 +423,7 @@ def status() -> None:
     agg = con.execute(
         f"SELECT SUM(field_count), SUM(interpreted_count), SUM(input_count),"
         f" SUM(not_input_count), SUM(semantic_count), AVG(elapsed_sec)"
-        f" FROM {STAGING} WHERE status='OK'"
+        f" FROM {STAGING} WHERE status='OK'"  # nosec B608
     ).fetchone()
     if agg and agg[0]:
         fc, ic, inp, notinp, sem, el = agg
@@ -440,7 +441,7 @@ def _load_verified_by_form(con) -> dict[int, set[str]]:
     con.execute(VERIFY_DDL)
     verified_by_form: dict[int, set[str]] = {}
     for fid, agreed in con.execute(
-        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
+        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"  # nosec B608
         f" WHERE status='OK' AND author_agreed IS NOT NULL"
     ):
         try:
@@ -536,7 +537,7 @@ def promote() -> None:
     """
     con = _connect()
     con.execute(DDL)
-    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()
+    rows = con.execute(f"SELECT status, COUNT(*) FROM {STAGING} GROUP BY status").fetchall()  # nosec B608 - STAGING 은 모듈 상수
     staged = sum(n for _, n in rows)
     ok = dict(rows).get("OK", 0)
     if not staged:
@@ -561,7 +562,7 @@ def promote() -> None:
     revived_forms = 0
     pending: list[tuple] = []
     for form_id, interp_json in con.execute(
-        f"SELECT form_id, interpretations FROM {STAGING}"
+        f"SELECT form_id, interpretations FROM {STAGING}"  # nosec B608
         f" WHERE status='OK' AND interpretations IS NOT NULL"
     ):
         outcome = _process_staged_form(con, form_id, interp_json, verified_by_form)

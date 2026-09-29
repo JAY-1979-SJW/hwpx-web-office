@@ -19,6 +19,10 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 _TAG_TBL = f"{{{NS_HP}}}tbl"
 _TAG_TR = f"{{{NS_HP}}}tr"
@@ -363,7 +367,7 @@ def _map_from_section_xmls(
 
     for section_idx, raw in enumerate(section_xmls):
         try:
-            root = ET.fromstring(raw)
+            root = _dx_fromstring(raw)
         except ET.ParseError:
             continue
 
@@ -586,7 +590,7 @@ def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
 
     for section_idx, raw in enumerate(section_xmls):
         try:
-            root = ET.fromstring(raw)
+            root = _dx_fromstring(raw)
         except ET.ParseError:
             continue
 
@@ -618,7 +622,9 @@ def map_objects_to_cells_with_geometry(source_path: Path) -> ObjectCellMappingRe
     doc_hash = hashlib.sha256(raw).hexdigest()
     section_xmls: list[bytes] = []
     with zipfile.ZipFile(source_path) as zf:
-        section_xmls.extend(zf.read(n) for n in sorted(zf.namelist()) if "section" in n and n.endswith(".xml"))
+        section_xmls.extend(
+            zf.read(n) for n in sorted(zf.namelist()) if "section" in n and n.endswith(".xml")
+        )
     base = _map_from_section_xmls(
         section_xmls,
         document_hash=doc_hash,

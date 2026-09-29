@@ -29,6 +29,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -173,7 +177,7 @@ def _parse_all_sections(
     for sec_name in section_files:
         try:
             raw = zf.read(sec_name)
-            root = ET.fromstring(raw)
+            root = _dx_fromstring(raw)
         except ET.ParseError as exc:
             parse_errors.append(f"{sec_name}: XML parse error: {exc}")
             continue

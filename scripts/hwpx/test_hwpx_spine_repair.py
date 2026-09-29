@@ -3,7 +3,9 @@ from __future__ import annotations
 import sys
 import zipfile
 from pathlib import Path
-import xml.etree.ElementTree as ET
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -31,10 +33,14 @@ def test_repair_hwpx_spine_replaces_header_itemref_with_section(tmp_path: Path) 
     report = repair_hwpx_spine(source, output)
     with zipfile.ZipFile(output) as zf:
         names = set(zf.namelist())
-        root = ET.fromstring(zf.read("Contents/content.hpf"))
+        root = _dx_fromstring(zf.read("Contents/content.hpf"))
         mimetype = zf.read("mimetype").decode("utf-8")
         container_xml = zf.read("META-INF/container.xml").decode("utf-8")
-    refs = [child.attrib.get("idref") for child in root.iter() if child.tag.rsplit("}", 1)[-1] == "itemref"]
+    refs = [
+        child.attrib.get("idref")
+        for child in root.iter()
+        if child.tag.rsplit("}", 1)[-1] == "itemref"
+    ]
     manifest_items = {
         child.attrib.get("id"): child.attrib.get("href")
         for child in root.iter()

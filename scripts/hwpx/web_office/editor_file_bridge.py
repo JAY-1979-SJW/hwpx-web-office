@@ -54,50 +54,55 @@ def _build_table_address_maps(
     """표 전역 등장순 → tableId, 표별 cellAddr → 등장순 (r,c) 매핑."""
     import re as _re
     import sys as _sys
-    import xml.etree.ElementTree as _ET
     import zipfile
+
+    # B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+    from defusedxml.ElementTree import fromstring as _dx_fromstring
 
     def _ln(t):
         return t.rsplit("}", 1)[-1] if "}" in t else t
 
-    z = zipfile.ZipFile(source_path)
-    secs = sorted(
-        [n for n in z.namelist() if _re.search(r"section\d+\.xml$", n.lower())],
-        key=lambda n: int(_re.search(r"section(\d+)", n.lower()).group(1)),
-    )
     table_ids: list[str] = []
     addr_maps: list[dict[tuple[int, int], tuple[int, int]]] = []
-    for sec in secs:
-        si = int(_re.search(r"section(\d+)", sec.lower()).group(1))
-        root = _ET.fromstring(z.read(sec))
-        for ti, tbl in enumerate(e for e in root.iter() if _ln(e.tag) == "tbl"):
-            table_ids.append(f"t_s{si}_{ti:03d}")
-            amap: dict[tuple[int, int], tuple[int, int]] = {}
-            trs = [e for e in tbl if _ln(e.tag) == "tr"]
-            for r, tr in enumerate(trs):
-                tcs = [e for e in tr if _ln(e.tag) == "tc"]
-                for c, tc in enumerate(tcs):
-                    addr = next((x for x in tc.iter() if _ln(x.tag) == "cellAddr"), None)
-                    if addr is None:
-                        continue
-                    key = (int(addr.attrib.get("rowAddr", 0)), int(addr.attrib.get("colAddr", 0)))
-                    # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
-                    # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
-                    # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
-                    # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
-                    # 발동 로그 필수(대표님 지적) — 무음이면 가드가
-                    # 정당한 규칙인지 임시방편인지 판별 불가.
-                    if key in amap:
-                        print(
-                            f"[COORD_WARN] ADDR_COLLISION_FIRST_WINS: "
-                            f"{source_path} table=t_s{si}_{ti:03d} "
-                            f"cellAddr={key} 첫 occ={amap[key]} "
-                            f"무시된 occ=({r},{c})",
-                            file=_sys.stderr,
+    with zipfile.ZipFile(source_path) as z:
+        secs = sorted(
+            [n for n in z.namelist() if _re.search(r"section\d+\.xml$", n.lower())],
+            key=lambda n: int(_re.search(r"section(\d+)", n.lower()).group(1)),
+        )
+        for sec in secs:
+            si = int(_re.search(r"section(\d+)", sec.lower()).group(1))
+            root = _dx_fromstring(z.read(sec))
+            for ti, tbl in enumerate(e for e in root.iter() if _ln(e.tag) == "tbl"):
+                table_ids.append(f"t_s{si}_{ti:03d}")
+                amap: dict[tuple[int, int], tuple[int, int]] = {}
+                trs = [e for e in tbl if _ln(e.tag) == "tr"]
+                for r, tr in enumerate(trs):
+                    tcs = [e for e in tr if _ln(e.tag) == "tc"]
+                    for c, tc in enumerate(tcs):
+                        addr = next((x for x in tc.iter() if _ln(x.tag) == "cellAddr"), None)
+                        if addr is None:
+                            continue
+                        key = (
+                            int(addr.attrib.get("rowAddr", 0)),
+                            int(addr.attrib.get("colAddr", 0)),
                         )
-                    else:
-                        amap[key] = (r, c)
-            addr_maps.append(amap)
+                        # 첫 등장 우선(setdefault) — 표 꼬리에 장식용
+                        # 행이 cellAddr(0,0) 을 중복 선언하는 등 비정상
+                        # XML 사례에서, 나중 값으로 덮어쓰면 라벨이 전혀
+                        # 무관한 셀에 잘못 붙는 실사례 결함을 방지한다.
+                        # 발동 로그 필수(대표님 지적) — 무음이면 가드가
+                        # 정당한 규칙인지 임시방편인지 판별 불가.
+                        if key in amap:
+                            print(
+                                f"[COORD_WARN] ADDR_COLLISION_FIRST_WINS: "
+                                f"{source_path} table=t_s{si}_{ti:03d} "
+                                f"cellAddr={key} 첫 occ={amap[key]} "
+                                f"무시된 occ=({r},{c})",
+                                file=_sys.stderr,
+                            )
+                        else:
+                            amap[key] = (r, c)
+                addr_maps.append(amap)
     return table_ids, addr_maps
 
 

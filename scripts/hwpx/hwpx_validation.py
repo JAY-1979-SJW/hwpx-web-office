@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import zipfile
-import xml.etree.ElementTree as ET
+from pathlib import Path
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 from hwpx_package import HwpxValidator, decode_xml, is_xml_entry, package_has_placeholders
 
@@ -16,8 +18,8 @@ def package_contains_text(path: Path, values: list[str]) -> dict[str, bool]:
             if not is_xml_entry(name):
                 continue
             try:
-                root = ET.fromstring(decode_xml(zf.read(name)).encode("utf-8"))
-            except Exception:
+                root = _dx_fromstring(decode_xml(zf.read(name)).encode("utf-8"))
+            except Exception:  # ruff: ignore[blind-except] — 파싱 실패 항목은 건너뛰고 계속
                 continue
             for elem in root.iter():
                 if elem.text:
@@ -30,11 +32,15 @@ def package_contains_text(path: Path, values: list[str]) -> dict[str, bool]:
 
 def validate_rendered(path: Path, expected: list[str] | None = None) -> dict:
     validation = HwpxValidator.validate_hwpx(path)
-    validation["placeholder_remaining"] = package_has_placeholders(path) if validation.get("zip_ok") else None
+    validation["placeholder_remaining"] = (
+        package_has_placeholders(path) if validation.get("zip_ok") else None
+    )
     if expected:
         contains = package_contains_text(path, expected)
         validation["expected_values_found"] = [value for value, found in contains.items() if found]
-        validation["missing_expected_values"] = [value for value, found in contains.items() if not found]
+        validation["missing_expected_values"] = [
+            value for value, found in contains.items() if not found
+        ]
     else:
         validation["expected_values_found"] = []
         validation["missing_expected_values"] = []

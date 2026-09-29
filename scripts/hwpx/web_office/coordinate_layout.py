@@ -16,9 +16,11 @@ import math
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 try:
     from .coord_styles import (
@@ -110,20 +112,20 @@ class _SectionCtx:
 
 
 def _extract_section(path, secname, row_scale=1.0):
-    z = zipfile.ZipFile(path)
-    root = ET.fromstring(z.read(secname))
-    parent_map = {c: p for p in root.iter() for c in p}
-    # 표 문서순 인덱스 — 문서모델(ro_view_importer)의 tableId
-    # 't_s{sec}_{order:03d}' 와 동일 순서로 매겨 cellId 를 일치시킨다(편집 연결).
-    _sec_idx = 0
-    m_sec = re.search(r"section(\d+)", secname)
-    if m_sec:
-        _sec_idx = int(m_sec.group(1))
-    tbl_order = {_t: _i for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl")}
+    with zipfile.ZipFile(path) as z:
+        root = _dx_fromstring(z.read(secname))
+        parent_map = {c: p for p in root.iter() for c in p}
+        # 표 문서순 인덱스 — 문서모델(ro_view_importer)의 tableId
+        # 't_s{sec}_{order:03d}' 와 동일 순서로 매겨 cellId 를 일치시킨다(편집 연결).
+        _sec_idx = 0
+        m_sec = re.search(r"section(\d+)", secname)
+        if m_sec:
+            _sec_idx = int(m_sec.group(1))
+        tbl_order = {_t: _i for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl")}
 
-    border_fills = parse_border_fills(z)
-    char_prs = parse_char_prs(z)
-    para_aligns = parse_para_aligns(z)
+        border_fills = parse_border_fills(z)
+        char_prs = parse_char_prs(z)
+        para_aligns = parse_para_aligns(z)
 
     geo = parse_page_geometry(root)
     page_w = geo["page_w"]
@@ -850,11 +852,13 @@ def extract(path, row_scale=1.0):
     이어붙인다 — 단일 섹션이 대부분이나, 다중 섹션 문서에서 section0 외의
     내용이 사라지지 않도록(표시/편집 누락 방지) 표준 처리한다.
     row_scale: 공장 캘리브레이션 행높이 배율(기본 1.0 = 무변화)."""
-    z = zipfile.ZipFile(path)
-    sec_files = [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())]
-    sec_files.sort(key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)))
-    if not sec_files:
-        sec_files = [n for n in z.namelist() if "section0" in n.lower() and n.endswith(".xml")][:1]
+    with zipfile.ZipFile(path) as z:
+        sec_files = [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())]
+        sec_files.sort(key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)))
+        if not sec_files:
+            sec_files = [n for n in z.namelist() if "section0" in n.lower() and n.endswith(".xml")][
+                :1
+            ]
     if len(sec_files) <= 1:
         return _extract_section(path, sec_files[0], row_scale)
 
@@ -944,19 +948,19 @@ def _table_id_sequence(path):
     전역 등장 순서·구성(tc 수)은 재저장에도 보존되므로 위치 대응으로
     원본 네임스페이스에 번역한다.
     """
-    z = zipfile.ZipFile(path)
-    sec_files = sorted(
-        [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())],
-        key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)),
-    )
-    out = []
-    for sec in sec_files:
-        m = re.search(r"section(\d+)", sec.lower())
-        si = int(m.group(1)) if m else 0
-        root = ET.fromstring(z.read(sec))
-        for i, t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
-            tc = sum(1 for e in t.iter() if ln(e.tag) == "tc")
-            out.append(("t_s%d_%03d" % (si, i), tc))
+    with zipfile.ZipFile(path) as z:
+        sec_files = sorted(
+            [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())],
+            key=lambda n: int(re.search(r"section(\d+)", n.lower()).group(1)),
+        )
+        out = []
+        for sec in sec_files:
+            m = re.search(r"section(\d+)", sec.lower())
+            si = int(m.group(1)) if m else 0
+            root = _dx_fromstring(z.read(sec))
+            for i, t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
+                tc = sum(1 for e in t.iter() if ln(e.tag) == "tc")
+                out.append(("t_s%d_%03d" % (si, i), tc))
     return out
 
 

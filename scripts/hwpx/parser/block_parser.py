@@ -9,6 +9,10 @@ import re
 import unicodedata
 import xml.etree.ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 from .parser_contract import BlockInfo
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -66,7 +70,7 @@ def parse_blocks_from_section(
 ) -> list[BlockInfo]:
     """section XML에서 최상위 블록 순서를 BlockInfo 목록으로 반환."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return []
 

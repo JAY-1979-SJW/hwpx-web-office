@@ -145,9 +145,11 @@ def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, An
 
     con = _connect()
     con.execute(DDL)
+    # VERIFY_TABLE/STAGING/TABLE 은 import 된 모듈 상수(고정 테이블명) —
+    # 이 파일의 모든 SQL 보간은 이 상수들뿐, 외부 입력이 섞이지 않는다
     rows = con.execute(
         f"SELECT v.form_id, v.verdicts, s.interpretations,"
-        f" COALESCE(f.doc_type,'') FROM {VERIFY_TABLE} v"
+        f" COALESCE(f.doc_type,'') FROM {VERIFY_TABLE} v"  # nosec B608
         f" JOIN {STAGING} s ON s.form_id=v.form_id"
         f" JOIN forms f ON f.form_id=v.form_id"
         f" WHERE v.status='OK' AND v.verdicts IS NOT NULL"
@@ -189,9 +191,9 @@ def backfill_from_verified(*, project_root: Path = PROJECT_ROOT) -> dict[str, An
             json.dumps(slot["form_ids"], ensure_ascii=False),
         ))
 
-    con.execute(f"DELETE FROM {TABLE}")  # 백필은 전량 재계산(재현 가능)
+    con.execute(f"DELETE FROM {TABLE}")  # 백필은 전량 재계산(재현 가능)  # nosec B608
     con.executemany(
-        f"INSERT INTO {TABLE}(cache_key,label,doc_type,verdict,semantic,"
+        f"INSERT INTO {TABLE}(cache_key,label,doc_type,verdict,semantic,"  # nosec B608
         f"profile_key,question,sample_count,conflict_count,consistent,"
         f"source_form_ids) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         payload,
@@ -212,7 +214,7 @@ def lookup(con: sqlite3.Connection, label: str, doc_type: str) -> dict[str, Any]
     """신뢰 가능한(consistent) 기준서 항목만 돌려준다. 없으면 None."""
     row = con.execute(
         f"SELECT verdict, semantic, profile_key, question, sample_count"
-        f" FROM {TABLE} WHERE cache_key=? AND consistent=1",
+        f" FROM {TABLE} WHERE cache_key=? AND consistent=1",  # nosec B608
         (cache_key(label, doc_type),),
     ).fetchone()
     if not row:
@@ -229,9 +231,9 @@ def lookup(con: sqlite3.Connection, label: str, doc_type: str) -> dict[str, Any]
 def status() -> dict[str, Any]:
     con = _connect()
     con.execute(DDL)
-    total = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
-    consistent = con.execute(f"SELECT COUNT(*) FROM {TABLE} WHERE consistent=1").fetchone()[0]
-    covered = con.execute(f"SELECT SUM(sample_count) FROM {TABLE}").fetchone()[0] or 0
+    total = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]  # nosec B608
+    consistent = con.execute(f"SELECT COUNT(*) FROM {TABLE} WHERE consistent=1").fetchone()[0]  # nosec B608
+    covered = con.execute(f"SELECT SUM(sample_count) FROM {TABLE}").fetchone()[0] or 0  # nosec B608
     con.close()
     return {
         "entries": total,

@@ -11,6 +11,11 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+# B314 — 엔티티 확장("billion laughs") 방어. stdlib ET.fromstring 은 내부 엔티티를
+# 그대로 확장해 DoS 가능(2026-09-30 실측 확인). 트리 생성(Element/SubElement 등)은
+# defusedxml 이 재노출 안 해 stdlib ET 그대로 두고, 파싱 함수만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 
 def local_name(tag: str) -> str:
     if "}" in tag:
@@ -195,7 +200,7 @@ class HwpxPackage:
         return sorted([name for name in self.entries if is_section_entry(name)], key=section_key)
 
     def read_xml(self, entry: str) -> ET.Element:
-        return ET.fromstring(decode_xml(self.entries[entry]).encode("utf-8"))
+        return _dx_fromstring(decode_xml(self.entries[entry]).encode("utf-8"))
 
     def read_text(self, entry: str) -> str:
         return decode_xml(self.entries[entry])
@@ -271,7 +276,7 @@ class HwpxValidator:
                 for name in xml_names:
                     raw = zf.read(name)
                     try:
-                        ET.fromstring(decode_xml(raw).encode("utf-8"))
+                        _dx_fromstring(decode_xml(raw).encode("utf-8"))
                     except Exception as exc:  # ruff: ignore[blind-except]
                         result["xml_errors"].append({"entry": name, "error": str(exc)})
                     audit = audit_text_bytes(raw)
@@ -319,7 +324,7 @@ class HwpxValidator:
                 result["section_entries"] = len([name for name in names if is_section_entry(name)])
                 for name in xml_names:
                     try:
-                        ET.fromstring(decode_xml(zf.read(name)).encode("utf-8"))
+                        _dx_fromstring(decode_xml(zf.read(name)).encode("utf-8"))
                     except Exception as exc:  # ruff: ignore[blind-except]
                         result["xml_errors"].append({"entry": name, "error": str(exc)})
                 result["xml_ok"] = not result["xml_errors"]
@@ -348,21 +353,33 @@ def _content_manifest(
     items = []
     itemrefs = []
     if manifest is not None:
-        items.extend({
-                    "id": child.attrib.get("id", ""),
-                    "href": child.attrib.get("href", ""),
-                    "media_type": child.attrib.get("media-type", ""),
-                } for child in list(manifest) if local_name(child.tag) == "item")
+        items.extend(
+            {
+                "id": child.attrib.get("id", ""),
+                "href": child.attrib.get("href", ""),
+                "media_type": child.attrib.get("media-type", ""),
+            }
+            for child in list(manifest)
+            if local_name(child.tag) == "item"
+        )
     if spine is not None:
-        itemrefs.extend({"idref": child.attrib.get("idref", "")} for child in list(spine) if local_name(child.tag) == "itemref")
+        itemrefs.extend(
+            {"idref": child.attrib.get("idref", "")}
+            for child in list(spine)
+            if local_name(child.tag) == "itemref"
+        )
     return items, itemrefs
 
 
 def _container_rootfiles(container_root: ET.Element) -> list[dict[str, str]]:
-    rootfiles = [{
-                "full_path": child.attrib.get("full-path", ""),
-                "media_type": child.attrib.get("media-type", ""),
-            } for child in container_root.iter() if local_name(child.tag) == "rootfile"]
+    rootfiles = [
+        {
+            "full_path": child.attrib.get("full-path", ""),
+            "media_type": child.attrib.get("media-type", ""),
+        }
+        for child in container_root.iter()
+        if local_name(child.tag) == "rootfile"
+    ]
     return rootfiles
 
 
@@ -370,7 +387,7 @@ def _xml_binary_refs(zf: zipfile.ZipFile, names: set[str]) -> list[dict[str, str
     refs: list[dict[str, str]] = []
     for entry in sorted(name for name in names if is_xml_entry(name)):
         try:
-            root = ET.fromstring(decode_xml(zf.read(entry)).encode("utf-8"))
+            root = _dx_fromstring(decode_xml(zf.read(entry)).encode("utf-8"))
         except Exception:  # ruff: ignore[blind-except] -- 파싱 불가 항목만 건너뛰고 계속
             continue
         for elem in root.iter():
@@ -389,7 +406,7 @@ def _audit_container_xml(
     if "META-INF/container.xml" not in names:
         return []
     try:
-        container_root = ET.fromstring(
+        container_root = _dx_fromstring(
             decode_xml(zf.read("META-INF/container.xml")).encode("utf-8")
         )
         rootfiles = _container_rootfiles(container_root)
@@ -417,7 +434,7 @@ def _audit_content_hpf(
     if "Contents/content.hpf" not in names:
         return manifest_items, spine_itemrefs, id_to_entry
     try:
-        content_root = ET.fromstring(decode_xml(zf.read("Contents/content.hpf")).encode("utf-8"))
+        content_root = _dx_fromstring(decode_xml(zf.read("Contents/content.hpf")).encode("utf-8"))
         manifest_items, spine_itemrefs = _content_manifest(content_root)
         href_to_entry: dict[str, str] = {}
         for item in manifest_items:

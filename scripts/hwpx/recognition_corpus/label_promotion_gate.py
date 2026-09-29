@@ -249,7 +249,9 @@ def evaluate_all_promotion_candidates(
 ) -> list[dict]:
     placeholders = ",".join("?" * len(statuses))
     rows = conn.execute(
-        f"SELECT normalized_label, proposed_semantic, occurrence_count,"
+        # {placeholders}는 "?"만 반복한 개수 문자열이고 실제 값(statuses)은
+        # 매개변수로 바인딩한다 — 문자열 보간은 자리표시자 개수뿐이라 주입 경로가 없다.
+        f"SELECT normalized_label, proposed_semantic, occurrence_count,"  # nosec B608
         f"  document_count, evidence_score "
         f"  FROM label_promotion_candidates WHERE status IN ({placeholders})",
         statuses,
@@ -507,8 +509,12 @@ def audit_production_snapshot_isolation() -> dict:
         if not p.is_file():
             continue
         text = p.read_text(encoding="utf-8", errors="ignore")
-        violations.extend({
-                    "file": str(p.relative_to(cs.PROJECT_ROOT)).replace("\\", "/"),
-                    "forbidden": n,
-                } for n in PROD_SNAPSHOT_FORBIDDEN_IMPORTS if n in text)
+        violations.extend(
+            {
+                "file": str(p.relative_to(cs.PROJECT_ROOT)).replace("\\", "/"),
+                "forbidden": n,
+            }
+            for n in PROD_SNAPSHOT_FORBIDDEN_IMPORTS
+            if n in text
+        )
     return {"ok": not violations, "violations": violations}

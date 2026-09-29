@@ -13,20 +13,22 @@
 
 import json
 import zipfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 
-NS_P = '{http://www.hancom.co.kr/hwpml/2011/paragraph}'
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
+NS_P = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
 def col_to_letter(col_idx0: int) -> str:
     """0-based 열 인덱스를 Excel 열 문자로 변환 (0->A, 1->B, ...)"""
     n = col_idx0 + 1
-    address = ''
+    address = ""
     while n > 0:
         n -= 1
-        address = chr(ord('A') + n % 26) + address
+        address = chr(ord("A") + n % 26) + address
         n //= 26
     return address
 
@@ -36,69 +38,69 @@ class HwpxParser:
 
     def __init__(self, hwpx_path: str):
         self.hwpx_path = Path(hwpx_path)
-        self.cells = []       # 모든 셀 (텍스트 유무 무관)
+        self.cells = []  # 모든 셀 (텍스트 유무 무관)
         self.total_rows = 0
 
-    def parse(self) -> Dict[str, Any]:
+    def parse(self) -> dict[str, Any]:
         if not self.hwpx_path.exists():
             raise FileNotFoundError(f"파일 없음: {self.hwpx_path}")
 
         try:
-            with zipfile.ZipFile(self.hwpx_path, 'r') as z:
-                xml_data = z.read('Contents/section0.xml')
+            with zipfile.ZipFile(self.hwpx_path, "r") as z:
+                xml_data = z.read("Contents/section0.xml")
 
-            root = ET.fromstring(xml_data)
+            root = _dx_fromstring(xml_data)
 
-            tables = root.findall(f'.//{NS_P}tbl')
+            tables = root.findall(f".//{NS_P}tbl")
             if tables:
                 self._parse_table(tables[0])
 
-            non_empty = [c for c in self.cells if c['text']]
+            non_empty = [c for c in self.cells if c["text"]]
 
             return {
-                'form_path': str(self.hwpx_path),
-                'form_file': self.hwpx_path.name,
-                'total_rows': self.total_rows,
-                'total_cells': len(self.cells),
-                'total_fields': len(non_empty),
-                'cells': self.cells,       # 전체 맥락(빈 칸 포함) - 인접 라벨 조회용
-                'fields': non_empty,       # 텍스트 있는 셀만
+                "form_path": str(self.hwpx_path),
+                "form_file": self.hwpx_path.name,
+                "total_rows": self.total_rows,
+                "total_cells": len(self.cells),
+                "total_fields": len(non_empty),
+                "cells": self.cells,  # 전체 맥락(빈 칸 포함) - 인접 라벨 조회용
+                "fields": non_empty,  # 텍스트 있는 셀만
             }
 
-        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+        except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
             return {
-                'error': str(e),
-                'form_path': str(self.hwpx_path),
-                'form_file': self.hwpx_path.name,
+                "error": str(e),
+                "form_path": str(self.hwpx_path),
+                "form_file": self.hwpx_path.name,
             }
 
     def _parse_table(self, table_elem):
         # 직계 자식 tr만 사용 - './/'(하위 전체 탐색)를 쓰면 셀 안에 중첩된
         # 하위 표(nested tbl)의 tr까지 섞여 들어와 cellAddr가 서로 다른 좌표계인데도
         # 뒤섞여 같은 주소(A1 등)가 중복되는 좌표 충돌이 발생한다.
-        rows = table_elem.findall(f'{NS_P}tr')
+        rows = table_elem.findall(f"{NS_P}tr")
         self.total_rows = len(rows)
 
         max_row0 = 0
 
         for tr in rows:
-            tcs = tr.findall(f'{NS_P}tc')
+            tcs = tr.findall(f"{NS_P}tc")
             for tc in tcs:
-                cell_addr = tc.find(f'{NS_P}cellAddr')
-                cell_span = tc.find(f'{NS_P}cellSpan')
+                cell_addr = tc.find(f"{NS_P}cellAddr")
+                cell_span = tc.find(f"{NS_P}cellSpan")
 
                 if cell_addr is None:
                     continue  # cellAddr 없는 셀은 실제 데이터 셀이 아님(무시)
 
-                col_addr0 = int(cell_addr.get('colAddr', '0'))
-                row_addr0 = int(cell_addr.get('rowAddr', '0'))
-                col_span = int(cell_span.get('colSpan', '1')) if cell_span is not None else 1
-                row_span = int(cell_span.get('rowSpan', '1')) if cell_span is not None else 1
+                col_addr0 = int(cell_addr.get("colAddr", "0"))
+                row_addr0 = int(cell_addr.get("rowAddr", "0"))
+                col_span = int(cell_span.get("colSpan", "1")) if cell_span is not None else 1
+                row_span = int(cell_span.get("rowSpan", "1")) if cell_span is not None else 1
 
                 max_row0 = max(max_row0, row_addr0)
 
                 paragraphs = self._extract_cell_paragraphs(tc)
-                text = ' '.join(p.strip() for p in paragraphs if p.strip())
+                text = " ".join(p.strip() for p in paragraphs if p.strip())
                 col_letter = col_to_letter(col_addr0)
                 row_num = row_addr0 + 1  # 1-based로 표기 (엑셀 스타일)
 
@@ -107,31 +109,31 @@ class HwpxParser:
                 embedded = False
                 if len(paragraphs) >= 2:
                     for p in paragraphs[1:]:
-                        if '     ' in p:  # 5칸 이상 연속 공백
+                        if "     " in p:  # 5칸 이상 연속 공백
                             embedded = True
                             break
 
                 self.cells.append({
-                    'cell': f"{col_letter}{row_num}",
-                    'row': row_num,
-                    'col': col_addr0 + 1,       # 1-based 열 번호
-                    'col_addr0': col_addr0,     # 0-based 원본 좌표(디버그용)
-                    'row_addr0': row_addr0,
-                    'col_span': col_span,
-                    'row_span': row_span,
-                    'text': text.strip(),
-                    'para_count': len(paragraphs),
-                    'embedded_write_space': embedded,
-                    'paragraphs': [p.strip() for p in paragraphs],
+                    "cell": f"{col_letter}{row_num}",
+                    "row": row_num,
+                    "col": col_addr0 + 1,  # 1-based 열 번호
+                    "col_addr0": col_addr0,  # 0-based 원본 좌표(디버그용)
+                    "row_addr0": row_addr0,
+                    "col_span": col_span,
+                    "row_span": row_span,
+                    "text": text.strip(),
+                    "para_count": len(paragraphs),
+                    "embedded_write_space": embedded,
+                    "paragraphs": [p.strip() for p in paragraphs],
                 })
 
         # cellAddr 기준 row_addr0 최댓값+1이 실제 논리 행 수 (tr 개수와 다를 수 있음: 병합 때문)
         self.total_rows = max_row0 + 1
 
-    def _extract_cell_paragraphs(self, cell_elem) -> List[str]:
+    def _extract_cell_paragraphs(self, cell_elem) -> list[str]:
         """셀 안의 문단들을 원문 그대로(공백 보존) 리스트로 반환"""
-        paragraphs = cell_elem.findall(f'.//{NS_P}p')
-        return [''.join(p.itertext()) for p in paragraphs]
+        paragraphs = cell_elem.findall(f".//{NS_P}p")
+        return ["".join(p.itertext()) for p in paragraphs]
 
 
 def parse_supervision_forms():
@@ -140,68 +142,70 @@ def parse_supervision_forms():
     form_library = Path(__file__).parent.parent.parent.parent / "data" / "drafts" / "form_library"
 
     forms = {
-        '331': {
-            'name': '공사 감리자 지정 신청서',
-            'file': '0393790f0e_16b6afa1e14849fc_02910_045_[별지_제22호의3서식]_공사_감리자_지정_신청서.hwpx'
+        "331": {
+            "name": "공사 감리자 지정 신청서",
+            "file": "0393790f0e_16b6afa1e14849fc_02910_045_[별지_제22호의3서식]_공사_감리자_지정_신청서.hwpx",
         },
-        '99': {
-            'name': '소방시설공사 완공검사신청서',
-            'file': '022e3f35e6_6ff3fe63f13a8199_01076_035_[별지_제17호서식]_소방시설공사_완공검사신청서__A.hwpx'
+        "99": {
+            "name": "소방시설공사 완공검사신청서",
+            "file": "022e3f35e6_6ff3fe63f13a8199_01076_035_[별지_제17호서식]_소방시설공사_완공검사신청서__A.hwpx",
         },
-        '57': {
-            'name': '특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서',
-            'file': '035e67fa92_7e0e56c15d7fecd8_01315_072_[별지_제41호서식]_특정ㆍ준특정옥외탱크저장소의_구조안전점검시기_연장신청서(위험물의_저장관리_등의_상황).hwpx'
-        }
+        "57": {
+            "name": "특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서",
+            "file": "035e67fa92_7e0e56c15d7fecd8_01315_072_[별지_제41호서식]_특정ㆍ준특정옥외탱크저장소의_구조안전점검시기_연장신청서(위험물의_저장관리_등의_상황).hwpx",
+        },
     }
 
     results = {}
 
     for form_id, form_info in forms.items():
-        file_path = form_library / form_info['file']
+        file_path = form_library / form_info["file"]
 
         print(f"\n📄 파싱 중: form_{form_id} ({form_info['name']})")
         print(f"   파일: {file_path.name}")
 
         if not file_path.exists():
             print("   ❌ 파일 없음")
-            results[form_id] = {'error': 'File not found'}
+            results[form_id] = {"error": "File not found"}
             continue
 
         parser = HwpxParser(str(file_path))
         result = parser.parse()
 
-        if 'error' in result:
+        if "error" in result:
             print(f"   ❌ 파싱 오류: {result['error']}")
             results[form_id] = result
             continue
 
         results[form_id] = {
-            'form_id': int(form_id),
-            'form_name': form_info['name'],
-            'total_rows': result['total_rows'],
-            'total_cells': result['total_cells'],
-            'total_fields': result['total_fields'],
-            'cells': result['cells'],
-            'fields': result['fields'],
-            'note': 'cellAddr/cellSpan 기반 정확 파싱 (병합 셀 반영)',
+            "form_id": int(form_id),
+            "form_name": form_info["name"],
+            "total_rows": result["total_rows"],
+            "total_cells": result["total_cells"],
+            "total_fields": result["total_fields"],
+            "cells": result["cells"],
+            "fields": result["fields"],
+            "note": "cellAddr/cellSpan 기반 정확 파싱 (병합 셀 반영)",
         }
 
-        print(f"   ✓ 전체 셀: {result['total_cells']}개, 텍스트 있는 셀: {result['total_fields']}개, 논리 행: {result['total_rows']}행")
+        print(
+            f"   ✓ 전체 셀: {result['total_cells']}개, 텍스트 있는 셀: {result['total_fields']}개, 논리 행: {result['total_rows']}행"
+        )
 
     return results
 
 
-def save_metadata(data: Dict, output_path: str):
+def save_metadata(data: dict, output_path: str):
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    with Path(output).open('w', encoding='utf-8') as f:
+    with Path(output).open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     print(f"\n✅ 메타데이터 저장: {output}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 60)
     print("🏗️  감리 서류 파싱 (cellAddr/cellSpan 기반 정확판)")
     print("=" * 60)
@@ -216,7 +220,9 @@ if __name__ == '__main__':
     print("📊 파싱 결과 요약")
     print("=" * 60)
     for form_id, data in metadata.items():
-        if 'error' not in data:
-            print(f"form_{form_id}: 셀 {data['total_cells']}개 (텍스트 {data['total_fields']}개), 행 {data['total_rows']}행")
+        if "error" not in data:
+            print(
+                f"form_{form_id}: 셀 {data['total_cells']}개 (텍스트 {data['total_fields']}개), 행 {data['total_rows']}행"
+            )
         else:
             print(f"form_{form_id}: ❌ {data['error']}")

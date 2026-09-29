@@ -19,6 +19,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -71,7 +75,7 @@ def _local_name(tag: str) -> str:
 
 def _section_text(xml_bytes: bytes) -> str:
     try:
-        root = ET.fromstring(xml_bytes)
+        root = _dx_fromstring(xml_bytes)
     except ET.ParseError:
         return xml_bytes.decode("utf-8", errors="replace")
     texts = []

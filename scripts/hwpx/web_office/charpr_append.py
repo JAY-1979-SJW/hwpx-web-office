@@ -20,6 +20,10 @@ import copy
 import xml.etree.ElementTree as ET
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 _HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
 ET.register_namespace("hh", _HH_NS)
 
@@ -117,7 +121,7 @@ def append_char_pr_with_overrides(
     if unknown:
         raise ValueError(f"지원하지 않는 override 키: {sorted(unknown)}")
 
-    root = ET.fromstring(header_bytes)
+    root = _dx_fromstring(header_bytes)
     char_pr_elems, char_pr_container = _find_char_pr_container(root)
 
     if char_pr_container is None:

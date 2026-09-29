@@ -6,9 +6,11 @@ HWPX ZIP 패키지 구조를 읽는다. 원본 수정 없음.
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 from .errors import ErrCode, WarnCode
 from .parser_contract import PackageInfo, ParserWarning
@@ -76,7 +78,7 @@ def read_package_info(path: Path) -> tuple[PackageInfo, list[ParserWarning]]:
             if has_header:
                 try:
                     header_raw = zf.read("Contents/header.xml")
-                    ET.fromstring(header_raw)
+                    _dx_fromstring(header_raw)
                 except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
                     pkg_warnings.append(f"header.xml parse failed: {exc}")
                     xml_decode_ok = False

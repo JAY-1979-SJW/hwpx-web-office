@@ -18,6 +18,10 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 from hwpx.pipeline.approval_gate import ACTION_CONFIRM, ApprovalResult, ApprovedField
 from hwpx.pipeline.form_auto_fill_writer_sandbox import run_sandbox_write
 from hwpx.pipeline.form_writer_download_review import (
@@ -261,7 +265,7 @@ def inspect_hwpx_structure(path: Path) -> dict[str, Any]:
                 }
             for name in section_names:
                 try:
-                    root = ET.fromstring(archive.read(name).decode("utf-8"))
+                    root = _dx_fromstring(archive.read(name).decode("utf-8"))
                 except (ET.ParseError, UnicodeDecodeError, KeyError):
                     section_xml_valid = False
                     continue

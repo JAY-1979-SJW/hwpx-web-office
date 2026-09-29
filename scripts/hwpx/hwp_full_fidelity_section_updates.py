@@ -6,6 +6,10 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 ET.register_namespace("hp", HP_NS)
 
@@ -496,7 +500,7 @@ def build_page_layout_section_updates(
             })
             continue
         try:
-            root = ET.fromstring(existing_entries[entry])
+            root = _dx_fromstring(existing_entries[entry])
         except ET.ParseError as exc:
             section_reports.append({
                 "entry": entry,
@@ -1072,7 +1076,7 @@ def build_table_layout_section_updates(
             })
             continue
         try:
-            root = ET.fromstring(existing_entries[entry])
+            root = _dx_fromstring(existing_entries[entry])
         except ET.ParseError as exc:
             section_reports.append({
                 "entry": entry,
@@ -1182,10 +1186,14 @@ def _apply_char_pr_refs(
         elif parsed is not None:
             unresolved_char_pr_refs.append({"target_index": target_index, "char_shape_id": parsed})
     if not applied_char_shape_ids:
-        unresolved_char_pr_refs.extend({
-                    "target_index": target_index,
-                    "char_shape_id": char_shape_id,
-                } for char_shape_id in _char_shape_refs_for_source(source) if refs.validate_char_refs and char_shape_id not in refs.char_shape_ids)
+        unresolved_char_pr_refs.extend(
+            {
+                "target_index": target_index,
+                "char_shape_id": char_shape_id,
+            }
+            for char_shape_id in _char_shape_refs_for_source(source)
+            if refs.validate_char_refs and char_shape_id not in refs.char_shape_ids
+        )
     return {
         "applied_char_pr_refs": applied_char_pr_refs,
         "unresolved_char_pr_refs": unresolved_char_pr_refs,
@@ -1285,7 +1293,7 @@ def build_body_style_section_updates(
     section_reports = []
     for section_index, entry in enumerate(section_entries):
         try:
-            root = ET.fromstring(existing_entries[entry])
+            root = _dx_fromstring(existing_entries[entry])
         except ET.ParseError as exc:
             section_reports.append({"entry": entry, "status": "FAIL", "error": str(exc)})
             continue

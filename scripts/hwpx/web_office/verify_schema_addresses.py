@@ -168,14 +168,19 @@ def verify_one(source_rel: str, schema: list[dict], *, project_root: Path = PROJ
 def run(limit: int = 0, shard: int = 0, shards: int = 1, scope: str | None = None) -> None:
     con = _connect()
     con.execute(DDL)
-    done = {r[0] for r in con.execute(f"SELECT form_id FROM {TABLE}")}
+    done = {r[0] for r in con.execute(f"SELECT form_id FROM {TABLE}")}  # nosec B608
     q = (
         "SELECT form_id, source_path, input_schema FROM forms"
         " WHERE input_schema IS NOT NULL AND input_schema != ''"
     )
+    params: list[str] = []
     if scope:
-        q += f" AND source_path LIKE '%{scope}%'"
-    rows = con.execute(q + " ORDER BY form_id").fetchall()
+        # --scope 는 사용자(운영자) 입력이라 문자열 이어붙이기 금지 —
+        # 실제 값은 매개변수로 바인딩한다(2026-09-29 감사에서 발견: 기존
+        # f"...'%{scope}%'" 는 bandit 이 잡지 못한 진짜 SQL 삽입 지점이었다)
+        q += " AND source_path LIKE ?"
+        params.append(f"%{scope}%")
+    rows = con.execute(q + " ORDER BY form_id", params).fetchall()
     targets = [r for r in rows if r[0] not in done and (shards <= 1 or r[0] % shards == shard)]
     if limit:
         targets = targets[:limit]
@@ -208,14 +213,14 @@ def status() -> None:
     total = con.execute(
         "SELECT COUNT(*) FROM forms WHERE input_schema IS NOT NULL AND input_schema != ''"
     ).fetchone()[0]
-    staged = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
+    staged = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]  # nosec B608
     _log(f"파싱 완료 {total} · 검증 완료 {staged} ({staged / max(1, total) * 100:.1f}%)")
     for v, n in con.execute(
-        f"SELECT COALESCE(verdict,status), COUNT(*) FROM {TABLE} GROUP BY COALESCE(verdict,status)"
+        f"SELECT COALESCE(verdict,status), COUNT(*) FROM {TABLE} GROUP BY COALESCE(verdict,status)"  # nosec B608
     ):
         _log(f"  {v}: {n}")
     agg = con.execute(
-        f"SELECT SUM(total_cells), SUM(ok_cells), SUM(fail_cells) FROM {TABLE} WHERE status='OK'"
+        f"SELECT SUM(total_cells), SUM(ok_cells), SUM(fail_cells) FROM {TABLE} WHERE status='OK'"  # nosec B608
     ).fetchone()
     if agg and agg[0]:
         tot, ok, fail = agg

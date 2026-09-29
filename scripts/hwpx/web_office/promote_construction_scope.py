@@ -48,7 +48,9 @@ def _scope_form_ids(con) -> set:
 
 def _staging_ok_ratio(con, scope_ids: set) -> tuple[int, int, float]:
     rows = con.execute(
-        f"SELECT status, COUNT(*) FROM {STAGING} WHERE form_id IN"
+        # STAGING 은 모듈 상수, ','.join('?'*n) 은 자리표시자 개수뿐 —
+        # 실제 form_id 값은 아래에서 매개변수로 바인딩한다
+        f"SELECT status, COUNT(*) FROM {STAGING} WHERE form_id IN"  # nosec B608
         f" ({','.join('?' * len(scope_ids))}) GROUP BY status",
         tuple(scope_ids),
     ).fetchall()
@@ -61,7 +63,7 @@ def _staging_ok_ratio(con, scope_ids: set) -> tuple[int, int, float]:
 def _verified_by_form(con, scope_ids: set) -> dict:
     verified_by_form = {}
     for fid, agreed in con.execute(
-        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"
+        f"SELECT form_id, author_agreed FROM {VERIFY_TABLE}"  # nosec B608
         f" WHERE status='OK' AND author_agreed IS NOT NULL"
     ):
         if fid not in scope_ids:
@@ -183,7 +185,7 @@ def promote_scoped():
     updated = demoted = tagged = revived = revived_forms = 0
     pending = []
     for form_id, interp_json in con.execute(
-        f"SELECT form_id, interpretations FROM {STAGING}"
+        f"SELECT form_id, interpretations FROM {STAGING}"  # nosec B608
         f" WHERE status='OK' AND interpretations IS NOT NULL"
         f" AND form_id IN ({','.join('?' * len(scope_ids))})",
         tuple(scope_ids),
