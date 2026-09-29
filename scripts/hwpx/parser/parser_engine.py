@@ -125,6 +125,22 @@ def _parse_all_sections(
     return all_blocks, all_tables, all_objects
 
 
+def _first_table_cell_text(all_tables: list) -> str | None:
+    """표 밖 본문 문단이 비어있을 때의 제목 후보 폴백.
+
+    HWPX 관공서 서식은 제목 자체가 표(hp:tbl) 안 첫 셀에 들어있는
+    경우가 흔하다(2026-09-29 python-hwpx 교차 검증으로 확인, 예:
+    form_99.hwpx). 첫 표의 읽기 순서상 첫 비어있지 않은 셀 텍스트를
+    제목 후보로 쓴다.
+    """
+    for table in all_tables:
+        for cell in table.cells:
+            text = (cell.normalizedText or cell.text or "").strip()
+            if text:
+                return text
+    return None
+
+
 def _classify_table_layouts(all_tables: list) -> None:
     # ── 5. layout 분류 ───────────────────────────────────────────────────────
     for table in all_tables:
@@ -196,7 +212,7 @@ def parse_hwpx_v2(path: Path, request_id: str | None = None) -> ParserV2Result:
     # ── 8. document 요약 ────────────────────────────────────────────────────
     para_blocks = [b for b in all_blocks if b.type in ("paragraph", "page_marker")]
     full_text_parts = [b.text for b in para_blocks if b.text]
-    title_candidate = full_text_parts[0] if full_text_parts else None
+    title_candidate = full_text_parts[0] if full_text_parts else _first_table_cell_text(all_tables)
 
     result.document = DocumentInfo(
         titleCandidate=title_candidate,

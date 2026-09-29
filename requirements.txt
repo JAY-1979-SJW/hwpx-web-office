@@ -25,3 +25,8 @@ numpy==2.3.1
 openpyxl==3.1.5
 matplotlib==3.11.2
 pytest==9.1.1
+
+# 2026-09-29: HWPX 파서 교차검증용 (scripts/ops/verify_hwpx_parser_against_python_hwpx.py).
+# 자체 파서(block_parser.py)의 문단/표 중첩 처리 버그를 이 라이브러리로
+# 교차 확인한 뒤 채택 — openhwp_rust_probe.py 와 같은 "비교 전용" 역할.
+python-hwpx==6.6.0
