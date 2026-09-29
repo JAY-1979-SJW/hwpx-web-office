@@ -117,39 +117,7 @@ def _audit_required_xml_parts(path: Path) -> tuple[bool, list[str]]:
     return len(missing) == 0, missing
 
 
-def _audit_one_file(item: dict) -> dict:
-    path = PROJECT_ROOT / item["relativePath"]
-    rec_out: dict = {
-        "relativePath": item["relativePath"],
-        "fileName": item["fileName"],
-        "fileSize": item["fileSize"],
-        "sha256Before": item["sha256Before"],
-        "mtimeBefore": item["mtimeBefore"],
-        "verdict": "PASS_CORE_RECOGNITION_ONLY",
-        "errors": [],
-    }
-    # 1) zip required parts
-    ok_parts, missing_parts = _audit_required_xml_parts(path)
-    rec_out["requiredPartsOk"] = ok_parts
-    rec_out["missingParts"] = missing_parts
-    if not ok_parts:
-        rec_out["verdict"] = "FAIL_STRUCTURE_MISMATCH"
-        rec_out["sha256After"] = item["sha256Before"]
-        rec_out["mtimeAfter"] = item["mtimeBefore"]
-        return rec_out
-
-    # 2) parser
-    try:
-        from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
-
-        r = parse_hwpx_v2(path)
-    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
-        rec_out["verdict"] = "FAIL_PARSE_ERROR"
-        rec_out["errors"].append({"stage": "parse", "detail": str(exc)})
-        rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
-        rec_out["mtimeAfter"] = path.stat().st_mtime
-        return rec_out
-
+def _populate_parse_stats(rec_out: dict, r, item: dict) -> None:
     cells = [c for t in r.tables for c in t.cells]
     paragraphs = [b for b in r.blocks if b.type == "paragraph"]
     merged_cells = sum(1 for c in cells if c.rowSpan > 1 or c.colSpan > 1)
@@ -171,6 +139,55 @@ def _audit_one_file(item: dict) -> dict:
     else:
         rec_out["textRatio"] = None
 
+
+def _fill_requirement_smoke(rec_out: dict, item: dict, r) -> tuple[dict, list] | None:
+    """5) FillRequirement smoke — recognition.cells에서 라벨/값 매핑 시도.
+
+    성공 시 (rec_dict, reqs) 반환, 실패 시 rec_out을 FAIL 상태로 채우고 None 반환.
+    """
+    path = PROJECT_ROOT / item["relativePath"]
+    try:
+        from scripts.hwpx.fill_review import fill_review_contract as fr
+
+        synth_cells = []
+        for t in r.tables:
+            for c in t.cells:
+                synth_cells.append({
+                    "cellKey": c.cellId,
+                    "normalizedText": c.normalizedText,
+                    "rowIndex": c.row,
+                    "cellIndex": c.col,
+                })
+        synth_paragraphs = []
+        # paragraph placeholders는 거의 없으므로 skip
+        rec_dict = fr.make_document_recognition_result(
+            documentId="audit",
+            sourceDocumentHash=item["sha256Before"],
+            sourcePath=item["relativePath"],
+            cells=synth_cells,
+            paragraphs=synth_paragraphs,
+        )
+        reqs = fr.build_fill_requirements(rec_dict)
+        rec_out["fillRequirementCount"] = len(reqs)
+        rec_out["fillRequirementSemanticBreakdown"] = {}
+        for req in reqs:
+            sem = req.get("semanticType", "UNKNOWN")
+            rec_out["fillRequirementSemanticBreakdown"][sem] = (
+                rec_out["fillRequirementSemanticBreakdown"].get(sem, 0) + 1
+            )
+        return rec_dict, reqs
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+        rec_out["errors"].append({
+            "stage": "fill_requirement",
+            "detail": str(exc),
+        })
+        rec_out["verdict"] = "FAIL_FILL_REQUIREMENT_ERROR"
+        rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        rec_out["mtimeAfter"] = path.stat().st_mtime
+        return None
+
+
+def _object_mapping_and_gate_smoke(rec_out: dict, path: Path) -> None:
     # 3) object-cell mapping
     try:
         from scripts.hwpx.parser.object_cell_mapper import (
@@ -227,48 +244,12 @@ def _audit_one_file(item: dict) -> dict:
         })
         rec_out["ambiguousAutoPromotionBlocked"] = False
 
-    # 5) FillRequirement smoke — recognition.cells에서 라벨/값 매핑 시도
+
+def _evidence_ui_decision_smoke(rec_out: dict, item: dict, rec_dict: dict, reqs: list) -> None:
+    # 6) evidence empty + missing material smoke
     try:
         from scripts.hwpx.fill_review import fill_review_contract as fr
 
-        synth_cells = []
-        for t in r.tables:
-            for c in t.cells:
-                synth_cells.append({
-                    "cellKey": c.cellId,
-                    "normalizedText": c.normalizedText,
-                    "rowIndex": c.row,
-                    "cellIndex": c.col,
-                })
-        synth_paragraphs = []
-        # paragraph placeholders는 거의 없으므로 skip
-        rec_dict = fr.make_document_recognition_result(
-            documentId="audit",
-            sourceDocumentHash=item["sha256Before"],
-            sourcePath=item["relativePath"],
-            cells=synth_cells,
-            paragraphs=synth_paragraphs,
-        )
-        reqs = fr.build_fill_requirements(rec_dict)
-        rec_out["fillRequirementCount"] = len(reqs)
-        rec_out["fillRequirementSemanticBreakdown"] = {}
-        for req in reqs:
-            sem = req.get("semanticType", "UNKNOWN")
-            rec_out["fillRequirementSemanticBreakdown"][sem] = (
-                rec_out["fillRequirementSemanticBreakdown"].get(sem, 0) + 1
-            )
-    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
-        rec_out["errors"].append({
-            "stage": "fill_requirement",
-            "detail": str(exc),
-        })
-        rec_out["verdict"] = "FAIL_FILL_REQUIREMENT_ERROR"
-        rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
-        rec_out["mtimeAfter"] = path.stat().st_mtime
-        return rec_out
-
-    # 6) evidence empty + missing material smoke
-    try:
         matches = fr.match_requirements_with_evidence(reqs, [])
         missing = fr.build_missing_material_requests(reqs, [], matches)
         items = fr.build_review_items(reqs, matches, missing)
@@ -312,6 +293,63 @@ def _audit_one_file(item: dict) -> dict:
     except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
         rec_out["errors"].append({"stage": "decision_validation", "detail": str(exc)})
 
+
+def _determine_final_verdict(rec_out: dict) -> str:
+    # 10) verdict 산정 — FillRequirement 우선 (빈 폼이어도 라벨이 인식되면 PASS_FULL)
+    if rec_out.get("textRatio") is None:
+        return "PASS_CORE_RECOGNITION_ONLY"
+    if rec_out["fillRequirementCount"] > 0:
+        return "PASS_FULL_RECOGNITION"
+    if rec_out["textRatio"] >= 0.5:
+        return "PASS_CORE_RECOGNITION_ONLY"
+    # text_ratio < 0.5 + fillRequirement 없음 → 빈 템플릿 또는 정보부족
+    return "WARN_TEMPLATE_EMPTY"
+
+
+def _audit_one_file(item: dict) -> dict:
+    path = PROJECT_ROOT / item["relativePath"]
+    rec_out: dict = {
+        "relativePath": item["relativePath"],
+        "fileName": item["fileName"],
+        "fileSize": item["fileSize"],
+        "sha256Before": item["sha256Before"],
+        "mtimeBefore": item["mtimeBefore"],
+        "verdict": "PASS_CORE_RECOGNITION_ONLY",
+        "errors": [],
+    }
+    # 1) zip required parts
+    ok_parts, missing_parts = _audit_required_xml_parts(path)
+    rec_out["requiredPartsOk"] = ok_parts
+    rec_out["missingParts"] = missing_parts
+    if not ok_parts:
+        rec_out["verdict"] = "FAIL_STRUCTURE_MISMATCH"
+        rec_out["sha256After"] = item["sha256Before"]
+        rec_out["mtimeAfter"] = item["mtimeBefore"]
+        return rec_out
+
+    # 2) parser
+    try:
+        from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
+
+        r = parse_hwpx_v2(path)
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 errors 기록 후 다음 단계/파일 계속
+        rec_out["verdict"] = "FAIL_PARSE_ERROR"
+        rec_out["errors"].append({"stage": "parse", "detail": str(exc)})
+        rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        rec_out["mtimeAfter"] = path.stat().st_mtime
+        return rec_out
+
+    _populate_parse_stats(rec_out, r, item)
+
+    _object_mapping_and_gate_smoke(rec_out, path)
+
+    fill_req_result = _fill_requirement_smoke(rec_out, item, r)
+    if fill_req_result is None:
+        return rec_out
+    rec_dict, reqs = fill_req_result
+
+    _evidence_ui_decision_smoke(rec_out, item, rec_dict, reqs)
+
     # 9) sha/mtime after (writer 미호출 — 변경 없어야 함)
     rec_out["sha256After"] = hashlib.sha256(path.read_bytes()).hexdigest()
     rec_out["mtimeAfter"] = path.stat().st_mtime
@@ -326,16 +364,7 @@ def _audit_one_file(item: dict) -> dict:
         })
         return rec_out
 
-    # 10) verdict 산정 — FillRequirement 우선 (빈 폼이어도 라벨이 인식되면 PASS_FULL)
-    if rec_out.get("textRatio") is None:
-        rec_out["verdict"] = "PASS_CORE_RECOGNITION_ONLY"
-    elif rec_out["fillRequirementCount"] > 0:
-        rec_out["verdict"] = "PASS_FULL_RECOGNITION"
-    elif rec_out["textRatio"] >= 0.5:
-        rec_out["verdict"] = "PASS_CORE_RECOGNITION_ONLY"
-    else:
-        # text_ratio < 0.5 + fillRequirement 없음 → 빈 템플릿 또는 정보부족
-        rec_out["verdict"] = "WARN_TEMPLATE_EMPTY"
+    rec_out["verdict"] = _determine_final_verdict(rec_out)
     return rec_out
 
 

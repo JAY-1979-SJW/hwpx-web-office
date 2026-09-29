@@ -10,12 +10,13 @@ HWPX Sample Inventory Audit Script
 - 중복 감지
 """
 
-import sys
-import json
-import hashlib
 import argparse
-from pathlib import Path
+import hashlib
+import json
+import sys
 from datetime import datetime
+from pathlib import Path
+
 
 def calculate_sha256(filepath, chunk_size=65536):
     """Calculate SHA256 hash of file"""
@@ -25,8 +26,9 @@ def calculate_sha256(filepath, chunk_size=65536):
             for chunk in iter(lambda: f.read(chunk_size), b""):
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
-    except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
-        return f"ERROR: {str(e)}"
+    except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
+        return f"ERROR: {e!s}"
+
 
 def is_fixture(filepath, filename):
     """Determine if file is a test fixture"""
@@ -52,6 +54,7 @@ def is_fixture(filepath, filename):
 
     return False
 
+
 def estimate_category(filename):
     """Estimate sample category from filename"""
     filename_lower = filename.lower()
@@ -62,6 +65,7 @@ def estimate_category(filename):
         return "standard"
     else:
         return "unknown"
+
 
 def find_all_hwpx_files(sample_root):
     """Find all .hwpx files in sample root"""
@@ -88,10 +92,91 @@ def find_all_hwpx_files(sample_root):
                     continue
                 visited.add(abs_path)
                 hwpx_files.append(hwpx_file)
-        except Exception as e:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+        except Exception as e:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
             print(f"Warning: Error scanning {search_dir}: {e}", file=sys.stderr)
 
     return sorted(hwpx_files)
+
+
+def _determine_judgment(report, real_samples):
+    """Overall verdict: PASS unless no real samples were found, or any hash failed."""
+    if report["realSamples"] >= 1:
+        judgment = "PASS"
+    else:
+        judgment = "WARN_REAL_SAMPLE_NOT_FOUND"
+
+    if any(item.get("sha256", "").startswith("ERROR") for item in real_samples):
+        judgment = "FAIL_SHA256_MISSING"
+    return judgment
+
+
+def _write_markdown_report(md_path, audit_time, report, inventory, real_samples):
+    """Write the human-readable inventory report as Markdown."""
+    with Path(md_path).open("w", encoding="utf-8") as f:
+        f.write("# HWPX Sample Inventory\n\n")
+        f.write(f"**Audit Time**: {audit_time}\n\n")
+        f.write("## Summary\n\n")
+        f.write("| 구분 | 개수 |\n")
+        f.write("|------|------|\n")
+        f.write(f"| Total | {report['totalFiles']} |\n")
+        f.write(f"| Real Samples | {report['realSamples']} |\n")
+        f.write(f"| Fixtures | {report['fixtures']} |\n\n")
+
+        f.write("## Inventory\n\n")
+        f.write("| # | Filename | Size (B) | Category | Fixture |\n")
+        f.write("|---|----------|----------|----------|----------|\n")
+        for item in inventory:
+            is_fixture_mark = "✅" if item["isFixture"] else "❌"
+            f.write(
+                f"| {item['index']:2d} | {item['filename'][:50]} | {item['sizeBytes']:>10} | {item['sampleCategory']:<10} | {is_fixture_mark} |\n"
+            )
+
+        f.write("\n## SHA256 Hashes\n\n")
+        for item in real_samples:
+            f.write(f"- `{item['sha256']}`  {item['filename']}\n")
+
+
+def _relative_path_for(hwpx_file):
+    """Resolve hwpx_file relative to cwd, falling back to absolute-vs-absolute, then the raw path."""
+    try:
+        return str(hwpx_file.relative_to(Path.cwd()))
+    except ValueError:
+        pass
+    cwd = Path.cwd()
+    abs_file = hwpx_file.resolve()
+    abs_cwd = cwd.resolve()
+    try:
+        return str(abs_file.relative_to(abs_cwd))
+    except ValueError:
+        return str(hwpx_file)
+
+
+def _build_inventory_item(hwpx_file, idx):
+    """Collect metadata (hash, stat, classification) for one sample file."""
+    filename = hwpx_file.name
+    filepath = str(hwpx_file)
+    relative_path = _relative_path_for(hwpx_file)
+
+    stat = hwpx_file.stat()
+    size_bytes = stat.st_size
+    mtime = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+    sha256 = calculate_sha256(filepath)
+    is_fixture_bool = is_fixture(filepath, filename)
+    category = estimate_category(filename)
+
+    return {
+        "index": idx,
+        "filename": filename,
+        "path": filepath,
+        "relativePath": relative_path,
+        "sizeBytes": size_bytes,
+        "sha256": sha256,
+        "modifiedTime": mtime,
+        "isFixture": is_fixture_bool,
+        "sampleCategory": category,
+    }
+
 
 def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
     """Main audit function"""
@@ -113,48 +198,15 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
     filename_groups = {}
 
     for idx, hwpx_file in enumerate(hwpx_files, 1):
-        filename = hwpx_file.name
-        filepath = str(hwpx_file)
-        try:
-            relative_path = str(hwpx_file.relative_to(Path.cwd()))
-        except ValueError:
-            # If file is not relative to cwd, try from parent
-            cwd = Path.cwd()
-            abs_file = hwpx_file.resolve()
-            abs_cwd = cwd.resolve()
-            try:
-                relative_path = str(abs_file.relative_to(abs_cwd))
-            except ValueError:
-                relative_path = filepath
-
-        # File stats
-        stat = hwpx_file.stat()
-        size_bytes = stat.st_size
-        mtime = datetime.fromtimestamp(stat.st_mtime).isoformat()
-
-        # Calculate SHA256
-        sha256 = calculate_sha256(filepath)
-
-        # Classify
-        is_fixture_bool = is_fixture(filepath, filename)
-        category = estimate_category(filename)
-
-        item = {
-            "index": idx,
-            "filename": filename,
-            "path": filepath,
-            "relativePath": relative_path,
-            "sizeBytes": size_bytes,
-            "sha256": sha256,
-            "modifiedTime": mtime,
-            "isFixture": is_fixture_bool,
-            "sampleCategory": category,
-        }
-
+        item = _build_inventory_item(hwpx_file, idx)
         inventory.append(item)
 
+        sha256 = item["sha256"]
+        filename = item["filename"]
+        filepath = item["path"]
+
         # Track hashes for duplicate detection
-        if sha256 != "ERROR" and not is_fixture_bool:
+        if sha256 != "ERROR" and not item["isFixture"]:
             if sha256 not in hash_groups:
                 hash_groups[sha256] = []
             hash_groups[sha256].append(filename)
@@ -164,7 +216,7 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
             filename_groups[filename] = []
         filename_groups[filename].append(filepath)
 
-        print(f"[{idx:2d}/27] {filename[:60]:<60} {size_bytes:>10} bytes", file=sys.stderr)
+        print(f"[{idx:2d}/27] {filename[:60]:<60} {item['sizeBytes']:>10} bytes", file=sys.stderr)
 
     # Generate report
     audit_time = datetime.now().isoformat()
@@ -194,26 +246,7 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
 
     # Generate Markdown report
     md_path = f"{output_dir}/inventories/hwpx_sample_inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    with Path(md_path).open("w", encoding="utf-8") as f:
-        f.write("# HWPX Sample Inventory\n\n")
-        f.write(f"**Audit Time**: {audit_time}\n\n")
-        f.write("## Summary\n\n")
-        f.write("| 구분 | 개수 |\n")
-        f.write("|------|------|\n")
-        f.write(f"| Total | {report['totalFiles']} |\n")
-        f.write(f"| Real Samples | {report['realSamples']} |\n")
-        f.write(f"| Fixtures | {report['fixtures']} |\n\n")
-
-        f.write("## Inventory\n\n")
-        f.write("| # | Filename | Size (B) | Category | Fixture |\n")
-        f.write("|---|----------|----------|----------|----------|\n")
-        for item in inventory:
-            is_fixture_mark = "✅" if item["isFixture"] else "❌"
-            f.write(f"| {item['index']:2d} | {item['filename'][:50]} | {item['sizeBytes']:>10} | {item['sampleCategory']:<10} | {is_fixture_mark} |\n")
-
-        f.write("\n## SHA256 Hashes\n\n")
-        for item in real_samples:
-            f.write(f"- `{item['sha256']}`  {item['filename']}\n")
+    _write_markdown_report(md_path, audit_time, report, inventory, real_samples)
 
     # Save latest MD
     latest_md = f"{output_dir}/inventories/hwpx_sample_inventory_latest.md"
@@ -227,18 +260,11 @@ def audit_hwpx_samples(sample_root=".", output_dir="docs/reports/hwpx_audit"):
     print(f"  JSON: {latest_json}", file=sys.stderr)
     print(f"  MD: {latest_md}", file=sys.stderr)
 
-    # Determine judgment
-    if report['realSamples'] >= 1:
-        judgment = "PASS"
-    else:
-        judgment = "WARN_REAL_SAMPLE_NOT_FOUND"
-
-    if any(item.get("sha256", "").startswith("ERROR") for item in real_samples):
-        judgment = "FAIL_SHA256_MISSING"
-
+    judgment = _determine_judgment(report, real_samples)
     print(f"  Judgment: {judgment}", file=sys.stderr)
 
     return report, judgment
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HWPX Sample Inventory Audit")
