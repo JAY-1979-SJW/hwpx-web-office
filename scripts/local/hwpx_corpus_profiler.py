@@ -855,6 +855,137 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
             raise
 
 
+def _process_one_table(
+    ctx: CorpusContext,
+    file_id: str,
+    sec_idx: int,
+    tbl_idx: int,
+    tbl: Any,
+    paragraphs: list[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """표 하나를 분석해 (table_record, stats) 반환.
+
+    stats 는 이 표 하나 기준값(호출부가 파일 전체로 누적):
+    rows, cols, cellsTotal, empty, merged, hasScheduleKeyword,
+    hasDateAxis, hasGantt.
+    """
+    grid = table_rows_cells(tbl)
+    rows = len(grid)
+    cols = max((len(r) for r in grid), default=0)
+
+    cells_total_local = 0
+    empty_local = 0
+    merged_local = 0
+    for row in grid:
+        for cell in row:
+            cells_total_local += 1
+            if not cell_text(cell).strip():
+                empty_local += 1
+            cs, rs = cell_span(cell)
+            if cs > 1 or rs > 1:
+                merged_local += 1
+
+    tbl_scores = _compute_table_scores(grid)
+    nested_count = tbl_scores["nested_table_count"]
+
+    header_rows = detect_header_rows(grid)
+    header_texts: list[str] = []
+    if header_rows:
+        first_header_row = grid[header_rows[0]]
+        for col_idx, cell in enumerate(first_header_row):
+            norm = normalize_header(cell_text(cell))
+            if norm:
+                header_texts.append(norm)
+                ctx.header_counter[norm][file_id] += 1
+                ctx.header_files[norm].add(file_id)
+                ctx.header_tables[norm].add(f"{file_id}:t{tbl_idx}")
+                ctx.header_col_positions[norm][col_idx] += 1
+
+    date_headers = [t for t in header_texts if is_date_like(t)]
+    numeric_headers = [t for t in header_texts if is_numeric_like(t)]
+    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts))
+
+    layout, conf, evidence = classify_table_layout(grid, header_texts, paragraphs[:5])
+
+    first_rows_preview = []
+    for r in grid[:3]:
+        first_rows_preview.append([normalize_header(cell_text(c))[:40] for c in r])
+    left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
+
+    table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
+    text_cell_count = sum(1 for row in grid for c in row if normalize_header(cell_text(c)))
+    table_record = {
+        "fileId": file_id,
+        "tableId": table_id,
+        "sectionIndex": sec_idx,
+        "blockIndex": tbl_idx,
+        "tableIndex": tbl_idx,
+        "rowCount": rows,
+        "colCount": cols,
+        "cellCount": cells_total_local,
+        "mergedCellCount": merged_local,
+        "emptyCellCount": empty_local,
+        "hasMergedCells": merged_local > 0,
+        "maxColSpan": tbl_scores["max_col_span"],
+        "maxRowSpan": tbl_scores["max_row_span"],
+        "hasNestedTables": nested_count > 0,
+        "nestedTableCount": nested_count,
+        "textCellRatio": round(tbl_scores["text_cell_ratio"], 3),
+        "denseCellRatio": round(
+            text_cell_count / cells_total_local if cells_total_local else 0.0, 3
+        ),
+        "labelValuePairScore": round(tbl_scores["label_value_pair_score"], 3),
+        "dateAxisScore": round(len(date_headers) / max(cols, 1), 3),
+        "approvalStampScore": round(tbl_scores["approval_stamp_score"], 3),
+        "pageMarkerScore": round(tbl_scores["page_marker_score"], 3),
+        "headerRowCandidates": header_rows,
+        "headerTexts": header_texts,
+        "firstRowsPreview": first_rows_preview,
+        "leftColumnPreview": left_col_preview,
+        "dateHeaderCandidates": date_headers,
+        "numericHeaderCandidates": numeric_headers,
+        "layoutGuess": layout,
+        "confidence": round(conf, 3),
+        "classificationEvidence": evidence,
+        "warnings": [],
+    }
+    stats = {
+        "rows": rows,
+        "cols": cols,
+        "cellsTotal": cells_total_local,
+        "empty": empty_local,
+        "merged": merged_local,
+        "hasScheduleKeyword": schedule_hits >= 2,
+        "hasDateAxis": bool(date_headers),
+        "hasGantt": layout == "gantt_like_table",
+    }
+    return table_record, stats
+
+
+def _read_section_root(
+    ctx: CorpusContext, file_id: str, zf: zipfile.ZipFile, sec_name: str
+) -> tuple[Any | None, str | None]:
+    """섹션 XML을 읽고 파싱. 실패 시 (None, 경고문자열) 반환."""
+    try:
+        raw = zf.read(sec_name)
+    except (KeyError, zipfile.BadZipFile, OSError) as exc:
+        return None, f"section read failed {sec_name}: {exc}"
+    root = parse_section_xml(raw)
+    if root is None:
+        ctx.failure_records.append({
+            "fileId": file_id,
+            "stage": "XML_DECODE",
+            "errorType": "ParseError",
+            "errorMessage": f"section {sec_name}",
+            "tracebackShort": "",
+            "recoverable": True,
+            "suggestedFix": "investigate non-utf8 or malformed XML",
+            "fixturePriority": "high",
+        })
+        return None, f"section parse failed {sec_name}"
+    return root, None
+
+
 def _parse_and_catalog(
     ctx: CorpusContext,
     file_id: str,
@@ -881,24 +1012,10 @@ def _parse_and_catalog(
     paragraphs_for_schedule: list[str] = []
 
     for sec_idx, sec_name in enumerate(section_entries):
-        try:
-            raw = zf.read(sec_name)
-        except (KeyError, zipfile.BadZipFile, OSError) as exc:
-            parser_warnings.append(f"section read failed {sec_name}: {exc}")
-            continue
-        root = parse_section_xml(raw)
+        root, warning = _read_section_root(ctx, file_id, zf, sec_name)
+        if warning:
+            parser_warnings.append(warning)
         if root is None:
-            parser_warnings.append(f"section parse failed {sec_name}")
-            ctx.failure_records.append({
-                "fileId": file_id,
-                "stage": "XML_DECODE",
-                "errorType": "ParseError",
-                "errorMessage": f"section {sec_name}",
-                "tracebackShort": "",
-                "recoverable": True,
-                "suggestedFix": "investigate non-utf8 or malformed XML",
-                "fixturePriority": "high",
-            })
             continue
 
         paragraphs = collect_paragraphs(root)
@@ -913,99 +1030,20 @@ def _parse_and_catalog(
         tables = collect_tables(root)
         for tbl_idx, tbl in enumerate(tables):
             table_count += 1
-            grid = table_rows_cells(tbl)
-            rows = len(grid)
-            cols = max((len(r) for r in grid), default=0)
-            max_rows = max(max_rows, rows)
-            max_cols = max(max_cols, cols)
-
-            cells_total_local = 0
-            empty_local = 0
-            merged_local = 0
-            for row in grid:
-                for cell in row:
-                    cells_total_local += 1
-                    if not cell_text(cell).strip():
-                        empty_local += 1
-                    cs, rs = cell_span(cell)
-                    if cs > 1 or rs > 1:
-                        merged_local += 1
-            total_cells += cells_total_local
-            empty_cells += empty_local
-            merged_cells += merged_local
-
-            tbl_scores = _compute_table_scores(grid)
-            nested_count = tbl_scores["nested_table_count"]
-
-            header_rows = detect_header_rows(grid)
-            header_texts: list[str] = []
-            if header_rows:
-                first_header_row = grid[header_rows[0]]
-                for col_idx, cell in enumerate(first_header_row):
-                    norm = normalize_header(cell_text(cell))
-                    if norm:
-                        header_texts.append(norm)
-                        ctx.header_counter[norm][file_id] += 1
-                        ctx.header_files[norm].add(file_id)
-                        ctx.header_tables[norm].add(f"{file_id}:t{tbl_idx}")
-                        ctx.header_col_positions[norm][col_idx] += 1
-
-            date_headers = [t for t in header_texts if is_date_like(t)]
-            numeric_headers = [t for t in header_texts if is_numeric_like(t)]
-            if date_headers:
-                has_date_axis = True
-            schedule_hits = sum(
-                1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts)
+            table_record, stats = _process_one_table(
+                ctx, file_id, sec_idx, tbl_idx, tbl, paragraphs
             )
-            if schedule_hits >= 2:
+            max_rows = max(max_rows, stats["rows"])
+            max_cols = max(max_cols, stats["cols"])
+            total_cells += stats["cellsTotal"]
+            empty_cells += stats["empty"]
+            merged_cells += stats["merged"]
+            if stats["hasDateAxis"]:
+                has_date_axis = True
+            if stats["hasScheduleKeyword"]:
                 has_schedule_keyword = True
-
-            layout, conf, evidence = classify_table_layout(grid, header_texts, paragraphs[:5])
-            if layout == "gantt_like_table":
+            if stats["hasGantt"]:
                 has_gantt = True
-
-            first_rows_preview = []
-            for r in grid[:3]:
-                first_rows_preview.append([normalize_header(cell_text(c))[:40] for c in r])
-            left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
-
-            table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
-            text_cell_count = sum(1 for row in grid for c in row if normalize_header(cell_text(c)))
-            table_record = {
-                "fileId": file_id,
-                "tableId": table_id,
-                "sectionIndex": sec_idx,
-                "blockIndex": tbl_idx,
-                "tableIndex": tbl_idx,
-                "rowCount": rows,
-                "colCount": cols,
-                "cellCount": cells_total_local,
-                "mergedCellCount": merged_local,
-                "emptyCellCount": empty_local,
-                "hasMergedCells": merged_local > 0,
-                "maxColSpan": tbl_scores["max_col_span"],
-                "maxRowSpan": tbl_scores["max_row_span"],
-                "hasNestedTables": nested_count > 0,
-                "nestedTableCount": nested_count,
-                "textCellRatio": round(tbl_scores["text_cell_ratio"], 3),
-                "denseCellRatio": round(
-                    text_cell_count / cells_total_local if cells_total_local else 0.0, 3
-                ),
-                "labelValuePairScore": round(tbl_scores["label_value_pair_score"], 3),
-                "dateAxisScore": round(len(date_headers) / max(cols, 1), 3),
-                "approvalStampScore": round(tbl_scores["approval_stamp_score"], 3),
-                "pageMarkerScore": round(tbl_scores["page_marker_score"], 3),
-                "headerRowCandidates": header_rows,
-                "headerTexts": header_texts,
-                "firstRowsPreview": first_rows_preview,
-                "leftColumnPreview": left_col_preview,
-                "dateHeaderCandidates": date_headers,
-                "numericHeaderCandidates": numeric_headers,
-                "layoutGuess": layout,
-                "confidence": round(conf, 3),
-                "classificationEvidence": evidence,
-                "warnings": [],
-            }
             ctx.table_records.append(table_record)
             tables_for_schedule.append(table_record)
 
