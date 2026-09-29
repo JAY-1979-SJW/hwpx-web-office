@@ -11,6 +11,7 @@ table/row/cell 탐색 helper 만 호출한다. 신규 mutation primitive 작성 
 from __future__ import annotations
 import math
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -27,14 +28,13 @@ from hwpx_table_ops import (  # noqa: E402
 )
 from hwpx_paragraph_ops import (  # noqa: E402
     find_paragraph_in_cell, find_run_in_paragraph,
-    paragraph_text, paragraph_runs, run_text,
+    paragraph_text, run_text,
     locate_run_for_paragraph_offset, detect_multi_run_range,
     apply_text_range_edit,
     apply_text_range_edit_multi_run,
     apply_charpr_to_range_existing,
     _is_safe_text_run,
-    POLICY_ANCHOR_CHARPR, POLICY_FOCUS_CHARPR,
-    POLICY_REQUIRES_REVIEW,
+    POLICY_ANCHOR_CHARPR, POLICY_REQUIRES_REVIEW,
     STATUS_OK, STATUS_RUN_TEXT_NODE_MISSING,
     STATUS_RANGE_OUT_OF_BOUNDS, STATUS_EXPECTED_BEFORE_MISMATCH,
     STATUS_UNSAFE_RUN_CHILDREN, STATUS_NEW_CHARPR_INTRODUCED,
@@ -289,7 +289,6 @@ def _read_header_para_pr_ids(package: HwpxPackage) -> set[str]:
                 break
     if header_bytes is None:
         return set()
-    import xml.etree.ElementTree as ET  # noqa: WPS433
     try:
         root = ET.fromstring(header_bytes)
     except ET.ParseError:
@@ -328,7 +327,6 @@ def _read_header_char_pr_ids(package: HwpxPackage) -> set[str]:
         result: set[str] = set()
     else:
         try:
-            import xml.etree.ElementTree as ET  # noqa: WPS433
             root = ET.fromstring(header_bytes)
             ids: set[str] = set()
             for el in root.iter(f"{{{_HH_NS}}}charPr"):
@@ -651,7 +649,6 @@ def _apply_para_delete(section_root, prev_paragraph_elem,
 
     returns: {"status": "OK", ...} 또는 {"status": REASON, ...}
     """
-    import xml.etree.ElementTree as _ET
     import copy as _copy
 
     cur_text = paragraph_text(current_paragraph_elem)
