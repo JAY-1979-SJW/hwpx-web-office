@@ -18,6 +18,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+from dataclasses import dataclass, field
 
 try:
     from .coord_styles import (
@@ -77,6 +78,37 @@ _parse_border_fills = parse_border_fills
 # 필요)으로 재시도한다.
 
 
+@dataclass
+class _SectionCtx:
+    """`_extract_section` 순회 상태 묶음.
+
+    STD-08(복잡도) 정리: 예전엔 이 필드들이 전부 `_extract_section` 안
+    중첩 클로저(emit_para/walk_table/walk 등 15개)가 캡처하는 자유변수였다.
+    ruff 의 C901/PLR0915 는 중첩 def 본문까지 포함해 바깥 함수 복잡도를
+    누적 계산하므로, `_extract_section` 자체가 복잡도 114·문장 339로
+    잡혔다(실제로는 안쪽 각 함수는 이미 개별적으로 임계값 이하). 동작은
+    그대로 두고 중첩 함수를 전부 최상위로 승격 + 공유 상태를 이 dataclass
+    로 명시 전달하는 것이 유일한 근본 수정(닫힘변수 접근 방식만 바뀜).
+    """
+
+    parent_map: dict
+    sec_idx: int
+    tbl_order: dict
+    border_fills: dict
+    char_prs: dict
+    para_aligns: dict
+    geo: dict
+    page_w: float
+    page_h: float
+    m_left: float
+    m_top: float
+    row_scale: float
+    st: dict
+    lines: list = field(default_factory=list)
+    boxes: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+
+
 def _extract_section(path, secname, row_scale=1.0):
     z = zipfile.ZipFile(path)
     root = ET.fromstring(z.read(secname))
@@ -91,9 +123,6 @@ def _extract_section(path, secname, row_scale=1.0):
     for _i, _t in enumerate(e for e in root.iter() if ln(e.tag) == "tbl"):
         tbl_order[_t] = _i
 
-    def _cell_id(tbl, row, col):
-        return "cell_t_s%d_%03d_r%d_c%d" % (_sec_idx, tbl_order.get(tbl, 0), row, col)
-
     border_fills = parse_border_fills(z)
     char_prs = parse_char_prs(z)
     para_aligns = parse_para_aligns(z)
@@ -104,632 +133,677 @@ def _extract_section(path, secname, row_scale=1.0):
     m_left = geo["m_left"]
     m_top = geo["m_top"]
 
-    lines = []
-    boxes = []
-    warnings: list[dict] = []
-    st = {
-        "page_idx": 0,
-        "prev_vpos": -1,
-        "flow_y": m_top,
-        "max_y": m_top,
-        "col_count": 1,
-        "col_idx": 0,
+    ctx = _SectionCtx(
+        parent_map=parent_map,
+        sec_idx=_sec_idx,
+        tbl_order=tbl_order,
+        border_fills=border_fills,
+        char_prs=char_prs,
+        para_aligns=para_aligns,
+        geo=geo,
+        page_w=page_w,
+        page_h=page_h,
+        m_left=m_left,
+        m_top=m_top,
+        row_scale=row_scale,
+        st={
+            "page_idx": 0,
+            "prev_vpos": -1,
+            "flow_y": m_top,
+            "max_y": m_top,
+            "col_count": 1,
+            "col_idx": 0,
+        },
+    )
+
+    _walk(ctx, root)
+    return _build_section_result(ctx)
+
+
+def _cell_id(ctx, tbl, row, col):
+    return "cell_t_s%d_%03d_r%d_c%d" % (ctx.sec_idx, ctx.tbl_order.get(tbl, 0), row, col)
+
+
+def _update_col_state(ctx, p):
+    """다단(colPr colCount>=2) 구간 진입/이탈 반영 — 페이지 카운터용.
+
+    colPr 은 문단 안 secPr 제어문자로 중간 삽입돼(문서 전체가 아니라
+    구간별 단 수를 바꿈), vertpos 리셋이 "새 페이지"인지 "같은 페이지
+    안 다음 칼럼"인지 구별하는 데 반드시 필요하다. 새 단 구간 진입 시
+    칼럼 카운터를 0(첫 칼럼)으로 되돌린다 — 안 그러면 이전 구간에서
+    남은 칼럼 위상이 새 구간의 페이지 판정을 어긋나게 한다.
+
+    주의: x-오프셋(칼럼을 실제로 나란히 배치)은 아직 미구현이다 —
+    시도해본 결과 이 문서의 2단 구간이 물리적으로 여러 페이지에 걸쳐
+    있어(칼럼 하나가 content_h 를 넘김), 단순 "칼럼 인덱스 mod N" 만
+    으로는 페이지 경계를 못 잡고 오히려 품질 게이트(bodyOverlap) 회귀
+    가 발생해 되돌렸다. 페이지 카운터 이중 증가 방지(이 함수)만 유지.
+    """
+    col_pr = next((e for e in p.iter() if ln(e.tag) == "colPr"), None)
+    if col_pr is None:
+        return
+    try:
+        cc = int(col_pr.attrib.get("colCount", "1") or "1")
+    except (TypeError, ValueError):
+        return
+    if cc != ctx.st["col_count"]:
+        ctx.st["col_count"] = max(cc, 1)
+        ctx.st["col_idx"] = 0
+        if os.environ.get("COORD_DEBUG"):
+            print(f"[DBG col] colCount -> {ctx.st['col_count']}", file=sys.stderr)
+
+
+def _on_vpos_reset(ctx):
+    """vertpos 리셋(감소) 시 페이지 전진 여부 판정.
+
+    단일 칼럼이면 리셋 즉시 새 페이지(기존 동작 보존). 다단(N>=2)이면
+    칼럼이 N 번 채워져야(칼럼 1→2→…→N 순환 완료) 비로소 실제 새
+    페이지다 — 그 전까지는 같은 페이지 안 다음 칼럼으로의 이동일 뿐.
+    실사례: colCount=2 구간에서 매 리셋마다 페이지를 전진시키면 표
+    앵커가 부풀려진 page_idx 기준으로 환산돼 실제보다 훨씬 아래(페이지
+    바닥 91%)로 계산되는 결함이 있었다(영천경마공원 79셀 표 사례).
+    """
+    if ctx.st["col_count"] > 1:
+        ctx.st["col_idx"] += 1
+        if ctx.st["col_idx"] >= ctx.st["col_count"]:
+            ctx.st["col_idx"] = 0
+            ctx.st["page_idx"] += 1
+    else:
+        ctx.st["page_idx"] += 1
+    if os.environ.get("COORD_DEBUG"):
+        print(
+            f"[DBG reset] col_count={ctx.st['col_count']} "
+            f"col_idx={ctx.st['col_idx']} page_idx={ctx.st['page_idx']}",
+            file=sys.stderr,
+        )
+
+
+def _container_object_heights(p):
+    # 인라인 개체(이미지 container 등, pos.treatAsChar=1) 앵커 lineseg
+    # 검출 — 텍스트는 없지만(own_runs 는 개체를 문자로 안 셈) 한컴이
+    # 그 개체 높이를 vertsize 에 그대로 기록해 둔다(실측: curSz.height
+    # 73900 = 해당 lineseg vertsize 73900, 정확히 일치). "빈 줄은 흐름을
+    # 안 민다"는 유령페이지 방지 규칙이 이 개체 줄까지 빈 줄로 오인해
+    # 삼켜, 이미지 있는 문서에서 페이지가 통째로 결측되는 원인이었다
+    # (실무 서식에 흔한 직인·로고·도면 삽입 — 안전보건계획 문서 45쪽
+    # 중 5쪽 결측 실사례). 원본 무수정 원칙상 이미지는 그리지 않되,
+    # 문단 안 개체들의 curSz.height 를 미리 모아 두면, 어느 lineseg
+    # 든 그 높이와 근사 일치하는 빈 줄을 '개체 자리'로 인정해 흐름에
+    # 반영할 수 있다(개체 자체를 렌더/편집하는 것은 아님).
+    _obj_heights: set[int] = set()
+    for ctrl_container in p.iter():
+        if ln(ctrl_container.tag) != "container":
+            continue
+        sz_el = next((e for e in ctrl_container.iter() if ln(e.tag) == "curSz"), None)
+        if sz_el is not None:
+            try:
+                _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
+            except (TypeError, ValueError):
+                pass
+    return _obj_heights
+
+
+def _resolve_row_flow_overflow_y(st, page_h, m_top, vpos, h, y):
+    if vpos < 1.0:
+        # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
+        # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
+        # 뜻)인 경우가 흔하다 — 작은(한 페이지짜리) 표 바로
+        # 뒤에 오는 제목 문단이 전부 이 패턴이라, 페이지를
+        # 통째로 건너뛰면(과거 동작) 표마다 빈 페이지가
+        # 하나씩 낭비된다(실사례: 표 6개 문서가 6쪽 → 실제로
+        # 필요 없는 빈 페이지로 부풀려짐). 앵커처럼 흐름
+        # 위치에 그대로 붙인다(페이지 전진 없음).
+        return st["flow_y"]
+    # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
+    # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
+    _guard = 0
+    while y < st["flow_y"] - max(h * 1.5, 20.0) and _guard < 6:
+        st["page_idx"] += 1
+        y = (st["page_idx"] * page_h) + m_top + vpos * HU
+        _guard += 1
+    return y
+
+
+def emit_para(ctx, p, block_idx=None):
+    txt, spans = own_runs(p)
+    segs = direct_linesegs(p)
+    align = css_align(ctx.para_aligns.get(p.attrib.get("paraPrIDRef")))
+    _obj_heights = _container_object_heights(p)
+    for i, s in enumerate(segs):
+        vpos = float(s.get("vertpos", "0"))
+        a = int(s.get("textpos", "0") or "0")
+        b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
+        line_txt = txt[a:b]
+        # 페이지 상태머신은 가시 줄만 구동 — 빈 문단(공백 줄)은 페이지를
+        # 만들지 않는다. 문서 끝의 빈 문단 수백 개가 vpos 리셋을 반복해
+        # 유령 페이지 6쪽+를 만들던 결함(한컴은 빈 문단으로 쪽을 늘리지
+        # 않음 — 별지2: 한컴 12쪽 vs 우리 18쪽의 근본 원인).
+        _obj_h = 0
+        if not line_txt.strip() and _obj_heights:
+            _raw_vsz = int(float(s.get("vertsize", 0) or 0))
+            _obj_h = next((h for h in _obj_heights if abs(h - _raw_vsz) <= 5), 0)
+        _vis = bool(line_txt.strip()) or _obj_h > 0
+        if _vis:
+            if ctx.st["prev_vpos"] >= 0 and vpos + 1 < ctx.st["prev_vpos"]:
+                _on_vpos_reset(ctx)  # vpos 리셋 → 새 페이지(또는 다단 다음 칼럼)
+            ctx.st["prev_vpos"] = vpos
+        y = (ctx.st["page_idx"] * ctx.page_h) + ctx.m_top + vpos * HU
+        x = ctx.m_left + float(s.get("horzpos", "0")) * HU
+        w = float(s.get("horzsize", "0")) * HU
+        h = float(s.get("vertsize", "1000")) * HU
+        bl = float(s.get("baseline", "0")) * HU
+        # 흐름 불변식 — 문단은 선행 내용(표 하단 flow_y) 위에 올라앉을 수
+        # 없다. 표가 여러 페이지를 쓰면 뒤 본문을 같은 vpos 로 다음
+        # 페이지에 놓는다(한컴 배치: 각주 vpos 는 표가 끝난 페이지 기준).
+        # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
+        # 증가), 1.5줄 이상 실침범 시에만 발동.
+        if (
+            i == 0
+            and ctx.page_h > 0
+            and line_txt.strip()
+            and y < ctx.st["flow_y"] - max(h * 1.5, 20.0)
+        ):
+            y = _resolve_row_flow_overflow_y(ctx.st, ctx.page_h, ctx.m_top, vpos, h, y)
+        line = {
+            "text": line_txt,
+            "segments": slice_segments(txt, spans, a, b),
+            "x": round(x, 1),
+            "y": round(y, 1),
+            "w": round(w, 1),
+            "h": round(h, 1),
+            "baseline": round(bl, 1),
+            "cell": False,
+        }
+        if align:
+            line["align"] = align
+        # 본문 문단(표 셀 아님) 클릭 편집 배선용 — block_idx 는
+        # block_parser.parse_blocks_from_section 과 동일 규칙(section
+        # root 직계 p 자식 순서)으로 walk() 가 부여한다. paragraphId 는
+        # ro_view_importer._stable_paragraph_id 와 동일 포맷(local_index
+        # 는 문단 안 여러 lineseg 를 한 문단으로 묶으므로 항상 0).
+        if block_idx is not None and line_txt.strip():
+            line["paragraphId"] = f"par_s{ctx.sec_idx}_b{block_idx}_p0"
+            line["containerScope"] = {
+                "kind": "block",
+                "sectionIndex": ctx.sec_idx,
+                "blockIndex": block_idx,
+            }
+            # 캐럿 위치 편집(문장 중 클릭 지점에 정확히 삽입)용 —
+            # 이 줄이 문단 전체 텍스트(txt) 중 몇 번째 글자부터
+            # 시작하는지. 프런트가 클릭된 화면 좌표를 이 줄 안
+            # 로컬 오프셋으로 바꾼 뒤 이 값을 더해 문단 전체
+            # 기준 캐럿 오프셋을 구한다(문단 전체를 통째로
+            # textarea 에 채워 바꾸는 대신, 클릭한 지점에만
+            # 삽입하는 캐럿 편집을 위해 필요).
+            line["paraTextOffset"] = a
+        ctx.lines.append(line)
+        if _vis:
+            ctx.st["max_y"] = max(ctx.st["max_y"], y + h)
+    ctx.st["flow_y"] = ctx.st["max_y"]
+
+
+def _cell_info(ctx, tc):
+    addr = next((c.attrib for c in tc if ln(c.tag) == "cellAddr"), {})
+    span = next((c.attrib for c in tc if ln(c.tag) == "cellSpan"), {})
+    sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
+    mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
+    sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
+    w = sane_hu(sz.get("width", "0"))
+    h = sane_hu(sz.get("height", "0"))
+    # 손상 여백 방어 — 일부 문서가 cellMargin 에 셀보다 큰 값
+    # (예: 20520HU=274px)을 담아 행높이를 폭증시킨다. 여백 합이 셀
+    # 크기를 잠식(90%↑)하면 한컴처럼 무시하고 기본값(≈141HU)으로.
+    _DEF_MG = 1.9
+    ml_raw = sane_hu(mg.get("left", "0"))
+    mt_raw = sane_hu(mg.get("top", "0"))
+    ml = ml_raw if (w <= 0 or ml_raw * 2 <= w * 0.9) else _DEF_MG
+    mt = mt_raw if (h <= 0 or mt_raw * 2 <= h * 0.9) else _DEF_MG
+    # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
+    # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
+    content = 0.0
+    compact = 0.0  # 줄간격 제거 시 최소 높이(글리프 합) — 앵커 압축용
+    for cp in tc.iter():
+        if ln(cp.tag) == "p" and _nearest_cell(ctx, cp) is tc:
+            for cl in _cell_para_lines(ctx, cp):
+                content = max(content, cl["ry"] + cl["h"])
+                compact += cl["h"]
+    # 직속 중첩표 높이도 내용에 포함 — 안 하면 외곽 행이 중첩표보다
+    # 짧아, 뒤 내용(푸터 등)이 위로 올라오고 중첩표가 아래로 넘친다.
+    for nt in tc.iter():
+        if ln(nt.tag) == "tbl" and _nearest_cell(ctx, nt) is tc:
+            pp = _nearest_p(ctx, nt)
+            nsegs = direct_linesegs(pp) if pp is not None else []
+            nvpos = float(nsegs[0].get("vertpos", "0")) * HU if nsegs else 0.0
+            nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
+            nh = sane_hu(nsz.get("height", "0"))
+            content = max(content, nvpos + nh)
+            compact += nh
+    return {
+        "row": int(addr.get("rowAddr", "0")),
+        "col": int(addr.get("colAddr", "0")),
+        "rowSpan": int(span.get("rowSpan", "1") or "1"),
+        "colSpan": int(span.get("colSpan", "1") or "1"),
+        "w": w,
+        "h": h,
+        "ml": ml,
+        "mt": mt,
+        "hContent": content,
+        "hCompact": min(compact, content) if compact > 0 else content,
+        "bfRef": tc.attrib.get("borderFillIDRef"),
+        "vAlign": sub.get("vertAlign", "TOP"),
+        # 세로쓰기(textDirection=VERTICAL/VERTICALALL) — 자리수 헤더
+        # (조/천억/백억 등 좁고 긴 금액칸)에서 흔함. CSS writing-mode
+        # 로 렌더러가 처리하도록 셀 단위로 전달.
+        "vertical": str(sub.get("textDirection", "")).startswith("VERTICAL"),
+        "tc": tc,
     }
 
-    def _update_col_state(p):
-        """다단(colPr colCount>=2) 구간 진입/이탈 반영 — 페이지 카운터용.
 
-        colPr 은 문단 안 secPr 제어문자로 중간 삽입돼(문서 전체가 아니라
-        구간별 단 수를 바꿈), vertpos 리셋이 "새 페이지"인지 "같은 페이지
-        안 다음 칼럼"인지 구별하는 데 반드시 필요하다. 새 단 구간 진입 시
-        칼럼 카운터를 0(첫 칼럼)으로 되돌린다 — 안 그러면 이전 구간에서
-        남은 칼럼 위상이 새 구간의 페이지 판정을 어긋나게 한다.
-
-        주의: x-오프셋(칼럼을 실제로 나란히 배치)은 아직 미구현이다 —
-        시도해본 결과 이 문서의 2단 구간이 물리적으로 여러 페이지에 걸쳐
-        있어(칼럼 하나가 content_h 를 넘김), 단순 "칼럼 인덱스 mod N" 만
-        으로는 페이지 경계를 못 잡고 오히려 품질 게이트(bodyOverlap) 회귀
-        가 발생해 되돌렸다. 페이지 카운터 이중 증가 방지(이 함수)만 유지.
-        """
-        col_pr = next((e for e in p.iter() if ln(e.tag) == "colPr"), None)
-        if col_pr is None:
-            return
-        try:
-            cc = int(col_pr.attrib.get("colCount", "1") or "1")
-        except (TypeError, ValueError):
-            return
-        if cc != st["col_count"]:
-            st["col_count"] = max(cc, 1)
-            st["col_idx"] = 0
-            if os.environ.get("COORD_DEBUG"):
-                print(f"[DBG col] colCount -> {st['col_count']}", file=sys.stderr)
-
-    def _on_vpos_reset():
-        """vertpos 리셋(감소) 시 페이지 전진 여부 판정.
-
-        단일 칼럼이면 리셋 즉시 새 페이지(기존 동작 보존). 다단(N>=2)이면
-        칼럼이 N 번 채워져야(칼럼 1→2→…→N 순환 완료) 비로소 실제 새
-        페이지다 — 그 전까지는 같은 페이지 안 다음 칼럼으로의 이동일 뿐.
-        실사례: colCount=2 구간에서 매 리셋마다 페이지를 전진시키면 표
-        앵커가 부풀려진 page_idx 기준으로 환산돼 실제보다 훨씬 아래(페이지
-        바닥 91%)로 계산되는 결함이 있었다(영천경마공원 79셀 표 사례).
-        """
-        if st["col_count"] > 1:
-            st["col_idx"] += 1
-            if st["col_idx"] >= st["col_count"]:
-                st["col_idx"] = 0
-                st["page_idx"] += 1
+def walk_table(ctx, tbl, base_x, base_y, anchor_vpos=None):
+    """tbl 을 (base_x, base_y) 를 좌상단으로 배치. 이 tbl 의 직속 셀만
+    그리고, 셀 안 중첩표는 그 셀 내용 좌상단에서 재귀 배치한다.
+    anchor_vpos: 표 다음 본문 문단의 저장 vpos(페이지 상대) — 다중페이지
+    표의 실제 높이를 원본 좌표에서 역산하는 권위 앵커. 반환: 표 하단 y."""
+    cells = [
+        _cell_info(ctx, tc)
+        for tc in tbl.iter()
+        if ln(tc.tag) == "tc" and _nearest_tbl(ctx, tc) is tbl
+    ]
+    if not cells:
+        return base_y
+    ncol = max((c["col"] + c["colSpan"] for c in cells), default=1)
+    nrow = max((c["row"] + c["rowSpan"] for c in cells), default=1)
+    # 행높이는 cellSz 와 실제 내용높이(hContent+상하여백) 중 큰 값으로 —
+    # cellSz 가 최소값이라 내용이 넘쳐 셀이 세로로 충돌하는 것을 막는다.
+    for c in cells:
+        c["hEff"] = max(c["h"], c["hContent"] + c["mt"] * 2)
+    col_w = solve_axis(cells, ncol, "col", "colSpan", "w")
+    row_h = solve_axis(cells, nrow, "row", "rowSpan", "hEff")
+    row_h = expand_rowspan_content(cells, row_h, nrow)
+    sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
+    tw = sane_hu(sz.get("width", "0"))
+    th = sane_hu(sz.get("height", "0"))
+    col_w, row_h = normalize_declared(cells, col_w, row_h, tw, th, nrow)
+    # 병합 내용 불변식 재확약 — normalize 의 슬랙 축소는 단일-span
+    # 하한(min_need)만 보호해 병합(rowSpan) 셀 보장을 되물릴 수 있다
+    # (별표2: 병합 5~8줄 셀이 최대 57px 물림). 멱등 재호출로 재보장.
+    row_h = expand_rowspan_content(cells, row_h, nrow)
+    # 높이0 반복 헤더행 접기 — 한컴 '표 머리행 반복'의 저장 잔재(전 셀
+    # cellSz=0, 내용도 없음)를 흐름 중간에 평행으로 그리면 페이지 꼬리
+    # 문구와 겹친다. 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음).
+    # 회귀 수리 — 선언 높이(c["h"])만 보고 내용(hContent)은 확인하지
+    # 않아, 흐름도형 표(신고서 접수→등록증발급 등, 화살표 셀)처럼
+    # "높이 0 선언 + 실제 텍스트" 인 정상 행까지 통째로 숨기던 실사례
+    # 결함(107셀 표 중 82셀 소실) 확인 — hContent>0(실제 내용 있음)인
+    # 행은 절대 접지 않는다.
+    _zero_rows = set()
+    _zr = {}
+    for c in cells:
+        if c["rowSpan"] == 1:
+            _zr.setdefault(c["row"], True)
+            if c["h"] > 0 or c["hContent"] > 0:
+                _zr[c["row"]] = False
+    for _r, _az in _zr.items():
+        if _az and _r > 0:
+            _zero_rows.add(_r)
+            row_h[_r] = 0.0
+    # 공장 캘리브레이션 배율 — 한컴 실제 쪽수에 맞춘 행높이 미세 배율
+    # (truth 캐시의 calib.json). 축소 시엔 내용 하한(floor)을 지켜
+    # 물림을 만들지 않는다. 확대는 그대로(잘림 없음).
+    _calib_alpha = 0.0
+    row_scale = ctx.row_scale
+    if row_scale and abs(row_scale - 1.0) > 1e-3:
+        if row_scale > 1.0:
+            row_h = [row_h[i] * row_scale for i in range(nrow)]
         else:
-            st["page_idx"] += 1
-        if os.environ.get("COORD_DEBUG"):
-            print(
-                f"[DBG reset] col_count={st['col_count']} "
-                f"col_idx={st['col_idx']} page_idx={st['page_idx']}",
-                file=sys.stderr,
-            )
+            # 축소 — 내용 하한이 아니라 글리프-컴팩트 하한(줄간격 제거)
+            # 까지 허용하고, α 보간 기계로 줄 위치도 함께 압축한다
+            # (글리프 크기 유지 → 물림 없음). 한컴이 조밀 문서에서
+            # 실제로 쓰는 압축 방식과 동일 모델.
+            _comp = [0.0] * nrow
+            for c in cells:
+                if c["rowSpan"] == 1 and c["row"] not in _zero_rows:
+                    _cv = c["hCompact"] + c["mt"]
+                    _comp[c["row"]] = max(_comp[c["row"]], _cv)
+            for i in range(nrow):
+                _comp[i] = min(_comp[i], row_h[i])
+            _new = [max(_comp[i], row_h[i] * row_scale) for i in range(nrow)]
+            # 행별 α — 각 행의 실제 압축률(원↔컴팩트 사이 위치).
+            # 표 전역 단일 α는 꽉 찬 행(압축률 1.0)과 여유 행(0.x)을
+            # 평균내 꽉 찬 행의 줄이 밖으로 밀린다(물림).
+            _row_alpha = [0.0] * nrow
+            for i in range(nrow):
+                d = row_h[i] - _comp[i]
+                if d > 1e-6:
+                    _row_alpha[i] = min(1.0, max(0.0, (row_h[i] - _new[i]) / d))
+            _calib_alpha = _row_alpha
+            row_h = _new
+    # 표 압축 폐지 — 원본 해부 결과 한컴은 다중페이지 표를 압축하지 않고
+    # 페이지를 늘린다(검증: cellSz 합 2091 = p1 964+p2 1009+p3 118,
+    # 각주 저장 vpos 239 = p3 표 하단 바로 아래 — 픽셀 정합). 행은
+    # cellSz(한컴 저장 실높이) 그대로 두고, 표 뒤 본문은 emit_para 의
+    # 흐름 불변식이 올바른 페이지로 보낸다. (α압축은 2쪽 오가정 위에서
+    # 행을 글리프 밀착까지 눌러 서식이 뭉개지는 결함이었다)
+    alpha = _calib_alpha  # 0.0 | 행별 α 리스트(캘리브레이션 축소 시)
+    if os.environ.get("COORD_DEBUG"):
+        print(
+            f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
+            f"nrow={nrow} ncol={ncol} th={th:.0f} "
+            f"sum={sum(row_h):.0f} row_h="
+            f"{[round(h, 1) for h in row_h]}",
+            file=sys.stderr,
+        )
+    col_x = [0.0] * (ncol + 1)
+    for i in range(ncol):
+        col_x[i + 1] = col_x[i] + col_w[i]
+    row_abs, row_bot = paginate_rows(cells, row_h, nrow, base_y, ctx.geo)
+    col_rank = col_rank_map(cells)
+    table_bottom = base_y
+    for c in cells:
+        if c["rowSpan"] == 1 and c["row"] in _zero_rows:
+            continue  # 접힌 반복 헤더행 — 비표시
+        cid = _cell_id(ctx, tbl, c["row"], col_rank.get((c["row"], c["col"]), c["col"]))
+        cx = base_x + col_x[c["col"]]
+        cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
+        _last = min(c["row"] + c["rowSpan"], nrow) - 1
+        # 병합 셀이 페이지 점프에 걸치면 연속 구간(조각)으로 분해 —
+        # 한컴의 병합 셀 페이지 분할 재현. 조각마다 박스를 따로 그리고,
+        # 셀 내용 줄은 조각을 잇는 연속 오프셋 공간에 매핑한다.
+        frags = []  # [(y_top, height)] 페이지별 연속 구간
+        _fs = c["row"]
+        for r2 in range(c["row"], _last + 1):
+            if r2 < _last and abs(row_abs[r2 + 1] - row_bot[r2]) > 0.5:
+                frags.append((row_abs[_fs], row_bot[r2] - row_abs[_fs]))
+                _fs = r2 + 1
+        frags.append((row_abs[_fs], row_bot[_last] - row_abs[_fs]))
+        ch = sum(f[1] for f in frags)  # 가시 높이(페이지 갭 제외)
 
-    def _container_object_heights(p):
-        # 인라인 개체(이미지 container 등, pos.treatAsChar=1) 앵커 lineseg
-        # 검출 — 텍스트는 없지만(own_runs 는 개체를 문자로 안 셈) 한컴이
-        # 그 개체 높이를 vertsize 에 그대로 기록해 둔다(실측: curSz.height
-        # 73900 = 해당 lineseg vertsize 73900, 정확히 일치). "빈 줄은 흐름을
-        # 안 민다"는 유령페이지 방지 규칙이 이 개체 줄까지 빈 줄로 오인해
-        # 삼켜, 이미지 있는 문서에서 페이지가 통째로 결측되는 원인이었다
-        # (실무 서식에 흔한 직인·로고·도면 삽입 — 안전보건계획 문서 45쪽
-        # 중 5쪽 결측 실사례). 원본 무수정 원칙상 이미지는 그리지 않되,
-        # 문단 안 개체들의 curSz.height 를 미리 모아 두면, 어느 lineseg
-        # 든 그 높이와 근사 일치하는 빈 줄을 '개체 자리'로 인정해 흐름에
-        # 반영할 수 있다(개체 자체를 렌더/편집하는 것은 아님).
-        _obj_heights: set[int] = set()
-        for ctrl_container in p.iter():
-            if ln(ctrl_container.tag) != "container":
-                continue
-            sz_el = next((e for e in ctrl_container.iter() if ln(e.tag) == "curSz"), None)
-            if sz_el is not None:
-                try:
-                    _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
-                except (TypeError, ValueError):
-                    pass
-        return _obj_heights
+        def _y_at(off, lh=0.0, _frags=frags):
+            """셀 내용 오프셋 → 절대 y (조각 경계를 건너 연속 매핑).
 
-    def _resolve_row_flow_overflow_y(st, page_h, m_top, vpos, h, y):
-        if vpos < 1.0:
-            # vertpos=0 은 "새 페이지 절대위치"가 아니라 표 앵커와
-            # 같은 관용적 리셋 표시(흐름 위치 그대로 이어 쓰라는
-            # 뜻)인 경우가 흔하다 — 작은(한 페이지짜리) 표 바로
-            # 뒤에 오는 제목 문단이 전부 이 패턴이라, 페이지를
-            # 통째로 건너뛰면(과거 동작) 표마다 빈 페이지가
-            # 하나씩 낭비된다(실사례: 표 6개 문서가 6쪽 → 실제로
-            # 필요 없는 빈 페이지로 부풀려짐). 앵커처럼 흐름
-            # 위치에 그대로 붙인다(페이지 전진 없음).
-            return st["flow_y"]
-        # vpos 가 실제 값이면(다중페이지 표 뒤 본문처럼) 기존
-        # 대로 페이지 단위로 전진 — 진짜 다음 페이지 콘텐츠다.
-        _guard = 0
-        while y < st["flow_y"] - max(h * 1.5, 20.0) and _guard < 6:
-            st["page_idx"] += 1
-            y = (st["page_idx"] * page_h) + m_top + vpos * HU
-            _guard += 1
-        return y
+            lh(줄 높이)를 주면 줄이 조각 절단면에 걸칠 때 한컴처럼 줄
+            전체를 다음 조각(다음 페이지) 시작으로 넘긴다 — 글리프가
+            페이지 절단면에서 반쯤 잘리는 것을 방지."""
+            cum = 0.0
+            for _k, (fy, fh) in enumerate(_frags):
+                if _k == len(_frags) - 1 or off + lh <= cum + fh + 1.0:
+                    # 이월된 줄은 조각 상단에 클램프(음수 오프셋 방지)
+                    return fy + max(0.0, off - cum)
+                cum += fh
+            return _frags[-1][0] + max(0.0, off - cum)
 
-    def emit_para(p, block_idx=None):
-        txt, spans = own_runs(p)
-        segs = direct_linesegs(p)
-        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
-        _obj_heights = _container_object_heights(p)
-        for i, s in enumerate(segs):
-            vpos = float(s.get("vertpos", "0"))
-            a = int(s.get("textpos", "0") or "0")
-            b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
-            line_txt = txt[a:b]
-            # 페이지 상태머신은 가시 줄만 구동 — 빈 문단(공백 줄)은 페이지를
-            # 만들지 않는다. 문서 끝의 빈 문단 수백 개가 vpos 리셋을 반복해
-            # 유령 페이지 6쪽+를 만들던 결함(한컴은 빈 문단으로 쪽을 늘리지
-            # 않음 — 별지2: 한컴 12쪽 vs 우리 18쪽의 근본 원인).
-            _obj_h = 0
-            if not line_txt.strip() and _obj_heights:
-                _raw_vsz = int(float(s.get("vertsize", 0) or 0))
-                _obj_h = next((h for h in _obj_heights if abs(h - _raw_vsz) <= 5), 0)
-            _vis = bool(line_txt.strip()) or _obj_h > 0
-            if _vis:
-                if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
-                    _on_vpos_reset()  # vpos 리셋 → 새 페이지(또는 다단 다음 칼럼)
-                st["prev_vpos"] = vpos
-            y = (st["page_idx"] * page_h) + m_top + vpos * HU
-            x = m_left + float(s.get("horzpos", "0")) * HU
-            w = float(s.get("horzsize", "0")) * HU
-            h = float(s.get("vertsize", "1000")) * HU
-            bl = float(s.get("baseline", "0")) * HU
-            # 흐름 불변식 — 문단은 선행 내용(표 하단 flow_y) 위에 올라앉을 수
-            # 없다. 표가 여러 페이지를 쓰면 뒤 본문을 같은 vpos 로 다음
-            # 페이지에 놓는다(한컴 배치: 각주 vpos 는 표가 끝난 페이지 기준).
-            # 빈 줄은 밀지 않는다(보이지 않는 간격 문단 — 밀면 연쇄 페이지
-            # 증가), 1.5줄 이상 실침범 시에만 발동.
-            if i == 0 and page_h > 0 and line_txt.strip() and y < st["flow_y"] - max(h * 1.5, 20.0):
-                y = _resolve_row_flow_overflow_y(st, page_h, m_top, vpos, h, y)
-            line = {
-                "text": line_txt,
-                "segments": slice_segments(txt, spans, a, b),
-                "x": round(x, 1),
-                "y": round(y, 1),
-                "w": round(w, 1),
-                "h": round(h, 1),
-                "baseline": round(bl, 1),
-                "cell": False,
-            }
-            if align:
-                line["align"] = align
-            # 본문 문단(표 셀 아님) 클릭 편집 배선용 — block_idx 는
-            # block_parser.parse_blocks_from_section 과 동일 규칙(section
-            # root 직계 p 자식 순서)으로 walk() 가 부여한다. paragraphId 는
-            # ro_view_importer._stable_paragraph_id 와 동일 포맷(local_index
-            # 는 문단 안 여러 lineseg 를 한 문단으로 묶으므로 항상 0).
-            if block_idx is not None and line_txt.strip():
-                line["paragraphId"] = f"par_s{_sec_idx}_b{block_idx}_p0"
-                line["containerScope"] = {
-                    "kind": "block",
-                    "sectionIndex": _sec_idx,
-                    "blockIndex": block_idx,
-                }
-                # 캐럿 위치 편집(문장 중 클릭 지점에 정확히 삽입)용 —
-                # 이 줄이 문단 전체 텍스트(txt) 중 몇 번째 글자부터
-                # 시작하는지. 프런트가 클릭된 화면 좌표를 이 줄 안
-                # 로컬 오프셋으로 바꾼 뒤 이 값을 더해 문단 전체
-                # 기준 캐럿 오프셋을 구한다(문단 전체를 통째로
-                # textarea 에 채워 바꾸는 대신, 클릭한 지점에만
-                # 삽입하는 캐럿 편집을 위해 필요).
-                line["paraTextOffset"] = a
-            lines.append(line)
-            if _vis:
-                st["max_y"] = max(st["max_y"], y + h)
-        st["flow_y"] = st["max_y"]
-
-    def _cell_info(tc):
-        addr = next((c.attrib for c in tc if ln(c.tag) == "cellAddr"), {})
-        span = next((c.attrib for c in tc if ln(c.tag) == "cellSpan"), {})
-        sz = next((c.attrib for c in tc if ln(c.tag) == "cellSz"), {})
-        mg = next((c.attrib for c in tc if ln(c.tag) == "cellMargin"), {})
-        sub = next((c.attrib for c in tc if ln(c.tag) == "subList"), {})
-        w = sane_hu(sz.get("width", "0"))
-        h = sane_hu(sz.get("height", "0"))
-        # 손상 여백 방어 — 일부 문서가 cellMargin 에 셀보다 큰 값
-        # (예: 20520HU=274px)을 담아 행높이를 폭증시킨다. 여백 합이 셀
-        # 크기를 잠식(90%↑)하면 한컴처럼 무시하고 기본값(≈141HU)으로.
-        _DEF_MG = 1.9
-        ml_raw = sane_hu(mg.get("left", "0"))
-        mt_raw = sane_hu(mg.get("top", "0"))
-        ml = ml_raw if (w <= 0 or ml_raw * 2 <= w * 0.9) else _DEF_MG
-        mt = mt_raw if (h <= 0 or mt_raw * 2 <= h * 0.9) else _DEF_MG
-        # 셀 직속 문단의 실제 내용 높이(저장 lineseg ry+h 최대) — 행높이가
-        # cellSz(최소값일 수 있음)보다 작아 내용이 넘치는 것을 막기 위함.
-        content = 0.0
-        compact = 0.0  # 줄간격 제거 시 최소 높이(글리프 합) — 앵커 압축용
-        for cp in tc.iter():
-            if ln(cp.tag) == "p" and _nearest_cell(cp) is tc:
-                for cl in _cell_para_lines(cp):
-                    content = max(content, cl["ry"] + cl["h"])
-                    compact += cl["h"]
-        # 직속 중첩표 높이도 내용에 포함 — 안 하면 외곽 행이 중첩표보다
-        # 짧아, 뒤 내용(푸터 등)이 위로 올라오고 중첩표가 아래로 넘친다.
-        for nt in tc.iter():
-            if ln(nt.tag) == "tbl" and _nearest_cell(nt) is tc:
-                pp = _nearest_p(nt)
+        # 이 셀 직속 문단만 (중첩표 안 문단 제외)
+        cell_lines = []
+        for cp in c["tc"].iter():
+            if ln(cp.tag) == "p" and _nearest_cell(ctx, cp) is c["tc"]:
+                cell_lines.extend(_cell_para_lines(ctx, cp))
+        # 세로쓰기(vertical) 2글자 이상 헤더의 w/h 스왑 — 재적용 후
+        # 회귀 발견(별지 제20호서식 등에서 layout_quality cellOverflow
+        # 324건, 최대 15.3px) 확인돼 재차 되돌림. 코퍼스 세로쓰기 비율
+        # 0.6%(142/24153건)로 극소수라, 회귀를 0으로 만드는 쪽이 이득
+        # 이라는 대표님 판단에 따라 미완성 기능으로 별도 워크스트림에
+        # 미룬다(1글자 헤더는 CSS writing-mode 만으로 정상 렌더돼
+        # cline["vertical"] 플래그는 유지 — 그쪽은 회귀 없음).
+        # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
+        nested = []
+        for nt in c["tc"].iter():
+            if ln(nt.tag) == "tbl" and _nearest_cell(ctx, nt) is c["tc"]:
+                pp = _nearest_p(ctx, nt)
                 nsegs = direct_linesegs(pp) if pp is not None else []
                 nvpos = float(nsegs[0].get("vertpos", "0")) * HU if nsegs else 0.0
                 nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
                 nh = sane_hu(nsz.get("height", "0"))
-                content = max(content, nvpos + nh)
-                compact += nh
-        return {
-            "row": int(addr.get("rowAddr", "0")),
-            "col": int(addr.get("colAddr", "0")),
-            "rowSpan": int(span.get("rowSpan", "1") or "1"),
-            "colSpan": int(span.get("colSpan", "1") or "1"),
-            "w": w,
-            "h": h,
-            "ml": ml,
-            "mt": mt,
-            "hContent": content,
-            "hCompact": min(compact, content) if compact > 0 else content,
-            "bfRef": tc.attrib.get("borderFillIDRef"),
-            "vAlign": sub.get("vertAlign", "TOP"),
-            # 세로쓰기(textDirection=VERTICAL/VERTICALALL) — 자리수 헤더
-            # (조/천억/백억 등 좁고 긴 금액칸)에서 흔함. CSS writing-mode
-            # 로 렌더러가 처리하도록 셀 단위로 전달.
-            "vertical": str(sub.get("textDirection", "")).startswith("VERTICAL"),
-            "tc": tc,
-        }
-
-    def walk_table(tbl, base_x, base_y, anchor_vpos=None):
-        """tbl 을 (base_x, base_y) 를 좌상단으로 배치. 이 tbl 의 직속 셀만
-        그리고, 셀 안 중첩표는 그 셀 내용 좌상단에서 재귀 배치한다.
-        anchor_vpos: 표 다음 본문 문단의 저장 vpos(페이지 상대) — 다중페이지
-        표의 실제 높이를 원본 좌표에서 역산하는 권위 앵커. 반환: 표 하단 y."""
-        cells = [
-            _cell_info(tc) for tc in tbl.iter() if ln(tc.tag) == "tc" and _nearest_tbl(tc) is tbl
-        ]
-        if not cells:
-            return base_y
-        ncol = max((c["col"] + c["colSpan"] for c in cells), default=1)
-        nrow = max((c["row"] + c["rowSpan"] for c in cells), default=1)
-        # 행높이는 cellSz 와 실제 내용높이(hContent+상하여백) 중 큰 값으로 —
-        # cellSz 가 최소값이라 내용이 넘쳐 셀이 세로로 충돌하는 것을 막는다.
-        for c in cells:
-            c["hEff"] = max(c["h"], c["hContent"] + c["mt"] * 2)
-        col_w = solve_axis(cells, ncol, "col", "colSpan", "w")
-        row_h = solve_axis(cells, nrow, "row", "rowSpan", "hEff")
-        row_h = expand_rowspan_content(cells, row_h, nrow)
-        sz = next((ch.attrib for ch in tbl if ln(ch.tag) == "sz"), {})
-        tw = sane_hu(sz.get("width", "0"))
-        th = sane_hu(sz.get("height", "0"))
-        col_w, row_h = normalize_declared(cells, col_w, row_h, tw, th, nrow)
-        # 병합 내용 불변식 재확약 — normalize 의 슬랙 축소는 단일-span
-        # 하한(min_need)만 보호해 병합(rowSpan) 셀 보장을 되물릴 수 있다
-        # (별표2: 병합 5~8줄 셀이 최대 57px 물림). 멱등 재호출로 재보장.
-        row_h = expand_rowspan_content(cells, row_h, nrow)
-        # 높이0 반복 헤더행 접기 — 한컴 '표 머리행 반복'의 저장 잔재(전 셀
-        # cellSz=0, 내용도 없음)를 흐름 중간에 평행으로 그리면 페이지 꼬리
-        # 문구와 겹친다. 높이 0 으로 접고 비표시(원 헤더는 r0 에 있음).
-        # 회귀 수리 — 선언 높이(c["h"])만 보고 내용(hContent)은 확인하지
-        # 않아, 흐름도형 표(신고서 접수→등록증발급 등, 화살표 셀)처럼
-        # "높이 0 선언 + 실제 텍스트" 인 정상 행까지 통째로 숨기던 실사례
-        # 결함(107셀 표 중 82셀 소실) 확인 — hContent>0(실제 내용 있음)인
-        # 행은 절대 접지 않는다.
-        _zero_rows = set()
-        _zr = {}
-        for c in cells:
-            if c["rowSpan"] == 1:
-                _zr.setdefault(c["row"], True)
-                if c["h"] > 0 or c["hContent"] > 0:
-                    _zr[c["row"]] = False
-        for _r, _az in _zr.items():
-            if _az and _r > 0:
-                _zero_rows.add(_r)
-                row_h[_r] = 0.0
-        # 공장 캘리브레이션 배율 — 한컴 실제 쪽수에 맞춘 행높이 미세 배율
-        # (truth 캐시의 calib.json). 축소 시엔 내용 하한(floor)을 지켜
-        # 물림을 만들지 않는다. 확대는 그대로(잘림 없음).
-        _calib_alpha = 0.0
-        if row_scale and abs(row_scale - 1.0) > 1e-3:
-            if row_scale > 1.0:
-                row_h = [row_h[i] * row_scale for i in range(nrow)]
-            else:
-                # 축소 — 내용 하한이 아니라 글리프-컴팩트 하한(줄간격 제거)
-                # 까지 허용하고, α 보간 기계로 줄 위치도 함께 압축한다
-                # (글리프 크기 유지 → 물림 없음). 한컴이 조밀 문서에서
-                # 실제로 쓰는 압축 방식과 동일 모델.
-                _comp = [0.0] * nrow
-                for c in cells:
-                    if c["rowSpan"] == 1 and c["row"] not in _zero_rows:
-                        _cv = c["hCompact"] + c["mt"]
-                        _comp[c["row"]] = max(_comp[c["row"]], _cv)
-                for i in range(nrow):
-                    _comp[i] = min(_comp[i], row_h[i])
-                _new = [max(_comp[i], row_h[i] * row_scale) for i in range(nrow)]
-                # 행별 α — 각 행의 실제 압축률(원↔컴팩트 사이 위치).
-                # 표 전역 단일 α는 꽉 찬 행(압축률 1.0)과 여유 행(0.x)을
-                # 평균내 꽉 찬 행의 줄이 밖으로 밀린다(물림).
-                _row_alpha = [0.0] * nrow
-                for i in range(nrow):
-                    d = row_h[i] - _comp[i]
-                    if d > 1e-6:
-                        _row_alpha[i] = min(1.0, max(0.0, (row_h[i] - _new[i]) / d))
-                _calib_alpha = _row_alpha
-                row_h = _new
-        # 표 압축 폐지 — 원본 해부 결과 한컴은 다중페이지 표를 압축하지 않고
-        # 페이지를 늘린다(검증: cellSz 합 2091 = p1 964+p2 1009+p3 118,
-        # 각주 저장 vpos 239 = p3 표 하단 바로 아래 — 픽셀 정합). 행은
-        # cellSz(한컴 저장 실높이) 그대로 두고, 표 뒤 본문은 emit_para 의
-        # 흐름 불변식이 올바른 페이지로 보낸다. (α압축은 2쪽 오가정 위에서
-        # 행을 글리프 밀착까지 눌러 서식이 뭉개지는 결함이었다)
-        alpha = _calib_alpha  # 0.0 | 행별 α 리스트(캘리브레이션 축소 시)
-        if os.environ.get("COORD_DEBUG"):
-            print(
-                f"[DBG tbl] base=({base_x:.0f},{base_y:.0f}) "
-                f"nrow={nrow} ncol={ncol} th={th:.0f} "
-                f"sum={sum(row_h):.0f} row_h="
-                f"{[round(h, 1) for h in row_h]}",
-                file=sys.stderr,
+                nested.append((nt, nvpos, nh))
+        # α 압축 시 줄 위치 보간 — 각 줄을 [원 ry ↔ 글리프-밀착 스택]
+        # 사이에서 α 만큼 이동(줄간격만 줄고 글리프는 유지 → 물림 없음).
+        # 행별 α 배열이면 이 셀 span 의 최대 α 를 사용.
+        if isinstance(alpha, list):
+            _a = max(
+                (alpha[r] for r in range(c["row"], min(c["row"] + c["rowSpan"], nrow))),
+                default=0.0,
             )
-        col_x = [0.0] * (ncol + 1)
-        for i in range(ncol):
-            col_x[i + 1] = col_x[i] + col_w[i]
-        row_abs, row_bot = paginate_rows(cells, row_h, nrow, base_y, geo)
-        col_rank = col_rank_map(cells)
-        table_bottom = base_y
-        for c in cells:
-            if c["rowSpan"] == 1 and c["row"] in _zero_rows:
-                continue  # 접힌 반복 헤더행 — 비표시
-            cid = _cell_id(tbl, c["row"], col_rank.get((c["row"], c["col"]), c["col"]))
-            cx = base_x + col_x[c["col"]]
-            cw = col_x[min(c["col"] + c["colSpan"], ncol)] - col_x[c["col"]]
-            _last = min(c["row"] + c["rowSpan"], nrow) - 1
-            # 병합 셀이 페이지 점프에 걸치면 연속 구간(조각)으로 분해 —
-            # 한컴의 병합 셀 페이지 분할 재현. 조각마다 박스를 따로 그리고,
-            # 셀 내용 줄은 조각을 잇는 연속 오프셋 공간에 매핑한다.
-            frags = []  # [(y_top, height)] 페이지별 연속 구간
-            _fs = c["row"]
-            for r2 in range(c["row"], _last + 1):
-                if r2 < _last and abs(row_abs[r2 + 1] - row_bot[r2]) > 0.5:
-                    frags.append((row_abs[_fs], row_bot[r2] - row_abs[_fs]))
-                    _fs = r2 + 1
-            frags.append((row_abs[_fs], row_bot[_last] - row_abs[_fs]))
-            ch = sum(f[1] for f in frags)  # 가시 높이(페이지 갭 제외)
-
-            def _y_at(off, lh=0.0, _frags=frags):
-                """셀 내용 오프셋 → 절대 y (조각 경계를 건너 연속 매핑).
-
-                lh(줄 높이)를 주면 줄이 조각 절단면에 걸칠 때 한컴처럼 줄
-                전체를 다음 조각(다음 페이지) 시작으로 넘긴다 — 글리프가
-                페이지 절단면에서 반쯤 잘리는 것을 방지."""
-                cum = 0.0
-                for _k, (fy, fh) in enumerate(_frags):
-                    if _k == len(_frags) - 1 or off + lh <= cum + fh + 1.0:
-                        # 이월된 줄은 조각 상단에 클램프(음수 오프셋 방지)
-                        return fy + max(0.0, off - cum)
-                    cum += fh
-                return _frags[-1][0] + max(0.0, off - cum)
-
-            # 이 셀 직속 문단만 (중첩표 안 문단 제외)
-            cell_lines = []
-            for cp in c["tc"].iter():
-                if ln(cp.tag) == "p" and _nearest_cell(cp) is c["tc"]:
-                    cell_lines.extend(_cell_para_lines(cp))
-            # 세로쓰기(vertical) 2글자 이상 헤더의 w/h 스왑 — 재적용 후
-            # 회귀 발견(별지 제20호서식 등에서 layout_quality cellOverflow
-            # 324건, 최대 15.3px) 확인돼 재차 되돌림. 코퍼스 세로쓰기 비율
-            # 0.6%(142/24153건)로 극소수라, 회귀를 0으로 만드는 쪽이 이득
-            # 이라는 대표님 판단에 따라 미완성 기능으로 별도 워크스트림에
-            # 미룬다(1글자 헤더는 CSS writing-mode 만으로 정상 렌더돼
-            # cline["vertical"] 플래그는 유지 — 그쪽은 회귀 없음).
-            # 직속 중첩표 (nvpos, 선언 높이) — voff 계산·배치에 공통 사용
-            nested = []
-            for nt in c["tc"].iter():
-                if ln(nt.tag) == "tbl" and _nearest_cell(nt) is c["tc"]:
-                    pp = _nearest_p(nt)
-                    nsegs = direct_linesegs(pp) if pp is not None else []
-                    nvpos = float(nsegs[0].get("vertpos", "0")) * HU if nsegs else 0.0
-                    nsz = next((x.attrib for x in nt if ln(x.tag) == "sz"), {})
-                    nh = sane_hu(nsz.get("height", "0"))
-                    nested.append((nt, nvpos, nh))
-            # α 압축 시 줄 위치 보간 — 각 줄을 [원 ry ↔ 글리프-밀착 스택]
-            # 사이에서 α 만큼 이동(줄간격만 줄고 글리프는 유지 → 물림 없음).
-            # 행별 α 배열이면 이 셀 span 의 최대 α 를 사용.
-            if isinstance(alpha, list):
-                _a = max(
-                    (alpha[r] for r in range(c["row"], min(c["row"] + c["rowSpan"], nrow))),
-                    default=0.0,
-                )
-            else:
-                _a = alpha
-            mt_eff = c["mt"] * (1.0 - 0.5 * _a)
-            if _a > 0 and cell_lines:
-                order = sorted(range(len(cell_lines)), key=lambda i: cell_lines[i]["ry"])
-                cum = 0.0
-                for i in order:
-                    cl = cell_lines[i]
-                    cl["ryEff"] = cl["ry"] - _a * (cl["ry"] - cum)
-                    cum += cl["h"]
-            else:
-                for cl in cell_lines:
-                    cl["ryEff"] = cl["ry"]
-            # 내용 총 높이 = 본문 줄 + 중첩표 하단 중 최대
-            text_h = max(
-                [cl["ryEff"] + cl["h"] for cl in cell_lines]
-                + [nv + nh for _, nv, nh in nested]
-                + [0.0]
-            )
-            avail = ch - mt_eff * 2
-            va = c["vAlign"]
-            voff = (
-                max(0.0, (avail - text_h) / 2)
-                if va == "CENTER"
-                else max(0.0, avail - text_h)
-                if va == "BOTTOM"
-                else 0.0
-            )
+        else:
+            _a = alpha
+        mt_eff = c["mt"] * (1.0 - 0.5 * _a)
+        if _a > 0 and cell_lines:
+            order = sorted(range(len(cell_lines)), key=lambda i: cell_lines[i]["ry"])
+            cum = 0.0
+            for i in order:
+                cl = cell_lines[i]
+                cl["ryEff"] = cl["ry"] - _a * (cl["ry"] - cum)
+                cum += cl["h"]
+        else:
             for cl in cell_lines:
-                line_x = cx + c["ml"] + cl["rx"]
-                # 줄 폭을 셀 오른쪽 경계까지로 제한 — horzsize 가 셀보다 넓어도
-                # (공백 패딩 등) 셀 밖으로 삐져나가지 않게 한다. 넘치는 부분은
-                # overflow:clip 으로 셀 안에서 잘리고, 우측정렬 ')' 는 셀
-                # 가장자리에 놓인다.
-                cap = (cx + cw) - line_x
-                wpx = min(cl["w"], cap) if cap > 2 else cl["w"]
-                cline = {
-                    "text": cl["text"],
-                    "segments": cl.get("segments", []),
-                    "x": round(line_x, 1),
-                    "y": round(_y_at(mt_eff + voff + cl["ryEff"], cl["h"]), 1),
-                    "w": round(wpx, 1),
-                    "h": round(cl["h"], 1),
-                    "baseline": round(cl.get("baseline", 0), 1),
-                    "cell": True,
-                    "cellId": cid,
-                }
-                if c.get("vertical"):
-                    cline["vertical"] = True
-                if cl.get("align"):
-                    cline["align"] = cl["align"]
-                lines.append(cline)
-            bf = border_fills.get(c["bfRef"])
-            for _fi, (fy, fh) in enumerate(frags):
-                box = {
-                    "x": round(cx, 1),
-                    "y": round(fy, 1),
-                    "w": round(cw, 1),
-                    "h": round(fh, 1),
-                    "cellId": cid,
-                }
-                if _fi > 0:
-                    box["frag"] = _fi  # 병합 셀의 다음 페이지 연속 조각
-                if bf:
-                    box["border"] = border_sides_css(bf["sides"])
-                    if bf.get("fill"):
-                        box["fill"] = bf["fill"]
-                boxes.append(box)
-            # 직속 중첩표 재귀 배치 — voff(세로정렬 오프셋)를 본문 줄과 동일
-            # 하게 더한다. 안 그러면 vAlign=CENTER 셀에서 본문만 내려가 겹친다.
-            # α 압축 시 여백 절반화 근사(다중페이지 표 안 중첩표는 코퍼스에
-            # 드묾; 위치만 완만히 당긴다)
-            for nt, nvpos, _ in nested:
-                walk_table(nt, cx + c["ml"], _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * _a)))
-            table_bottom = max(table_bottom, row_bot[_last])
-        st["flow_y"] = table_bottom + 4
-        st["max_y"] = max(st["max_y"], table_bottom)
-        # 통합 페이지 추적 — 본문(page_idx×page_h+vertpos)과 표(flow_y)가
-        # 별도 좌표계라, 페이지를 넘긴 표 뒤의 본문이 stale page_idx 로 계산돼
-        # 표 위에 겹치던 결함을 잡는다. 표 하단이 속한 페이지로 page_idx 를
-        # 전진시켜, 표 뒤 본문(page-relative vertpos)이 올바른 페이지에 놓이게
-        # 한다. 표가 한 페이지 안이면 end_pg==page_idx 라 무변화(단일페이지
-        # 배치·기존 시각회귀 baseline 보존).
-        if page_h:
-            end_pg = int(table_bottom // page_h)
-            if end_pg > st["page_idx"]:
-                st["page_idx"] = end_pg
-                # 새 페이지 기준 — 표 앞 본문 vertpos 와 비교해 거짓 리셋 방지
-                st["prev_vpos"] = -1
-        return table_bottom
+                cl["ryEff"] = cl["ry"]
+        # 내용 총 높이 = 본문 줄 + 중첩표 하단 중 최대
+        text_h = max(
+            [cl["ryEff"] + cl["h"] for cl in cell_lines] + [nv + nh for _, nv, nh in nested] + [0.0]
+        )
+        avail = ch - mt_eff * 2
+        va = c["vAlign"]
+        voff = (
+            max(0.0, (avail - text_h) / 2)
+            if va == "CENTER"
+            else max(0.0, avail - text_h)
+            if va == "BOTTOM"
+            else 0.0
+        )
+        for cl in cell_lines:
+            line_x = cx + c["ml"] + cl["rx"]
+            # 줄 폭을 셀 오른쪽 경계까지로 제한 — horzsize 가 셀보다 넓어도
+            # (공백 패딩 등) 셀 밖으로 삐져나가지 않게 한다. 넘치는 부분은
+            # overflow:clip 으로 셀 안에서 잘리고, 우측정렬 ')' 는 셀
+            # 가장자리에 놓인다.
+            cap = (cx + cw) - line_x
+            wpx = min(cl["w"], cap) if cap > 2 else cl["w"]
+            cline = {
+                "text": cl["text"],
+                "segments": cl.get("segments", []),
+                "x": round(line_x, 1),
+                "y": round(_y_at(mt_eff + voff + cl["ryEff"], cl["h"]), 1),
+                "w": round(wpx, 1),
+                "h": round(cl["h"], 1),
+                "baseline": round(cl.get("baseline", 0), 1),
+                "cell": True,
+                "cellId": cid,
+            }
+            if c.get("vertical"):
+                cline["vertical"] = True
+            if cl.get("align"):
+                cline["align"] = cl["align"]
+            ctx.lines.append(cline)
+        bf = ctx.border_fills.get(c["bfRef"])
+        for _fi, (fy, fh) in enumerate(frags):
+            box = {
+                "x": round(cx, 1),
+                "y": round(fy, 1),
+                "w": round(cw, 1),
+                "h": round(fh, 1),
+                "cellId": cid,
+            }
+            if _fi > 0:
+                box["frag"] = _fi  # 병합 셀의 다음 페이지 연속 조각
+            if bf:
+                box["border"] = border_sides_css(bf["sides"])
+                if bf.get("fill"):
+                    box["fill"] = bf["fill"]
+            ctx.boxes.append(box)
+        # 직속 중첩표 재귀 배치 — voff(세로정렬 오프셋)를 본문 줄과 동일
+        # 하게 더한다. 안 그러면 vAlign=CENTER 셀에서 본문만 내려가 겹친다.
+        # α 압축 시 여백 절반화 근사(다중페이지 표 안 중첩표는 코퍼스에
+        # 드묾; 위치만 완만히 당긴다)
+        for nt, nvpos, _ in nested:
+            walk_table(ctx, nt, cx + c["ml"], _y_at(mt_eff + voff + nvpos * (1.0 - 0.5 * _a)))
+        table_bottom = max(table_bottom, row_bot[_last])
+    ctx.st["flow_y"] = table_bottom + 4
+    ctx.st["max_y"] = max(ctx.st["max_y"], table_bottom)
+    # 통합 페이지 추적 — 본문(page_idx×page_h+vertpos)과 표(flow_y)가
+    # 별도 좌표계라, 페이지를 넘긴 표 뒤의 본문이 stale page_idx 로 계산돼
+    # 표 위에 겹치던 결함을 잡는다. 표 하단이 속한 페이지로 page_idx 를
+    # 전진시켜, 표 뒤 본문(page-relative vertpos)이 올바른 페이지에 놓이게
+    # 한다. 표가 한 페이지 안이면 end_pg==page_idx 라 무변화(단일페이지
+    # 배치·기존 시각회귀 baseline 보존).
+    if ctx.page_h:
+        end_pg = int(table_bottom // ctx.page_h)
+        if end_pg > ctx.st["page_idx"]:
+            ctx.st["page_idx"] = end_pg
+            # 새 페이지 기준 — 표 앞 본문 vertpos 와 비교해 거짓 리셋 방지
+            ctx.st["prev_vpos"] = -1
+    return table_bottom
 
-    def _nearest_tbl(el):
-        """el 의 가장 가까운 조상 tbl (없으면 None)."""
-        x = parent_map.get(el)
-        while x is not None:
-            if ln(x.tag) == "tbl":
-                return x
-            x = parent_map.get(x)
+
+def _nearest_tbl(ctx, el):
+    """el 의 가장 가까운 조상 tbl (없으면 None)."""
+    x = ctx.parent_map.get(el)
+    while x is not None:
+        if ln(x.tag) == "tbl":
+            return x
+        x = ctx.parent_map.get(x)
+    return None
+
+
+def _nearest_cell(ctx, el):
+    """el 의 가장 가까운 조상 tc (없으면 None)."""
+    x = ctx.parent_map.get(el)
+    while x is not None:
+        if ln(x.tag) == "tc":
+            return x
+        x = ctx.parent_map.get(x)
+    return None
+
+
+def _nearest_p(ctx, el):
+    """el 의 가장 가까운 조상 p (없으면 None)."""
+    x = ctx.parent_map.get(el)
+    while x is not None:
+        if ln(x.tag) == "p":
+            return x
+        x = ctx.parent_map.get(x)
+    return None
+
+
+def _cell_para_lines(ctx, p):
+    """셀 문단 → 셀 상대 라인 [{rx, ry, w, h, text, segments, align}]."""
+    txt, spans = own_runs(p)
+    segs = direct_linesegs(p)
+    align = css_align(ctx.para_aligns.get(p.attrib.get("paraPrIDRef")))
+    out = []
+    for i, s in enumerate(segs):
+        a = int(s.get("textpos", "0") or "0")
+        b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
+        out.append({
+            "rx": float(s.get("horzpos", "0")) * HU,
+            "ry": float(s.get("vertpos", "0")) * HU,
+            "w": float(s.get("horzsize", "0")) * HU,
+            "h": float(s.get("vertsize", "1000")) * HU,
+            "baseline": float(s.get("baseline", "0")) * HU,
+            "text": txt[a:b],
+            "align": align,
+            "segments": slice_segments(txt, spans, a, b),
+        })
+    return out
+
+
+def _para_top_y(ctx, p):
+    """문단 첫 lineseg 의 전역 top(px). 페이지 상태(prev_vpos/page_idx)도
+    emit_para 와 동일 규칙으로 갱신한다. lineseg 없으면 None."""
+    segs = direct_linesegs(p)
+    if not segs:
         return None
+    vpos = float(segs[0].get("vertpos", "0"))
+    if ctx.st["prev_vpos"] >= 0 and vpos + 1 < ctx.st["prev_vpos"]:
+        _on_vpos_reset(ctx)
+    ctx.st["prev_vpos"] = vpos
+    return (ctx.st["page_idx"] * ctx.page_h) + ctx.m_top + vpos * HU
 
-    def _nearest_cell(el):
-        """el 의 가장 가까운 조상 tc (없으면 None)."""
-        x = parent_map.get(el)
-        while x is not None:
-            if ln(x.tag) == "tc":
-                return x
-            x = parent_map.get(x)
-        return None
 
-    def _nearest_p(el):
-        """el 의 가장 가까운 조상 p (없으면 None)."""
-        x = parent_map.get(el)
-        while x is not None:
-            if ln(x.tag) == "p":
-                return x
-            x = parent_map.get(x)
-        return None
+def _lookahead_anchor_vpos(el, child):
+    # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
+    # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
+    # 신호로 마지막 표에 전달한다.
+    seen = False
+    for sib in el:
+        if seen and ln(sib.tag) == "p":
+            if any(ln(t.tag) == "tbl" for t in sib.iter()):
+                break  # 다음 표 그룹 — 앵커 아님
+            sgs = direct_linesegs(sib)
+            if sgs and own_text(sib).strip():
+                return float(sgs[0].get("vertpos", "0")) * HU
+        if sib is child:
+            seen = True
+    return None
 
-    def _cell_para_lines(p):
-        """셀 문단 → 셀 상대 라인 [{rx, ry, w, h, text, segments, align}]."""
-        txt, spans = own_runs(p)
-        segs = direct_linesegs(p)
-        align = css_align(para_aligns.get(p.attrib.get("paraPrIDRef")))
-        out = []
-        for i, s in enumerate(segs):
-            a = int(s.get("textpos", "0") or "0")
-            b = int(segs[i + 1].get("textpos", "0") or "0") if i + 1 < len(segs) else len(txt)
-            out.append({
-                "rx": float(s.get("horzpos", "0")) * HU,
-                "ry": float(s.get("vertpos", "0")) * HU,
-                "w": float(s.get("horzsize", "0")) * HU,
-                "h": float(s.get("vertsize", "1000")) * HU,
-                "baseline": float(s.get("baseline", "0")) * HU,
-                "text": txt[a:b],
-                "align": align,
-                "segments": slice_segments(txt, spans, a, b),
-            })
-        return out
 
-    def _para_top_y(p):
-        """문단 첫 lineseg 의 전역 top(px). 페이지 상태(prev_vpos/page_idx)도
-        emit_para 와 동일 규칙으로 갱신한다. lineseg 없으면 None."""
-        segs = direct_linesegs(p)
-        if not segs:
-            return None
-        vpos = float(segs[0].get("vertpos", "0"))
-        if st["prev_vpos"] >= 0 and vpos + 1 < st["prev_vpos"]:
-            _on_vpos_reset()
-        st["prev_vpos"] = vpos
-        return (st["page_idx"] * page_h) + m_top + vpos * HU
-
-    def _lookahead_anchor_vpos(el, child):
-        # 다음 본문 앵커 lookahead — 표 그룹 뒤 첫 본문 문단의 저장
-        # vpos(한컴 실제 배치 좌표). 다중페이지 표 높이 역산의 권위
-        # 신호로 마지막 표에 전달한다.
-        seen = False
-        for sib in el:
-            if seen and ln(sib.tag) == "p":
-                if any(ln(t.tag) == "tbl" for t in sib.iter()):
-                    break  # 다음 표 그룹 — 앵커 아님
-                sgs = direct_linesegs(sib)
-                if sgs and own_text(sib).strip():
-                    return float(sgs[0].get("vertpos", "0")) * HU
-            if sib is child:
-                seen = True
-        return None
-
-    def walk(el):
-        block_idx = 0
-        for child in el:
-            if ln(child.tag) != "p":
-                continue
-            this_block_idx = block_idx
-            block_idx += 1
-            _update_col_state(child)
-            # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
-            # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
-            # (page_idx 전진 + vertpos 리셋). "0"/미지정이면 자동 흐름(무변화).
-            if child.attrib.get("pageBreak", "0") not in ("0", ""):
-                if page_h and st["max_y"] > st["page_idx"] * page_h + m_top:
-                    st["page_idx"] += 1
-                    st["prev_vpos"] = -1
-                    st["flow_y"] = st["page_idx"] * page_h + m_top
-            # 이 문단의 최상위 표만(중첩표는 walk_table 이 재귀 배치)
-            top_tbls = [t for t in child.iter() if ln(t.tag) == "tbl" and _nearest_tbl(t) is None]
-            if top_tbls:
-                # 표를 flow 위치(직전 내용 아래)에 순차 배치. 다중 표가 각기
-                # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
-                # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다.
-                # 같은 문단에 자체 텍스트가 있으면 유실 없이 먼저 방출.
-                # 텍스트 없는 표-호스트 문단은 자체 lineseg 1개(표 배치
-                # 앵커, vertpos=표가 문단 흐름 안에서 시작하는 오프셋)를
-                # 갖는 경우가 흔하다 — 이 반환값을 버리면(과거 "페이지 상태
-                # 갱신용"으로만 씀) 표 전체가 그 오프셋만큼 위로 밀려
-                # 렌더된다(실사례: vertpos=2312HU=30.8px 누락 → 표 전체가
-                # 31px 위로 어긋남). 반환된 앵커 y 를 표 시작 기준으로 사용.
-                _anchor_top = None
-                if own_text(child).strip():
-                    emit_para(child, this_block_idx)
-                else:
-                    _anchor_top = _para_top_y(child)
-                anchor_vpos = _lookahead_anchor_vpos(el, child)
-                # 안전장치 — 다중 표 문서에서 뒤쪽 표의 호스트 문단 앵커가
-                # (page_idx 갱신 어긋남 등으로) 이전 표보다 앞선 y 를 내면
-                # 표끼리 겹쳐 쪽수가 왜곡되는 회귀가 실사례로 확인됨(마커
-                # 문서 7→5쪽). 앵커는 흐름 위치보다 뒤로 당길 수만 있고
-                # (전진), 이미 채워진 flow_y 이전으로 되돌리지 않는다.
-                base_y = max(_anchor_top, st["flow_y"]) if _anchor_top is not None else st["flow_y"]
-                if _anchor_top is not None and _anchor_top < st["flow_y"] - 0.5:
-                    # 가드 발동 로그 — 무음이면 진짜 앵커 계산 버그가 가드에
-                    # 가려져 diff 만 미세하게 나빠지는 원인추적 불가 상태가
-                    # 된다(대표님 지적). 발동 빈도를 코퍼스 통계로 뽑아
-                    # 가드가 정당한 규칙인지 임시방편인지 판별하는 근거.
-                    warnings.append({
-                        "code": "ANCHOR_CLAMPED",
-                        "message": (
-                            f"table anchor {_anchor_top:.1f}px < "
-                            f"flow_y {st['flow_y']:.1f}px — "
-                            "anchor 무시하고 flow_y 사용"
-                        ),
-                        "anchorTop": round(_anchor_top, 1),
-                        "flowY": round(st["flow_y"], 1),
-                    })
-                for ti, t in enumerate(top_tbls):
-                    walk_table(t, m_left, base_y, anchor_vpos if ti == len(top_tbls) - 1 else None)
-                    base_y = st["flow_y"]
+def _walk(ctx, el):
+    block_idx = 0
+    for child in el:
+        if ln(child.tag) != "p":
+            continue
+        this_block_idx = block_idx
+        block_idx += 1
+        _update_col_state(ctx, child)
+        # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
+        # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
+        # (page_idx 전진 + vertpos 리셋). "0"/미지정이면 자동 흐름(무변화).
+        if child.attrib.get("pageBreak", "0") not in ("0", ""):
+            if ctx.page_h and ctx.st["max_y"] > ctx.st["page_idx"] * ctx.page_h + ctx.m_top:
+                ctx.st["page_idx"] += 1
+                ctx.st["prev_vpos"] = -1
+                ctx.st["flow_y"] = ctx.st["page_idx"] * ctx.page_h + ctx.m_top
+        # 이 문단의 최상위 표만(중첩표는 walk_table 이 재귀 배치)
+        top_tbls = [t for t in child.iter() if ln(t.tag) == "tbl" and _nearest_tbl(ctx, t) is None]
+        if top_tbls:
+            # 표를 flow 위치(직전 내용 아래)에 순차 배치. 다중 표가 각기
+            # vertpos=0(흐름) 이라 문단 top 에 두면 전부 겹친다. flow_y 로
+            # 쌓고, 페이지 넘침은 렌더러가 y 로 분할한다.
+            # 같은 문단에 자체 텍스트가 있으면 유실 없이 먼저 방출.
+            # 텍스트 없는 표-호스트 문단은 자체 lineseg 1개(표 배치
+            # 앵커, vertpos=표가 문단 흐름 안에서 시작하는 오프셋)를
+            # 갖는 경우가 흔하다 — 이 반환값을 버리면(과거 "페이지 상태
+            # 갱신용"으로만 씀) 표 전체가 그 오프셋만큼 위로 밀려
+            # 렌더된다(실사례: vertpos=2312HU=30.8px 누락 → 표 전체가
+            # 31px 위로 어긋남). 반환된 앵커 y 를 표 시작 기준으로 사용.
+            _anchor_top = None
+            if own_text(child).strip():
+                emit_para(ctx, child, this_block_idx)
             else:
-                emit_para(child, this_block_idx)
+                _anchor_top = _para_top_y(ctx, child)
+            anchor_vpos = _lookahead_anchor_vpos(el, child)
+            # 안전장치 — 다중 표 문서에서 뒤쪽 표의 호스트 문단 앵커가
+            # (page_idx 갱신 어긋남 등으로) 이전 표보다 앞선 y 를 내면
+            # 표끼리 겹쳐 쪽수가 왜곡되는 회귀가 실사례로 확인됨(마커
+            # 문서 7→5쪽). 앵커는 흐름 위치보다 뒤로 당길 수만 있고
+            # (전진), 이미 채워진 flow_y 이전으로 되돌리지 않는다.
+            base_y = (
+                max(_anchor_top, ctx.st["flow_y"]) if _anchor_top is not None else ctx.st["flow_y"]
+            )
+            if _anchor_top is not None and _anchor_top < ctx.st["flow_y"] - 0.5:
+                # 가드 발동 로그 — 무음이면 진짜 앵커 계산 버그가 가드에
+                # 가려져 diff 만 미세하게 나빠지는 원인추적 불가 상태가
+                # 된다(대표님 지적). 발동 빈도를 코퍼스 통계로 뽑아
+                # 가드가 정당한 규칙인지 임시방편인지 판별하는 근거.
+                ctx.warnings.append({
+                    "code": "ANCHOR_CLAMPED",
+                    "message": (
+                        f"table anchor {_anchor_top:.1f}px < "
+                        f"flow_y {ctx.st['flow_y']:.1f}px — "
+                        "anchor 무시하고 flow_y 사용"
+                    ),
+                    "anchorTop": round(_anchor_top, 1),
+                    "flowY": round(ctx.st["flow_y"], 1),
+                })
+            for ti, t in enumerate(top_tbls):
+                walk_table(
+                    ctx, t, ctx.m_left, base_y, anchor_vpos if ti == len(top_tbls) - 1 else None
+                )
+                base_y = ctx.st["flow_y"]
+        else:
+            emit_para(ctx, child, this_block_idx)
 
-    walk(root)
+
+def _build_section_result(ctx):
+    st = ctx.st
+    page_h = ctx.page_h
     total_pages = max(st["page_idx"] + 1, int(math.ceil(st["max_y"] / page_h)) if page_h else 1)
     # 페이지별 복구·출력 — 전역 y 를 페이지-로컬 좌표로 재조립한다.
     # 렌더러는 각 페이지를 독립 단위로 그리므로 전역 y 슬라이싱(경계 번짐·
@@ -738,13 +812,13 @@ def _extract_section(path, secname, row_scale=1.0):
     # 감사·회귀 호환을 위해 병행 유지.
     pages_detail = [{"no": i + 1, "lines": [], "boxes": []} for i in range(total_pages)]
     if page_h > 0:
-        for l in lines:
+        for l in ctx.lines:
             p = int(l["y"] // page_h)
             if 0 <= p < total_pages:
                 q = dict(l)
                 q["y"] = round(l["y"] - p * page_h, 1)
                 pages_detail[p]["lines"].append(q)
-        for b in boxes:
+        for b in ctx.boxes:
             top, bot = b["y"], b["y"] + b["h"]
             p0 = max(int(top // page_h), 0)
             p1 = min(int((bot - 0.1) // page_h), total_pages - 1)
@@ -760,16 +834,16 @@ def _extract_section(path, secname, row_scale=1.0):
                     q["frag"] = 1
                 pages_detail[p]["boxes"].append(q)
     return {
-        "pageWidthPx": round(page_w, 1),
+        "pageWidthPx": round(ctx.page_w, 1),
         "pageHeightPx": round(page_h, 1),
-        "marginLeftPx": round(m_left, 1),
-        "marginTopPx": round(m_top, 1),
+        "marginLeftPx": round(ctx.m_left, 1),
+        "marginTopPx": round(ctx.m_top, 1),
         "pages": total_pages,
-        "lines": lines,
-        "boxes": boxes,
+        "lines": ctx.lines,
+        "boxes": ctx.boxes,
         "pagesDetail": pages_detail,
-        "charPrDefs": char_prs,
-        "warnings": warnings,
+        "charPrDefs": ctx.char_prs,
+        "warnings": ctx.warnings,
     }
 
 
