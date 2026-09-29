@@ -139,6 +139,12 @@ def _classify_infra_and_docs_paths(lower: str, path: str, name: str) -> tuple[st
         "pyproject.toml",
         "requirements.txt",
         "locked_files.toml",
+        # 2026-09-29: FE-01/FE-03 품질검사 도구(eslint/html-validate) 도입 시 신설.
+        # package.json 과 같은 성격(루트 빌드/린트 설정)인데 허용목록이 없어
+        # 새 파일 분류 게이트가 UNKNOWN_REVIEW_REQUIRED 로 막았다.
+        "eslint.config.mjs",
+        ".htmlvalidate.json",
+        ".htmlvalidateignore",
     }:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):

@@ -62,14 +62,14 @@
 
 <div class="wrap">
   <div class="searchbar">
-    <input data-role="q" type="search" placeholder="서식 이름으로 검색 (예: 착공신고서) — 또는 «AI 검색»으로 자연어 질의" />
+    <input data-role="q" type="search" aria-label="서식 이름으로 검색" placeholder="서식 이름으로 검색 (예: 착공신고서) — 또는 «AI 검색»으로 자연어 질의" />
     <button data-role="go" type="button">검색</button>
     <button data-role="ai" type="button" title="자연어로 서식 찾기 (Claude, 수 초 소요)" style="background:#fff4d1;border-color:#e0b84a;color:#7a5b12;">🤖 AI 검색</button>
   </div>
   <p class="hint">키워드 검색(즉시) · 카테고리 브라우즈 · AI 의미검색("공사 시작할 때 내는 서류" 같은 자연어). 서식을 고르면 입력칸이 보입니다.</p>
   <div class="instrow">
-    <label>🏛 기관·부처</label>
-    <select data-role="inst"><option value="">전체 기관</option></select>
+    <label for="inst-select">🏛 기관·부처</label>
+    <select id="inst-select" data-role="inst"><option value="">전체 기관</option></select>
     <button data-role="instgo" type="button" title="선택한 기관의 서식 보기">이 기관 서식</button>
     <button data-role="instclear" type="button" title="기관 필터 해제">✕ 해제</button>
     <span class="instnote" data-role="instnote"></span>

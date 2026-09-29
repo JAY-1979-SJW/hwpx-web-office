@@ -19,17 +19,15 @@ export function mountWebOffice(root) {
   const $ = (sel) => root.querySelector(sel);
   let loaded = null, cell = null, save = null;
   let coordLayout = null;   // 한컴 좌표 기반 faithful 레이아웃
-  let truthBase = null;     // '원본 그대로' 모드 — 한컴 실렌더 배경 URL 접두
   let selectedCellId = null;   // 서식 툴바 대상(마지막 클릭 칸)
   let paraSelTarget = null;    // 서식 툴바 대상(흐름 상자 안 텍스트 선택)
                                 // {paragraphId, start, end} — 있으면 셀
                                 // 선택보다 우선.
   let fmtBusy = false;         // 서식 적용 중 중복 클릭 방지
   const paraEdits = new Map();  // paragraphId → 편집된 텍스트(표 셀 아님)
-  let paraBusy = false;        // 본문 문단 저장 중 표시(상태줄 용)
   // 저장 요청 직렬화 큐 — 실측(2026-07-24) 확인된 결함: 이전 저장이
   // 아직 끝나기 전(한컴 실렌더 배경 재계산은 수 초 걸림) 사용자가 다음
-  // 문단을 편집·커밋하면, 예전에는 paraBusy 가드가 그 요청을 "조용히
+  // 문단을 편집·커밋하면, 예전에는 busy 플래그 가드가 그 요청을 "조용히
   // 버렸다"(편집기는 이미 닫혀 텍스트 유실, 에러 표시도 없음) — 이게
   // "클릭은 되는데 저장은 안 된다" 신고의 실제 원인이었다. 이제는
   // 버리지 않고 큐에 이어 붙여 이전 저장이 끝나면 순서대로 실행한다.
@@ -95,7 +93,6 @@ export function mountWebOffice(root) {
     // 생성 없음(§4 유지). 다중 run 문단도 anchor(첫 run) 서식으로 통일.
     const applyPr = (p.runs && p.runs[0] && p.runs[0].charPrIDRef) || null;
     if (before === newText) return true;   // 무변경 — 저장 안 함(이미 반영됨)
-    paraBusy = true;
     setStatus("load", "문단 저장 중 …");
     try {
       return !!(await _runParaSaveCommand(model, {
@@ -115,8 +112,6 @@ export function mountWebOffice(root) {
     } catch (e) {
       setStatus("fail", "문단 저장 실패: " + (e.message || e));
       return false;
-    } finally {
-      paraBusy = false;
     }
   }
 
@@ -190,15 +185,6 @@ export function mountWebOffice(root) {
       // 이 문단은 이제 실제 좌표로 다시 그려질 것이므로 클라이언트 캐시
       // 오버레이는 걷어낸다("덧방" 제거) — 아래 재로딩된 좌표가 진실.
       paraEdits.delete(paragraphId);
-      // truthBase(한컴 실렌더 배경 URL) 를 먼저 비운다 — 안 비우면 아래
-      // render() 가 "이전 파일"의 낡은 사진을 그대로 보여준다(실측
-      // 확인: 연속 저장 시 두 번째부터 화면이 안 바뀌는 것처럼 보이던
-      // 결함 — probeTruth 가 새 사진을 못 구해오면(한컴 렌더 실패
-      // → 404, 설계상 정상 폴백 신호) truthBase 가 영영 갱신 안 돼
-      // 화면이 그 이전 상태에 멈춰 있었다). 좌표 렌더러는 항상 최신
-      // documentModel 기준으로 정확하므로, truthBase 없이 먼저
-      // 보여주고 사진은 준비되면 probeTruth 가 덮어씌운다.
-      truthBase = null;
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
@@ -484,11 +470,6 @@ export function mountWebOffice(root) {
         }
       } catch (_e) { /* sourcePath 체이닝은 이미 반영됨 — 무시 */ }
       resyncCellControllerIfIdle();
-      // truthBase 선-초기화 — saveParagraphText 와 동일 이유(이전 파일의
-      // 낡은 실렌더 사진이 새 파일 렌더에도 그대로 남아, probeTruth 가
-      // 실패(404, 정상 폴백 신호)하면 화면이 그 이전 상태에 영영
-      // 멈춰 있던 결함).
-      truthBase = null;
       coordLayout = await fetchLayout(loaded.sourcePath);
       render();
       probeTruth(loaded.sourcePath);
@@ -503,10 +484,6 @@ export function mountWebOffice(root) {
     const e = $("[data-role=status]");
     e.dataset.k = k; e.textContent = msg;
   };
-  // 충실 보기(좌표 렌더러)가 유일 표시 모드 — 원본 배치 충실 재현 + 셀 직접
-  // 편집. 좌표 레이아웃이 없는 문서(lineseg 미저장)만 흐름 렌더러로 폴백.
-  const faithful = () => coordLayout != null;
-
   async function fetchLayout(sourcePath) {
     if (!sourcePath) return null;
     // 서버 재기동 순간 등 일시 실패 시 짧게 재시도 — 실패로 흐름(blob)
@@ -797,7 +774,6 @@ export function mountWebOffice(root) {
   // 서버에서 한컴 조판(수 초)이 돌 수 있어 비동기 프로브 후 재렌더한다.
   // 404(한컴 미설치 서비스 환경)면 좌표 렌더 그대로 — 무중단 폴백.
   async function probeTruth(sourcePath) {
-    truthBase = null;
     if (!sourcePath) return;
     const base = `${TRUTH_ENDPOINT}?src=${encodeURIComponent(sourcePath)}&page=`;
     try {
@@ -815,7 +791,6 @@ export function mountWebOffice(root) {
           render();
           return;
         }
-        truthBase = base;   // 화면엔 안 씀 — 정합 확인됐다는 내부 표시만
         setStatus("ok", ($("[data-role=status]").textContent || "")
           + " · 한컴 정합 확인"
           + (aligned && aligned.truthAligned ? "(스냅됨)" : ""));
@@ -827,7 +802,6 @@ export function mountWebOffice(root) {
   async function onLoaded(d) {
     loaded = d;
     coordLayout = null;
-    truthBase = null;
     selectedCellId = null;
     paraSelTarget = null;
     ["fmt-bold", "fmt-italic", "fmt-underline", "fmt-size", "fmt-color"]

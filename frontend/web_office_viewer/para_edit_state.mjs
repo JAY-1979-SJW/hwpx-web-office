@@ -8,8 +8,7 @@ import {
   makeTypeTextCommand, makeReplaceTextRangeCommand,
   makeDeleteTextRangeCommand, makeApplyFormatCommand, makeApplyParaFormatCommand,
   applyCommandToParagraph,
-  CT_TYPE_TEXT, CT_REPLACE_TEXT_RANGE, CT_DELETE_TEXT_RANGE,
-  CT_APPLY_FORMAT, CT_PARA_INSERT, CT_PARA_DELETE,
+  CT_PARA_INSERT, CT_PARA_DELETE,
   STATUS_VALIDATED,
   // WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-INSERT-01.
   makeParaInsertCommand, allocateNewParagraphId,
@@ -26,16 +25,6 @@ export const SEL_NONE = "NONE";
 export const SEL_CARET = "CARET";
 export const SEL_TEXT_RANGE = "TEXT_RANGE";
 export const SEL_COMPOSITION = "COMPOSITION";
-
-function _uuid() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
 
 function _paraText(p) { return p.runs.map((r) => r.text).join(""); }
 
@@ -80,10 +69,6 @@ function _inlineScopeRejectReason(scope) {
 function _inlineScopeGuard(state) {
   const p = _findPara(state, state.activeParagraphId);
   return _inlineScopeRejectReason(p?.containerScope ?? null);
-}
-
-function _findRun(paragraph, runId) {
-  return paragraph.runs.find((r) => r.runId === runId);
 }
 
 function _replaceParagraph(state, paragraphId, newPara) {

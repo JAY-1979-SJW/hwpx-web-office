@@ -392,7 +392,7 @@ function mountPanel(root) {
       ".co-box[data-fill-role='applicant']{background:rgba(45,108,223,.12);}" +
       ".co-box[data-fill-role='office']{background:rgba(120,120,120,.12);}" +
       "</style>" + sheet.innerHTML +
-      "<script>window.onload=function(){window.print();};<\/script>");
+      "<script>window.onload=function(){window.print();};</script>");
     w.document.close();
   }
 

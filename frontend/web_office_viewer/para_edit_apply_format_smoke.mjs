@@ -9,7 +9,6 @@ import {
   applyFormatToSelection,
   startComposition, cancelComposition,
   undo, redo, buildSaveDryRunPayload,
-  SEL_CARET, SEL_TEXT_RANGE,
 } from "./para_edit_state.mjs";
 
 const result = { task: "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-"

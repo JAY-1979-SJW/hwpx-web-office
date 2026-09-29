@@ -2,11 +2,9 @@
 /* PARA-EDIT BROWSER 상태기계 자체 시나리오. 실패 시 비-0 종료. */
 import {
   makeParagraphEditorState, selectParagraph,
-  setCaret, setRange, clearSelection,
+  setCaret, setRange,
   typeTextAtCaret, deleteRange, deleteBackward,
   applyFormatToSelection,
-  startComposition, updateComposition, endComposition,
-  cancelComposition,
   undo, redo, buildSaveDryRunPayload,
   SEL_NONE, SEL_CARET, SEL_TEXT_RANGE, SEL_COMPOSITION,
 } from "./para_edit_state.mjs";
@@ -142,7 +140,6 @@ s = onCompositionStart(s, {}).state;
 r = typeTextAtCaret(s, "X");
 assert(r.command === null, "no command while composition active");
 assert(r.reason === "COMPOSITION_LOCKED");
-s = cancelComposition(s);
 checks.compositionLockBlocksTypeText = true;
 
 // 10) undo / redo

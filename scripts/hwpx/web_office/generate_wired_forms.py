@@ -23,67 +23,70 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
+from hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # ruff: ignore[module-import-not-at-top-of-file]
 
 SPEC_PATH = PROJECT_ROOT / "docs" / "specifications" / "supervision_forms_final.json"
 OUTPUT_DIR = PROJECT_ROOT / "frontend" / "web_office_viewer" / "forms"
 API_BASE = "http://127.0.0.1:8811"
 
 DOCS = {
-    '331': {
-        'source': "data/drafts/form_library/0393790f0e_16b6afa1e14849fc_02910_045_[별지_제22호의3서식]_공사_감리자_지정_신청서.hwpx",
-        'slug': 'supervisor-designation-application-live',
-        'icon': '📋',
+    "331": {
+        "source": "data/drafts/form_library/0393790f0e_16b6afa1e14849fc_02910_045_[별지_제22호의3서식]_공사_감리자_지정_신청서.hwpx",
+        "slug": "supervisor-designation-application-live",
+        "icon": "📋",
     },
-    '99': {
-        'source': "data/drafts/form_library/022e3f35e6_6ff3fe63f13a8199_01076_035_[별지_제17호서식]_소방시설공사_완공검사신청서__A.hwpx",
-        'slug': 'fire-facility-completion-inspection-application-live',
-        'icon': '🔥',
+    "99": {
+        "source": "data/drafts/form_library/022e3f35e6_6ff3fe63f13a8199_01076_035_[별지_제17호서식]_소방시설공사_완공검사신청서__A.hwpx",
+        "slug": "fire-facility-completion-inspection-application-live",
+        "icon": "🔥",
     },
-    '57': {
-        'source': "data/drafts/form_library/035e67fa92_7e0e56c15d7fecd8_01315_072_[별지_제41호서식]_특정ㆍ준특정옥외탱크저장소의_구조안전점검시기_연장신청서(위험물의_저장관리_등의_상황).hwpx",
-        'slug': 'outdoor-tank-safety-inspection-extension-application-live',
-        'icon': '🏭',
+    "57": {
+        "source": "data/drafts/form_library/035e67fa92_7e0e56c15d7fecd8_01315_072_[별지_제41호서식]_특정ㆍ준특정옥외탱크저장소의_구조안전점검시기_연장신청서(위험물의_저장관리_등의_상황).hwpx",
+        "slug": "outdoor-tank-safety-inspection-extension-application-live",
+        "icon": "🏭",
     },
 }
 
 
 def norm(s: str) -> str:
-    return re.sub(r'\s+', '', s or '')
+    return re.sub(r"\s+", "", s or "")
 
 
 def build_guidance_index(fields: list) -> dict:
     idx = {}
     for f in fields:
-        idx[norm(f['field_name'])] = f
-        idx[norm(f.get('label_cell', ''))] = f  # 보조키(거의 안 씀)
+        idx[norm(f["field_name"])] = f
+        idx[norm(f.get("label_cell", ""))] = f  # 보조키(거의 안 씀)
     return idx
 
 
 def render_field(f, guidance_field):
-    label = f['label']
-    cell_id = f['cellId']
-    ftype = 'date' if f['fieldType'] == 'date' else ('number' if f['fieldType'] == 'number' else 'text')
-    guidance = (guidance_field or {}).get('ai_guidance') or f.get('prompt', '')
-    role = (guidance_field or {}).get('role', 'user')
-    icon = {'agency': '🏛️', 'signature': '✍️', 'user': '✏️'}.get(role, '✏️')
-    readonly = 'readonly' if role == 'agency' else ''
+    label = f["label"]
+    cell_id = f["cellId"]
+    ftype = (
+        "date" if f["fieldType"] == "date" else ("number" if f["fieldType"] == "number" else "text")
+    )
+    guidance = (guidance_field or {}).get("ai_guidance") or f.get("prompt", "")
+    role = (guidance_field or {}).get("role", "user")
+    icon = {"agency": "🏛️", "signature": "✍️", "user": "✏️"}.get(role, "✏️")
+    readonly = "readonly" if role == "agency" else ""
 
+    input_id = f"field-{cell_id}"
     return f'''
                 <div class="form-field">
-                    <label class="field-label">{label}
+                    <label class="field-label" for="{input_id}">{label}
                         <span class="cell-ref">[{cell_id}]</span>
                     </label>
-                    <input type="{ftype}" class="field-input" data-cell-id="{cell_id}" {readonly}>
+                    <input id="{input_id}" type="{ftype}" class="field-input" data-cell-id="{cell_id}" {readonly}>
                     <div class="guidance-box">{icon} {guidance}</div>
                 </div>'''
 
 
 def render_page(form_id, info, recognized_fields, guidance_idx, form_name):
-    fields_html = ''
+    fields_html = ""
     matched = 0
     for f in recognized_fields:
-        g = guidance_idx.get(norm(f['label']))
+        g = guidance_idx.get(norm(f["label"]))
         if g:
             matched += 1
         fields_html += render_field(f, g)
@@ -125,7 +128,7 @@ button {{ padding:11px 26px; border:none; border-radius:5px; cursor:pointer; fon
 </head>
 <body>
 <div class="container">
-    <header><h1>{info['icon']} {form_name}</h1><p style="opacity:0.9;font-size:0.85em;">실제 저장 API 연동 ({len(recognized_fields)}개 필드, 매칭 {matched}개)</p></header>
+    <header><h1>{info["icon"]} {form_name}</h1><p style="opacity:0.9;font-size:0.85em;">실제 저장 API 연동 ({len(recognized_fields)}개 필드, 매칭 {matched}개)</p></header>
     <div class="status-bar" id="statusBar">🔌 문서 불러오는 중...</div>
     <form class="form-container" id="formMain">
 {fields_html}
@@ -138,7 +141,7 @@ button {{ padding:11px 26px; border:none; border-radius:5px; cursor:pointer; fon
 </div>
 <script>
 const API_BASE = "{API_BASE}";
-const SOURCE_PATH = {json.dumps(info['source'], ensure_ascii=False)};
+const SOURCE_PATH = {json.dumps(info["source"], ensure_ascii=False)};
 let sourceDocumentHash = null;
 let tableIndexById = {{}};
 
@@ -236,30 +239,38 @@ loadDoc();
 
 
 def main():
-    spec = json.loads(SPEC_PATH.read_text(encoding='utf-8'))
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
     entries = []
 
     for form_id, info in DOCS.items():
         result = load_hwpx_for_editor(
-            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": info['source']},
-            project_root=PROJECT_ROOT)
+            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": info["source"]},
+            project_root=PROJECT_ROOT,
+        )
         if result.get("verdict") != "PASS":
             print(f"❌ {form_id} 로드 실패: {result}")
             continue
         recognized = result["documentModel"]["recognizedFields"]
-        guidance_idx = build_guidance_index(spec[form_id]['fields'])
-        form_name = spec[form_id]['form_name']
+        guidance_idx = build_guidance_index(spec[form_id]["fields"])
+        form_name = spec[form_id]["form_name"]
 
         html = render_page(form_id, info, recognized, guidance_idx, form_name)
         out_file = OUTPUT_DIR / f"{info['slug']}.html"
-        out_file.write_text(html, encoding='utf-8')
+        out_file.write_text(html, encoding="utf-8")
 
-        matched = sum(1 for f in recognized if norm(f['label']) in guidance_idx)
-        print(f"✅ {form_name}: recognizedFields {len(recognized)}개, AI해설 매칭 {matched}개 -> {out_file.name}")
-        entries.append({'slug': info['slug'], 'name': form_name, 'icon': info['icon'], 'count': len(recognized)})
+        matched = sum(1 for f in recognized if norm(f["label"]) in guidance_idx)
+        print(
+            f"✅ {form_name}: recognizedFields {len(recognized)}개, AI해설 매칭 {matched}개 -> {out_file.name}"
+        )
+        entries.append({
+            "slug": info["slug"],
+            "name": form_name,
+            "icon": info["icon"],
+            "count": len(recognized),
+        })
 
     return entries
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

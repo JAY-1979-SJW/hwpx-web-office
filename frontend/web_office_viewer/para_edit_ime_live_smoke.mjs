@@ -12,7 +12,7 @@
  */
 import {
   makeParagraphEditorState, selectParagraph, setCaret,
-  typeTextAtCaret, undo, redo, cancelComposition,
+  typeTextAtCaret, undo, redo,
   SEL_COMPOSITION, SEL_CARET,
 } from "./para_edit_state.mjs";
 import {
@@ -155,7 +155,6 @@ rec("compositionLocksTypeText", rl.command === null
         && rl.reason === "COMPOSITION_LOCKED");
 rec("compositionLockedLogUnchanged",
         rl.state.commandLog.length === lockLogLen);
-s = cancelComposition(rl.state);
 
 // ── 9. emit live command snapshot (Python E2E 투입용) ──────────────
 result.liveCommand = {

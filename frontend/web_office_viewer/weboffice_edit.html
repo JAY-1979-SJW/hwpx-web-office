@@ -153,9 +153,9 @@
       </div><div class="lbl">문단 정렬</div></div>
 
       <div class="grp" data-tab="home"><div class="btns">
-        <select data-role="font" disabled title="글꼴"><option>글꼴</option></select>
-        <select data-role="size" disabled title="글자 크기"><option>크기</option></select>
-        <select data-role="color" disabled title="글자 색"><option>색</option></select>
+        <select data-role="font" disabled title="글꼴" aria-label="글꼴"><option>글꼴</option></select>
+        <select data-role="size" disabled title="글자 크기" aria-label="글자 크기"><option>크기</option></select>
+        <select data-role="color" disabled title="글자 색" aria-label="글자 색"><option>색</option></select>
       </div><div class="lbl">크기 · 색</div></div>
 
       <div class="grp" data-tab="review"><div class="btns">
@@ -177,12 +177,12 @@
 
   <div class="findbar" data-role="findbar">
     <span>🔍</span>
-    <input data-role="findq" type="text" placeholder="찾을 내용" size="24" />
+    <input data-role="findq" type="text" aria-label="찾을 내용" placeholder="찾을 내용" size="24" />
     <button data-role="findprev" type="button" title="이전(Shift+Enter)">◀</button>
     <button data-role="findnext" type="button" title="다음(Enter)">▶</button>
     <span class="cnt" data-role="findcnt"></span>
     <span style="width:12px"></span>
-    <input data-role="findr" type="text" placeholder="바꿀 내용" size="18" />
+    <input data-role="findr" type="text" aria-label="바꿀 내용" placeholder="바꿀 내용" size="18" />
     <button data-role="findrone" type="button" title="현재 매치 바꾸기">바꾸기</button>
     <button data-role="findrall" type="button" title="모두 바꾸기">모두바꾸기</button>
     <span style="flex:1"></span>
@@ -194,11 +194,11 @@
   <div class="wo-main">
     <div class="wo-page"><div class="sheet" data-role="sheet" tabindex="0"><p class="muted">문서 없음.</p></div></div>
     <aside class="wo-side">
-      <h3>AI 검토 <span class="muted" style="font-weight:400">(채운 값 확인)</span></h3>
+      <h2>AI 검토 <span class="muted" style="font-weight:400">(채운 값 확인)</span></h2>
       <ul class="rev" data-role="review"><li class="muted">아직 AI 채움 없음</li></ul>
-      <h3>편집 상태</h3>
+      <h2>편집 상태</h2>
       <div class="mx" data-role="metrics"><span>문단 0</span></div>
-      <h3>Command Log</h3>
+      <h2>Command Log</h2>
       <ul class="log" data-role="log"><li class="muted">편집 없음</li></ul>
     </aside>
   </div>

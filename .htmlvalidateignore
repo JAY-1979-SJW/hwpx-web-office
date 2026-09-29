@@ -1,0 +1,4 @@
+# hwpx_data_inline.html은 실제 HTML 문서가 아니라 <script type="application/json"> 데이터
+# 조각이다(2026-09-29 확인: 코드베이스 어디에서도 참조되지 않는 고아 파일, doctype이 없는 게
+# 버그가 아니라 애초에 문서가 아니기 때문). html-validate는 모든 .html을 문서로 가정해 오탐한다.
+frontend/web_office_viewer/hwpx_data_inline.html

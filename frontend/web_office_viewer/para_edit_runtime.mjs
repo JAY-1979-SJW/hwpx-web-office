@@ -6,7 +6,7 @@
 import {
   typeTextAtCaret, setCaret, setRange,
   startComposition, updateComposition, endComposition,
-  cancelComposition, deleteBackward, deleteRange,
+  deleteBackward, deleteRange,
   undo, redo,
   // WEB-OFFICE-PARA-EDIT-STRUCTURE-PARA-INSERT-01.
   splitParagraphAtCaret,

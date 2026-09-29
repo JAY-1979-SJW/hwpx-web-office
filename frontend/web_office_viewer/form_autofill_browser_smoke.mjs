@@ -1,12 +1,5 @@
 const WRITE_SANDBOX_ENDPOINT = "/api/hwpx/form-autofill/write-sandbox";
 
-const BLOCKED_APPROVAL_STATUSES = [
-  "BLOCKED_NEEDS_REVIEW",
-  "BLOCKED_MISSING_REQUIRED",
-  "BLOCKED_ATTACHMENT_MISSING",
-  "HOLD_BY_USER",
-];
-
 const RESULT_LABELS = {
   SUCCESS: {
     title: "작성 성공",
