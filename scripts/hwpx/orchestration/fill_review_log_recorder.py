@@ -18,11 +18,13 @@ read-only로 받아서, D동 audit_learning_log_contract schema에 맞춰
 - raw 개인정보 저장 금지
 - secret/DB URL 출력 금지
 """
+
 from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 CONTRACT_NAME = "HWPX-FILL-REVIEW-LOG-ORCHESTRATION-01"
@@ -47,7 +49,7 @@ def _normalize_path_str(p: str | Path) -> str:
     # Path 표준화로 한 번 더 (relative case 등)
     try:
         return Path(raw).as_posix()
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except] - 정규화 실패 시 원본 문자열로 폴백(경로 차단 로직은 원본으로도 동작)
         return raw
 
 
@@ -73,9 +75,12 @@ def open_logging_connection(db_path: str | Path | None) -> sqlite3.Connection:
         schema가 init된 sqlite3.Connection.
     """
     from scripts.hwpx.recognition_corpus import (
-        corpus_schema as cs,
         audit_learning_log_contract as al,
     )
+    from scripts.hwpx.recognition_corpus import (
+        corpus_schema as cs,
+    )
+
     if db_path is None:
         target = ":memory:"
     else:
@@ -83,13 +88,15 @@ def open_logging_connection(db_path: str | Path | None) -> sqlite3.Connection:
             raise ProtectedDbPathRejected(
                 f"protected corpus path rejected: {db_path}. "
                 "See RISK-LEDGER R2 — set explicit activation gate before "
-                "writing to data/recognition_corpus/*.sqlite3.")
+                "writing to data/recognition_corpus/*.sqlite3."
+            )
         target = str(db_path)
     conn = sqlite3.connect(target)
     conn.execute("PRAGMA foreign_keys = ON")
     cs.init_db(conn)
     al.init_audit_learning_log_schema(conn)
     return conn
+
 
 # 운영동 pipelineStatus → D동 session_status 매핑
 _PIPELINE_TO_SESSION_STATUS = {
@@ -119,15 +126,13 @@ class OrchestrationError(RuntimeError):
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _coerce_session_status(pipeline_status: str | None,
-                                errors: list | None) -> str:
+def _coerce_session_status(pipeline_status: str | None, errors: list | None) -> str:
     if errors:
         return "ERROR"
-    return _PIPELINE_TO_SESSION_STATUS.get(
-        pipeline_status or "", "REVIEW_STARTED")
+    return _PIPELINE_TO_SESSION_STATUS.get(pipeline_status or "", "REVIEW_STARTED")
 
 
 def _new_session_id(request_id: str | None) -> str:
@@ -136,9 +141,293 @@ def _new_session_id(request_id: str | None) -> str:
     return f"sess-{uuid.uuid4().hex[:16]}"
 
 
+# ── 기록 단계별 헬퍼 (record_pipeline_result 분리) ──────────────────────────
+
+
+def _record_decisions(
+    conn: sqlite3.Connection, al, session_id: str, decision_payload: dict | None, now: str
+) -> tuple[dict[str, int], int]:
+    """decisionPayload 기반 결정 기록. (decision_log_id_by_item, count) 반환."""
+    decision_log_id_by_item: dict[str, int] = {}
+    count = 0
+    if decision_payload and isinstance(decision_payload, dict):
+        for d in decision_payload.get("decisions", []) or []:
+            decision_raw = d.get("decision")
+            if decision_raw not in _DECISION_MAP:
+                continue
+            review_item_id = d.get("reviewItemId") or ""
+            normalized_label = d.get("label") or d.get("normalizedLabel")
+            semantic_type = d.get("semanticType")
+            target = d.get("target") or {}
+            target_type = (target.get("targetType") or "").upper() or None
+            target_key = target.get("cellKey") or target.get("paragraphKey")
+            proposed = d.get("proposedValue") or d.get("editedValue")
+            edited = d.get("editedValue")
+            current = d.get("currentValue")
+            rec_d = {
+                "session_id": session_id,
+                "review_item_id": review_item_id,
+                "requirement_id": d.get("requirementId"),
+                "normalized_label": normalized_label,
+                "semantic_type": semantic_type,
+                "target_type": target_type,
+                "target_key": target_key,
+                "current_value_hash": al.hash_value(current) if current else None,
+                "proposed_value_hash": al.hash_value(proposed) if proposed else None,
+                "edited_value_hash": al.hash_value(edited) if edited else None,
+                "decision": _DECISION_MAP[decision_raw],
+                "decision_source": d.get("decisionSource") or "USER",
+                "decided_by": d.get("decidedBy") or "anonymous",
+                "decided_at": d.get("decidedAt") or now,
+                "reason": d.get("reason"),
+                "risk_flags_json": None,
+                "evidence_refs_json": None,
+            }
+            built = al.build_decision_log_records([rec_d])
+            decision_log_id = al.insert_decision(conn, built[0])
+            decision_log_id_by_item[review_item_id] = decision_log_id
+            count += 1
+    return decision_log_id_by_item, count
+
+
+def _record_writer_operations(
+    conn: sqlite3.Connection,
+    al,
+    session_id: str,
+    pipeline_result: dict,
+    decision_log_id_by_item: dict[str, int],
+    now: str,
+) -> tuple[list[int], dict[int, dict], list[dict], int]:
+    """approvedEditPlan.operations 기록.
+
+    (op_log_ids, op_results_by_index, ops, count) 반환.
+    """
+    plan = pipeline_result.get("approvedEditPlan") or {}
+    ops = plan.get("operations") or []
+    writer_status_summary = pipeline_result.get("writerResult") or {}
+    writer_op_results = writer_status_summary.get("operationResults") or []
+    op_results_by_index = {i: r for i, r in enumerate(writer_op_results)}
+
+    op_log_ids: list[int] = []
+    count = 0
+    for idx, op in enumerate(ops):
+        op_type = op.get("op") or op.get("operationType")
+        if not op_type:
+            continue
+        target = op.get("target") or {}
+        target_type = (target.get("targetType") or target.get("type") or "").upper() or "CELL"
+        target_key = (
+            target.get("cellKey") or target.get("paragraphKey") or target.get("targetKey") or ""
+        )
+        expected_before = op.get("expectedBeforeHash") or "PRECOMPUTED"
+        value_after = (
+            op.get("valueHash") or al.hash_value(op.get("value") or "")
+            if op.get("value") is not None
+            else None
+        )
+        wresult = op_results_by_index.get(idx, {})
+        op_status_raw = wresult.get("status") or "CREATED"
+        op_status = (
+            op_status_raw
+            if op_status_raw in ("CREATED", "BLOCKED", "APPLIED", "SKIPPED")
+            else "CREATED"
+        )
+        blocked_reason = wresult.get("blockedReason")
+        review_item_id = op.get("reviewItemId") or ""
+        decision_log_id = decision_log_id_by_item.get(review_item_id)
+        op_rec = {
+            "session_id": session_id,
+            "decision_log_id": decision_log_id,
+            "operation_type": op_type,
+            "writer_method": op.get("writerMethod"),
+            "target_type": target_type,
+            "target_key": target_key or "unknown",
+            "expected_before_hash": expected_before,
+            "value_hash": value_after,
+            "operation_status": op_status,
+            "blocked_reason": blocked_reason,
+            "created_at": now,
+        }
+        built_op = al.build_writer_operation_log_records([op_rec])
+        op_log_id = al.insert_writer_operation(conn, built_op[0])
+        op_log_ids.append(op_log_id)
+        count += 1
+
+    return op_log_ids, op_results_by_index, ops, count
+
+
+def _record_readbacks(
+    conn: sqlite3.Connection,
+    al,
+    session_id: str,
+    pipeline_result: dict,
+    op_log_ids: list[int],
+    now: str,
+) -> tuple[list[dict], int]:
+    """readback 결과 기록. (readback_op_results, count) 반환."""
+    readback = pipeline_result.get("readback") or {}
+    readback_op_results = readback.get("operationResults") or []
+    count = 0
+    for idx, r in enumerate(readback_op_results):
+        status_raw = r.get("status") or "NOT_RUN"
+        status = (
+            status_raw if status_raw in ("MATCHED", "MISMATCH", "NOT_RUN", "BLOCKED") else "NOT_RUN"
+        )
+        r_rec = {
+            "session_id": session_id,
+            "operation_log_id": op_log_ids[idx] if idx < len(op_log_ids) else None,
+            "readback_status": status,
+            "expected_after_hash": r.get("expectedAfterHash"),
+            "actual_after_hash": r.get("actualAfterHash"),
+            "divergence_code": r.get("divergenceCode"),
+            "divergence_summary": r.get("divergenceSummary"),
+            "checked_at": r.get("checkedAt") or now,
+        }
+        built_r = al.build_readback_log_records([r_rec])
+        al.insert_readback(conn, built_r[0])
+        count += 1
+    return readback_op_results, count
+
+
+@dataclass
+class _LogContext:
+    """record_pipeline_result 단계별 헬퍼가 공유하는 세션 식별 정보."""
+
+    session_id: str
+    document_id: str
+    now: str
+    document_type: str | None = None
+    sub_type: str | None = None
+
+
+@dataclass
+class _LearningSignalInputs:
+    """_record_learning_signals 전용 입력 묶음(인자 개수 축소 목적)."""
+
+    ops: list[dict]
+    review_items: list[dict]
+    decision_payload: dict | None
+    op_results_by_index: dict[int, dict]
+    readback_op_results: list[dict]
+
+
+def _record_learning_signals(
+    conn: sqlite3.Connection, al, ctx: _LogContext, inputs: _LearningSignalInputs
+) -> int:
+    """decision + writer + readback 결합 학습 신호 기록. count 반환."""
+    count = 0
+    for idx, op in enumerate(inputs.ops):
+        review_item_id = op.get("reviewItemId") or ""
+        item = next(
+            (it for it in inputs.review_items if it.get("reviewItemId") == review_item_id), None
+        )
+        if not item:
+            continue
+        decision_rec = None
+        if inputs.decision_payload:
+            decision_rec = next(
+                (
+                    d
+                    for d in inputs.decision_payload.get("decisions", []) or []
+                    if d.get("reviewItemId") == review_item_id
+                ),
+                None,
+            )
+        decision_value = decision_rec.get("decision") if decision_rec else None
+        if not decision_value:
+            continue
+        wresult = inputs.op_results_by_index.get(idx, {})
+        rresult = inputs.readback_op_results[idx] if idx < len(inputs.readback_op_results) else {}
+        signal_input = {
+            "session_id": ctx.session_id,
+            "document_id": ctx.document_id,
+            "document_type": ctx.document_type,
+            "sub_type": ctx.sub_type,
+            "normalized_label": item.get("label") or item.get("normalizedLabel"),
+            "semantic_type": item.get("semanticType"),
+            "target_type": (op.get("target") or {}).get("targetType", "CELL").upper(),
+            "target_pattern": _derive_target_pattern(op.get("target") or {}),
+            "evidence_type": (item.get("evidenceRefs")[0] if item.get("evidenceRefs") else None),
+            "decision": decision_value,
+            "decision_source": decision_rec.get("decisionSource") or "USER",
+            "writer_status": wresult.get("status") or "NOT_RUN",
+            "readback_status": rresult.get("status") or "NOT_RUN",
+            "target_key": (op.get("target") or {}).get("cellKey")
+            or (op.get("target") or {}).get("paragraphKey"),
+            "has_conflict": bool(item.get("semanticConflict")),
+            "created_at": ctx.now,
+        }
+        built_sig = al.build_learning_signal_records([signal_input])
+        al.insert_learning_signal(conn, built_sig[0])
+        count += 1
+    return count
+
+
+def _record_xml_backlog_flags(
+    conn: sqlite3.Connection,
+    al,
+    ctx: _LogContext,
+    pipeline_result: dict,
+    readback_op_results: list[dict],
+) -> int:
+    """readback mismatch + warnings 기반 XML deep analyzer backlog 기록. count 반환."""
+    flags_input: list[dict] = []
+    for r in readback_op_results:
+        if r.get("status") == "MISMATCH":
+            flags_input.append({
+                "session_id": ctx.session_id,
+                "document_id": ctx.document_id,
+                "reason_code": "READBACK_MISMATCH",
+                "target_key": r.get("targetKey"),
+                "normalized_label": r.get("normalizedLabel"),
+                "context_json": None,
+                "severity": "HIGH",
+                "created_at": ctx.now,
+            })
+    for warn in pipeline_result.get("warnings") or []:
+        code = (warn.get("code") or "").upper()
+        if code == "RUN_BOUNDARY_UNSUPPORTED":
+            flags_input.append({
+                "session_id": ctx.session_id,
+                "document_id": ctx.document_id,
+                "reason_code": "RUN_BOUNDARY_UNSUPPORTED",
+                "target_key": warn.get("targetKey"),
+                "normalized_label": warn.get("normalizedLabel"),
+                "context_json": None,
+                "severity": "MEDIUM",
+                "created_at": ctx.now,
+            })
+        elif code in (
+            "CHECKBOX_OR_SHAPE_NEEDED",
+            "OBJECT_ANCHOR_NEEDED",
+            "STYLE_RESOLUTION_NEEDED",
+            "CELL_INTERNAL_PARAGRAPH_NEEDED",
+            "MERGED_CELL_GEOMETRY_NEEDED",
+            "TARGET_AMBIGUOUS",
+            "LABEL_CONTEXT_INSUFFICIENT",
+        ):
+            flags_input.append({
+                "session_id": ctx.session_id,
+                "document_id": ctx.document_id,
+                "reason_code": code,
+                "target_key": warn.get("targetKey"),
+                "normalized_label": warn.get("normalizedLabel"),
+                "context_json": None,
+                "severity": "MEDIUM",
+                "created_at": ctx.now,
+            })
+    built_flags = al.build_xml_deep_analyzer_need_flags(flags_input)
+    count = 0
+    for f in built_flags:
+        al.insert_xml_backlog(conn, f)
+        count += 1
+    return count
+
+
 # ── 메인 진입점 ───────────────────────────────────────────────────────────
 
-def record_pipeline_result(
+
+def record_pipeline_result(  # ruff: ignore[too-many-arguments] - 25개 이상 호출부(운영+테스트)가 있는 공개 API, 시그니처 변경 보류
     conn: sqlite3.Connection,
     pipeline_result: dict,
     *,
@@ -181,10 +470,16 @@ def record_pipeline_result(
 
     rec = pipeline_result.get("fillReview") or {}
     review_items = rec.get("reviewItems") or []
-    document_type = (pipeline_result.get("recognitionResult") or {}).get(
-        "documentType") if pipeline_result.get("recognitionResult") else None
-    sub_type = (pipeline_result.get("recognitionResult") or {}).get(
-        "subType") if pipeline_result.get("recognitionResult") else None
+    document_type = (
+        (pipeline_result.get("recognitionResult") or {}).get("documentType")
+        if pipeline_result.get("recognitionResult")
+        else None
+    )
+    sub_type = (
+        (pipeline_result.get("recognitionResult") or {}).get("subType")
+        if pipeline_result.get("recognitionResult")
+        else None
+    )
 
     # 1) session log
     session = al.build_fill_review_session_log(
@@ -193,9 +488,17 @@ def record_pipeline_result(
         source_document_hash=source_hash,
         started_at=now,
         session_status=session_status,
-        completed_at=now if session_status in (
-            "COMPLETED", "WRITER_APPLIED", "READBACK_FAILED",
-            "WRITER_BLOCKED", "CANCELLED", "ERROR") else None,
+        completed_at=now
+        if session_status
+        in (
+            "COMPLETED",
+            "WRITER_APPLIED",
+            "READBACK_FAILED",
+            "WRITER_BLOCKED",
+            "CANCELLED",
+            "ERROR",
+        )
+        else None,
         document_type=document_type,
         sub_type=sub_type,
         classifier_version=classifier_version,
@@ -205,211 +508,44 @@ def record_pipeline_result(
     al.insert_session(conn, session)
 
     counts = {
-        "decisions": 0, "writerOps": 0, "readbacks": 0,
-        "learningSignals": 0, "xmlBacklogFlags": 0,
+        "decisions": 0,
+        "writerOps": 0,
+        "readbacks": 0,
+        "learningSignals": 0,
+        "xmlBacklogFlags": 0,
     }
 
-    # 2) decisions (decisionPayload 기반)
-    decision_log_id_by_item: dict[str, int] = {}
-    if decision_payload and isinstance(decision_payload, dict):
-        for d in decision_payload.get("decisions", []) or []:
-            decision_raw = d.get("decision")
-            if decision_raw not in _DECISION_MAP:
-                continue
-            review_item_id = d.get("reviewItemId") or ""
-            normalized_label = d.get("label") or d.get("normalizedLabel")
-            semantic_type = d.get("semanticType")
-            target = d.get("target") or {}
-            target_type = (target.get("targetType") or "").upper() or None
-            target_key = target.get("cellKey") or target.get("paragraphKey")
-            proposed = d.get("proposedValue") or d.get("editedValue")
-            edited = d.get("editedValue")
-            current = d.get("currentValue")
-            rec_d = {
-                "session_id": session_id,
-                "review_item_id": review_item_id,
-                "requirement_id": d.get("requirementId"),
-                "normalized_label": normalized_label,
-                "semantic_type": semantic_type,
-                "target_type": target_type,
-                "target_key": target_key,
-                "current_value_hash": al.hash_value(current) if current else None,
-                "proposed_value_hash": al.hash_value(proposed) if proposed else None,
-                "edited_value_hash": al.hash_value(edited) if edited else None,
-                "decision": _DECISION_MAP[decision_raw],
-                "decision_source": d.get("decisionSource") or "USER",
-                "decided_by": d.get("decidedBy") or "anonymous",
-                "decided_at": d.get("decidedAt") or now,
-                "reason": d.get("reason"),
-                "risk_flags_json": None,
-                "evidence_refs_json": None,
-            }
-            built = al.build_decision_log_records([rec_d])
-            decision_log_id = al.insert_decision(conn, built[0])
-            decision_log_id_by_item[review_item_id] = decision_log_id
-            counts["decisions"] += 1
-
-    # 3) writer operations (approvedEditPlan)
-    plan = pipeline_result.get("approvedEditPlan") or {}
-    ops = plan.get("operations") or []
-    writer_status_summary = pipeline_result.get("writerResult") or {}
-    writer_op_results = writer_status_summary.get("operationResults") or []
-
-    op_results_by_index = {i: r for i, r in enumerate(writer_op_results)}
-
-    op_log_ids: list[int] = []
-    for idx, op in enumerate(ops):
-        op_type = op.get("op") or op.get("operationType")
-        if not op_type:
-            continue
-        target = op.get("target") or {}
-        target_type = (target.get("targetType")
-                          or target.get("type")
-                          or "").upper() or "CELL"
-        target_key = (target.get("cellKey")
-                          or target.get("paragraphKey")
-                          or target.get("targetKey") or "")
-        expected_before = op.get("expectedBeforeHash") or "PRECOMPUTED"
-        value_after = (op.get("valueHash")
-                          or al.hash_value(op.get("value") or "")
-                          if op.get("value") is not None else None)
-        wresult = op_results_by_index.get(idx, {})
-        op_status_raw = wresult.get("status") or "CREATED"
-        op_status = op_status_raw if op_status_raw in (
-            "CREATED", "BLOCKED", "APPLIED", "SKIPPED") else "CREATED"
-        blocked_reason = wresult.get("blockedReason")
-        review_item_id = op.get("reviewItemId") or ""
-        decision_log_id = decision_log_id_by_item.get(review_item_id)
-        op_rec = {
-            "session_id": session_id,
-            "decision_log_id": decision_log_id,
-            "operation_type": op_type,
-            "writer_method": op.get("writerMethod"),
-            "target_type": target_type,
-            "target_key": target_key or "unknown",
-            "expected_before_hash": expected_before,
-            "value_hash": value_after,
-            "operation_status": op_status,
-            "blocked_reason": blocked_reason,
-            "created_at": now,
-        }
-        built_op = al.build_writer_operation_log_records([op_rec])
-        op_log_id = al.insert_writer_operation(conn, built_op[0])
-        op_log_ids.append(op_log_id)
-        counts["writerOps"] += 1
-
-    # 4) readback
-    readback = pipeline_result.get("readback") or {}
-    readback_op_results = readback.get("operationResults") or []
-    for idx, r in enumerate(readback_op_results):
-        status_raw = r.get("status") or "NOT_RUN"
-        status = status_raw if status_raw in (
-            "MATCHED", "MISMATCH", "NOT_RUN", "BLOCKED") else "NOT_RUN"
-        r_rec = {
-            "session_id": session_id,
-            "operation_log_id": op_log_ids[idx] if idx < len(op_log_ids) else None,
-            "readback_status": status,
-            "expected_after_hash": r.get("expectedAfterHash"),
-            "actual_after_hash": r.get("actualAfterHash"),
-            "divergence_code": r.get("divergenceCode"),
-            "divergence_summary": r.get("divergenceSummary"),
-            "checked_at": r.get("checkedAt") or now,
-        }
-        built_r = al.build_readback_log_records([r_rec])
-        al.insert_readback(conn, built_r[0])
-        counts["readbacks"] += 1
-
-    # 5) learning signals — decision + writer + readback 결합
-    for idx, op in enumerate(ops):
-        review_item_id = op.get("reviewItemId") or ""
-        item = next((it for it in review_items
-                          if it.get("reviewItemId") == review_item_id), None)
-        if not item:
-            continue
-        decision_rec = None
-        if decision_payload:
-            decision_rec = next(
-                (d for d in decision_payload.get("decisions", []) or []
-                    if d.get("reviewItemId") == review_item_id), None)
-        decision_value = decision_rec.get("decision") if decision_rec else None
-        if not decision_value:
-            continue
-        wresult = op_results_by_index.get(idx, {})
-        rresult = readback_op_results[idx] if idx < len(readback_op_results) else {}
-        signal_input = {
-            "session_id": session_id,
-            "document_id": document_id,
-            "document_type": document_type,
-            "sub_type": sub_type,
-            "normalized_label": item.get("label")
-                or item.get("normalizedLabel"),
-            "semantic_type": item.get("semanticType"),
-            "target_type": (op.get("target") or {}).get("targetType",
-                                                                "CELL").upper(),
-            "target_pattern": _derive_target_pattern(op.get("target") or {}),
-            "evidence_type": (item.get("evidenceRefs")[0]
-                                if item.get("evidenceRefs") else None),
-            "decision": decision_value,
-            "decision_source": decision_rec.get("decisionSource") or "USER",
-            "writer_status": wresult.get("status") or "NOT_RUN",
-            "readback_status": rresult.get("status") or "NOT_RUN",
-            "target_key": (op.get("target") or {}).get("cellKey")
-                or (op.get("target") or {}).get("paragraphKey"),
-            "has_conflict": bool(item.get("semanticConflict")),
-            "created_at": now,
-        }
-        built_sig = al.build_learning_signal_records([signal_input])
-        al.insert_learning_signal(conn, built_sig[0])
-        counts["learningSignals"] += 1
-
-    # 6) XML deep analyzer backlog — readback mismatch + warnings 기반
-    flags_input: list[dict] = []
-    for r in readback_op_results:
-        if (r.get("status") == "MISMATCH"):
-            flags_input.append({
-                "session_id": session_id,
-                "document_id": document_id,
-                "reason_code": "READBACK_MISMATCH",
-                "target_key": r.get("targetKey"),
-                "normalized_label": r.get("normalizedLabel"),
-                "context_json": None,
-                "severity": "HIGH",
-                "created_at": now,
-            })
-    for warn in pipeline_result.get("warnings") or []:
-        code = (warn.get("code") or "").upper()
-        if code == "RUN_BOUNDARY_UNSUPPORTED":
-            flags_input.append({
-                "session_id": session_id,
-                "document_id": document_id,
-                "reason_code": "RUN_BOUNDARY_UNSUPPORTED",
-                "target_key": warn.get("targetKey"),
-                "normalized_label": warn.get("normalizedLabel"),
-                "context_json": None,
-                "severity": "MEDIUM",
-                "created_at": now,
-            })
-        elif code in ("CHECKBOX_OR_SHAPE_NEEDED",
-                          "OBJECT_ANCHOR_NEEDED",
-                          "STYLE_RESOLUTION_NEEDED",
-                          "CELL_INTERNAL_PARAGRAPH_NEEDED",
-                          "MERGED_CELL_GEOMETRY_NEEDED",
-                          "TARGET_AMBIGUOUS",
-                          "LABEL_CONTEXT_INSUFFICIENT"):
-            flags_input.append({
-                "session_id": session_id,
-                "document_id": document_id,
-                "reason_code": code,
-                "target_key": warn.get("targetKey"),
-                "normalized_label": warn.get("normalizedLabel"),
-                "context_json": None,
-                "severity": "MEDIUM",
-                "created_at": now,
-            })
-    built_flags = al.build_xml_deep_analyzer_need_flags(flags_input)
-    for f in built_flags:
-        al.insert_xml_backlog(conn, f)
-        counts["xmlBacklogFlags"] += 1
+    decision_log_id_by_item, counts["decisions"] = _record_decisions(
+        conn, al, session_id, decision_payload, now
+    )
+    op_log_ids, op_results_by_index, ops, counts["writerOps"] = _record_writer_operations(
+        conn, al, session_id, pipeline_result, decision_log_id_by_item, now
+    )
+    readback_op_results, counts["readbacks"] = _record_readbacks(
+        conn, al, session_id, pipeline_result, op_log_ids, now
+    )
+    log_ctx = _LogContext(
+        session_id=session_id,
+        document_id=document_id,
+        now=now,
+        document_type=document_type,
+        sub_type=sub_type,
+    )
+    counts["learningSignals"] = _record_learning_signals(
+        conn,
+        al,
+        log_ctx,
+        _LearningSignalInputs(
+            ops=ops,
+            review_items=review_items,
+            decision_payload=decision_payload,
+            op_results_by_index=op_results_by_index,
+            readback_op_results=readback_op_results,
+        ),
+    )
+    counts["xmlBacklogFlags"] = _record_xml_backlog_flags(
+        conn, al, log_ctx, pipeline_result, readback_op_results
+    )
 
     conn.commit()
 
@@ -466,5 +602,4 @@ def audit_orchestration_isolation() -> dict:
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
                 })
-    return {"violations": violations, "ok": not violations,
-              "filesChecked": checked}
+    return {"violations": violations, "ok": not violations, "filesChecked": checked}
