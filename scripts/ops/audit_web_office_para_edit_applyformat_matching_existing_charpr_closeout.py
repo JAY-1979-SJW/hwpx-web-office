@@ -19,7 +19,7 @@ if str(PR) not in sys.path:
 CLOSEOUT_DOC = (
     PR / "docs/architecture/web_office_para_edit_applyformat_matching_existing_charpr_closeout.md"
 )
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+BASELINE_COMMIT = "9d201a3"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (b992ad6 → 9d201a3)
 
 DOC_REQUIRED_IN_SCOPE = [
     "format_charpr_matcher.mjs",

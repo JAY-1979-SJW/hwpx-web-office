@@ -17,7 +17,7 @@ if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_structure_para_delete_closeout.md"
-BASELINE_COMMIT = "f119308"  # lineseg 보정 로그/가드 준공 후 갱신 (6111a9e -> f119308)
+BASELINE_COMMIT = "9d201a3"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (f119308 → 9d201a3)
 FEATURE_COMMIT = "1f442ec"
 
 DOC_REQUIRED_IN_SCOPE = [
