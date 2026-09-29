@@ -4,6 +4,7 @@ app.mjs(메인 편집기, 병행 세션 영역)를 건드리지 않는 독립 �
 엔드포인트만 쓴다. TS/JS 런타임은 node self-test 로, 계약·안전 성질은
 정적 검사로 검증한다(저장소의 프론트 contract 관례와 동일).
 """
+
 from __future__ import annotations
 
 import shutil
@@ -21,6 +22,7 @@ SELFTEST = FE / "form_question_panel_self_test.mjs"
 
 # ── 파일 존재 ───────────────────────────────────────────────────────────
 
+
 def test_panel_files_exist():
     assert MJS.is_file()
     assert HTML.is_file()
@@ -29,6 +31,7 @@ def test_panel_files_exist():
 
 # ── 병행 세션 영역 불가침 ───────────────────────────────────────────────
 
+
 def test_does_not_touch_main_app_files():
     """패널은 app.mjs / weboffice 를 import 하거나 <script src> 로 싣지 않는다.
 
@@ -36,6 +39,7 @@ def test_does_not_touch_main_app_files():
     import/src 참조만 금지한다.
     """
     import re
+
     mjs = MJS.read_text(encoding="utf-8")
     html = HTML.read_text(encoding="utf-8")
     # import ... from "...app.mjs" 형태
@@ -57,6 +61,7 @@ def test_uses_only_existing_endpoints():
 
 
 # ── §4 안전 성질 (정적) ─────────────────────────────────────────────────
+
 
 def test_original_not_mutated_message():
     src = MJS.read_text(encoding="utf-8") + HTML.read_text(encoding="utf-8")
@@ -83,11 +88,28 @@ def test_empty_value_not_filled_logic_present():
     assert 'value === ""' in src or "value === ''" in src
 
 
+def test_ai_fill_sends_source_path():
+    """ai-fill 요청에 sourcePath 를 실어야 서버가 문맥 포함 해석
+    (ai_fill_dry_run.run_dry_run)으로 분기한다 — 없으면 app.mjs 와 같은
+    라벨-only 경로(ai_form_fill.propose_values, 예시값 생성)로 빠진다."""
+    src = MJS.read_text(encoding="utf-8")
+    assert 'post("ai-fill"' in src
+    assert "sourcePath: state.rel" in src
+
+
 # ── node self-test (런타임 로직) ────────────────────────────────────────
+
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node 없음")
 def test_node_self_test_passes():
-    r = subprocess.run(["node", str(SELFTEST)], capture_output=True,
-                       text=True, encoding="utf-8", errors="replace", timeout=60, cwd=str(FE))
+    r = subprocess.run(
+        ["node", str(SELFTEST)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+        cwd=str(FE),
+    )
     assert r.returncode == 0, r.stdout + r.stderr
     assert "ALL PASS" in r.stdout

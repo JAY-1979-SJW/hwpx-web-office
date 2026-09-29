@@ -532,12 +532,17 @@ function mountPanel(root) {
     const items = [...ask, ...sensitive, ...(state.plan.autoFill || [])];
     const fields = items.map((f) => ({ key: f.paragraphId, label: f.label,
       subject: f.subject, sensitive: f.requiresConfirmation }));
-    const r = await post("ai-fill", { fields, sourceData: source });
+    // sourcePath 를 실으면 서버가 ai_fill_dry_run(문맥 포함 해석 + 비창조·
+    // 주소 검증)을 쓴다 — fields 는 이 경로에서 서버가 documentModel 로
+    // 다시 만들어 쓰므로 클라이언트 값은 무시된다(호환을 위해 계속 보냄).
+    const r = await post("ai-fill", { fields, sourceData: source, sourcePath: state.rel });
     const ai = r.data || r;
     state.answers = applyAiProposals(state.answers, ai, items);
     const held = (ai.heldForThirdParty || []).length;
+    const rejected = (ai.rejected || []).length;
     aiNote.textContent = `제안 ${(ai.proposals || []).length} 반영` +
-      (held ? ` · 제3자 칸 ${held} 보호(자동 안 채움)` : "");
+      (held ? ` · 제3자 칸 ${held} 보호(자동 안 채움)` : "") +
+      (rejected ? ` · 검증 실패 ${rejected}건(비창조/주소 등)` : "");
     renderPlan();      // 답변 반영해 다시 그림 (AI 박스는 body 밖이라 유지)
   }
 

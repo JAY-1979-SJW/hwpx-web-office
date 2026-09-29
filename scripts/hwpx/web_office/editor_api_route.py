@@ -458,10 +458,20 @@ def call_fill_plan(request: dict[str, Any], *, project_root: Path = PROJECT_ROOT
     )
 
 
-def call_ai_fill(request: dict[str, Any]) -> dict[str, Any]:
+def call_ai_fill(request: dict[str, Any], *, project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
     """AI 서식 자동채움 — Claude CLI(Haiku)로 입력칸 값 제안. §7/§9 준수.
 
-    request.sourceData 가 있으면 실제 소스 값을 라벨에 매핑(예시 아님)."""
+    request.sourcePath 가 있으면(질문 패널, form_question_panel.mjs) 문맥
+    포함 해석 + 비창조/주소 검증까지 하는 ai_fill_dry_run.run_dry_run 을
+    쓴다 — request.fields 는 이 경로에서 무시된다(서버가 documentModel 을
+    다시 읽어 직접 문맥을 구성하므로 클라이언트가 만든 fields 는 불필요).
+    sourcePath 가 없으면(메인 편집기, weboffice/app.mjs) 기존 라벨-only
+    경로(ai_form_fill.propose_values)를 그대로 쓴다 — 동작 변경 없음.
+    """
+    source_path = request.get("sourcePath")
+    if source_path:
+        return call_ai_fill_with_context(request, project_root=project_root)
+
     from .ai_form_fill import propose_values
 
     fields = request.get("fields") or []
@@ -479,6 +489,58 @@ def call_ai_fill(request: dict[str, Any]) -> dict[str, Any]:
             }
         ],
     )
+
+
+def call_ai_fill_with_context(
+    request: dict[str, Any], *, project_root: Path = PROJECT_ROOT, runner=None
+) -> dict[str, Any]:
+    """문맥 포함 AI 서식 자동채움 — ai_fill_dry_run.run_dry_run 사용.
+
+    기준서: docs/design/hwpx_ai_doc_interpretation_fill_standard.md §4/§6.
+    비창조 검증·주소 검증·게이트까지 포함된 조립 경로만 쓴다 — 안전 검증을
+    건너뛰는 ai_doc_interpret.propose_with_context 직접 호출은 하지 않는다.
+    runner: 시험용 주입(§9 관례) — 운영에서는 항상 None(실제 Claude CLI).
+    """
+    from .ai_fill_dry_run import run_dry_run
+
+    source_path = request.get("sourcePath")
+    source_data = request.get("sourceData") or {}
+    report = run_dry_run(source_path, source_data, project_root=project_root, runner=runner)
+    if report["verdict"] not in ("PASS", "FAIL"):
+        # REJECTED(로드 실패) / NOOP(신청인 입력칸 없음)
+        return _envelope(
+            "FAILED",
+            report,
+            [
+                {
+                    "code": report.get("reason", "AI_FILL_DRY_RUN_FAILED"),
+                    "message": report.get("reason", ""),
+                }
+            ],
+        )
+    envelope_status = "SUCCESS" if report["verdict"] == "PASS" else "FAILED"
+    result = {
+        "ok": report["verdict"] == "PASS",
+        "provider": "claude_cli_haiku",
+        "mode": "doc_context",
+        "proposals": report.get("proposals", []),
+        "heldForThirdParty": report.get("heldForThirdParty", []),
+        "rejected": report.get("rejected", []),
+        "gate": report.get("gate", {}),
+        "fieldCount": report.get("fieldCount", 0),
+    }
+    if envelope_status == "FAILED":
+        return _envelope(
+            "FAILED",
+            result,
+            [
+                {
+                    "code": "AI_FILL_GATE_FAILED",
+                    "message": f"게이트 실패: 거부 {len(report.get('rejected', []))}건",
+                }
+            ],
+        )
+    return _envelope("SUCCESS", result)
 
 
 def call_source_extract(request: dict[str, Any]) -> dict[str, Any]:
@@ -687,6 +749,7 @@ if _FASTAPI_AVAILABLE:
     class AiFillRequest(BaseModel):
         fields: list[dict[str, Any]] = []
         sourceData: dict[str, Any] | None = None
+        sourcePath: str | None = None
 
     class SourceExtractRequest(BaseModel):
         imagePath: str
@@ -791,7 +854,7 @@ def create_app() -> Any:  # ruff: ignore[complex-structure] -- FastAPI 라우트
         return call_hwpx_load(req.model_dump())
 
     @app.post("/api/web-office/hwpx-upload")
-    async def hwpx_upload(file: UploadFile = File(...)) -> dict[str, Any]:  # ruff: ignore[function-call-in-default-argument] -- FastAPI DI 관례
+    async def hwpx_upload(file: UploadFile = File(...)) -> dict[str, Any]:
         """브라우저 파일선택/드래그로 올린 HWPX 를 sandbox 에 받아 로드.
         누구나 자기 파일을 업로드해 볼 수 있다(서버는 사용자 경로 미접근)."""
         content = await file.read()
