@@ -32,7 +32,10 @@ from .cell_edit_plan import (  # ruff: ignore[module-import-not-at-top-of-file]
     SAVE_DRY_RUN_REJECTED,
     build_dry_run_edit_plan,
 )
-from .cell_save_verify7 import verify7  # ruff: ignore[module-import-not-at-top-of-file]
+from .cell_save_verify7 import (  # ruff: ignore[module-import-not-at-top-of-file]
+    Verify7Inputs,
+    verify7,
+)
 from .edit_command_model import EditCommand  # ruff: ignore[module-import-not-at-top-of-file]
 from .ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
@@ -205,13 +208,15 @@ def save_cell_edits(
 
     # 5) verify7 게이트
     v7 = verify7(
-        source_path=source_path,
-        output_path=output_path,
-        project_root=project_root,
-        accepted_commands=accepted_commands,
-        pre_save_cell_texts=pre_save_cell_texts,
-        source_sha_before=source_sha_before,
-        source_mtime_before=source_mtime_before,
+        Verify7Inputs(
+            source_path=source_path,
+            output_path=output_path,
+            project_root=project_root,
+            accepted_commands=accepted_commands,
+            pre_save_cell_texts=pre_save_cell_texts,
+            source_sha_before=source_sha_before,
+            source_mtime_before=source_mtime_before,
+        )
     )
 
     output_sha = _sha(output_path) if output_path.is_file() else None

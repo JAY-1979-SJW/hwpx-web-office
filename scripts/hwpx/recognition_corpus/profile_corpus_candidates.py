@@ -154,6 +154,85 @@ def _has_pii_in_content(section_root: ET.Element) -> bool:
     return any(p.search(all_text) for p in _PII_PATTERNS)
 
 
+def _parse_all_sections(
+    zf: zipfile.ZipFile, section_files: list[str]
+) -> tuple[int, int, int, int, int, bool, list[str]]:
+    """섹션들을 파싱해 합산 카운트와 PII 발견 여부를 반환.
+
+    (total_paragraphs, total_tables, total_cells, total_objects,
+    total_labels, pii_found, parse_errors) 반환.
+    """
+    total_paragraphs = 0
+    total_tables = 0
+    total_cells = 0
+    total_objects = 0
+    total_labels = 0
+    pii_found = False
+    parse_errors: list[str] = []
+
+    for sec_name in section_files:
+        try:
+            raw = zf.read(sec_name)
+            root = ET.fromstring(raw)
+        except ET.ParseError as exc:
+            parse_errors.append(f"{sec_name}: XML parse error: {exc}")
+            continue
+        except (KeyError, zipfile.BadZipFile, OSError) as exc:
+            parse_errors.append(f"{sec_name}: read error: {exc}")
+            continue
+
+        total_paragraphs += _count_paragraphs(root)
+        t, c = _count_tables_cells(root)
+        total_tables += t
+        total_cells += c
+        total_objects += _count_objects(root)
+        total_labels += _count_label_candidates(root)
+        if not pii_found:
+            try:
+                pii_found = _has_pii_in_content(root)
+            except Exception as exc:  # ruff: ignore[blind-except] — fail-safe: 탐지 자체가
+                # 실패하면 "PII 없음"이 아니라 "있을 수 있음"으로 간주해
+                # 사람 검토로 보낸다(무음이면 PII 유출을 놓칠 수 있음).
+                pii_found = True
+                parse_errors.append(f"{sec_name}: pii_check_failed: {exc}")
+
+    return (
+        total_paragraphs,
+        total_tables,
+        total_cells,
+        total_objects,
+        total_labels,
+        pii_found,
+        parse_errors,
+    )
+
+
+def _classify_profile(
+    total_paragraphs: int,
+    total_tables: int,
+    pii_found: bool,
+    total_cells: int,
+    has_parse_errors: bool,
+) -> tuple[str, str]:
+    """집계값으로 (status, blockedReason)을 정한다."""
+    if has_parse_errors and total_paragraphs == 0 and total_tables == 0:
+        return STATUS_UNSUPPORTED, "all sections failed to parse"
+
+    if total_paragraphs == 0 and total_tables == 0:
+        return STATUS_EMPTY, "no paragraphs and no tables"
+
+    if pii_found:
+        return STATUS_PII, "PII pattern detected in content"
+
+    if total_cells > LARGE_THRESHOLD_CELLS or total_paragraphs > LARGE_THRESHOLD_PARAGRAPHS:
+        return (
+            STATUS_LARGE,
+            f"large document: cells={total_cells}, paragraphs={total_paragraphs}",
+        )
+
+    return STATUS_READY, ""
+
+
 def profile_one(path: Path) -> ProfileRecord:
     now = datetime.now(tz=UTC).isoformat()
     rec = ProfileRecord(
@@ -194,40 +273,15 @@ def profile_one(path: Path) -> ProfileRecord:
 
         rec.sectionCount = len(section_files)
 
-        # parse sections
-        total_paragraphs = 0
-        total_tables = 0
-        total_cells = 0
-        total_objects = 0
-        total_labels = 0
-        pii_found = False
-        parse_errors: list[str] = []
-
-        for sec_name in section_files:
-            try:
-                raw = zf.read(sec_name)
-                root = ET.fromstring(raw)
-            except ET.ParseError as exc:
-                parse_errors.append(f"{sec_name}: XML parse error: {exc}")
-                continue
-            except (KeyError, zipfile.BadZipFile, OSError) as exc:
-                parse_errors.append(f"{sec_name}: read error: {exc}")
-                continue
-
-            total_paragraphs += _count_paragraphs(root)
-            t, c = _count_tables_cells(root)
-            total_tables += t
-            total_cells += c
-            total_objects += _count_objects(root)
-            total_labels += _count_label_candidates(root)
-            if not pii_found:
-                try:
-                    pii_found = _has_pii_in_content(root)
-                except Exception as exc:  # noqa: BLE001 — fail-safe: 탐지 자체가
-                    # 실패하면 "PII 없음"이 아니라 "있을 수 있음"으로 간주해
-                    # 사람 검토로 보낸다(무음이면 PII 유출을 놓칠 수 있음).
-                    pii_found = True
-                    parse_errors.append(f"{sec_name}: pii_check_failed: {exc}")
+        (
+            total_paragraphs,
+            total_tables,
+            total_cells,
+            total_objects,
+            total_labels,
+            pii_found,
+            parse_errors,
+        ) = _parse_all_sections(zf, section_files)
 
         rec.paragraphCount = total_paragraphs
         rec.tableCount = total_tables
@@ -238,30 +292,9 @@ def profile_one(path: Path) -> ProfileRecord:
         if parse_errors:
             rec.warnings.extend(parse_errors[:5])
 
-        # classify
-        if parse_errors and total_paragraphs == 0 and total_tables == 0:
-            rec.status = STATUS_UNSUPPORTED
-            rec.blockedReason = "all sections failed to parse"
-            return rec
-
-        if total_paragraphs == 0 and total_tables == 0:
-            rec.status = STATUS_EMPTY
-            rec.blockedReason = "no paragraphs and no tables"
-            return rec
-
-        if pii_found:
-            rec.status = STATUS_PII
-            rec.blockedReason = "PII pattern detected in content"
-            return rec
-
-        if total_cells > LARGE_THRESHOLD_CELLS or total_paragraphs > LARGE_THRESHOLD_PARAGRAPHS:
-            rec.status = STATUS_LARGE
-            rec.blockedReason = (
-                f"large document: cells={total_cells}, paragraphs={total_paragraphs}"
-            )
-            return rec
-
-        rec.status = STATUS_READY
+        rec.status, rec.blockedReason = _classify_profile(
+            total_paragraphs, total_tables, pii_found, total_cells, bool(parse_errors)
+        )
         return rec
 
 
