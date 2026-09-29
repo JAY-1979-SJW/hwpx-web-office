@@ -164,14 +164,29 @@ def build_edit_plan_from_form(
     """
     acc = _PlanAccumulator()
 
-    # 안전 슬롯이 없고 reviewRequired=True면 fallback 사용 금지
+    # 요청받은 필드 중 하나도 안전 슬롯이 없으면 fallback 사용 금지.
+    #
+    # 2026-09-29: 원래는 form_recognition.reviewRequired(문서 전체 기준 —
+    # 요청받은 필드와 무관한 슬롯도 포함해 계산됨)로 판단했다. 이 때문에
+    # layout_classifier.py의 표 분류 정확도를 고친 뒤 실측
+    # (fx_many_tables_page_marker.hwpx)에서 실제 버그가 드러남 — 문서
+    # 어딘가(예: 설비 점검표)에 믿을 만한 슬롯이 생기자 reviewRequired가
+    # False로 바뀌면서, 그 문서와 전혀 무관한 요청 필드(공사명 등)까지
+    # _FIELD_LABEL_MAP 추측값으로 채워버렸다. "안전 슬롯 여부"는 지금
+    # 요청받은 필드에 한정해서 판단해야 한다 — 요청받지 않은 필드의
+    # 확신도는 이 요청이 "라벨 없는 서식"에 대한 것인지 판단하는 근거가
+    # 될 수 없다.
     slots_all = getattr(form_recognition, "enhancedSlots", []) or []
-    form_review_required = getattr(form_recognition, "reviewRequired", False)
-    no_safe_slots = not any(getattr(s, "confidence", 0) >= _REVIEW_SUGGESTED for s in slots_all)
-    if form_review_required and no_safe_slots and not allow_fallback_when_no_slots:
+    requested_fields = set(field_values)
+    no_safe_slots = not any(
+        getattr(s, "confidence", 0) >= _REVIEW_SUGGESTED
+        and getattr(s, "fieldGuess", "unknown") in requested_fields
+        for s in slots_all
+    )
+    if no_safe_slots and not allow_fallback_when_no_slots:
         for field_name in field_values:
             acc.skipped.append(field_name)
-            acc.review_reasons[field_name] = "no_safe_slots_form_review_required"
+            acc.review_reasons[field_name] = "no_safe_slots_for_requested_fields"
         return PlanResult(
             editPlan={},
             plannedFields=[],
