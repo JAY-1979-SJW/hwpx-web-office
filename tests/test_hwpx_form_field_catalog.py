@@ -129,3 +129,39 @@ def test_catalog_module_no_write_package():
     ).read_text("utf-8")
     assert "write_package" not in src
     assert "apply_edit_plan" not in src
+
+
+# ── load_catalog_entry (2026-09-29, editor_api_route.call_catalog_fill 용) ──
+
+
+def test_load_catalog_entry_finds_real_form():
+    from scripts.hwpx.recognition_corpus import form_field_catalog as ffc
+
+    if not CATALOG_JSONL.exists():
+        pytest.skip("카탈로그 jsonl 없음")
+    entry = ffc.load_catalog_entry("공사 감리자 지정 신청서", CATALOG_JSONL)
+    assert entry is not None
+    assert entry["formName"] == "공사 감리자 지정 신청서"
+
+
+def test_load_catalog_entry_returns_none_for_unknown_form():
+    from scripts.hwpx.recognition_corpus import form_field_catalog as ffc
+
+    if not CATALOG_JSONL.exists():
+        pytest.skip("카탈로그 jsonl 없음")
+    assert ffc.load_catalog_entry("존재하지 않는 서식 이름 12345", CATALOG_JSONL) is None
+
+
+def test_load_catalog_entry_missing_file_returns_none(tmp_path):
+    from scripts.hwpx.recognition_corpus import form_field_catalog as ffc
+
+    assert ffc.load_catalog_entry("아무거나", tmp_path / "no_such.jsonl") is None
+
+
+def test_map_from_paths_uses_load_catalog_entry():
+    """form_field_mapper.map_from_paths 가 인라인 스캔 대신 load_catalog_entry
+    를 호출하도록 옮겼는지(중복 제거) 소스로 고정한다."""
+    src = (PROJECT_ROOT / "scripts" / "hwpx" / "pipeline" / "form_field_mapper.py").read_text(
+        "utf-8"
+    )
+    assert "load_catalog_entry" in src

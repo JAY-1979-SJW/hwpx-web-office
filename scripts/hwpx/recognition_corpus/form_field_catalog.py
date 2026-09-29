@@ -29,6 +29,9 @@ FORM_TYPE_JSONL = (
 INPUT_CELLS_JSONL = (
     PROJECT_ROOT / "data" / "reports" / "hwpx_survey_drafts" / "survey_input_cells_raw.jsonl"
 )
+CATALOG_JSONL = (
+    PROJECT_ROOT / "data" / "reports" / "hwpx_form_field_catalog" / "form_field_catalog.jsonl"
+)
 
 # ── 필드별 자료 출처 힌트 ────────────────────────────────────────────────────
 _SOURCE_HINT: dict[str, str] = {
@@ -300,3 +303,26 @@ def build_summary(catalog: list[FormCatalogEntry]) -> dict[str, Any]:
         "domainCounts": dict(domain_counts.most_common()),
         "formKindCounts": dict(kind_counts.most_common()),
     }
+
+
+def load_catalog_entry(
+    form_name: str, catalog_jsonl: Path = CATALOG_JSONL
+) -> dict[str, Any] | None:
+    """이미 빌드된 카탈로그(jsonl)에서 formName 완전일치로 항목 1개를 찾는다.
+
+    form_field_mapper.map_from_paths()가 인라인으로 하던 줄단위 스캔을
+    재사용 가능한 함수로 뽑아낸 것 — 그 함수가 이걸 호출하도록 함께
+    고쳤다(2026-09-29). build_catalog()로 15만 행을 매번 다시 집계하는 대신
+    이미 만들어진 jsonl을 그대로 읽는다 — 다른 formName은 안 건드리므로
+    build_catalog()의 required_ratio 등 집계 로직과는 결과가 같다(같은
+    소스 파일에서 빌드된 jsonl이므로).
+    """
+    if not catalog_jsonl.is_file():
+        return None
+    for line in catalog_jsonl.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        if entry.get("formName", "") == form_name:
+            return entry
+    return None

@@ -97,6 +97,16 @@ def test_ai_fill_sends_source_path():
     assert "sourcePath: state.rel" in src
 
 
+def test_catalog_fill_sends_reference_and_source_path():
+    """catalog-fill 요청에 referencePath(참조 서식)와 sourcePath(대상 서식)를
+    둘 다 실어야 서버가 참조 문서를 파싱해 대상 서식의 카탈로그로 매칭한다
+    (upload_document_parser + form_field_mapper, AI 없음)."""
+    src = MJS.read_text(encoding="utf-8")
+    assert 'post("catalog-fill"' in src
+    assert "referencePath: ref" in src
+    assert "sourcePath: state.rel" in src
+
+
 # ── node self-test (런타임 로직) ────────────────────────────────────────
 
 

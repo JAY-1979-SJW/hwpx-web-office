@@ -5,6 +5,8 @@
  *
  *   POST /api/web-office/hwpx-load        문서 로드(문단·run·charPr·해시)
  *   POST /api/web-office/fill-plan        채움 계획(autoFill/questions/skipped)
+ *   POST /api/web-office/ai-fill          문맥 포함 AI 해석(ai_fill_dry_run)
+ *   POST /api/web-office/catalog-fill     참조 서식 + corpus 카탈로그 매칭(AI 없음)
  *   POST /api/web-office/para-save-apply  paragraphId 겨냥 기입 → sandbox 저장
  *   GET  /api/web-office/download/{name}  결과 다운로드
  *
@@ -285,9 +287,17 @@ function mountPanel(root) {
   const aiBtn = el("button", { "data-testid": "ai-fill-btn",
     onClick: () => askAi(aiText.value) }, "AI에게 값 받기");
   const aiNote = el("small", { "data-testid": "ai-note", style: "color:#6b7280" }, "");
+  // 카탈로그 매칭 — 예전에 채운 hwpx(참조 서식)에서 값을 직접 뽑아온다.
+  // AI 호출 없음(upload_document_parser 규칙 기반 파서 + corpus 카탈로그).
+  const catalogRefInput = el("input", { "data-testid": "catalog-ref-path",
+    placeholder: "data/drafts/form_library/.../예전에_채운_서식.hwpx", size: "60" });
+  const catalogBtn = el("button", { "data-testid": "catalog-fill-btn",
+    onClick: () => askCatalog(catalogRefInput.value) }, "참조 서식으로 채우기");
   const aiBox = el("section", { "data-testid": "sec-ai", hidden: "true" },
     el("h3", {}, "② AI 대화 입력 (선택)"),
-    el("div", {}, aiText), aiBtn, " ", aiNote);
+    el("div", {}, aiText), aiBtn, " ", aiNote,
+    el("div", { style: "margin-top:8px" },
+      el("div", {}, catalogRefInput), catalogBtn));
 
   const body = el("div", { "data-testid": "plan-body" });
   const fillBtn = el("button", { "data-testid": "fill-btn", disabled: "true",
@@ -321,6 +331,7 @@ function mountPanel(root) {
     viewer.replaceChildren();
     aiBox.setAttribute("hidden", "true");
     aiText.value = "";
+    catalogRefInput.value = "";
     aiNote.textContent = "";
     fillBtn.disabled = true;
     state.docModel = null; state.plan = null; state.hash = null;
@@ -544,6 +555,28 @@ function mountPanel(root) {
       (held ? ` · 제3자 칸 ${held} 보호(자동 안 채움)` : "") +
       (rejected ? ` · 검증 실패 ${rejected}건(비창조/주소 등)` : "");
     renderPlan();      // 답변 반영해 다시 그림 (AI 박스는 body 밖이라 유지)
+  }
+
+  /** 참조 서식(예전에 채운 hwpx)에서 corpus 카탈로그로 값을 매칭해 채운다.
+   * AI 호출 없음 — upload_document_parser(규칙 기반) + 카탈로그 매칭. */
+  async function askCatalog(referencePath) {
+    const ref = (referencePath || "").trim();
+    if (!ref || !state.plan || !state.rel) { return; }
+    const { ask, sensitive } = partitionPlan(state.plan);
+    const items = [...ask, ...sensitive, ...(state.plan.autoFill || [])];
+    const r = await post("catalog-fill",
+      { referencePath: ref, sourcePath: state.rel });
+    const cat = r.data || r;
+    if (r.status !== "SUCCESS") {
+      aiNote.textContent = "카탈로그 매칭 실패: " +
+        (r.errors?.[0]?.message || r.errors?.[0]?.code || "?");
+      return;
+    }
+    state.answers = applyAiProposals(state.answers, cat, items);
+    const missing = cat.missingCount || 0;
+    aiNote.textContent = `카탈로그 매칭: 제안 ${(cat.proposals || []).length}건 반영` +
+      (missing ? ` · 누락 ${missing}건` : "");
+    renderPlan();
   }
 
   async function applyFill() {

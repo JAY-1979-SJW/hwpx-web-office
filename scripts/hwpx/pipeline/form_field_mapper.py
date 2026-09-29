@@ -396,10 +396,10 @@ def map_from_paths(
 
     form_name이 비어 있으면 파일명에서 추론.
     """
-    import json
     from pathlib import Path
 
     from hwpx.pipeline.upload_document_parser import parse_hwpx
+    from hwpx.recognition_corpus.form_field_catalog import load_catalog_entry
     from hwpx.recognition_corpus.form_type_classifier import classify_form_type
 
     p = Path(hwpx_path)
@@ -408,15 +408,10 @@ def map_from_paths(
     ft = classify_form_type(p)
     target_name = form_name or ft.formName
 
-    # 카탈로그에서 서식 찾기
-    catalog_entry = None
-    for line in Path(catalog_jsonl).read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        entry = json.loads(line)
-        if entry.get("formName", "") == target_name:
-            catalog_entry = entry
-            break
+    # 2026-09-29: 줄단위 스캔을 form_field_catalog.load_catalog_entry() 로
+    # 옮겼다(재사용 가능하게 — editor_api_route.call_catalog_fill 도 같은
+    # 함수를 쓴다). 동작은 동일(같은 완전일치 스캔).
+    catalog_entry = load_catalog_entry(target_name, Path(catalog_jsonl))
 
     if catalog_entry is None:
         # 카탈로그 미매칭: 빈 결과

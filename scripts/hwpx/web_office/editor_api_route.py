@@ -543,6 +543,90 @@ def call_ai_fill_with_context(
     return _envelope("SUCCESS", result)
 
 
+def call_catalog_fill(
+    request: dict[str, Any], *, project_root: Path = PROJECT_ROOT
+) -> dict[str, Any]:
+    """참조 서식(이미 채워진 hwpx)을 파싱해 corpus 카탈로그로 대상 서식 칸에
+    매칭. AI/OCR 미사용 — 규칙 기반 파서(upload_document_parser)만 쓴다.
+
+    request.referencePath: 값을 뽑아올 참조 hwpx(예: 예전에 낸 비슷한 서식).
+    request.sourcePath: 지금 채우는 대상 서식 — 이 파일의 formName으로
+    카탈로그를 찾는다(build_input_schema의 cleanName이 아니라
+    classify_form_type을 그대로 쓴다 — 카탈로그가 그 함수로 만들어졌으므로
+    이름 체계가 갈리면 안 됨, 2026-09-29 확인).
+
+    응답의 proposals 모양은 applyAiProposals(form_question_panel.mjs)가
+    이미 읽는 {key,label,value} 와 맞춰 새 병합 로직을 안 만든다.
+    """
+
+    reference_path = request.get("referencePath")
+    source_path = request.get("sourcePath")
+    if not reference_path or not source_path:
+        return _envelope(
+            "FAILED",
+            {},
+            [{"code": "PATH_MISSING", "message": "referencePath/sourcePath 필요"}],
+        )
+
+    import sys
+
+    scripts_dir = str(project_root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from hwpx.pipeline.form_field_mapper import STATUS_AUTO, STATUS_REVIEW, map_fields
+    from hwpx.pipeline.upload_document_parser import parse_hwpx
+    from hwpx.recognition_corpus.form_field_catalog import load_catalog_entry
+    from hwpx.recognition_corpus.form_type_classifier import classify_form_type
+
+    ref_full = project_root / reference_path
+    src_full = project_root / source_path
+    if not ref_full.is_file() or not src_full.is_file():
+        return _envelope(
+            "FAILED",
+            {},
+            [{"code": "FILE_NOT_FOUND", "message": "참조/대상 파일을 찾을 수 없음"}],
+        )
+
+    target_form_name = classify_form_type(src_full).formName
+    catalog_entry = load_catalog_entry(target_form_name)
+    if catalog_entry is None:
+        return _envelope(
+            "FAILED",
+            {"formName": target_form_name},
+            [
+                {
+                    "code": "CATALOG_NOT_MATCHED",
+                    "message": f"카탈로그에 없는 서식: {target_form_name}",
+                }
+            ],
+        )
+
+    parse_result = parse_hwpx(ref_full)
+    mapping = map_fields(parse_result, catalog_entry)
+
+    proposals = [
+        {
+            "key": mf.fieldKey,
+            "label": mf.label,
+            "value": mf.value,
+            "confidence": mf.confidence,
+            "subject": "self",
+            "requiresConfirmation": mf.status == STATUS_REVIEW,
+        }
+        for mf in mapping.mappedFields
+        if mf.status in (STATUS_AUTO, STATUS_REVIEW)
+    ]
+    return _envelope(
+        "SUCCESS",
+        {
+            "formName": target_form_name,
+            "proposals": proposals,
+            "heldForThirdParty": [],
+            "missingCount": len(mapping.missingFields),
+        },
+    )
+
+
 def call_source_extract(request: dict[str, Any]) -> dict[str, Any]:
     """소스 문서(사업자등록증 등) 이미지에서 Claude 비전으로 값 추출. §4/§9 준수.
 
@@ -751,6 +835,10 @@ if _FASTAPI_AVAILABLE:
         sourceData: dict[str, Any] | None = None
         sourcePath: str | None = None
 
+    class CatalogFillRequest(BaseModel):
+        referencePath: str
+        sourcePath: str
+
     class SourceExtractRequest(BaseModel):
         imagePath: str
         docType: str | None = None
@@ -883,6 +971,10 @@ def create_app() -> Any:  # ruff: ignore[complex-structure] -- FastAPI 라우트
     @app.post("/api/web-office/ai-fill")
     def ai_fill(req: AiFillRequest) -> dict[str, Any]:
         return call_ai_fill(req.model_dump())
+
+    @app.post("/api/web-office/catalog-fill")
+    def catalog_fill(req: CatalogFillRequest) -> dict[str, Any]:
+        return call_catalog_fill(req.model_dump())
 
     @app.post("/api/web-office/source-extract")
     def source_extract(req: SourceExtractRequest) -> dict[str, Any]:
