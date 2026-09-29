@@ -486,49 +486,51 @@ def _next_unique_object_key(
     return object_key, seq
 
 
-def _record_object_geometry(
-    elem: ET.Element,
-    tag: str,
-    *,
-    section_idx: int,
-    section_obj_counter: list[int],
-    seen_object_keys: set[str],
-    cell_stack: list[dict],
-    object_geom: dict[str, dict],
-) -> bool:
+@dataclass
+class _GeometryWalkState:
+    """`_walk_geometry_element` 재귀 전체에서 공유되는 가변 상태.
+
+    section_idx/table_count_global은 섹션마다 고정, 나머지는 섹션 내부에서
+    누적되거나(카운터) 여러 섹션에 걸쳐 누적된다(geom dict, seen keys).
+    """
+
+    section_idx: int
+    table_count_global: int
+    cell_geom: dict[str, dict]
+    object_geom: dict[str, dict]
+    seen_object_keys: set[str]
+    cell_stack: list[dict] = field(default_factory=list)
+    section_table_counter: int = 0
+    section_obj_counter: int = 0
+
+
+def _record_object_geometry(elem: ET.Element, tag: str, state: _GeometryWalkState) -> bool:
     """object 요소면 object_geom 에 기록하고 True, 아니면 False."""
     obj_type = _OBJECT_TAG_TO_TYPE.get(tag)
     if obj_type is None:
         return False
     raw_id = elem.get("id", "")
-    seq = section_obj_counter[0]
-    section_obj_counter[0] += 1
-    object_key, _ = _next_unique_object_key(seen_object_keys, section_idx, raw_id, seq)
-    seen_object_keys.add(object_key)
-    object_geom[object_key] = {
+    seq = state.section_obj_counter
+    state.section_obj_counter += 1
+    object_key, _ = _next_unique_object_key(state.seen_object_keys, state.section_idx, raw_id, seq)
+    state.seen_object_keys.add(object_key)
+    state.object_geom[object_key] = {
         "objectType": obj_type,
         "bbox": _extract_bbox(elem),
-        "inCellStack": bool(cell_stack),
+        "inCellStack": bool(state.cell_stack),
     }
     return True
 
 
 def _record_table_cell_geometry(
-    tc: ET.Element,
-    *,
-    section_idx: int,
-    tbl_idx: int,
-    row_idx: int,
-    col_idx: int,
-    table_count_global: int,
-    cell_geom: dict[str, dict],
+    tc: ET.Element, state: _GeometryWalkState, *, tbl_idx: int, row_idx: int, col_idx: int
 ) -> str:
     col_span, row_span = _cell_span(tc)
     cell_text = _cell_normalized_text(tc)
-    cell_key = f"t_s{section_idx}_{tbl_idx:03d}:r{row_idx}:c{col_idx}"
+    cell_key = f"t_s{state.section_idx}_{tbl_idx:03d}:r{row_idx}:c{col_idx}"
     bbox = _extract_bbox(tc)
-    cell_geom[cell_key] = {
-        "tableIndex": table_count_global + tbl_idx,
+    state.cell_geom[cell_key] = {
+        "tableIndex": state.table_count_global + tbl_idx,
         "rowIndex": row_idx,
         "cellIndex": col_idx,
         "rowSpan": row_span,
@@ -539,22 +541,11 @@ def _record_table_cell_geometry(
     return cell_key
 
 
-def _walk_geometry_element(
-    elem: ET.Element,
-    *,
-    section_idx: int,
-    cell_stack: list[dict],
-    section_table_counter: list[int],
-    section_obj_counter: list[int],
-    table_count_global: int,
-    cell_geom: dict[str, dict],
-    object_geom: dict[str, dict],
-    seen_object_keys: set[str],
-) -> None:
+def _walk_geometry_element(elem: ET.Element, state: _GeometryWalkState) -> None:
     tag = elem.tag.split("}")[-1]
     if tag == "tbl":
-        tbl_idx = section_table_counter[0]
-        section_table_counter[0] += 1
+        tbl_idx = state.section_table_counter
+        state.section_table_counter += 1
         row_idx = 0
         for tr in list(elem):
             if tr.tag != _TAG_TR:
@@ -564,55 +555,21 @@ def _walk_geometry_element(
                 if tc.tag != _TAG_TC:
                     continue
                 cell_key = _record_table_cell_geometry(
-                    tc,
-                    section_idx=section_idx,
-                    tbl_idx=tbl_idx,
-                    row_idx=row_idx,
-                    col_idx=col_idx,
-                    table_count_global=table_count_global,
-                    cell_geom=cell_geom,
+                    tc, state, tbl_idx=tbl_idx, row_idx=row_idx, col_idx=col_idx
                 )
-                cell_stack.append({"cellKey": cell_key})
+                state.cell_stack.append({"cellKey": cell_key})
                 for child in list(tc):
-                    _walk_geometry_element(
-                        child,
-                        section_idx=section_idx,
-                        cell_stack=cell_stack,
-                        section_table_counter=section_table_counter,
-                        section_obj_counter=section_obj_counter,
-                        table_count_global=table_count_global,
-                        cell_geom=cell_geom,
-                        object_geom=object_geom,
-                        seen_object_keys=seen_object_keys,
-                    )
-                cell_stack.pop()
+                    _walk_geometry_element(child, state)
+                state.cell_stack.pop()
                 col_idx += 1
             row_idx += 1
         return
 
-    if _record_object_geometry(
-        elem,
-        tag,
-        section_idx=section_idx,
-        section_obj_counter=section_obj_counter,
-        seen_object_keys=seen_object_keys,
-        cell_stack=cell_stack,
-        object_geom=object_geom,
-    ):
+    if _record_object_geometry(elem, tag, state):
         return
 
     for child in list(elem):
-        _walk_geometry_element(
-            child,
-            section_idx=section_idx,
-            cell_stack=cell_stack,
-            section_table_counter=section_table_counter,
-            section_obj_counter=section_obj_counter,
-            table_count_global=table_count_global,
-            cell_geom=cell_geom,
-            object_geom=object_geom,
-            seen_object_keys=seen_object_keys,
-        )
+        _walk_geometry_element(child, state)
 
 
 def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
@@ -633,23 +590,17 @@ def _collect_geometry_from_section_xmls(section_xmls: list[bytes]):
         except ET.ParseError:
             continue
 
-        section_table_counter = [0]
-        section_obj_counter = [0]
-        cell_stack: list[dict] = []
+        state = _GeometryWalkState(
+            section_idx=section_idx,
+            table_count_global=table_count_global,
+            cell_geom=cell_geom,
+            object_geom=object_geom,
+            seen_object_keys=seen_object_keys,
+        )
 
         for child in list(root):
-            _walk_geometry_element(
-                child,
-                section_idx=section_idx,
-                cell_stack=cell_stack,
-                section_table_counter=section_table_counter,
-                section_obj_counter=section_obj_counter,
-                table_count_global=table_count_global,
-                cell_geom=cell_geom,
-                object_geom=object_geom,
-                seen_object_keys=seen_object_keys,
-            )
-        table_count_global += section_table_counter[0]
+            _walk_geometry_element(child, state)
+        table_count_global += state.section_table_counter
 
     return cell_geom, object_geom
 
@@ -688,6 +639,156 @@ def map_objects_to_cells_with_geometry_from_section_xmls(
     return _augment_with_geometric_candidates(base, section_xmls)
 
 
+def _no_geometry_entry(m, reason: str) -> GeometricCandidateEntry:
+    return GeometricCandidateEntry(
+        objectKey=m.objectKey,
+        objectType=m.objectType,
+        candidateCellKey=None,
+        tableIndex=None,
+        rowIndex=None,
+        cellIndex=None,
+        cellText=None,
+        overlapRatio=None,
+        centerDistance=None,
+        confidence=0.0,
+        reason=reason,
+    )
+
+
+def _score_cell_candidates(
+    obj_bbox: tuple[int, int, int, int],
+    obj_center: tuple[float, float],
+    obj_area: float,
+    cell_geom: dict[str, dict],
+) -> list[tuple[str, dict, float, float, bool]]:
+    # (cellKey, cell_geom_record, overlap_ratio, center_distance, center_inside)
+    candidate_scores: list[tuple[str, dict, float, float, bool]] = []
+    for cell_key, g in cell_geom.items():
+        cell_bbox = g["bbox"]
+        if cell_bbox is None:
+            continue
+        ov = _bbox_overlap_area(obj_bbox, cell_bbox)
+        overlap_ratio = ov / obj_area
+        center_distance = _euclid(obj_center, _bbox_center(cell_bbox))
+        center_inside = _center_inside(obj_center, cell_bbox)
+        candidate_scores.append((cell_key, g, overlap_ratio, center_distance, center_inside))
+    return candidate_scores
+
+
+def _center_inside_candidates(
+    m, center_inside_hits: list[tuple[str, dict, float, float, bool]]
+) -> tuple[list[GeometricCandidateEntry], bool]:
+    # 중심점이 cell bbox 내부 → CENTER_INSIDE_CELL
+    top_overlap = max(c[2] for c in center_inside_hits)
+    top_n = sorted(center_inside_hits, key=lambda c: -c[2])
+    # ambiguous: 동일/유사 score 후보 2개 이상
+    is_ambiguous = (
+        len(center_inside_hits) >= 2 and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
+    )
+    entries = []
+    for ck, g, overlap_ratio, dist, _ in top_n:
+        conf = min(_CONF_CENTER_INSIDE_CELL_MAX, 0.5 + 0.3 * min(1.0, overlap_ratio))
+        entries.append(
+            GeometricCandidateEntry(
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=ck,
+                tableIndex=g["tableIndex"],
+                rowIndex=g["rowIndex"],
+                cellIndex=g["cellIndex"],
+                cellText=g["cellText"],
+                overlapRatio=round(overlap_ratio, 4),
+                centerDistance=round(dist, 2),
+                confidence=round(conf, 3),
+                reason="CENTER_INSIDE_CELL",
+                ambiguous=is_ambiguous,
+            )
+        )
+    return entries, is_ambiguous
+
+
+def _bbox_overlap_candidates(
+    m, overlap_hits: list[tuple[str, dict, float, float, bool]]
+) -> tuple[list[GeometricCandidateEntry], bool]:
+    # bbox 일부 overlap → BBOX_OVERLAP
+    top_overlap = max(c[2] for c in overlap_hits)
+    top_n = sorted(overlap_hits, key=lambda c: -c[2])
+    is_ambiguous = len(overlap_hits) >= 2 and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
+    entries = []
+    for ck, g, overlap_ratio, dist, _ in top_n:
+        conf = min(_CONF_BBOX_OVERLAP_MAX, 0.3 + 0.5 * min(1.0, overlap_ratio))
+        entries.append(
+            GeometricCandidateEntry(
+                objectKey=m.objectKey,
+                objectType=m.objectType,
+                candidateCellKey=ck,
+                tableIndex=g["tableIndex"],
+                rowIndex=g["rowIndex"],
+                cellIndex=g["cellIndex"],
+                cellText=g["cellText"],
+                overlapRatio=round(overlap_ratio, 4),
+                centerDistance=round(dist, 2),
+                confidence=round(conf, 3),
+                reason="BBOX_OVERLAP",
+                ambiguous=is_ambiguous,
+            )
+        )
+    return entries, is_ambiguous
+
+
+def _nearest_cell_candidate(
+    m,
+    obj_bbox: tuple[int, int, int, int],
+    candidate_scores: list[tuple[str, dict, float, float, bool]],
+) -> GeometricCandidateEntry:
+    # overlap 없음 → NEAREST_CELL 단일 후보 (가장 가까운 셀)
+    nearest = min(candidate_scores, key=lambda c: c[3])
+    ck, g, _ov, dist, _ = nearest
+    # 거리가 가까울수록 confidence 높음 (상한 0.6), 정규화 기준: 객체 자체 크기
+    obj_diag = (obj_bbox[2] ** 2 + obj_bbox[3] ** 2) ** 0.5 or 1.0
+    normalized = max(0.0, 1.0 - dist / (obj_diag * 4.0))
+    conf = min(_CONF_NEAREST_CELL_MAX, 0.2 + 0.4 * normalized)
+    return GeometricCandidateEntry(
+        objectKey=m.objectKey,
+        objectType=m.objectType,
+        candidateCellKey=ck,
+        tableIndex=g["tableIndex"],
+        rowIndex=g["rowIndex"],
+        cellIndex=g["cellIndex"],
+        cellText=g["cellText"],
+        overlapRatio=0.0,
+        centerDistance=round(dist, 2),
+        confidence=round(conf, 3),
+        reason="NEAREST_CELL",
+        ambiguous=False,
+    )
+
+
+def _geometric_candidates_for_object(
+    m, object_geom: dict[str, dict], has_any_cell_bbox: bool, cell_geom: dict[str, dict]
+) -> tuple[list[GeometricCandidateEntry], bool]:
+    obj_info = object_geom.get(m.objectKey, {})
+    obj_bbox = obj_info.get("bbox")
+    if obj_bbox is None:
+        return [_no_geometry_entry(m, "NO_GEOMETRY")], False
+    if not has_any_cell_bbox:
+        return [_no_geometry_entry(m, "NO_CELL_GEOMETRY")], False
+
+    obj_center = _bbox_center(obj_bbox)
+    obj_area = max(1.0, _bbox_area(obj_bbox))
+    candidate_scores = _score_cell_candidates(obj_bbox, obj_center, obj_area, cell_geom)
+    if not candidate_scores:
+        return [_no_geometry_entry(m, "NO_CELL_GEOMETRY")], False
+
+    center_inside_hits = [c for c in candidate_scores if c[4]]
+    overlap_hits = [c for c in candidate_scores if c[2] > 0]
+    if center_inside_hits:
+        return _center_inside_candidates(m, center_inside_hits)
+    if overlap_hits:
+        return _bbox_overlap_candidates(m, overlap_hits)
+    return [_nearest_cell_candidate(m, obj_bbox, candidate_scores)], False
+
+
 def _augment_with_geometric_candidates(
     base: ObjectCellMappingResult, section_xmls: list[bytes]
 ) -> ObjectCellMappingResult:
@@ -695,10 +796,7 @@ def _augment_with_geometric_candidates(
 
     has_any_cell_bbox = any(g["bbox"] is not None for g in cell_geom.values())
     has_any_object_bbox = any(g["bbox"] is not None for g in object_geom.values())
-    if has_any_cell_bbox or has_any_object_bbox:
-        base.coordinateUnit = "HWPX_UNIT"
-    else:
-        base.coordinateUnit = "UNKNOWN"
+    base.coordinateUnit = "HWPX_UNIT" if (has_any_cell_bbox or has_any_object_bbox) else "UNKNOWN"
 
     seen_pair: set[tuple[str, str | None]] = set()
     candidates: list[GeometricCandidateEntry] = []
@@ -708,179 +806,19 @@ def _augment_with_geometric_candidates(
     out_of_cell_objects = [m for m in base.mappings if m.reason == "OUT_OF_CELL"]
 
     for m in out_of_cell_objects:
-        obj_info = object_geom.get(m.objectKey, {})
-        obj_bbox = obj_info.get("bbox")
-        if obj_bbox is None:
-            entry = GeometricCandidateEntry(
-                objectKey=m.objectKey,
-                objectType=m.objectType,
-                candidateCellKey=None,
-                tableIndex=None,
-                rowIndex=None,
-                cellIndex=None,
-                cellText=None,
-                overlapRatio=None,
-                centerDistance=None,
-                confidence=0.0,
-                reason="NO_GEOMETRY",
-            )
+        entries, is_ambiguous = _geometric_candidates_for_object(
+            m, object_geom, has_any_cell_bbox, cell_geom
+        )
+        for entry in entries:
             pair = (entry.objectKey, entry.candidateCellKey)
-            if pair not in seen_pair:
-                seen_pair.add(pair)
-                candidates.append(entry)
-                no_geometry_count += 1
-            continue
-
-        if not has_any_cell_bbox:
-            entry = GeometricCandidateEntry(
-                objectKey=m.objectKey,
-                objectType=m.objectType,
-                candidateCellKey=None,
-                tableIndex=None,
-                rowIndex=None,
-                cellIndex=None,
-                cellText=None,
-                overlapRatio=None,
-                centerDistance=None,
-                confidence=0.0,
-                reason="NO_CELL_GEOMETRY",
-            )
-            pair = (entry.objectKey, entry.candidateCellKey)
-            if pair not in seen_pair:
-                seen_pair.add(pair)
-                candidates.append(entry)
-                no_geometry_count += 1
-            continue
-
-        # 후보 셀 점수 계산
-        obj_center = _bbox_center(obj_bbox)
-        obj_area = max(1.0, _bbox_area(obj_bbox))
-        candidate_scores: list[tuple[str, dict, float, float, bool]] = []
-        # (cellKey, cell_geom_record, overlap_ratio, center_distance, center_inside)
-
-        for cell_key, g in cell_geom.items():
-            cell_bbox = g["bbox"]
-            if cell_bbox is None:
+            if pair in seen_pair:
                 continue
-            ov = _bbox_overlap_area(obj_bbox, cell_bbox)
-            overlap_ratio = ov / obj_area
-            center_distance = _euclid(obj_center, _bbox_center(cell_bbox))
-            center_inside = _center_inside(obj_center, cell_bbox)
-            candidate_scores.append((cell_key, g, overlap_ratio, center_distance, center_inside))
-
-        if not candidate_scores:
-            entry = GeometricCandidateEntry(
-                objectKey=m.objectKey,
-                objectType=m.objectType,
-                candidateCellKey=None,
-                tableIndex=None,
-                rowIndex=None,
-                cellIndex=None,
-                cellText=None,
-                overlapRatio=None,
-                centerDistance=None,
-                confidence=0.0,
-                reason="NO_CELL_GEOMETRY",
-            )
-            pair = (entry.objectKey, entry.candidateCellKey)
-            if pair not in seen_pair:
-                seen_pair.add(pair)
-                candidates.append(entry)
+            seen_pair.add(pair)
+            candidates.append(entry)
+            if entry.reason in ("NO_GEOMETRY", "NO_CELL_GEOMETRY"):
                 no_geometry_count += 1
-            continue
-
-        center_inside_hits = [c for c in candidate_scores if c[4]]
-        overlap_hits = [c for c in candidate_scores if c[2] > 0]
-
-        if center_inside_hits:
-            # 중심점이 cell bbox 내부 → CENTER_INSIDE_CELL
-            top_overlap = max(c[2] for c in center_inside_hits)
-            top_n = sorted(center_inside_hits, key=lambda c: -c[2])
-            # ambiguous: 동일/유사 score 후보 2개 이상
-            is_ambiguous = (
-                len(center_inside_hits) >= 2
-                and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
-            )
-            for ck, g, overlap_ratio, dist, _ in top_n:
-                conf = min(_CONF_CENTER_INSIDE_CELL_MAX, 0.5 + 0.3 * min(1.0, overlap_ratio))
-                entry = GeometricCandidateEntry(
-                    objectKey=m.objectKey,
-                    objectType=m.objectType,
-                    candidateCellKey=ck,
-                    tableIndex=g["tableIndex"],
-                    rowIndex=g["rowIndex"],
-                    cellIndex=g["cellIndex"],
-                    cellText=g["cellText"],
-                    overlapRatio=round(overlap_ratio, 4),
-                    centerDistance=round(dist, 2),
-                    confidence=round(conf, 3),
-                    reason="CENTER_INSIDE_CELL",
-                    ambiguous=is_ambiguous,
-                )
-                pair = (entry.objectKey, entry.candidateCellKey)
-                if pair in seen_pair:
-                    continue
-                seen_pair.add(pair)
-                candidates.append(entry)
-            if is_ambiguous:
-                ambiguous_object_keys.add(m.objectKey)
-        elif overlap_hits:
-            # bbox 일부 overlap → BBOX_OVERLAP
-            top_overlap = max(c[2] for c in overlap_hits)
-            top_n = sorted(overlap_hits, key=lambda c: -c[2])
-            is_ambiguous = (
-                len(overlap_hits) >= 2 and (top_overlap - top_n[1][2]) < _AMBIGUITY_OVERLAP_DELTA
-            )
-            for ck, g, overlap_ratio, dist, _ in top_n:
-                conf = min(_CONF_BBOX_OVERLAP_MAX, 0.3 + 0.5 * min(1.0, overlap_ratio))
-                entry = GeometricCandidateEntry(
-                    objectKey=m.objectKey,
-                    objectType=m.objectType,
-                    candidateCellKey=ck,
-                    tableIndex=g["tableIndex"],
-                    rowIndex=g["rowIndex"],
-                    cellIndex=g["cellIndex"],
-                    cellText=g["cellText"],
-                    overlapRatio=round(overlap_ratio, 4),
-                    centerDistance=round(dist, 2),
-                    confidence=round(conf, 3),
-                    reason="BBOX_OVERLAP",
-                    ambiguous=is_ambiguous,
-                )
-                pair = (entry.objectKey, entry.candidateCellKey)
-                if pair in seen_pair:
-                    continue
-                seen_pair.add(pair)
-                candidates.append(entry)
-            if is_ambiguous:
-                ambiguous_object_keys.add(m.objectKey)
-        else:
-            # overlap 없음 → NEAREST_CELL 단일 후보 (가장 가까운 셀)
-            nearest = min(candidate_scores, key=lambda c: c[3])
-            ck, g, _ov, dist, _ = nearest
-            # 거리가 가까울수록 confidence 높음 (상한 0.6)
-            # 정규화 기준: 객체 자체 크기로 정규화
-            obj_diag = (obj_bbox[2] ** 2 + obj_bbox[3] ** 2) ** 0.5 or 1.0
-            normalized = max(0.0, 1.0 - dist / (obj_diag * 4.0))
-            conf = min(_CONF_NEAREST_CELL_MAX, 0.2 + 0.4 * normalized)
-            entry = GeometricCandidateEntry(
-                objectKey=m.objectKey,
-                objectType=m.objectType,
-                candidateCellKey=ck,
-                tableIndex=g["tableIndex"],
-                rowIndex=g["rowIndex"],
-                cellIndex=g["cellIndex"],
-                cellText=g["cellText"],
-                overlapRatio=0.0,
-                centerDistance=round(dist, 2),
-                confidence=round(conf, 3),
-                reason="NEAREST_CELL",
-                ambiguous=False,
-            )
-            pair = (entry.objectKey, entry.candidateCellKey)
-            if pair not in seen_pair:
-                seen_pair.add(pair)
-                candidates.append(entry)
+        if is_ambiguous:
+            ambiguous_object_keys.add(m.objectKey)
 
     base.geometricCandidates = candidates
     base.geometricCandidateCount = len(candidates)

@@ -402,6 +402,177 @@ def _decision_value_invalid(d: dict) -> bool:
     return d.get("decision") not in ALLOWED_DECISIONS
 
 
+def _resolve_decision_item(
+    d: dict, idx: int, items_by_id: dict, seen_item_ids: set
+) -> tuple[dict | None, str | None, list[dict]]:
+    """decision dict의 형태·식별자·중복·존재 여부를 확인.
+
+    (item, item_id, errors) 반환. errors가 비어있지 않으면 item은 항상 None.
+    """
+    if not isinstance(d, dict):
+        return (
+            None,
+            None,
+            [{"code": "DECISION_NOT_OBJECT", "detail": f"decisions[{idx}] is not a dict"}],
+        )
+
+    item_id = d.get("reviewItemId")
+    decision_val = d.get("decision")
+
+    if not item_id:
+        return (
+            None,
+            None,
+            [
+                {
+                    "code": "REVIEW_ITEM_ID_REQUIRED",
+                    "detail": f"decisions[{idx}].reviewItemId missing",
+                }
+            ],
+        )
+
+    if _decision_value_invalid(d):
+        return (
+            None,
+            item_id,
+            [
+                {
+                    "code": "INVALID_DECISION_VALUE",
+                    "detail": f"decision={decision_val!r} not in {sorted(ALLOWED_DECISIONS)}",
+                    "reviewItemId": item_id,
+                }
+            ],
+        )
+
+    if item_id in seen_item_ids:
+        return (
+            None,
+            item_id,
+            [
+                {
+                    "code": "DUPLICATE_DECISION",
+                    "detail": f"duplicate reviewItemId={item_id!r}",
+                    "reviewItemId": item_id,
+                }
+            ],
+        )
+    seen_item_ids.add(item_id)
+
+    item = items_by_id.get(item_id)
+    if item is None:
+        return (
+            None,
+            item_id,
+            [
+                {
+                    "code": "REVIEW_ITEM_NOT_FOUND",
+                    "detail": f"reviewItemId={item_id!r} not in review_items",
+                    "reviewItemId": item_id,
+                }
+            ],
+        )
+
+    allowed_actions = item.get("allowedActions") or item.get("allowedDecisions") or []
+    if decision_val not in allowed_actions:
+        return (
+            None,
+            item_id,
+            [
+                {
+                    "code": "DECISION_NOT_ALLOWED_FOR_ITEM",
+                    "detail": (
+                        f"decision={decision_val!r} not in allowedActions={allowed_actions}"
+                    ),
+                    "reviewItemId": item_id,
+                }
+            ],
+        )
+
+    return item, item_id, []
+
+
+def _check_decision_value_requirements(
+    d: dict, item: dict, item_id: str, items_with_missing: set
+) -> tuple[list[dict], list[dict]]:
+    """EDIT_VALUE/REQUEST_MATERIAL 요구조건, HIGH위험 경고, 금지명 검사.
+
+    (errors, warnings) 반환.
+    """
+    decision_val = d.get("decision")
+
+    if decision_val == DECISION_EDIT_VALUE:
+        edited = d.get("editedValue")
+        if edited is None or (isinstance(edited, str) and not edited.strip()):
+            return [
+                {
+                    "code": "EDIT_VALUE_REQUIRES_VALUE",
+                    "detail": "editedValue must be non-empty for EDIT_VALUE",
+                    "reviewItemId": item_id,
+                }
+            ], []
+
+    if decision_val == DECISION_REQUEST_MATERIAL:
+        # 해당 item의 requirementId에 missing material request가 있어야 함
+        req_id = item.get("requirementId")
+        if req_id not in items_with_missing:
+            return [
+                {
+                    "code": "REQUEST_MATERIAL_NOT_AVAILABLE",
+                    "detail": (
+                        f"REQUEST_MATERIAL for reviewItemId={item_id!r} "
+                        "but no missing material request"
+                    ),
+                    "reviewItemId": item_id,
+                }
+            ], []
+
+    # APPROVE on HIGH risk → warning만 (차단 X)
+    warnings: list[dict] = []
+    if decision_val == DECISION_APPROVE and item.get("riskLevel") == RISK_HIGH:
+        warnings.append({
+            "code": "APPROVE_ON_HIGH_RISK",
+            "detail": f"reviewItemId={item_id!r} is HIGH risk",
+            "reviewItemId": item_id,
+        })
+
+    # naming guard: 어떤 경우에도 setCellParagraphText 등 금지명을
+    # decision에 포함시키면 안 됨 (사실 decision은 op_type이 아니지만 방어선)
+    for k in ("editedValueOperationType",):  # 미래 확장 대비
+        if d.get(k) in FORBIDDEN_PARAGRAPH_OP_NAMES:
+            return [
+                {
+                    "code": "FORBIDDEN_OPERATION_NAME",
+                    "detail": (
+                        f"{k}={d.get(k)!r} is forbidden; use {OFFICIAL_PARAGRAPH_FULL_REPLACE_OP}"
+                    ),
+                    "reviewItemId": item_id,
+                }
+            ], warnings
+
+    return [], warnings
+
+
+def _validate_one_decision(
+    d: dict,
+    idx: int,
+    items_by_id: dict,
+    items_with_missing: set,
+    seen_item_ids: set,
+) -> tuple[list[dict], list[dict], bool]:
+    """decisions[idx] 하나를 검증. (errors, warnings, accepted) 반환.
+
+    errors가 비어있으면 accepted=True (경고 유무와 무관), 그렇지 않으면 blocked.
+    """
+    item, item_id, errors = _resolve_decision_item(d, idx, items_by_id, seen_item_ids)
+    if errors:
+        return errors, [], False
+
+    errors, warnings = _check_decision_value_requirements(d, item, item_id, items_with_missing)
+    if errors:
+        return errors, warnings, False
+    return [], warnings, True
+
+
 def validate_decision_payload(
     decision_payload: dict,
     review_items: list[dict],
@@ -446,114 +617,15 @@ def validate_decision_payload(
     blocked = 0
 
     for idx, d in enumerate(decisions):
-        if not isinstance(d, dict):
-            result.errors.append({
-                "code": "DECISION_NOT_OBJECT",
-                "detail": f"decisions[{idx}] is not a dict",
-            })
-            blocked += 1
-            continue
-
-        item_id = d.get("reviewItemId")
-        decision_val = d.get("decision")
-
-        if not item_id:
-            result.errors.append({
-                "code": "REVIEW_ITEM_ID_REQUIRED",
-                "detail": f"decisions[{idx}].reviewItemId missing",
-            })
-            blocked += 1
-            continue
-
-        if _decision_value_invalid(d):
-            result.errors.append({
-                "code": "INVALID_DECISION_VALUE",
-                "detail": f"decision={decision_val!r} not in {sorted(ALLOWED_DECISIONS)}",
-                "reviewItemId": item_id,
-            })
-            blocked += 1
-            continue
-
-        if item_id in seen_item_ids:
-            result.errors.append({
-                "code": "DUPLICATE_DECISION",
-                "detail": f"duplicate reviewItemId={item_id!r}",
-                "reviewItemId": item_id,
-            })
-            blocked += 1
-            continue
-        seen_item_ids.add(item_id)
-
-        item = items_by_id.get(item_id)
-        if item is None:
-            result.errors.append({
-                "code": "REVIEW_ITEM_NOT_FOUND",
-                "detail": f"reviewItemId={item_id!r} not in review_items",
-                "reviewItemId": item_id,
-            })
-            blocked += 1
-            continue
-
-        allowed_actions = item.get("allowedActions") or item.get("allowedDecisions") or []
-        if decision_val not in allowed_actions:
-            result.errors.append({
-                "code": "DECISION_NOT_ALLOWED_FOR_ITEM",
-                "detail": (f"decision={decision_val!r} not in allowedActions={allowed_actions}"),
-                "reviewItemId": item_id,
-            })
-            blocked += 1
-            continue
-
-        if decision_val == DECISION_EDIT_VALUE:
-            edited = d.get("editedValue")
-            if edited is None or (isinstance(edited, str) and not edited.strip()):
-                result.errors.append({
-                    "code": "EDIT_VALUE_REQUIRES_VALUE",
-                    "detail": "editedValue must be non-empty for EDIT_VALUE",
-                    "reviewItemId": item_id,
-                })
-                blocked += 1
-                continue
-
-        if decision_val == DECISION_REQUEST_MATERIAL:
-            # 해당 item의 requirementId에 missing material request가 있어야 함
-            req_id = item.get("requirementId")
-            if req_id not in items_with_missing:
-                result.errors.append({
-                    "code": "REQUEST_MATERIAL_NOT_AVAILABLE",
-                    "detail": (
-                        f"REQUEST_MATERIAL for reviewItemId={item_id!r} "
-                        "but no missing material request"
-                    ),
-                    "reviewItemId": item_id,
-                })
-                blocked += 1
-                continue
-
-        # APPROVE on HIGH risk → warning만 (차단 X)
-        if decision_val == DECISION_APPROVE and item.get("riskLevel") == RISK_HIGH:
-            result.warnings.append({
-                "code": "APPROVE_ON_HIGH_RISK",
-                "detail": f"reviewItemId={item_id!r} is HIGH risk",
-                "reviewItemId": item_id,
-            })
-
-        # naming guard: 어떤 경우에도 setCellParagraphText 등 금지명을
-        # decision에 포함시키면 안 됨 (사실 decision은 op_type이 아니지만 방어선)
-        for k in ("editedValueOperationType",):  # 미래 확장 대비
-            if d.get(k) in FORBIDDEN_PARAGRAPH_OP_NAMES:
-                result.errors.append({
-                    "code": "FORBIDDEN_OPERATION_NAME",
-                    "detail": (
-                        f"{k}={d.get(k)!r} is forbidden; use {OFFICIAL_PARAGRAPH_FULL_REPLACE_OP}"
-                    ),
-                    "reviewItemId": item_id,
-                })
-                blocked += 1
-                break
-        else:
+        errors, warnings, is_accepted = _validate_one_decision(
+            d, idx, items_by_id, items_with_missing, seen_item_ids
+        )
+        result.errors.extend(errors)
+        result.warnings.extend(warnings)
+        if is_accepted:
             accepted += 1
-            continue
+        else:
+            blocked += 1
 
     result.acceptedDecisionCount = accepted
     result.blockedDecisionCount = blocked
