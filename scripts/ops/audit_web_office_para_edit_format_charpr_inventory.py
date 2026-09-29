@@ -24,7 +24,7 @@ INVENTORY_PY = (PR / "scripts/hwpx/web_office/charpr_inventory.py")
 # 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정.
 # 셀 텍스트 손실·중첩 표 중복 수리 준공 후 재갱신 (b9782a5 → 3f94c2a) —
 # hp:t 인라인 tail 유실 + 중첩 표 내용 중복 제거. 정당 변경 확인 후 재고정.
-BASELINE_COMMIT = "5b33ccd"  # hp:ctrl 텍스트유출 수리 준공 후 갱신 (cbe8cce → 5b33ccd)
+BASELINE_COMMIT = "84f6345"  # hp:ctrl 텍스트유출 수리 준공 후 갱신 (5b33ccd → 84f6345)
 
 REQUIRED_INVENTORY_PATTERNS = [
     r"def\s+paragraph_char_pr_inventory\(",

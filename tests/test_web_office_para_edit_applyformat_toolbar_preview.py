@@ -24,7 +24,7 @@ from scripts.hwpx.web_office.render_payload import build_render_payload  # ruff:
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 PREVIEW_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatPreview.tsx"
-BASELINE_COMMIT = "9d201a3"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (b992ad6 → 9d201a3)
+BASELINE_COMMIT = "84f6345"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (9d201a3 → 84f6345)
 
 
 def _sha(p: Path) -> str:

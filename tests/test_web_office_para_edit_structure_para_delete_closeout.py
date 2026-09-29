@@ -14,7 +14,7 @@ from pathlib import Path
 PR = Path(__file__).parents[1]
 
 CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_structure_para_delete_closeout.md"
-BASELINE_COMMIT = "9d201a3"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (f119308 → 9d201a3)
+BASELINE_COMMIT = "84f6345"  # paragraph_writer_adapter.py ET 미정의 참조 수정 준공 후 갱신 (9d201a3 → 84f6345)
 FEATURE_COMMIT = "1f442ec"
 
 LOCKED_VS_BASELINE = [

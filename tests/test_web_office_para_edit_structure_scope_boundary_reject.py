@@ -13,7 +13,7 @@ from pathlib import Path
 
 PR = Path(__file__).parents[1]
 
-BASELINE_COMMIT = "334d665"  # M2 문단서식 준공 후 갱신 (334d665 → 334d665)
+BASELINE_COMMIT = "84f6345"  # M2 문단서식 준공 후 갱신 (334d665 → 84f6345)
 
 SCOPE_REASON_CONSTANTS = [
     "REASON_HEADER_SCOPE_NOT_SUPPORTED",

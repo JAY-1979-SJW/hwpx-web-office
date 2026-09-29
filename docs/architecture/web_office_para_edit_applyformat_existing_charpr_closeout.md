@@ -233,3 +233,5 @@ PARA-EDIT 동 · ApplyFormat (existing charPr 전용)
 > **baseline 갱신**: 5b33ccd (hp:ctrl 텍스트유출 수리, 2026-08-05) — folder-37(교육사이트) site-docs 미리보기에서 자재검수요청서.hwpx 열람 시 hp:fieldBegin 필드명령 문자열·hp:shapeComment(이미지 대체텍스트)가 본문 텍스트로 새는 게 발견돼, ro_view_importer.py 의 _inline_text_content() 에 hp:tbl 과 같은 방식으로 hp:ctrl 스킵을 추가. 기능 회귀 0건(ro_view/inline_text 관련 테스트 전부 통과), 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
 
 > **baseline 갱신**: 9d201a3 (paragraph_writer_adapter.py ET 미정의 참조 수정, 2026-09-29) — audit-kit run(ruff F821)으로 발견: 모듈 최상단에 xml.etree.ElementTree import 가 없어 함수 시그니처(ET.Element)가 미정의 이름을 참조했다(지연평가 어노테이션이라 당장 크래시는 없었음). 상단에 import 추가, 가려져 있던 중복 지역 import 2곳 제거. 동작 변경 없음, 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+> **baseline 갱신**: 84f6345 (웹뷰어 JS/HTML 코드 품질검사 도구 신설, 2026-09-29) — ESLint(flat config)+html-validate 최초 도입 중 para_edit_apply_format_smoke.mjs/para_edit_runtime.mjs/para_edit_state.mjs/para_edit_structure_smoke.mjs 에서 안 쓰는 import/변수 제거(동작 변경 없음, node 자체 테스트 전부 재통과 확인). 잠금 파일 정당 변경 확인 후 베이스라인 갱신.

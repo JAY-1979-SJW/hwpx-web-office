@@ -12,7 +12,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-BASELINE_COMMIT = "66f5870"
+BASELINE_COMMIT = "84f6345"  # 웹뷰어 JS/HTML 품질수정(ESLint/html-validate) 준공 후 갱신 (66f5870 → 84f6345)
 
 REQUIRED_FILES = [
     "frontend/web_office_viewer/para_edit_command.mjs",

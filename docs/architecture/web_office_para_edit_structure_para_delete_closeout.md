@@ -136,3 +136,5 @@
 - 2026-07-24: baseline → `f119308` (lineseg 추정 보정 로그 + 페이지 초과 가드 준공)
 
 > **baseline 갱신**: 9d201a3 (paragraph_writer_adapter.py ET 미정의 참조 수정, 2026-09-29) — audit-kit run(ruff F821)으로 발견: 모듈 최상단에 xml.etree.ElementTree import 가 없어 함수 시그니처(ET.Element)가 미정의 이름을 참조했다(지연평가 어노테이션이라 당장 크래시는 없었음). 상단에 import 추가, 가려져 있던 중복 지역 import 2곳 제거. 동작 변경 없음, 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
+
+> **baseline 갱신**: 84f6345 (웹뷰어 JS/HTML 코드 품질검사 도구 신설, 2026-09-29) — ESLint(flat config)+html-validate 최초 도입 중 para_edit_apply_format_smoke.mjs/para_edit_runtime.mjs/para_edit_state.mjs/para_edit_structure_smoke.mjs 에서 안 쓰는 import/변수 제거(동작 변경 없음, node 자체 테스트 전부 재통과 확인). 잠금 파일 정당 변경 확인 후 베이스라인 갱신.
