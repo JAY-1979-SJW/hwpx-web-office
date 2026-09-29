@@ -1,0 +1,9 @@
+[tool.audit-kit]
+# "scripts.hwpx" 만 지정해도, audit-kit 의 스코프 판정이 패키지 경로의
+# 최상위 세그먼트("scripts")만 보고 role 을 정하기 때문에 실제로는
+# scripts/ 전체(ops, local, hooks, hwp-worker, 최상위 스크립트 포함)가
+# "제품 코드"로 분류된다. 파일 자체는 전부 검사되므로 findings 누락은
+# 없지만 건강도 점수·역할 라벨은 부정확할 수 있다(2026-09-29 확인,
+# audit-kit 쪽 개선 필요 — src/audit_kit/scope.py discover() 의
+# prod_tops 계산이 parts[0] 만 보는 게 원인).
+packages = ["scripts.hwpx"]
