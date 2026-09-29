@@ -68,7 +68,9 @@ def _sandbox_result(written: int = 2, readback_fail: int = 0, source_mutated: bo
         "sourceMutated": source_mutated,
         "outputHash": "abc123def456",
         "outputPathMasked": "masked_id_001",
-        "writtenFields": [{"fieldKey": f"f{i}", "valueHash": f"hash{i:016x}"} for i in range(written)],
+        "writtenFields": [
+            {"fieldKey": f"f{i}", "valueHash": f"hash{i:016x}"} for i in range(written)
+        ],
         "blockedFields": [],
         "warnings": [],
         "summary": {
@@ -93,7 +95,9 @@ def _hardening_result(
         "fieldResults": [
             {
                 "fieldKey": "f0",
-                "readbackStatus": "READBACK_PASS" if readback_fail == 0 else "READBACK_FAIL_VALUE_MISMATCH",
+                "readbackStatus": "READBACK_PASS"
+                if readback_fail == 0
+                else "READBACK_FAIL_VALUE_MISMATCH",
                 "expectedValueHash": "hash000000000000",
             }
         ],
@@ -112,6 +116,7 @@ def _hardening_result(
 # T01 – import
 # ---------------------------------------------------------------------------
 
+
 def test_T01_import():
     assert hasattr(uc, "build_ui_connect_payload")
     assert hasattr(uc, "build_sandbox_write_request")
@@ -123,6 +128,7 @@ def test_T01_import():
 # T02 – READY_FOR_WRITER → button enabled true
 # ---------------------------------------------------------------------------
 
+
 def test_T02_ready_enables_button():
     payload = uc.build_ui_connect_payload(_approval_ready())
     assert payload["approvalStatus"] == uc.STATUS_READY
@@ -132,6 +138,7 @@ def test_T02_ready_enables_button():
 # ---------------------------------------------------------------------------
 # T03 – BLOCKED_NEEDS_REVIEW → button disabled
 # ---------------------------------------------------------------------------
+
 
 def test_T03_blocked_needs_review_disables_button():
     ap = _approval_ready()
@@ -145,6 +152,7 @@ def test_T03_blocked_needs_review_disables_button():
 # T04 – BLOCKED_MISSING_REQUIRED → button disabled
 # ---------------------------------------------------------------------------
 
+
 def test_T04_blocked_missing_required_disables_button():
     ap = _approval_ready()
     ap["summary"]["missingRequired"] = 1
@@ -157,6 +165,7 @@ def test_T04_blocked_missing_required_disables_button():
 # T05 – attachmentsMissing > 0 → button disabled
 # ---------------------------------------------------------------------------
 
+
 def test_T05_attachment_missing_disables_button():
     ap = _approval_blocked("ATTACHMENT")
     payload = uc.build_ui_connect_payload(ap)
@@ -166,6 +175,7 @@ def test_T05_attachment_missing_disables_button():
 # ---------------------------------------------------------------------------
 # T06 – writerEligible=false → button disabled (no eligible fields)
 # ---------------------------------------------------------------------------
+
 
 def test_T06_writer_eligible_false_disables_button():
     ap = _approval_ready()
@@ -181,6 +191,7 @@ def test_T06_writer_eligible_false_disables_button():
 # T07 – approvedFields 0개 → button disabled
 # ---------------------------------------------------------------------------
 
+
 def test_T07_zero_approved_disables_button():
     ap = _approval_ready(0)
     payload = uc.build_ui_connect_payload(ap)
@@ -191,6 +202,7 @@ def test_T07_zero_approved_disables_button():
 # T08 – button mode is SANDBOX_ONLY
 # ---------------------------------------------------------------------------
 
+
 def test_T08_button_mode_sandbox_only():
     payload = uc.build_ui_connect_payload(_approval_ready())
     assert payload["button"]["mode"] == "SANDBOX_ONLY"
@@ -200,6 +212,7 @@ def test_T08_button_mode_sandbox_only():
 # T09 – sourceMutationAllowed false
 # ---------------------------------------------------------------------------
 
+
 def test_T09_source_mutation_allowed_false():
     payload = uc.build_ui_connect_payload(_approval_ready())
     assert payload["security"]["sourceMutationAllowed"] is False
@@ -208,6 +221,7 @@ def test_T09_source_mutation_allowed_false():
 # ---------------------------------------------------------------------------
 # T10 – raw path UI 노출 없음
 # ---------------------------------------------------------------------------
+
 
 def test_T10_no_raw_path_in_payload(tmp_path):
     template = tmp_path / "form.hwpx"
@@ -224,6 +238,7 @@ def test_T10_no_raw_path_in_payload(tmp_path):
 # T11 – raw filename UI 노출 없음
 # ---------------------------------------------------------------------------
 
+
 def test_T11_no_raw_filename_in_payload(tmp_path):
     template = tmp_path / "소방완공검사신청서_2024.hwpx"
     template.write_bytes(b"PK\x03\x04")
@@ -237,6 +252,7 @@ def test_T11_no_raw_filename_in_payload(tmp_path):
 # T12 – PII pattern UI 노출 없음
 # ---------------------------------------------------------------------------
 
+
 def test_T12_no_pii_in_result_payload():
     sandbox = _sandbox_result()
     sandbox["writtenFields"][0]["value"] = "870101-1234567"  # PII raw
@@ -248,6 +264,7 @@ def test_T12_no_pii_in_result_payload():
 # ---------------------------------------------------------------------------
 # T13 – sandbox writer request payload 생성 가능
 # ---------------------------------------------------------------------------
+
 
 def test_T13_sandbox_write_request_generated(tmp_path):
     template = tmp_path / "t.hwpx"
@@ -264,6 +281,7 @@ def test_T13_sandbox_write_request_generated(tmp_path):
 # T14 – output_path == source_path 요청 생성 금지
 # ---------------------------------------------------------------------------
 
+
 def test_T14_output_equals_source_rejected(tmp_path):
     template = tmp_path / "t.hwpx"
     template.write_bytes(b"PK\x03\x04")
@@ -276,6 +294,7 @@ def test_T14_output_equals_source_rejected(tmp_path):
 # T15 – writer result SUCCESS payload 생성 가능
 # ---------------------------------------------------------------------------
 
+
 def test_T15_result_success_payload():
     result = uc.build_ui_result_payload(_sandbox_result(written=3, readback_fail=0))
     assert result["writerStatus"] == uc.WRITER_SUCCESS
@@ -287,6 +306,7 @@ def test_T15_result_success_payload():
 # ---------------------------------------------------------------------------
 # T16 – readbackFail > 0 → FAILED_READBACK
 # ---------------------------------------------------------------------------
+
 
 def test_T16_readback_fail_shows_failure():
     result = uc.build_ui_result_payload(
@@ -301,6 +321,7 @@ def test_T16_readback_fail_shows_failure():
 # T17 – sourceMutated true → FAILED_SOURCE_MUTATED
 # ---------------------------------------------------------------------------
 
+
 def test_T17_source_mutated_shows_failure():
     result = uc.build_ui_result_payload(
         _sandbox_result(source_mutated=True),
@@ -314,6 +335,7 @@ def test_T17_source_mutated_shows_failure():
 # T18 – output broken → FAILED_OUTPUT_BROKEN
 # ---------------------------------------------------------------------------
 
+
 def test_T18_output_broken_shows_failure():
     result = uc.build_ui_result_payload(
         _sandbox_result(),
@@ -325,6 +347,7 @@ def test_T18_output_broken_shows_failure():
 # ---------------------------------------------------------------------------
 # T19 – 원본 HWPX 직접 수정 없음 (sourceMutationAllowed always False)
 # ---------------------------------------------------------------------------
+
 
 def test_T19_source_mutation_never_allowed():
     for ap in [_approval_ready(), _approval_blocked("HOLD")]:
@@ -338,8 +361,10 @@ def test_T19_source_mutation_never_allowed():
 # T20 – AI API 호출 없음
 # ---------------------------------------------------------------------------
 
+
 def test_T20_no_ai_api():
     import inspect
+
     src = inspect.getsource(uc)
     for kw in ("openai", "anthropic", "ChatCompletion", "claude", "gemini", "llm"):
         assert kw not in src.lower() or kw == "claude"  # module path 제외
@@ -347,21 +372,43 @@ def test_T20_no_ai_api():
 
 def test_T20b_no_ai_import():
     import importlib
+
     spec = importlib.util.find_spec("scripts.hwpx.pipeline.form_writer_ui_connect")
     assert spec is not None
     # 직접 source 확인으로 대체
     import inspect
+
     src = inspect.getsource(uc)
     assert "openai" not in src
     assert "anthropic" not in src
 
 
 # ---------------------------------------------------------------------------
+# T26 – writerEnabled=True (approval gate invariant 위반) → 버튼 비활성화
+#
+# audit-kit run(F821)으로 발견: writerEnabled=True 분기가
+# `STATUS_BLOCKED_NOT_READY`라는 미정의 이름을 참조해 NameError로 죽던
+# 회귀. 이 분기가 그동안 어떤 테스트로도 실행된 적이 없어 발견이 늦었다.
+# ---------------------------------------------------------------------------
+
+
+def test_T26_writer_enabled_true_invariant_violation_disables_button():
+    ap = _approval_ready()
+    ap["writerEnabled"] = True
+    payload = uc.build_ui_connect_payload(ap)
+    assert payload["approvalStatus"] == uc.STATUS_BLOCKED_NOT_READY
+    assert payload["button"]["enabled"] is False
+    assert uc.STATUS_BLOCKED_NOT_READY in payload["button"]["disabledReason"]
+
+
+# ---------------------------------------------------------------------------
 # T21 – OCR 호출 없음
 # ---------------------------------------------------------------------------
 
+
 def test_T21_no_ocr():
     import inspect
+
     src = inspect.getsource(uc)
     for kw in ("pytesseract", "easyocr", "paddle", "cv2.OCR", "ocr_"):
         assert kw not in src.lower()
@@ -371,8 +418,10 @@ def test_T21_no_ocr():
 # T22 – Hancom 필수 의존 없음
 # ---------------------------------------------------------------------------
 
+
 def test_T22_no_hancom_required():
     import inspect
+
     src = inspect.getsource(uc)
     for kw in ("hwp5", "pyhwp", "HwpCtrl", "hancom"):
         assert kw not in src.lower()
@@ -382,11 +431,17 @@ def test_T22_no_hancom_required():
 # T23 – 기존 readback hardening 테스트 유지
 # ---------------------------------------------------------------------------
 
+
 def test_T23_readback_hardening_tests_pass():
-    import subprocess, sys
+    import subprocess
+    import sys
+
     r = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/test_hwpx_form_writer_readback_hardening.py", "-q"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -396,11 +451,17 @@ def test_T23_readback_hardening_tests_pass():
 # T24 – 기존 sandbox writer 테스트 유지
 # ---------------------------------------------------------------------------
 
+
 def test_T24_sandbox_writer_tests_pass():
-    import subprocess, sys
+    import subprocess
+    import sys
+
     r = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/test_hwpx_form_auto_fill_writer_sandbox.py", "-q"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -410,15 +471,25 @@ def test_T24_sandbox_writer_tests_pass():
 # T25 – 기존 approval/review/mapping/parser 테스트 유지
 # ---------------------------------------------------------------------------
 
+
 def test_T25_upstream_tests_pass():
-    import subprocess, sys
+    import subprocess
+    import sys
+
     r = subprocess.run(
-        [sys.executable, "-m", "pytest",
-         "tests/test_hwpx_approval_gate.py",
-         "tests/test_hwpx_review_panel.py",
-         "tests/test_hwpx_form_field_mapping.py",
-         "-q"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/test_hwpx_approval_gate.py",
+            "tests/test_hwpx_review_panel.py",
+            "tests/test_hwpx_form_field_mapping.py",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr

@@ -27,6 +27,7 @@ STATUS_BLOCKED_MISSING = "BLOCKED_MISSING_REQUIRED"
 STATUS_BLOCKED_ATTACHMENT = "BLOCKED_ATTACHMENT_MISSING"
 STATUS_HOLD = "HOLD_BY_USER"
 STATUS_BLOCKED_NO_FIELDS = "BLOCKED_NO_ELIGIBLE_FIELDS"
+STATUS_BLOCKED_NOT_READY = "BLOCKED_NOT_READY"
 
 # Writer result statuses
 WRITER_SUCCESS = "SUCCESS"
@@ -58,6 +59,7 @@ def _val_hash(value: str) -> str:
 # Approval status derivation
 # ---------------------------------------------------------------------------
 
+
 def _derive_approval_status(approval_dict: dict) -> str:
     """ApprovalResult dict에서 버튼 활성화 가능 상태를 계산한다."""
     summary = approval_dict.get("summary", {})
@@ -66,8 +68,8 @@ def _derive_approval_status(approval_dict: dict) -> str:
 
     # writerEnabled must be False (invariant from approval gate)
     # writer_enabled 필드 자체가 없거나 False여야 한다
-    if approval_dict.get("writerEnabled", False):
-        return STATUS_BLOCKED_NOT_READY if False else STATUS_BLOCKED_NOT_READY
+    if approval_dict.get("writerEnabled"):
+        return STATUS_BLOCKED_NOT_READY
 
     approved_count = len(approved)
     if approved_count == 0:
@@ -96,6 +98,7 @@ def _derive_approval_status(approval_dict: dict) -> str:
 # Button state
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ButtonState:
     label: str = "승인 후 작성"
@@ -119,6 +122,7 @@ def compute_button_state(approval_dict: dict) -> ButtonState:
 # ---------------------------------------------------------------------------
 # UI connect payload
 # ---------------------------------------------------------------------------
+
 
 def build_ui_connect_payload(
     approval_dict: dict,
@@ -173,6 +177,7 @@ def build_ui_connect_payload(
 # Sandbox write request (actual pipeline call)
 # ---------------------------------------------------------------------------
 
+
 def build_sandbox_write_request(
     approval_dict: dict,
     template_path: Path,
@@ -221,6 +226,7 @@ def build_sandbox_write_request(
 # Writer result → UI result payload
 # ---------------------------------------------------------------------------
 
+
 def build_ui_result_payload(
     sandbox_result_dict: dict,
     hardening_result_dict: dict | None = None,
@@ -247,7 +253,9 @@ def build_ui_result_payload(
     if source_mutated:
         writer_status = WRITER_FAILED_MUTATED
     elif overall_verdict in ("FAIL_OUTPUT_HWPX_BROKEN", "FAIL_READBACK_MISMATCH"):
-        writer_status = WRITER_FAILED_BROKEN if "BROKEN" in overall_verdict else WRITER_FAILED_READBACK
+        writer_status = (
+            WRITER_FAILED_BROKEN if "BROKEN" in overall_verdict else WRITER_FAILED_READBACK
+        )
     elif readback_fail > 0:
         writer_status = WRITER_FAILED_READBACK
     else:
@@ -259,7 +267,8 @@ def build_ui_result_payload(
 
     # field results — strip raw values, keep only hashes and statuses
     raw_field_results = (
-        hardening_result_dict.get("fieldResults", []) if hardening_result_dict
+        hardening_result_dict.get("fieldResults", [])
+        if hardening_result_dict
         else sandbox_result_dict.get("writtenFields", [])
     )
     field_results_ui = [
