@@ -299,25 +299,11 @@ def _decide_verify7(
 # ── 통합 demo ──────────────────────────────────────────────────────
 
 
-def run_full_integration(source_hwpx: Path, sandbox_dir: Path) -> dict:
-    from hwpx_chart_png import generate_bar_chart_png
-    from hwpx_header_footer_ops import apply_page_numbering
-    from hwpx_image_ops import add_content_manifest_item
-    from hwpx_metadata_ops import apply_document_metadata
-    from hwpx_package import HwpxPackage
-    from hwpx_visible_image_ops import insert_generated_png_picture
-    from scripts.hwpx import hwpx_edit_tool as edit_tool
-    from scripts.hwpx.ai_proposal import target_resolver as tr
-    from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
-
-    sandbox_dir.mkdir(parents=True, exist_ok=True)
-    out_path = sandbox_dir / f"{source_hwpx.stem}__full_inline.hwpx"
-    stamp_png = sandbox_dir / "stamp.png"
-    chart_png = sandbox_dir / "chart.png"
-    stamp_png.write_bytes(bytes.fromhex(_SAMPLE_PNG_HEX.replace(" ", "")))
-
-    # ──① 본문 라벨 입력 ─────────────────────────────
-    parser_result = parse_hwpx_v2(source_hwpx)
+def _run_label_input_domain(
+    source_hwpx: Path, out_path: Path, parser_result, tr, edit_tool
+) -> dict:
+    """①본문 라벨 입력. apply_text_result/set_cells/applied_cells/rejected_cells/
+    proposals_count 를 dict 로 묶어 반환(호출부 재사용 목적)."""
     tid_to_idx = {tbl.tableId: i for i, tbl in enumerate(parser_result.tables)}
     set_cells = []
     seen_keys = set()
@@ -359,6 +345,65 @@ def run_full_integration(source_hwpx: Path, sandbox_dir: Path) -> dict:
     else:
         shutil.copy2(source_hwpx, out_path)
     apply_text_result = _summarize_apply_text(set_cells, applied_cells, rejected_cells)
+
+    return {
+        "apply_text_result": apply_text_result,
+        "set_cells": set_cells,
+        "applied_cells": applied_cells,
+        "rejected_cells": rejected_cells,
+        "proposals_count": proposals_count,
+    }
+
+
+def _run_domain_byte_checks(
+    out_path: Path, hf_spec: dict, stamp_entry: str, meta_spec: dict, chart_entry: str
+) -> dict:
+    """도메인별 byte-grep 검증(V10/V11/V12/V14)."""
+    domain_checks: dict = {}
+    try:
+        blob = ""
+        with zipfile.ZipFile(str(out_path)) as z:
+            names = z.namelist()
+            for n in names:
+                if n.endswith(".xml") or n.endswith(".hpf"):
+                    blob += z.read(n).decode("utf-8", "ignore")
+        domain_checks["V10_header"] = hf_spec["header_text"] in blob
+        domain_checks["V11_stamp_entry"] = stamp_entry in names
+        domain_checks["V11_stamp_hpf"] = stamp_entry in blob
+        domain_checks["V12_meta_title"] = meta_spec["title"] in blob
+        domain_checks["V12_meta_creator"] = meta_spec["creator"] in blob
+        domain_checks["V14_chart_entry"] = chart_entry in names
+        domain_checks["V14_chart_hpf"] = chart_entry in blob
+    except Exception as e:  # ruff: ignore[blind-except] (검증 스크립트 — 실패해도 err 기록 후 계속)
+        domain_checks["err"] = str(e)[:100]
+    return domain_checks
+
+
+def run_full_integration(source_hwpx: Path, sandbox_dir: Path) -> dict:
+    from hwpx_chart_png import generate_bar_chart_png
+    from hwpx_header_footer_ops import apply_page_numbering
+    from hwpx_image_ops import add_content_manifest_item
+    from hwpx_metadata_ops import apply_document_metadata
+    from hwpx_package import HwpxPackage
+    from hwpx_visible_image_ops import insert_generated_png_picture
+    from scripts.hwpx import hwpx_edit_tool as edit_tool
+    from scripts.hwpx.ai_proposal import target_resolver as tr
+    from scripts.hwpx.parser.parser_engine import parse_hwpx_v2
+
+    sandbox_dir.mkdir(parents=True, exist_ok=True)
+    out_path = sandbox_dir / f"{source_hwpx.stem}__full_inline.hwpx"
+    stamp_png = sandbox_dir / "stamp.png"
+    chart_png = sandbox_dir / "chart.png"
+    stamp_png.write_bytes(bytes.fromhex(_SAMPLE_PNG_HEX.replace(" ", "")))
+
+    # ──① 본문 라벨 입력 ─────────────────────────────
+    parser_result = parse_hwpx_v2(source_hwpx)
+    domain1 = _run_label_input_domain(source_hwpx, out_path, parser_result, tr, edit_tool)
+    set_cells = domain1["set_cells"]
+    applied_cells = domain1["applied_cells"]
+    rejected_cells = domain1["rejected_cells"]
+    apply_text_result = domain1["apply_text_result"]
+    proposals_count = domain1["proposals_count"]
 
     # ──② 헤더·푸터 ─────────────────────────────────
     package = HwpxPackage(out_path)
@@ -402,24 +447,7 @@ def run_full_integration(source_hwpx: Path, sandbox_dir: Path) -> dict:
 
     verify7 = _decide_verify7(applied_cells, source_hwpx, out_path, verify_one)
 
-    # 도메인별 byte-grep 검증
-    domain_checks = {}
-    try:
-        blob = ""
-        with zipfile.ZipFile(str(out_path)) as z:
-            names = z.namelist()
-            for n in names:
-                if n.endswith(".xml") or n.endswith(".hpf"):
-                    blob += z.read(n).decode("utf-8", "ignore")
-        domain_checks["V10_header"] = hf_spec["header_text"] in blob
-        domain_checks["V11_stamp_entry"] = stamp_entry in names
-        domain_checks["V11_stamp_hpf"] = stamp_entry in blob
-        domain_checks["V12_meta_title"] = meta_spec["title"] in blob
-        domain_checks["V12_meta_creator"] = meta_spec["creator"] in blob
-        domain_checks["V14_chart_entry"] = chart_entry in names
-        domain_checks["V14_chart_hpf"] = chart_entry in blob
-    except Exception as e:  # ruff: ignore[blind-except] (검증 스크립트 — 실패해도 err 기록 후 계속)
-        domain_checks["err"] = str(e)[:100]
+    domain_checks = _run_domain_byte_checks(out_path, hf_spec, stamp_entry, meta_spec, chart_entry)
 
     return {
         "src": str(source_hwpx),
