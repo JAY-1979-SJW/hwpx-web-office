@@ -9,6 +9,7 @@ inventory.json + 실제 HWPX 파싱 → corpus.sqlite3 ingest:
 원본 sha256/mtime 무변경 / writer 미호출 / output HWPX 미생성 /
 secret 출력 없음 / production module DB import 없음.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -16,13 +17,14 @@ import json
 import sqlite3
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.hwpx.recognition_corpus import corpus_schema as cs   # noqa: E402
+from scripts.hwpx.recognition_corpus import corpus_schema as cs  # ruff: ignore[module-import-not-at-top-of-file]
 
 INVENTORY_PATH = PROJECT_ROOT / "reports/collected_hwpx_inventory_audit/inventory.json"
 DB_PATH = PROJECT_ROOT / "data/recognition_corpus/corpus.sqlite3"
@@ -51,7 +53,7 @@ def _classify_doc_type_by_filename(rel_path: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _file_sha256(path: Path) -> str:
@@ -69,6 +71,7 @@ def _production_label_dictionary() -> dict:
     (production module이 corpus DB를 import하는 것만 금지)
     """
     from scripts.hwpx.fill_review.fill_review_contract import _LABEL_TO_SEMANTIC
+
     return dict(_LABEL_TO_SEMANTIC)
 
 
@@ -93,6 +96,7 @@ def _extract_label_candidates(parser_result):
             from scripts.hwpx.fill_review.fill_review_contract import (
                 _normalize_label,
             )
+
             norm = _normalize_label(text)
             if not norm:
                 continue
@@ -109,23 +113,28 @@ def _extract_label_candidates(parser_result):
     return out
 
 
-def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
-                  now_iso: str) -> dict:
+def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine, now_iso: str) -> dict:
     """단일 파일을 DB에 ingest. return summary dict."""
     rel = item["sourcePath"]
     path = PROJECT_ROOT / rel
-    res = {"sourcePath": rel, "document_id": item["sha256"],
-            "ingest_status": "OK", "label_occurrence_count": 0,
-            "documentType": "unknown",
-            "sha256Before": item["sha256"], "sha256After": "",
-            "mtimeBefore": item["mtime"], "mtimeAfter": -1,
-            "errors": []}
+    res = {
+        "sourcePath": rel,
+        "document_id": item["sha256"],
+        "ingest_status": "OK",
+        "label_occurrence_count": 0,
+        "documentType": "unknown",
+        "sha256Before": item["sha256"],
+        "sha256After": "",
+        "mtimeBefore": item["mtime"],
+        "mtimeAfter": -1,
+        "errors": [],
+    }
 
     # source mutation check (재해시)
     try:
         sha_after = _file_sha256(path)
         mt_after = path.stat().st_mtime
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
         res["ingest_status"] = "FAIL_SOURCE_READ"
         res["errors"].append(str(exc))
         return res
@@ -143,14 +152,23 @@ def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
         " detected_type, inventory_status, sha256, first_seen_at, "
         " last_audited_at, notes) "
         "VALUES (?, ?, ?, ?, ?, 'hwpx', 'FOUND', ?, ?, ?, ?)",
-        (item["sha256"], rel, item["sourceKind"], item["fileSize"],
-          item["mtime"], item["sha256"], now_iso, now_iso, ""),
+        (
+            item["sha256"],
+            rel,
+            item["sourceKind"],
+            item["fileSize"],
+            item["mtime"],
+            item["sha256"],
+            now_iso,
+            now_iso,
+            "",
+        ),
     )
 
     # 2) parse
     try:
         r = parser_engine.parse_hwpx_v2(path)
-    except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
         res["ingest_status"] = "FAIL_PARSE"
         res["errors"].append(str(exc)[:200])
         return res
@@ -163,10 +181,14 @@ def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
         "(document_id, classifier_version, document_type, confidence, "
         " evidence_json, classified_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
-        (item["sha256"], CLASSIFIER_VERSION, doc_type,
-          0.7 if doc_type != "unknown" else 0.3,
-          json.dumps({"basis": "filename_pattern"}),
-          now_iso),
+        (
+            item["sha256"],
+            CLASSIFIER_VERSION,
+            doc_type,
+            0.7 if doc_type != "unknown" else 0.3,
+            json.dumps({"basis": "filename_pattern"}),
+            now_iso,
+        ),
     )
 
     # 4) label occurrences (기존 label_occurrences는 ingest 단위로 추가; 동일 doc_id
@@ -183,19 +205,30 @@ def _ingest_one(conn: sqlite3.Connection, item: dict, parser_engine,
             " neighbor_text, right_neighbor_empty, row_index, cell_index, "
             " audited_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [(item["sha256"], c["table_id"], c["cell_key"], c["label_text"],
-                c["normalized_label"], c["neighbor_text"],
-                c["right_neighbor_empty"], c["row_index"], c["cell_index"],
-                now_iso) for c in cands],
+            [
+                (
+                    item["sha256"],
+                    c["table_id"],
+                    c["cell_key"],
+                    c["label_text"],
+                    c["normalized_label"],
+                    c["neighbor_text"],
+                    c["right_neighbor_empty"],
+                    c["row_index"],
+                    c["cell_index"],
+                    now_iso,
+                )
+                for c in cands
+            ],
         )
         res["label_occurrence_count"] = len(cands)
 
     return res
 
 
-def _rebuild_promotion_candidates(conn: sqlite3.Connection,
-                                       production_dict: dict,
-                                       now_iso: str) -> int:
+def _rebuild_promotion_candidates(
+    conn: sqlite3.Connection, production_dict: dict, now_iso: str
+) -> int:
     """production 사전에 없는 고빈도 라벨을 PENDING promotion candidate로 등록.
 
     proposed_semantic은 UNKNOWN으로 둔다 (사람 검수 필요 — Gate 3 잠금).
@@ -218,8 +251,8 @@ def _rebuild_promotion_candidates(conn: sqlite3.Connection,
         # evidence_score: 발생빈도/문서수 정규화 (0~1)
         # 임시 점수: log-scale (단순)
         import math
-        score = min(1.0, math.log10(occ + 1) / 4.0
-                    + math.log10(docs + 1) / 4.0)
+
+        score = min(1.0, math.log10(occ + 1) / 4.0 + math.log10(docs + 1) / 4.0)
         score = round(score, 4)
         conn.execute(
             "INSERT INTO label_promotion_candidates "
@@ -227,25 +260,14 @@ def _rebuild_promotion_candidates(conn: sqlite3.Connection,
             " document_count, evidence_score, status, conflict_count, "
             " evidence_json) "
             "VALUES (?, ?, ?, ?, ?, 'PENDING', 0, ?)",
-            (label, "UNKNOWN", occ, docs, score,
-              json.dumps({"basis": "frequency"})),
+            (label, "UNKNOWN", occ, docs, score, json.dumps({"basis": "frequency"})),
         )
         inserted += 1
     return inserted
 
 
-def run_ingest(limit: int | None = None) -> dict:
-    """전체 inventory를 corpus DB로 ingest. limit 지정 시 첫 N개."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    if not INVENTORY_PATH.exists():
-        return {"overallVerdict": "FAIL_INVENTORY_MISSING",
-                  "detail": str(INVENTORY_PATH)}
-
-    inv = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
-    items = inv["items"]
-    # parseCandidate=True + unique sha256
+def _select_ingest_targets(items: list[dict], limit: int | None) -> list[dict]:
+    """parseCandidate=True + unique sha256만 남긴다. limit 지정 시 첫 N개."""
     seen: set[str] = set()
     targets: list[dict] = []
     for it in items:
@@ -258,134 +280,194 @@ def run_ingest(limit: int | None = None) -> dict:
         targets.append(it)
     if limit is not None and limit > 0:
         targets = targets[:limit]
+    return targets
+
+
+class _IngestRunResult(NamedTuple):
+    """_ingest_all_targets 결과 묶음(_build_ingest_summary 인자 개수 축소 목적).
+
+    NamedTuple 채택 이유: 이 모듈을 importlib.util.spec_from_file_location 로
+    sys.modules 등록 없이 동적 로드하는 테스트(test_hwpx_recognition_corpus_ingest_audit.py)가
+    있는데, `from __future__ import annotations` 조합에서 @dataclass 는 Python
+    3.14의 KW_ONLY 감지 로직이 `sys.modules[cls.__module__]` 조회에 실패해
+    AttributeError 로 깨진다(실측 확인). NamedTuple 은 이 조회 경로를 타지 않아
+    안전하다."""
+
+    ingested: list[dict]
+    failed: list[dict]
+    mutation_violations: list[dict]
+    now_iso: str
+    elapsed_seconds: float
+
+
+def _ingest_all_targets(
+    conn: sqlite3.Connection, targets: list[dict], parser_engine
+) -> _IngestRunResult:
+    """targets를 순회하며 ingest한 결과를 반환."""
+    now_iso = _now_iso()
+    started = time.time()
+    ingested: list[dict] = []
+    failed: list[dict] = []
+    mutation_violations: list[dict] = []
+    batch_count = 0
+    for i, item in enumerate(targets, 1):
+        try:
+            res = _ingest_one(conn, item, parser_engine, now_iso)
+        except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
+            res = {
+                "sourcePath": item["sourcePath"],
+                "document_id": item["sha256"],
+                "ingest_status": "FAIL_INGEST",
+                "errors": [str(exc)[:200]],
+                "label_occurrence_count": 0,
+                "documentType": "unknown",
+                "sha256Before": item["sha256"],
+                "sha256After": item["sha256"],
+                "mtimeBefore": item["mtime"],
+                "mtimeAfter": item["mtime"],
+            }
+        if res["ingest_status"] == "OK":
+            ingested.append(res)
+        elif res["ingest_status"] == "FAIL_UNSAFE_MUTATION":
+            mutation_violations.append(res)
+            failed.append(res)
+        else:
+            failed.append(res)
+        batch_count += 1
+        if batch_count >= 100:
+            conn.commit()
+            batch_count = 0
+        if i % 500 == 0:
+            print(f"  ... {i}/{len(targets)} ({time.time() - started:.0f}s)", flush=True)
+    conn.commit()
+    elapsed_ingest = time.time() - started
+    return _IngestRunResult(ingested, failed, mutation_violations, now_iso, elapsed_ingest)
+
+
+def _build_ingest_summary(
+    conn: sqlite3.Connection,
+    targets: list[dict],
+    run_result: _IngestRunResult,
+    promo_count: int,
+) -> dict:
+    ingested = run_result.ingested
+    failed = run_result.failed
+    mutation_violations = run_result.mutation_violations
+
+    doctype_counts: dict[str, int] = {}
+    for r in ingested:
+        doctype_counts[r["documentType"]] = doctype_counts.get(r["documentType"], 0) + 1
+    label_total = conn.execute("SELECT COUNT(*) FROM label_occurrences").fetchone()[0]
+    unique_norm = conn.execute(
+        "SELECT COUNT(DISTINCT normalized_label) FROM label_occurrences"
+    ).fetchone()[0]
+    top_labels = conn.execute(
+        "SELECT normalized_label, occurrence_count, document_count "
+        "  FROM labels_by_frequency LIMIT 50"
+    ).fetchall()
+
+    return {
+        "targetCount": len(targets),
+        "ingestedCount": len(ingested),
+        "failedCount": len(failed),
+        "unsafeMutationCount": len(mutation_violations),
+        "elapsedSeconds": round(run_result.elapsed_seconds, 1),
+        "labelOccurrenceTotal": label_total,
+        "uniqueNormalizedLabelCount": unique_norm,
+        "promotionCandidatePending": promo_count,
+        "documentTypeBreakdown": doctype_counts,
+        "topLabels": [{"label": r[0], "occurrence": r[1], "documents": r[2]} for r in top_labels],
+        "overallVerdict": (
+            "FAIL_UNSAFE_MUTATION"
+            if mutation_violations
+            else ("WARN_PARTIAL_INGEST" if failed else "PASS_CORPUS_INGEST")
+        ),
+        "auditedAt": run_result.now_iso,
+    }
+
+
+def _write_ingest_reports(
+    summary: dict, ingested: list[dict], failed: list[dict], mutation_violations: list[dict]
+) -> None:
+    (OUTPUT_DIR / "ingest_audit.json").write_text(
+        json.dumps(
+            {
+                "summary": summary,
+                "ingested": ingested[:200],  # 샘플만 저장
+                "failed": failed[:200],
+                "mutationViolations": mutation_violations,
+            },
+            ensure_ascii=False,
+            indent=2,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+
+    doctype_counts = summary["documentTypeBreakdown"]
+    md = [
+        "# HWPX-RECOGNITION-CORPUS-INGEST-AUDIT-01",
+        "",
+        "## Summary",
+        f"- targets: {summary['targetCount']}",
+        f"- ingested: {summary['ingestedCount']}",
+        f"- failed: {summary['failedCount']}",
+        f"- unsafeMutation: {summary['unsafeMutationCount']}",
+        f"- elapsed: {summary['elapsedSeconds']}s",
+        f"- label occurrences total: {summary['labelOccurrenceTotal']}",
+        f"- unique normalized labels: {summary['uniqueNormalizedLabelCount']}",
+        f"- promotion candidates (PENDING): {summary['promotionCandidatePending']}",
+        f"- overallVerdict: **{summary['overallVerdict']}**",
+        "",
+        "## Document type breakdown (filename_pattern_v1)",
+        "",
+        "| docType | count |",
+        "|---|---|",
+    ]
+    for dt, n in sorted(doctype_counts.items(), key=lambda x: -x[1]):
+        md.append(f"| {dt} | {n} |")
+    md.append("")
+    md.append("## Top 50 labels by frequency")
+    md.append("")
+    md.append("| # | normalized_label | occurrence | documents |")
+    md.append("|---|---|---|---|")
+    for i, t in enumerate(summary["topLabels"], 1):
+        md.append(f"| {i} | {t['label']} | {t['occurrence']} | {t['documents']} |")
+    (OUTPUT_DIR / "ingest_audit.md").write_text(
+        "\n".join(md),
+        encoding="utf-8",
+    )
+
+
+def run_ingest(limit: int | None = None) -> dict:
+    """전체 inventory를 corpus DB로 ingest. limit 지정 시 첫 N개."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if not INVENTORY_PATH.exists():
+        return {"overallVerdict": "FAIL_INVENTORY_MISSING", "detail": str(INVENTORY_PATH)}
+
+    inv = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    targets = _select_ingest_targets(inv["items"], limit)
 
     print(f"[ingest] target unique parseable: {len(targets)}", flush=True)
 
     # parser_engine 1회 import
     from scripts.hwpx.parser import parser_engine
+
     production_dict = _production_label_dictionary()
 
     conn = cs.open_corpus_db(DB_PATH)
     try:
-        now_iso = _now_iso()
-        started = time.time()
-        ingested: list[dict] = []
-        failed: list[dict] = []
-        mutation_violations: list[dict] = []
-        batch_count = 0
-        for i, item in enumerate(targets, 1):
-            try:
-                res = _ingest_one(conn, item, parser_engine, now_iso)
-            except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
-                res = {"sourcePath": item["sourcePath"],
-                         "document_id": item["sha256"],
-                         "ingest_status": "FAIL_INGEST",
-                         "errors": [str(exc)[:200]],
-                         "label_occurrence_count": 0,
-                         "documentType": "unknown",
-                         "sha256Before": item["sha256"],
-                         "sha256After": item["sha256"],
-                         "mtimeBefore": item["mtime"],
-                         "mtimeAfter": item["mtime"]}
-            if res["ingest_status"] == "OK":
-                ingested.append(res)
-            elif res["ingest_status"] == "FAIL_UNSAFE_MUTATION":
-                mutation_violations.append(res)
-                failed.append(res)
-            else:
-                failed.append(res)
-            batch_count += 1
-            if batch_count >= 100:
-                conn.commit()
-                batch_count = 0
-            if i % 500 == 0:
-                print(f"  ... {i}/{len(targets)} "
-                       f"({time.time()-started:.0f}s)", flush=True)
-        conn.commit()
-        elapsed_ingest = time.time() - started
+        run_result = _ingest_all_targets(conn, targets, parser_engine)
 
         # promotion candidate 재구성
-        promo_count = _rebuild_promotion_candidates(conn, production_dict, now_iso)
+        promo_count = _rebuild_promotion_candidates(conn, production_dict, run_result.now_iso)
         conn.commit()
 
-        # 통계
-        doctype_counts: dict[str, int] = {}
-        for r in ingested:
-            doctype_counts[r["documentType"]] = \
-                doctype_counts.get(r["documentType"], 0) + 1
-        label_total = conn.execute(
-            "SELECT COUNT(*) FROM label_occurrences"
-        ).fetchone()[0]
-        unique_norm = conn.execute(
-            "SELECT COUNT(DISTINCT normalized_label) FROM label_occurrences"
-        ).fetchone()[0]
-        top_labels = conn.execute(
-            "SELECT normalized_label, occurrence_count, document_count "
-            "  FROM labels_by_frequency LIMIT 50"
-        ).fetchall()
-
-        summary = {
-            "targetCount": len(targets),
-            "ingestedCount": len(ingested),
-            "failedCount": len(failed),
-            "unsafeMutationCount": len(mutation_violations),
-            "elapsedSeconds": round(elapsed_ingest, 1),
-            "labelOccurrenceTotal": label_total,
-            "uniqueNormalizedLabelCount": unique_norm,
-            "promotionCandidatePending": promo_count,
-            "documentTypeBreakdown": doctype_counts,
-            "topLabels": [{"label": r[0], "occurrence": r[1],
-                              "documents": r[2]} for r in top_labels],
-            "overallVerdict": ("FAIL_UNSAFE_MUTATION"
-                                  if mutation_violations
-                                  else ("WARN_PARTIAL_INGEST"
-                                          if failed
-                                          else "PASS_CORPUS_INGEST")),
-            "auditedAt": now_iso,
-        }
-
-        (OUTPUT_DIR / "ingest_audit.json").write_text(
-            json.dumps({"summary": summary,
-                          "ingested": ingested[:200],   # 샘플만 저장
-                          "failed": failed[:200],
-                          "mutationViolations": mutation_violations},
-                         ensure_ascii=False, indent=2, default=str),
-            encoding="utf-8",
-        )
-
-        md = [
-            "# HWPX-RECOGNITION-CORPUS-INGEST-AUDIT-01",
-            "",
-            "## Summary",
-            f"- targets: {summary['targetCount']}",
-            f"- ingested: {summary['ingestedCount']}",
-            f"- failed: {summary['failedCount']}",
-            f"- unsafeMutation: {summary['unsafeMutationCount']}",
-            f"- elapsed: {summary['elapsedSeconds']}s",
-            f"- label occurrences total: {summary['labelOccurrenceTotal']}",
-            f"- unique normalized labels: "
-            f"{summary['uniqueNormalizedLabelCount']}",
-            f"- promotion candidates (PENDING): "
-            f"{summary['promotionCandidatePending']}",
-            f"- overallVerdict: **{summary['overallVerdict']}**",
-            "",
-            "## Document type breakdown (filename_pattern_v1)",
-            "",
-            "| docType | count |",
-            "|---|---|",
-        ]
-        for dt, n in sorted(doctype_counts.items(), key=lambda x: -x[1]):
-            md.append(f"| {dt} | {n} |")
-        md.append("")
-        md.append("## Top 50 labels by frequency")
-        md.append("")
-        md.append("| # | normalized_label | occurrence | documents |")
-        md.append("|---|---|---|---|")
-        for i, t in enumerate(summary["topLabels"], 1):
-            md.append(f"| {i} | {t['label']} | {t['occurrence']} "
-                         f"| {t['documents']} |")
-        (OUTPUT_DIR / "ingest_audit.md").write_text(
-            "\n".join(md), encoding="utf-8",
+        summary = _build_ingest_summary(conn, targets, run_result, promo_count)
+        _write_ingest_reports(
+            summary, run_result.ingested, run_result.failed, run_result.mutation_violations
         )
 
         return summary
@@ -395,6 +477,7 @@ def run_ingest(limit: int | None = None) -> dict:
 
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
