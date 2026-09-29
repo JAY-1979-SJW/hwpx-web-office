@@ -40,6 +40,7 @@
     python scripts/hwpx/web_office/rebuild_form_derivations_batch.py --status
     python scripts/hwpx/web_office/rebuild_form_derivations_batch.py --promote
 """
+
 from __future__ import annotations
 
 import argparse
@@ -52,12 +53,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.hwpx.web_office.build_form_catalog import extract_fields  # noqa: E402
-from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
-from scripts.hwpx.web_office.form_field_roles import _subject_of  # noqa: E402
-from scripts.hwpx.web_office.form_input_schema import build_input_schema  # noqa: E402
-from scripts.hwpx.web_office.form_requirements import extract_requirements  # noqa: E402
-from scripts.hwpx.web_office.form_taxonomy import classify_document  # noqa: E402
+from scripts.hwpx.web_office.build_form_catalog import extract_fields  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_field_roles import _subject_of  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_input_schema import build_input_schema  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_requirements import extract_requirements  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_taxonomy import classify_document  # ruff: ignore[module-import-not-at-top-of-file]
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 
@@ -97,12 +98,28 @@ def _log(m: str) -> None:
 
 
 STAGING_COLS = [
-    "form_id", "rebuild_status", "field_count", "labels",
-    "doc_type", "fillable", "clean_name", "doc_reason",
-    "form_kind", "input_schema", "input_count", "applicant_count",
-    "office_count", "sensitive_count", "schema_status",
-    "attachments", "attachment_count", "processing_time", "fee",
-    "legal_basis", "submit_to", "req_status",
+    "form_id",
+    "rebuild_status",
+    "field_count",
+    "labels",
+    "doc_type",
+    "fillable",
+    "clean_name",
+    "doc_reason",
+    "form_kind",
+    "input_schema",
+    "input_count",
+    "applicant_count",
+    "office_count",
+    "sensitive_count",
+    "schema_status",
+    "attachments",
+    "attachment_count",
+    "processing_time",
+    "fee",
+    "legal_basis",
+    "submit_to",
+    "req_status",
 ]
 
 
@@ -118,8 +135,7 @@ def _connect() -> sqlite3.Connection:
     return con
 
 
-def _flush(con: sqlite3.Connection, pending: list[dict],
-           retries: int = 10) -> None:
+def _flush(con: sqlite3.Connection, pending: list[dict], retries: int = 10) -> None:
     """모아둔 행을 짧은 트랜잭션 하나로 쓴다.
 
     잠금을 잡는 구간이 밀리초 단위라 샤드가 여럿이어도 서로 거의 안 기다린다.
@@ -127,9 +143,11 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
     """
     if not pending:
         return
-    sql = (f"INSERT OR REPLACE INTO {STAGING}"
-           f"({', '.join(STAGING_COLS)}) "
-           f"VALUES({', '.join('?' * len(STAGING_COLS))})")
+    sql = (
+        f"INSERT OR REPLACE INTO {STAGING}"
+        f"({', '.join(STAGING_COLS)}) "
+        f"VALUES({', '.join('?' * len(STAGING_COLS))})"
+    )
     payload = [tuple(r.get(c) for c in STAGING_COLS) for r in pending]
     for attempt in range(retries):
         try:
@@ -146,8 +164,7 @@ def _flush(con: sqlite3.Connection, pending: list[dict],
             if "locked" not in str(e).lower() and "busy" not in str(e).lower():
                 raise
             time.sleep(0.4 * (attempt + 1))
-    raise sqlite3.OperationalError(
-        f"스테이징 쓰기 실패 — {retries}회 재시도 후에도 잠김")
+    raise sqlite3.OperationalError(f"스테이징 쓰기 실패 — {retries}회 재시도 후에도 잠김")
 
 
 def _apply_subject(fields: list[dict]) -> int:
@@ -158,16 +175,117 @@ def _apply_subject(fields: list[dict]) -> int:
     """
     third = 0
     for f in fields:
-        want = (_subject_of(f.get("label", ""))
-                if f.get("role") == "applicant" else "self")
+        want = _subject_of(f.get("label", "")) if f.get("role") == "applicant" else "self"
         f["subject"] = want
         if want == "thirdParty":
             third += 1
     return third
 
 
-def run(limit: int = 0, size_cap_mb: float = 3.0,
-        shard: int = 0, shards: int = 1) -> None:
+def _build_pending_query(shard: int, shards: int) -> str:
+    shard_sql = ""
+    if shards > 1:
+        shard_sql = f" AND (f.form_id % {int(shards)}) = {int(shard)}"
+    return (
+        f"SELECT f.form_id, f.source_path, f.name FROM forms f "
+        f"LEFT JOIN {STAGING} s ON s.form_id = f.form_id "
+        f"WHERE f.status='OK' AND s.form_id IS NULL{shard_sql} "
+        f"ORDER BY f.form_id"
+    )
+
+
+def _fill_requirements_fields(row: dict, dm, rp) -> None:
+    r = extract_requirements(dm, rp)
+    row["attachments"] = json.dumps(r["attachments"], ensure_ascii=False)
+    row["attachment_count"] = r["attachmentCount"]
+    row["processing_time"] = r["processingTime"]
+    row["fee"] = r["fee"]
+    row["legal_basis"] = json.dumps(r["legalBasis"], ensure_ascii=False)
+    row["submit_to"] = r["submitTo"]
+    row["req_status"] = "OK"
+
+
+def _fill_input_schema_fields(
+    row: dict, dm, rp, name: str, fc: int, kinds: dict[str, int]
+) -> dict[str, int]:
+    s = build_input_schema(dm, rp, name=name, field_count=fc)
+    inputs = s["inputs"]
+    third = _apply_subject(inputs)
+    row["form_kind"] = s["formKind"]
+    row["input_schema"] = json.dumps(inputs, ensure_ascii=False)
+    row["input_count"] = s["inputCount"]
+    row["applicant_count"] = s["applicantCount"]
+    row["office_count"] = s["officeCount"]
+    row["sensitive_count"] = s["sensitiveCount"]
+    row["schema_status"] = "OK"
+    kinds[s["formKind"]] = kinds.get(s["formKind"], 0) + 1
+    return {
+        "third": third,
+        "app": s["applicantCount"],
+        "off": s["officeCount"],
+        "sec": s["sensitiveCount"],
+    }
+
+
+def _load_and_classify_form(row: dict, rel: str, name: str) -> tuple[dict | None, dict | None]:
+    """(dm_rp, cls) 반환. 실패 시 dm_rp=None (row에 이미 상태 기록됨)."""
+    res = load_hwpx_for_editor(
+        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel}, project_root=PROJECT_ROOT
+    )
+    if res.get("verdict") != "PASS":
+        row["rebuild_status"] = "FAIL:PARSE"
+        return None, None
+    dm, rp = res["documentModel"], res["renderPayload"]
+
+    # ③ 라벨 색인 + field_count — 먼저 나와야 한다. 분류(fillable)가 이 값을 먹기 때문이다.
+    labels = extract_fields(dm, rp)
+    fc = len(labels)
+    row["field_count"] = fc
+    row["labels"] = json.dumps(labels, ensure_ascii=False)
+
+    cls = classify_document(name, fc)
+    row["doc_type"] = cls["docType"]
+    row["fillable"] = 1 if cls["fillable"] else 0
+    row["clean_name"] = cls["cleanName"]
+    row["doc_reason"] = cls["reason"]
+    return {"dm": dm, "rp": rp, "fc": fc}, cls
+
+
+def _process_one_form(fid: int, rel: str, name: str, cap: float, kinds: dict[str, int]) -> dict:
+    """반환: row dict + status(ok/fail/skip) + agg_third/app/off/sec 델타."""
+    row: dict = {"form_id": fid, "rebuild_status": "OK"}
+    agg = {"third": 0, "app": 0, "off": 0, "sec": 0}
+    status = "ok"
+    try:
+        if not rel or Path(rel).is_absolute() or rel.startswith(("/", "\\")):
+            row["rebuild_status"] = "SKIP_OUTSIDE_PROJECT"
+            status = "skip"
+        else:
+            src = PROJECT_ROOT / rel
+            if not src.is_file() or src.stat().st_size > cap:
+                row["rebuild_status"] = "SKIP_SIZE_OR_MISSING"
+                status = "skip"
+            else:
+                loaded, cls = _load_and_classify_form(row, rel, name)
+                if loaded is None:
+                    status = "fail"
+                else:
+                    _fill_requirements_fields(row, loaded["dm"], loaded["rp"])
+                    # ① 입력 스키마 — 새 fillable 기준
+                    if cls["fillable"]:
+                        agg = _fill_input_schema_fields(
+                            row, loaded["dm"], loaded["rp"], name, loaded["fc"], kinds
+                        )
+                    else:
+                        row["schema_status"] = "SKIP_NOT_FILLABLE"
+                    status = "ok"
+    except Exception as e:  # ruff: ignore[blind-except]
+        row["rebuild_status"] = f"FAIL:{type(e).__name__}"
+        status = "fail"
+    return {"row": row, "status": status, "agg": agg}
+
+
+def run(limit: int = 0, size_cap_mb: float = 3.0, shard: int = 0, shards: int = 1) -> None:
     """shards>1 이면 form_id % shards == shard 인 것만 처리한다.
 
     파싱이 CPU 바운드 단일 프로세스라 16코어 기계에서 1코어만 쓴다.
@@ -180,21 +298,12 @@ def run(limit: int = 0, size_cap_mb: float = 3.0,
     con = _connect()
     con.executescript(DDL)
 
-    shard_sql = ""
-    if shards > 1:
-        shard_sql = f" AND (f.form_id % {int(shards)}) = {int(shard)}"
-    rows = con.execute(
-        f"SELECT f.form_id, f.source_path, f.name FROM forms f "
-        f"LEFT JOIN {STAGING} s ON s.form_id = f.form_id "
-        f"WHERE f.status='OK' AND s.form_id IS NULL{shard_sql} "
-        f"ORDER BY f.form_id").fetchall()
+    rows = con.execute(_build_pending_query(shard, shards)).fetchall()
     if limit:
         rows = rows[:limit]
-    done_already = con.execute(
-        f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
+    done_already = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
     tag = f"[shard {shard}/{shards}] " if shards > 1 else ""
-    _log(f"{tag}[start] 재생성 대상 {len(rows):,}종 "
-         f"(이미 쌓인 {done_already:,}건 제외 — 재개형)")
+    _log(f"{tag}[start] 재생성 대상 {len(rows):,}종 (이미 쌓인 {done_already:,}건 제외 — 재개형)")
 
     t0 = time.time()
     ok = fail = skip = 0
@@ -204,76 +313,18 @@ def run(limit: int = 0, size_cap_mb: float = 3.0,
     pending: list[dict] = []
 
     for i, (fid, rel, name) in enumerate(rows, 1):
-        row = {"form_id": fid, "rebuild_status": "OK"}
-        try:
-            if not rel or Path(rel).is_absolute() or rel.startswith(("/", "\\")):
-                row["rebuild_status"] = "SKIP_OUTSIDE_PROJECT"
-                skip += 1
-            else:
-                src = PROJECT_ROOT / rel
-                if not src.is_file() or src.stat().st_size > cap:
-                    row["rebuild_status"] = "SKIP_SIZE_OR_MISSING"
-                    skip += 1
-                else:
-                    res = load_hwpx_for_editor(
-                        {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
-                        project_root=PROJECT_ROOT)
-                    if res.get("verdict") != "PASS":
-                        row["rebuild_status"] = "FAIL:PARSE"
-                        fail += 1
-                    else:
-                        dm, rp = res["documentModel"], res["renderPayload"]
-
-                        # ③ 라벨 색인 + field_count — 먼저 나와야 한다.
-                        #    분류(fillable)가 이 값을 먹기 때문이다.
-                        labels = extract_fields(dm, rp)
-                        fc = len(labels)
-                        row["field_count"] = fc
-                        row["labels"] = json.dumps(labels, ensure_ascii=False)
-
-                        # 분류 — 이름 + 새 field_count
-                        cls = classify_document(name, fc)
-                        row["doc_type"] = cls["docType"]
-                        row["fillable"] = 1 if cls["fillable"] else 0
-                        row["clean_name"] = cls["cleanName"]
-                        row["doc_reason"] = cls["reason"]
-
-                        # ② 행정 요건
-                        r = extract_requirements(dm, rp)
-                        row["attachments"] = json.dumps(
-                            r["attachments"], ensure_ascii=False)
-                        row["attachment_count"] = r["attachmentCount"]
-                        row["processing_time"] = r["processingTime"]
-                        row["fee"] = r["fee"]
-                        row["legal_basis"] = json.dumps(
-                            r["legalBasis"], ensure_ascii=False)
-                        row["submit_to"] = r["submitTo"]
-                        row["req_status"] = "OK"
-
-                        # ① 입력 스키마 — 새 fillable 기준
-                        if cls["fillable"]:
-                            s = build_input_schema(
-                                dm, rp, name=name, field_count=fc)
-                            inputs = s["inputs"]
-                            agg_third += _apply_subject(inputs)
-                            row["form_kind"] = s["formKind"]
-                            row["input_schema"] = json.dumps(
-                                inputs, ensure_ascii=False)
-                            row["input_count"] = s["inputCount"]
-                            row["applicant_count"] = s["applicantCount"]
-                            row["office_count"] = s["officeCount"]
-                            row["sensitive_count"] = s["sensitiveCount"]
-                            row["schema_status"] = "OK"
-                            agg_app += s["applicantCount"]
-                            agg_off += s["officeCount"]
-                            agg_sec += s["sensitiveCount"]
-                            kinds[s["formKind"]] = kinds.get(s["formKind"], 0) + 1
-                        else:
-                            row["schema_status"] = "SKIP_NOT_FILLABLE"
-                        ok += 1
-        except Exception as e:  # noqa: BLE001
-            row["rebuild_status"] = f"FAIL:{type(e).__name__}"
+        outcome = _process_one_form(fid, rel, name, cap, kinds)
+        row = outcome["row"]
+        if outcome["status"] == "ok":
+            ok += 1
+        elif outcome["status"] == "fail":
             fail += 1
+        else:
+            skip += 1
+        agg_third += outcome["agg"]["third"]
+        agg_app += outcome["agg"]["app"]
+        agg_off += outcome["agg"]["off"]
+        agg_sec += outcome["agg"]["sec"]
 
         pending.append(row)
         if len(pending) >= COMMIT_EVERY:
@@ -282,50 +333,63 @@ def run(limit: int = 0, size_cap_mb: float = 3.0,
             el = time.time() - t0
             rate = i / el if el else 0
             eta = (len(rows) - i) / rate / 60 if rate else 0
-            _log(f"{tag}  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} "
-                 f"스킵 {skip} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
-                 f"신청인칸 {agg_app:,} 제3자칸 {agg_third:,}")
+            _log(
+                f"{tag}  … {i:,}/{len(rows):,} OK {ok:,} 실패 {fail} "
+                f"스킵 {skip} [{el:.0f}s ~{rate:.1f}/s 남은 {eta:.0f}분] "
+                f"신청인칸 {agg_app:,} 제3자칸 {agg_third:,}"
+            )
 
     _flush(con, pending)
     con.close()
     el = time.time() - t0
-    _log(f"{tag}[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el/60:.1f}분")
-    _log(f"[집계] 신청인칸 {agg_app:,} · 관공서칸 {agg_off:,} · "
-         f"민감칸 {agg_sec:,} · 제3자칸 {agg_third:,}")
+    _log(f"{tag}[done] OK {ok:,} · 실패 {fail} · 스킵 {skip} · {el / 60:.1f}분")
+    _log(
+        f"[집계] 신청인칸 {agg_app:,} · 관공서칸 {agg_off:,} · "
+        f"민감칸 {agg_sec:,} · 제3자칸 {agg_third:,}"
+    )
     if kinds:
-        _log("[서식종류] " + " · ".join(f"{k} {v:,}" for k, v in
-                                        sorted(kinds.items(), key=lambda x: -x[1])))
+        _log(
+            "[서식종류] "
+            + " · ".join(f"{k} {v:,}" for k, v in sorted(kinds.items(), key=lambda x: -x[1]))
+        )
     _log("[다음] --status 로 확인 후 --promote 로 반영")
 
 
 def status() -> dict:
     con = _connect()
-    have = {r[0] for r in con.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'")}
+    have = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if STAGING not in have:
         con.close()
         return {"staged": 0, "target": 0, "note": "스테이징 테이블 없음"}
-    target = con.execute(
-        "SELECT COUNT(*) FROM forms WHERE status='OK'").fetchone()[0]
+    target = con.execute("SELECT COUNT(*) FROM forms WHERE status='OK'").fetchone()[0]
     staged = con.execute(f"SELECT COUNT(*) FROM {STAGING}").fetchone()[0]
-    by = dict(con.execute(
-        f"SELECT rebuild_status, COUNT(*) FROM {STAGING} "
-        f"GROUP BY 1 ORDER BY 2 DESC").fetchall())
-    schema_ok = con.execute(
-        f"SELECT COUNT(*) FROM {STAGING} WHERE schema_status='OK'").fetchone()[0]
+    by = dict(
+        con.execute(
+            f"SELECT rebuild_status, COUNT(*) FROM {STAGING} GROUP BY 1 ORDER BY 2 DESC"
+        ).fetchall()
+    )
+    schema_ok = con.execute(f"SELECT COUNT(*) FROM {STAGING} WHERE schema_status='OK'").fetchone()[
+        0
+    ]
     con.close()
-    return {"target": target, "staged": staged, "byStatus": by,
-            "schemaOk": schema_ok,
-            "remaining": target - staged}
+    return {
+        "target": target,
+        "staged": staged,
+        "byStatus": by,
+        "schemaOk": schema_ok,
+        "remaining": target - staged,
+    }
 
 
 def promote(force: bool = False) -> dict:
     """스테이징을 forms/fields 에 반영. 커버리지 미달이면 거부."""
     st = status()
     if st["remaining"] > 0 and not force:
-        return {"promoted": False,
-                "reason": f"미완 {st['remaining']:,}건 — 배치를 마저 돌리거나 "
-                          f"--force 를 준다", **st}
+        return {
+            "promoted": False,
+            "reason": f"미완 {st['remaining']:,}건 — 배치를 마저 돌리거나 --force 를 준다",
+            **st,
+        }
     con = _connect()
     con.execute("BEGIN")
     try:
@@ -353,17 +417,20 @@ def promote(force: bool = False) -> dict:
             WHERE EXISTS (SELECT 1 FROM {STAGING} s WHERE s.form_id=forms.form_id)
         """)
         # 라벨 색인 재구축 — 재생성분이 있는 서식만 갈아끼운다
-        con.execute(f"DELETE FROM fields WHERE form_id IN "
-                    f"(SELECT form_id FROM {STAGING} WHERE labels IS NOT NULL)")
+        con.execute(
+            f"DELETE FROM fields WHERE form_id IN "
+            f"(SELECT form_id FROM {STAGING} WHERE labels IS NOT NULL)"
+        )
         for fid, raw in con.execute(
-                f"SELECT form_id, labels FROM {STAGING} "
-                f"WHERE labels IS NOT NULL").fetchall():
+            f"SELECT form_id, labels FROM {STAGING} WHERE labels IS NOT NULL"
+        ).fetchall():
             try:
                 labels = json.loads(raw)
             except (TypeError, json.JSONDecodeError):
                 continue
-            con.executemany("INSERT INTO fields(form_id,label) VALUES(?,?)",
-                            [(fid, lab) for lab in labels])
+            con.executemany(
+                "INSERT INTO fields(form_id,label) VALUES(?,?)", [(fid, lab) for lab in labels]
+            )
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")
@@ -378,13 +445,10 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--size-cap-mb", type=float, default=3.0)
     ap.add_argument("--status", action="store_true", help="진행 상황만 출력")
-    ap.add_argument("--promote", action="store_true",
-                    help="스테이징을 forms/fields 에 반영")
-    ap.add_argument("--force", action="store_true",
-                    help="--promote 시 미완이어도 강행")
+    ap.add_argument("--promote", action="store_true", help="스테이징을 forms/fields 에 반영")
+    ap.add_argument("--force", action="store_true", help="--promote 시 미완이어도 강행")
     ap.add_argument("--shard", type=int, default=0)
-    ap.add_argument("--shards", type=int, default=1,
-                    help="여러 프로세스로 나눠 돌릴 때 총 개수")
+    ap.add_argument("--shards", type=int, default=1, help="여러 프로세스로 나눠 돌릴 때 총 개수")
     args = ap.parse_args()
     if args.status:
         _log(json.dumps(status(), ensure_ascii=False, indent=2))

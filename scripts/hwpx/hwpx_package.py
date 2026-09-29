@@ -5,11 +5,11 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from typing import Any
-import re
-import zipfile
-import xml.etree.ElementTree as ET
 
 
 def local_name(tag: str) -> str:
@@ -66,7 +66,11 @@ def detect_text_encoding(raw: bytes) -> dict[str, Any]:
             return {"encoding": encoding, "decode_ok": True, "text": text}
         except UnicodeDecodeError:
             continue
-    return {"encoding": "utf-8-replace", "decode_ok": False, "text": raw.decode("utf-8", errors="replace")}
+    return {
+        "encoding": "utf-8-replace",
+        "decode_ok": False,
+        "text": raw.decode("utf-8", errors="replace"),
+    }
 
 
 MOJIBAKE_PATTERNS = (
@@ -142,18 +146,18 @@ def audit_hwpx_encoding(path: Path) -> dict[str, Any]:
                 encoding = audit["encoding"]
                 result["encoding_counts"][encoding] = result["encoding_counts"].get(encoding, 0) + 1
                 if not audit["decode_ok"] or not audit["quality"]["ok"]:
-                    result["problem_entries"].append(
-                        {
-                            "entry": name,
-                            "encoding": encoding,
-                            "decode_ok": audit["decode_ok"],
-                            "quality": audit["quality"],
-                        }
-                    )
+                    result["problem_entries"].append({
+                        "entry": name,
+                        "encoding": encoding,
+                        "decode_ok": audit["decode_ok"],
+                        "quality": audit["quality"],
+                    })
     except zipfile.BadZipFile:
         result["error"] = "BAD_ZIP"
         return result
-    result["status"] = "PASS" if result["checked_entries"] and not result["problem_entries"] else "FAIL"
+    result["status"] = (
+        "PASS" if result["checked_entries"] and not result["problem_entries"] else "FAIL"
+    )
     return result
 
 
@@ -268,11 +272,13 @@ class HwpxValidator:
                     raw = zf.read(name)
                     try:
                         ET.fromstring(decode_xml(raw).encode("utf-8"))
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:  # ruff: ignore[blind-except]
                         result["xml_errors"].append({"entry": name, "error": str(exc)})
                     audit = audit_text_bytes(raw)
                     encoding_check["checked_entries"] += 1
-                    encoding_check["encoding_counts"][audit["encoding"]] = encoding_check["encoding_counts"].get(audit["encoding"], 0) + 1
+                    encoding_check["encoding_counts"][audit["encoding"]] = (
+                        encoding_check["encoding_counts"].get(audit["encoding"], 0) + 1
+                    )
                     if not audit["decode_ok"] or not audit["quality"]["ok"]:
                         encoding_check["status"] = "FAIL"
                         encoding_check["problem_entries"].append({"entry": name, **audit})
@@ -281,7 +287,7 @@ class HwpxValidator:
                 result["encoding_check"] = encoding_check
         except zipfile.BadZipFile:
             result["error"] = "BAD_ZIP"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             result["error"] = str(exc)
         return result
 
@@ -314,13 +320,13 @@ class HwpxValidator:
                 for name in xml_names:
                     try:
                         ET.fromstring(decode_xml(zf.read(name)).encode("utf-8"))
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:  # ruff: ignore[blind-except]
                         result["xml_errors"].append({"entry": name, "error": str(exc)})
                 result["xml_ok"] = not result["xml_errors"]
                 result["package_consistency"] = audit_hwpx_package_consistency(zf)
         except zipfile.BadZipFile:
             result["error"] = "BAD_ZIP"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             result["error"] = str(exc)
         if result["zip_ok"]:
             result["encoding_check"] = audit_hwpx_encoding(path)
@@ -334,7 +340,9 @@ def _find_child(root: ET.Element, name: str) -> ET.Element | None:
     return None
 
 
-def _content_manifest(content_root: ET.Element) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+def _content_manifest(
+    content_root: ET.Element,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     manifest = _find_child(content_root, "manifest")
     spine = _find_child(content_root, "spine")
     items = []
@@ -342,13 +350,11 @@ def _content_manifest(content_root: ET.Element) -> tuple[list[dict[str, str]], l
     if manifest is not None:
         for child in list(manifest):
             if local_name(child.tag) == "item":
-                items.append(
-                    {
-                        "id": child.attrib.get("id", ""),
-                        "href": child.attrib.get("href", ""),
-                        "media_type": child.attrib.get("media-type", ""),
-                    }
-                )
+                items.append({
+                    "id": child.attrib.get("id", ""),
+                    "href": child.attrib.get("href", ""),
+                    "media_type": child.attrib.get("media-type", ""),
+                })
     if spine is not None:
         for child in list(spine):
             if local_name(child.tag) == "itemref":
@@ -360,12 +366,10 @@ def _container_rootfiles(container_root: ET.Element) -> list[dict[str, str]]:
     rootfiles = []
     for child in container_root.iter():
         if local_name(child.tag) == "rootfile":
-            rootfiles.append(
-                {
-                    "full_path": child.attrib.get("full-path", ""),
-                    "media_type": child.attrib.get("media-type", ""),
-                }
-            )
+            rootfiles.append({
+                "full_path": child.attrib.get("full-path", ""),
+                "media_type": child.attrib.get("media-type", ""),
+            })
     return rootfiles
 
 
@@ -374,13 +378,136 @@ def _xml_binary_refs(zf: zipfile.ZipFile, names: set[str]) -> list[dict[str, str
     for entry in sorted(name for name in names if is_xml_entry(name)):
         try:
             root = ET.fromstring(decode_xml(zf.read(entry)).encode("utf-8"))
-        except Exception:
+        except Exception:  # ruff: ignore[blind-except] -- 파싱 불가 항목만 건너뛰고 계속
             continue
         for elem in root.iter():
             for attr, value in elem.attrib.items():
                 if attr.endswith("binaryItemIDRef") or local_name(attr) == "binaryItemIDRef":
                     refs.append({"entry": entry, "id": value})
     return refs
+
+
+def _audit_container_xml(
+    zf: zipfile.ZipFile,
+    names: set[str],
+    errors: list[dict[str, Any]],
+    warnings: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    if "META-INF/container.xml" not in names:
+        return []
+    try:
+        container_root = ET.fromstring(
+            decode_xml(zf.read("META-INF/container.xml")).encode("utf-8")
+        )
+        rootfiles = _container_rootfiles(container_root)
+        content_rootfiles = [
+            item for item in rootfiles if item["full_path"] == "Contents/content.hpf"
+        ]
+        if not content_rootfiles:
+            errors.append({"code": "CONTAINER_CONTENT_ROOTFILE_MISSING"})
+        for item in rootfiles:
+            full_path = item["full_path"]
+            if full_path and full_path not in names:
+                warnings.append({"code": "CONTAINER_ROOTFILE_TARGET_MISSING", "entry": full_path})
+        return rootfiles
+    except Exception as exc:  # ruff: ignore[blind-except]
+        errors.append({"code": "CONTAINER_XML_PARSE_ERROR", "error": str(exc)})
+        return []
+
+
+def _audit_content_hpf(
+    zf: zipfile.ZipFile, names: set[str], errors: list[dict[str, Any]]
+) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, str]]:
+    manifest_items: list[dict[str, str]] = []
+    spine_itemrefs: list[dict[str, str]] = []
+    id_to_entry: dict[str, str] = {}
+    if "Contents/content.hpf" not in names:
+        return manifest_items, spine_itemrefs, id_to_entry
+    try:
+        content_root = ET.fromstring(decode_xml(zf.read("Contents/content.hpf")).encode("utf-8"))
+        manifest_items, spine_itemrefs = _content_manifest(content_root)
+        href_to_entry: dict[str, str] = {}
+        for item in manifest_items:
+            href = item["href"]
+            entry = normalize_entry_name(href, base_entry="Contents/content.hpf") if href else ""
+            href_to_entry[href] = entry
+            if item["id"]:
+                id_to_entry[item["id"]] = entry
+            if href and entry not in names:
+                errors.append({
+                    "code": "MANIFEST_TARGET_MISSING",
+                    "id": item["id"],
+                    "href": href,
+                    "entry": entry,
+                })
+        manifest_entries = set(href_to_entry.values())
+        required_manifest_entries = [
+            name
+            for name in names
+            if name.lower() == "settings.xml"
+            or is_section_entry(name)
+            or name.replace("\\", "/").lower().startswith("bindata/")
+        ]
+        missing_manifest_entries = sorted(
+            entry for entry in required_manifest_entries if entry not in manifest_entries
+        )
+        if missing_manifest_entries:
+            errors.append({
+                "code": "PACKAGE_ENTRY_NOT_IN_CONTENT_MANIFEST",
+                "entries": missing_manifest_entries,
+            })
+        manifest_ids = set(id_to_entry)
+        for itemref in spine_itemrefs:
+            idref = itemref["idref"]
+            if idref and idref not in manifest_ids:
+                errors.append({"code": "SPINE_IDREF_NOT_IN_MANIFEST", "idref": idref})
+        section_manifest_ids = {
+            item["id"]
+            for item in manifest_items
+            if is_section_entry(id_to_entry.get(item["id"], ""))
+        }
+        spine_ids = {item["idref"] for item in spine_itemrefs}
+        missing_spine_sections = sorted(
+            id_ for id_ in section_manifest_ids if id_ and id_ not in spine_ids
+        )
+        if missing_spine_sections:
+            errors.append({"code": "SECTION_NOT_IN_SPINE", "ids": missing_spine_sections})
+    except Exception as exc:  # ruff: ignore[blind-except]
+        errors.append({"code": "CONTENT_HPF_PARSE_ERROR", "error": str(exc)})
+    return manifest_items, spine_itemrefs, id_to_entry
+
+
+def _audit_binary_refs(
+    zf: zipfile.ZipFile,
+    names: set[str],
+    id_to_entry: dict[str, str],
+    errors: list[dict[str, Any]],
+    warnings: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    binary_refs = _xml_binary_refs(zf, names)
+    for ref in binary_refs:
+        target = id_to_entry.get(ref["id"])
+        if not target:
+            errors.append({
+                "code": "BINARY_REF_ID_NOT_IN_MANIFEST",
+                "id": ref["id"],
+                "entry": ref["entry"],
+            })
+        elif target not in names:
+            errors.append({
+                "code": "BINARY_REF_TARGET_MISSING",
+                "id": ref["id"],
+                "target": target,
+                "entry": ref["entry"],
+            })
+        elif not target.replace("\\", "/").lower().startswith("bindata/"):
+            warnings.append({
+                "code": "BINARY_REF_TARGET_NOT_BINDATA",
+                "id": ref["id"],
+                "target": target,
+                "entry": ref["entry"],
+            })
+    return binary_refs
 
 
 def audit_hwpx_package_consistency(zf: zipfile.ZipFile) -> dict[str, Any]:
@@ -401,71 +528,9 @@ def audit_hwpx_package_consistency(zf: zipfile.ZipFile) -> dict[str, Any]:
     if not section_entries:
         errors.append({"code": "SECTION_ENTRY_MISSING"})
 
-    manifest_items: list[dict[str, str]] = []
-    spine_itemrefs: list[dict[str, str]] = []
-    href_to_entry: dict[str, str] = {}
-    id_to_entry: dict[str, str] = {}
-    rootfiles: list[dict[str, str]] = []
-
-    if "META-INF/container.xml" in names:
-        try:
-            container_root = ET.fromstring(decode_xml(zf.read("META-INF/container.xml")).encode("utf-8"))
-            rootfiles = _container_rootfiles(container_root)
-            content_rootfiles = [item for item in rootfiles if item["full_path"] == "Contents/content.hpf"]
-            if not content_rootfiles:
-                errors.append({"code": "CONTAINER_CONTENT_ROOTFILE_MISSING"})
-            for item in rootfiles:
-                full_path = item["full_path"]
-                if full_path and full_path not in names:
-                    warnings.append({"code": "CONTAINER_ROOTFILE_TARGET_MISSING", "entry": full_path})
-        except Exception as exc:  # noqa: BLE001
-            errors.append({"code": "CONTAINER_XML_PARSE_ERROR", "error": str(exc)})
-
-    if "Contents/content.hpf" in names:
-        try:
-            content_root = ET.fromstring(decode_xml(zf.read("Contents/content.hpf")).encode("utf-8"))
-            manifest_items, spine_itemrefs = _content_manifest(content_root)
-            for item in manifest_items:
-                href = item["href"]
-                entry = normalize_entry_name(href, base_entry="Contents/content.hpf") if href else ""
-                href_to_entry[href] = entry
-                if item["id"]:
-                    id_to_entry[item["id"]] = entry
-                if href and entry not in names:
-                    errors.append({"code": "MANIFEST_TARGET_MISSING", "id": item["id"], "href": href, "entry": entry})
-            manifest_entries = set(href_to_entry.values())
-            required_manifest_entries = [
-                name
-                for name in names
-                if name.lower() == "settings.xml"
-                or is_section_entry(name)
-                or name.replace("\\", "/").lower().startswith("bindata/")
-            ]
-            missing_manifest_entries = sorted(entry for entry in required_manifest_entries if entry not in manifest_entries)
-            if missing_manifest_entries:
-                errors.append({"code": "PACKAGE_ENTRY_NOT_IN_CONTENT_MANIFEST", "entries": missing_manifest_entries})
-            manifest_ids = set(id_to_entry)
-            for itemref in spine_itemrefs:
-                idref = itemref["idref"]
-                if idref and idref not in manifest_ids:
-                    errors.append({"code": "SPINE_IDREF_NOT_IN_MANIFEST", "idref": idref})
-            section_manifest_ids = {item["id"] for item in manifest_items if is_section_entry(id_to_entry.get(item["id"], ""))}
-            spine_ids = {item["idref"] for item in spine_itemrefs}
-            missing_spine_sections = sorted(id_ for id_ in section_manifest_ids if id_ and id_ not in spine_ids)
-            if missing_spine_sections:
-                errors.append({"code": "SECTION_NOT_IN_SPINE", "ids": missing_spine_sections})
-        except Exception as exc:  # noqa: BLE001
-            errors.append({"code": "CONTENT_HPF_PARSE_ERROR", "error": str(exc)})
-
-    binary_refs = _xml_binary_refs(zf, names)
-    for ref in binary_refs:
-        target = id_to_entry.get(ref["id"])
-        if not target:
-            errors.append({"code": "BINARY_REF_ID_NOT_IN_MANIFEST", "id": ref["id"], "entry": ref["entry"]})
-        elif target not in names:
-            errors.append({"code": "BINARY_REF_TARGET_MISSING", "id": ref["id"], "target": target, "entry": ref["entry"]})
-        elif not target.replace("\\", "/").lower().startswith("bindata/"):
-            warnings.append({"code": "BINARY_REF_TARGET_NOT_BINDATA", "id": ref["id"], "target": target, "entry": ref["entry"]})
+    rootfiles = _audit_container_xml(zf, names, errors, warnings)
+    manifest_items, spine_itemrefs, id_to_entry = _audit_content_hpf(zf, names, errors)
+    binary_refs = _audit_binary_refs(zf, names, id_to_entry, errors, warnings)
 
     return {
         "status": "FAIL" if errors else ("WARN" if warnings else "PASS"),
@@ -482,7 +547,7 @@ def audit_hwpx_package_consistency(zf: zipfile.ZipFile) -> dict[str, Any]:
 
 
 def package_contains(path: Path, values: list[str]) -> dict[str, bool]:
-    result = {value: False for value in values}
+    result = dict.fromkeys(values, False)
     with zipfile.ZipFile(path) as zf:
         for name in zf.namelist():
             if not is_xml_entry(name):
@@ -496,7 +561,9 @@ def package_contains(path: Path, values: list[str]) -> dict[str, bool]:
 
 def package_has_placeholders(path: Path) -> bool:
     with zipfile.ZipFile(path) as zf:
-        return any(is_xml_entry(name) and "{{" in decode_xml(zf.read(name)) for name in zf.namelist())
+        return any(
+            is_xml_entry(name) and "{{" in decode_xml(zf.read(name)) for name in zf.namelist()
+        )
 
 
 def read_json(path: Path) -> Any:

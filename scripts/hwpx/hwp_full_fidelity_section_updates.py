@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import Any
 
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -882,6 +883,165 @@ def _apply_cell_addr_span(table: ET.Element) -> int:
     return applied
 
 
+def _apply_cell_geometry_for_table(
+    cells: list[Any],
+    list_headers: list[Any],
+    decoded_table: dict[str, Any],
+    border_fill_ids: set[int],
+    apply_exact_addr_span: bool,
+) -> dict[str, Any]:
+    applied_cells = 0
+    applied_cell_sizes = 0
+    applied_exact_cell_addrs = 0
+    applied_exact_cell_spans = 0
+    applied_cell_borders = 0
+    unresolved_cell_border_refs = []
+    for cell, list_header in zip(cells, list_headers, strict=False):
+        if not isinstance(list_header, dict):
+            continue
+        cell_addr = (
+            list_header.get("cell_addr") if isinstance(list_header.get("cell_addr"), dict) else {}
+        )
+        row_addr = _int_or_none(cell_addr.get("row"))
+        col_addr = _int_or_none(cell_addr.get("col"))
+        row_count = _int_or_none(decoded_table.get("row_count"))
+        col_count = _int_or_none(decoded_table.get("col_count"))
+        out_of_range_addr = (
+            row_addr is not None
+            and col_addr is not None
+            and row_count is not None
+            and col_count is not None
+            and (row_addr >= row_count or col_addr >= col_count)
+        )
+        geometry_header = (
+            {**list_header, "cell_addr": None, "cell_span": None, "border_fill_id": None}
+            if out_of_range_addr
+            else list_header
+        )
+        exact_geometry = _apply_exact_cell_geometry_from_list_header(
+            cell,
+            geometry_header,
+            apply_addr_span=apply_exact_addr_span and not out_of_range_addr,
+            border_fill_ids=border_fill_ids,
+        )
+        applied_exact_cell_addrs += exact_geometry["addr"]
+        applied_exact_cell_spans += exact_geometry["span"]
+        applied_cell_borders += exact_geometry["border"]
+        unresolved_cell_border_refs.extend(exact_geometry["unresolved_border_refs"])
+        sub_list = _first_child_local(cell, "subList")
+        if sub_list is not None:
+            if list_header.get("text_width") is not None:
+                sub_list.attrib["textWidth"] = str(list_header.get("text_width"))
+            if list_header.get("text_height") is not None:
+                sub_list.attrib["textHeight"] = str(list_header.get("text_height"))
+        cell_margin = _first_child_local(cell, "cellMargin")
+        header_margins = (
+            list_header.get("margins") if isinstance(list_header.get("margins"), dict) else {}
+        )
+        if cell_margin is not None:
+            for name in ("left", "right", "top", "bottom"):
+                if header_margins.get(name) is not None:
+                    cell_margin.attrib[name] = str(header_margins.get(name))
+        if _apply_cell_size_from_list_header(cell, list_header, header_margins):
+            applied_cell_sizes += 1
+        applied_cells += 1
+    return {
+        "applied_cells": applied_cells,
+        "applied_cell_sizes": applied_cell_sizes,
+        "applied_exact_cell_addrs": applied_exact_cell_addrs,
+        "applied_exact_cell_spans": applied_exact_cell_spans,
+        "applied_cell_borders": applied_cell_borders,
+        "unresolved_cell_border_refs": unresolved_cell_border_refs,
+    }
+
+
+def _process_one_target_table(
+    target_table: Any,
+    table_index: int,
+    source_tables: list[Any],
+    border_fill_ids: set[int],
+) -> dict[str, Any]:
+    if table_index >= len(source_tables):
+        return {"table_index": table_index, "status": "SOURCE_TABLE_NOT_FOUND"}
+    source_table = source_tables[table_index]
+    decoded_table = source_table.get("table") if isinstance(source_table.get("table"), dict) else {}
+    margins = decoded_table.get("margins") if isinstance(decoded_table.get("margins"), dict) else {}
+    if decoded_table.get("row_count"):
+        target_table.attrib["rowCnt"] = str(decoded_table.get("row_count"))
+    if decoded_table.get("col_count"):
+        target_table.attrib["colCnt"] = str(decoded_table.get("col_count"))
+    if decoded_table.get("cell_spacing") is not None:
+        target_table.attrib["cellSpacing"] = str(decoded_table.get("cell_spacing") or 0)
+    row_span_report = _apply_row_cell_count_col_spans(
+        target_table, decoded_table.get("row_cell_counts"), decoded_table.get("col_count")
+    )
+    applied_cell_addr_spans = _apply_cell_addr_span(target_table)
+    in_margin = _first_child_local(target_table, "inMargin")
+    if in_margin is not None:
+        for name in ("left", "right", "top", "bottom"):
+            if margins.get(name) is not None:
+                in_margin.attrib[name] = str(margins.get(name))
+    list_headers = (
+        source_table.get("list_headers")
+        if isinstance(source_table.get("list_headers"), list)
+        else []
+    )
+    all_cells = _table_cells(target_table)
+    cells, cell_mapping_policy = _row_cell_count_targets(
+        target_table, decoded_table.get("row_cell_counts"), len(list_headers)
+    )
+    apply_exact_addr_span = cell_mapping_policy == "row_cell_counts"
+    geometry = _apply_cell_geometry_for_table(
+        cells, list_headers, decoded_table, border_fill_ids, apply_exact_addr_span
+    )
+    return {
+        "table_index": table_index,
+        "status": "PASS",
+        "source_record_index": source_table.get("record_index"),
+        "row_count": decoded_table.get("row_count"),
+        "col_count": decoded_table.get("col_count"),
+        "target_cell_count": len(all_cells),
+        "target_metric_cell_count": len(cells),
+        "source_list_header_count": len(list_headers),
+        "source_row_cell_counts": decoded_table.get("row_cell_counts"),
+        "source_row_cell_count_total": decoded_table.get("row_cell_count_total"),
+        "cell_mapping_policy": cell_mapping_policy,
+        "row_cell_span_inference": row_span_report,
+        "applied_cell_metrics": geometry["applied_cells"],
+        "applied_cell_sizes": geometry["applied_cell_sizes"],
+        "applied_cell_addr_spans": applied_cell_addr_spans,
+        "applied_exact_cell_addrs": geometry["applied_exact_cell_addrs"],
+        "applied_exact_cell_spans": geometry["applied_exact_cell_spans"],
+        "applied_cell_borders": geometry["applied_cell_borders"],
+        "unresolved_cell_border_refs": geometry["unresolved_cell_border_refs"],
+        "unresolved_cell_border_ref_count": len(geometry["unresolved_cell_border_refs"]),
+        "applied_inferred_col_spans": row_span_report.get("applied_cells"),
+        "removed_covered_cells": row_span_report.get("removed_covered_cells"),
+        "unmapped_target_cells": max(0, len(all_cells) - geometry["applied_cells"]),
+    }
+
+
+def _aggregate_table_layout_totals(section_reports: list[dict[str, Any]]) -> dict[str, int]:
+    fields = (
+        "applied_cell_metrics",
+        "applied_cell_sizes",
+        "applied_cell_addr_spans",
+        "applied_inferred_col_spans",
+        "removed_covered_cells",
+        "applied_exact_cell_addrs",
+        "applied_exact_cell_spans",
+        "applied_cell_borders",
+        "unresolved_cell_border_ref_count",
+    )
+    tables = [
+        table
+        for section in section_reports
+        for table in section.get("tables", [])
+        if isinstance(table, dict)
+    ]
+    return {field: sum(int(table.get(field) or 0) for table in tables) for field in fields}
+
+
 def build_table_layout_section_updates(
     existing_entries: dict[str, bytes],
     table_layout: dict[str, Any],
@@ -922,132 +1082,10 @@ def build_table_layout_section_updates(
             })
             continue
         target_tables = _table_elements(root)
-        table_reports = []
-        for table_index, target_table in enumerate(target_tables):
-            if table_index >= len(source_tables):
-                table_reports.append({
-                    "table_index": table_index,
-                    "status": "SOURCE_TABLE_NOT_FOUND",
-                })
-                continue
-            source_table = source_tables[table_index]
-            decoded_table = (
-                source_table.get("table") if isinstance(source_table.get("table"), dict) else {}
-            )
-            margins = (
-                decoded_table.get("margins")
-                if isinstance(decoded_table.get("margins"), dict)
-                else {}
-            )
-            if decoded_table.get("row_count"):
-                target_table.attrib["rowCnt"] = str(decoded_table.get("row_count"))
-            if decoded_table.get("col_count"):
-                target_table.attrib["colCnt"] = str(decoded_table.get("col_count"))
-            if decoded_table.get("cell_spacing") is not None:
-                target_table.attrib["cellSpacing"] = str(decoded_table.get("cell_spacing") or 0)
-            row_span_report = _apply_row_cell_count_col_spans(
-                target_table, decoded_table.get("row_cell_counts"), decoded_table.get("col_count")
-            )
-            applied_cell_addr_spans = _apply_cell_addr_span(target_table)
-            in_margin = _first_child_local(target_table, "inMargin")
-            if in_margin is not None:
-                for name in ("left", "right", "top", "bottom"):
-                    if margins.get(name) is not None:
-                        in_margin.attrib[name] = str(margins.get(name))
-            list_headers = (
-                source_table.get("list_headers")
-                if isinstance(source_table.get("list_headers"), list)
-                else []
-            )
-            all_cells = _table_cells(target_table)
-            cells, cell_mapping_policy = _row_cell_count_targets(
-                target_table, decoded_table.get("row_cell_counts"), len(list_headers)
-            )
-            applied_cells = 0
-            applied_cell_sizes = 0
-            applied_exact_cell_addrs = 0
-            applied_exact_cell_spans = 0
-            applied_cell_borders = 0
-            unresolved_cell_border_refs = []
-            apply_exact_addr_span = cell_mapping_policy == "row_cell_counts"
-            for cell, list_header in zip(cells, list_headers, strict=False):
-                if not isinstance(list_header, dict):
-                    continue
-                cell_addr = (
-                    list_header.get("cell_addr")
-                    if isinstance(list_header.get("cell_addr"), dict)
-                    else {}
-                )
-                row_addr = _int_or_none(cell_addr.get("row"))
-                col_addr = _int_or_none(cell_addr.get("col"))
-                row_count = _int_or_none(decoded_table.get("row_count"))
-                col_count = _int_or_none(decoded_table.get("col_count"))
-                out_of_range_addr = (
-                    row_addr is not None
-                    and col_addr is not None
-                    and row_count is not None
-                    and col_count is not None
-                    and (row_addr >= row_count or col_addr >= col_count)
-                )
-                geometry_header = (
-                    {**list_header, "cell_addr": None, "cell_span": None, "border_fill_id": None}
-                    if out_of_range_addr
-                    else list_header
-                )
-                exact_geometry = _apply_exact_cell_geometry_from_list_header(
-                    cell,
-                    geometry_header,
-                    apply_addr_span=apply_exact_addr_span and not out_of_range_addr,
-                    border_fill_ids=border_fill_ids,
-                )
-                applied_exact_cell_addrs += exact_geometry["addr"]
-                applied_exact_cell_spans += exact_geometry["span"]
-                applied_cell_borders += exact_geometry["border"]
-                unresolved_cell_border_refs.extend(exact_geometry["unresolved_border_refs"])
-                sub_list = _first_child_local(cell, "subList")
-                if sub_list is not None:
-                    if list_header.get("text_width") is not None:
-                        sub_list.attrib["textWidth"] = str(list_header.get("text_width"))
-                    if list_header.get("text_height") is not None:
-                        sub_list.attrib["textHeight"] = str(list_header.get("text_height"))
-                cell_margin = _first_child_local(cell, "cellMargin")
-                header_margins = (
-                    list_header.get("margins")
-                    if isinstance(list_header.get("margins"), dict)
-                    else {}
-                )
-                if cell_margin is not None:
-                    for name in ("left", "right", "top", "bottom"):
-                        if header_margins.get(name) is not None:
-                            cell_margin.attrib[name] = str(header_margins.get(name))
-                if _apply_cell_size_from_list_header(cell, list_header, header_margins):
-                    applied_cell_sizes += 1
-                applied_cells += 1
-            table_reports.append({
-                "table_index": table_index,
-                "status": "PASS",
-                "source_record_index": source_table.get("record_index"),
-                "row_count": decoded_table.get("row_count"),
-                "col_count": decoded_table.get("col_count"),
-                "target_cell_count": len(all_cells),
-                "target_metric_cell_count": len(cells),
-                "source_list_header_count": len(list_headers),
-                "source_row_cell_counts": decoded_table.get("row_cell_counts"),
-                "source_row_cell_count_total": decoded_table.get("row_cell_count_total"),
-                "cell_mapping_policy": cell_mapping_policy,
-                "row_cell_span_inference": row_span_report,
-                "applied_cell_metrics": applied_cells,
-                "applied_cell_sizes": applied_cell_sizes,
-                "applied_cell_addr_spans": applied_cell_addr_spans,
-                "applied_exact_cell_addrs": applied_exact_cell_addrs,
-                "applied_exact_cell_spans": applied_exact_cell_spans,
-                "applied_cell_borders": applied_cell_borders,
-                "unresolved_cell_border_refs": unresolved_cell_border_refs,
-                "unresolved_cell_border_ref_count": len(unresolved_cell_border_refs),
-                "applied_inferred_col_spans": row_span_report.get("applied_cells"),
-                "removed_covered_cells": row_span_report.get("removed_covered_cells"),
-                "unmapped_target_cells": max(0, len(all_cells) - applied_cells),
-            })
+        table_reports = [
+            _process_one_target_table(target_table, table_index, source_tables, border_fill_ids)
+            for table_index, target_table in enumerate(target_tables)
+        ]
         if table_reports:
             updates[entry] = _xml_string(root).encode("utf-8")
         section_reports.append({
@@ -1058,72 +1096,11 @@ def build_table_layout_section_updates(
             "target_table_count": len(target_tables),
             "tables": table_reports,
         })
-    applied = sum(
-        int(table.get("applied_cell_metrics") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_cell_sizes = sum(
-        int(table.get("applied_cell_sizes") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_cell_addr_spans = sum(
-        int(table.get("applied_cell_addr_spans") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_inferred_col_spans = sum(
-        int(table.get("applied_inferred_col_spans") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    removed_covered_cells = sum(
-        int(table.get("removed_covered_cells") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_exact_cell_addrs = sum(
-        int(table.get("applied_exact_cell_addrs") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_exact_cell_spans = sum(
-        int(table.get("applied_exact_cell_spans") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    applied_cell_borders = sum(
-        int(table.get("applied_cell_borders") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
-    unresolved_cell_border_refs = sum(
-        int(table.get("unresolved_cell_border_ref_count") or 0)
-        for section in section_reports
-        for table in section.get("tables", [])
-        if isinstance(table, dict)
-    )
+    totals = _aggregate_table_layout_totals(section_reports)
     return updates, {
-        "status": "PASS" if applied else "TABLE_CELL_METRICS_NOT_APPLIED",
+        "status": "PASS" if totals["applied_cell_metrics"] else "TABLE_CELL_METRICS_NOT_APPLIED",
         "section_count": len(section_entries),
-        "applied_cell_metrics": applied,
-        "applied_cell_sizes": applied_cell_sizes,
-        "applied_cell_addr_spans": applied_cell_addr_spans,
-        "applied_exact_cell_addrs": applied_exact_cell_addrs,
-        "applied_exact_cell_spans": applied_exact_cell_spans,
-        "applied_cell_borders": applied_cell_borders,
-        "unresolved_cell_border_ref_count": unresolved_cell_border_refs,
-        "applied_inferred_col_spans": applied_inferred_col_spans,
-        "removed_covered_cells": removed_covered_cells,
+        **totals,
         "sections": section_reports,
         "full_fidelity": False,
         "warning": "TABLE row/column/margins, LIST_HEADER cell text box metrics, cell addresses/spans, and borderFillIDRef values are mapped; complex merged-cell identity and table zone border overrides remain pending.",
@@ -1154,6 +1131,132 @@ def _resolve_ref_id(raw: Any, known_ids: set[int]) -> int | None:
     return None
 
 
+@dataclass
+class _ShapeRefValidation:
+    """Bundled shape-id validation context for paragraph style application."""
+
+    para_shape_ids: set[int]
+    char_shape_ids: set[int]
+    validate_para_refs: bool
+    validate_char_refs: bool
+
+
+def _apply_para_pr_ref(
+    target: Any, source: dict[str, Any], target_index: int, refs: _ShapeRefValidation
+) -> dict[str, Any]:
+    if source.get("para_shape_id") is None:
+        return {"applied_para_pr_refs": 0, "unresolved_para_pr_refs": []}
+    para_shape_id = _int_or_none(source.get("para_shape_id"))
+    target.attrib["paraPrIDRef"] = str(source.get("para_shape_id"))
+    if para_shape_id is not None and (
+        not refs.validate_para_refs or para_shape_id in refs.para_shape_ids
+    ):
+        return {"applied_para_pr_refs": 1, "unresolved_para_pr_refs": []}
+    if para_shape_id is not None:
+        return {
+            "applied_para_pr_refs": 0,
+            "unresolved_para_pr_refs": [
+                {"target_index": target_index, "para_shape_id": para_shape_id}
+            ],
+        }
+    return {"applied_para_pr_refs": 0, "unresolved_para_pr_refs": []}
+
+
+def _apply_char_pr_refs(
+    source: dict[str, Any],
+    target_index: int,
+    char_shape_report: dict[str, Any],
+    refs: _ShapeRefValidation,
+) -> dict[str, Any]:
+    applied_char_pr_refs = 0
+    unresolved_char_pr_refs = []
+    applied_char_shape_ids = [
+        item
+        for item in (char_shape_report.get("applied_char_shape_ids") or [])
+        if _int_or_none(item) is not None
+    ]
+    for char_shape_id in applied_char_shape_ids:
+        parsed = _int_or_none(char_shape_id)
+        if parsed is not None and (not refs.validate_char_refs or parsed in refs.char_shape_ids):
+            applied_char_pr_refs += 1
+        elif parsed is not None:
+            unresolved_char_pr_refs.append({"target_index": target_index, "char_shape_id": parsed})
+    if not applied_char_shape_ids:
+        for char_shape_id in _char_shape_refs_for_source(source):
+            if refs.validate_char_refs and char_shape_id not in refs.char_shape_ids:
+                unresolved_char_pr_refs.append({
+                    "target_index": target_index,
+                    "char_shape_id": char_shape_id,
+                })
+    return {
+        "applied_char_pr_refs": applied_char_pr_refs,
+        "unresolved_char_pr_refs": unresolved_char_pr_refs,
+    }
+
+
+def _apply_one_paragraph_style(
+    target: Any,
+    source: dict[str, Any],
+    target_index: int,
+    refs: _ShapeRefValidation,
+) -> dict[str, Any]:
+    para_pr = _apply_para_pr_ref(target, source, target_index, refs)
+    if source.get("style_id") is not None:
+        target.attrib["styleIDRef"] = str(source.get("style_id"))
+    char_shape_report = apply_char_shape_segments_to_paragraph(target, source)
+    char_pr = _apply_char_pr_refs(source, target_index, char_shape_report, refs)
+    first_run_only = 0
+    complex_paragraph = 0
+    if char_shape_report.get("status") == "FIRST_RUN_ONLY":
+        first_run_only = 1
+        if char_shape_report.get("reason") == "COMPLEX_PARAGRAPH":
+            complex_paragraph = 1
+    line_segment_report = apply_line_segments_to_paragraph(target, source)
+    line_segment_arrays = 0
+    line_segments = 0
+    if line_segment_report.get("status") == "PASS":
+        line_segment_arrays = 1
+        line_segments = int(line_segment_report.get("line_segment_count") or 0)
+    return {
+        "applied_para_pr_refs": para_pr["applied_para_pr_refs"],
+        "unresolved_para_pr_refs": para_pr["unresolved_para_pr_refs"],
+        "applied_char_pr_refs": char_pr["applied_char_pr_refs"],
+        "unresolved_char_pr_refs": char_pr["unresolved_char_pr_refs"],
+        "split_runs": int(char_shape_report.get("split_run_count") or 0),
+        "first_run_only": first_run_only,
+        "complex_paragraph": complex_paragraph,
+        "line_segment_arrays": line_segment_arrays,
+        "line_segments": line_segments,
+    }
+
+
+def _aggregate_body_style_totals(section_reports: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "applied_text_paragraphs": sum(
+            int(row.get("applied_text_paragraphs") or 0) for row in section_reports
+        ),
+        "applied_para_pr_refs": sum(
+            int(row.get("applied_para_pr_refs") or 0) for row in section_reports
+        ),
+        "unresolved_para_pr_ref_count": sum(
+            int(row.get("unresolved_para_pr_ref_count") or 0) for row in section_reports
+        ),
+        "applied_char_pr_refs": sum(
+            int(row.get("applied_char_pr_refs") or 0) for row in section_reports
+        ),
+        "unresolved_char_pr_ref_count": sum(
+            int(row.get("unresolved_char_pr_ref_count") or 0) for row in section_reports
+        ),
+        "split_char_shape_runs": sum(
+            int(row.get("split_char_shape_runs") or 0) for row in section_reports
+        ),
+        "line_segment_arrays": sum(
+            int(row.get("line_segment_arrays") or 0) for row in section_reports
+        ),
+        "line_segments": sum(int(row.get("line_segments") or 0) for row in section_reports),
+    }
+
+
 def build_body_style_section_updates(
     existing_entries: dict[str, bytes],
     body_layout: dict[str, Any],
@@ -1168,6 +1271,9 @@ def build_body_style_section_updates(
     )
     validate_para_refs = bool(para_shape_ids)
     validate_char_refs = bool(char_shape_ids)
+    shape_refs = _ShapeRefValidation(
+        para_shape_ids, char_shape_ids, validate_para_refs, validate_char_refs
+    )
     section_entries = sorted(
         [
             name
@@ -1201,52 +1307,19 @@ def build_body_style_section_updates(
         unresolved_para_pr_refs = []
         applied_char_pr_refs = 0
         unresolved_char_pr_refs = []
-        for target, source in zip(target_paragraphs, source_paragraphs, strict=False):
-            if source.get("para_shape_id") is not None:
-                para_shape_id = _int_or_none(source.get("para_shape_id"))
-                target.attrib["paraPrIDRef"] = str(source.get("para_shape_id"))
-                if para_shape_id is not None and (
-                    not validate_para_refs or para_shape_id in para_shape_ids
-                ):
-                    applied_para_pr_refs += 1
-                elif para_shape_id is not None:
-                    unresolved_para_pr_refs.append({
-                        "target_index": applied,
-                        "para_shape_id": para_shape_id,
-                    })
-            if source.get("style_id") is not None:
-                target.attrib["styleIDRef"] = str(source.get("style_id"))
-            char_shape_report = apply_char_shape_segments_to_paragraph(target, source)
-            split_runs += int(char_shape_report.get("split_run_count") or 0)
-            applied_char_shape_ids = [
-                item
-                for item in (char_shape_report.get("applied_char_shape_ids") or [])
-                if _int_or_none(item) is not None
-            ]
-            for char_shape_id in applied_char_shape_ids:
-                parsed = _int_or_none(char_shape_id)
-                if parsed is not None and (not validate_char_refs or parsed in char_shape_ids):
-                    applied_char_pr_refs += 1
-                elif parsed is not None:
-                    unresolved_char_pr_refs.append({
-                        "target_index": applied,
-                        "char_shape_id": parsed,
-                    })
-            if not applied_char_shape_ids:
-                for char_shape_id in _char_shape_refs_for_source(source):
-                    if validate_char_refs and char_shape_id not in char_shape_ids:
-                        unresolved_char_pr_refs.append({
-                            "target_index": applied,
-                            "char_shape_id": char_shape_id,
-                        })
-            if char_shape_report.get("status") == "FIRST_RUN_ONLY":
-                first_run_only += 1
-                if char_shape_report.get("reason") == "COMPLEX_PARAGRAPH":
-                    complex_paragraphs += 1
-            line_segment_report = apply_line_segments_to_paragraph(target, source)
-            if line_segment_report.get("status") == "PASS":
-                line_segment_arrays += 1
-                line_segments += int(line_segment_report.get("line_segment_count") or 0)
+        for target_index, (target, source) in enumerate(
+            zip(target_paragraphs, source_paragraphs, strict=False)
+        ):
+            para_stats = _apply_one_paragraph_style(target, source, target_index, shape_refs)
+            applied_para_pr_refs += para_stats["applied_para_pr_refs"]
+            unresolved_para_pr_refs.extend(para_stats["unresolved_para_pr_refs"])
+            applied_char_pr_refs += para_stats["applied_char_pr_refs"]
+            unresolved_char_pr_refs.extend(para_stats["unresolved_char_pr_refs"])
+            split_runs += para_stats["split_runs"]
+            first_run_only += para_stats["first_run_only"]
+            complex_paragraphs += para_stats["complex_paragraph"]
+            line_segment_arrays += para_stats["line_segment_arrays"]
+            line_segments += para_stats["line_segments"]
             applied += 1
         if applied:
             updates[entry] = _xml_string(root).encode("utf-8")
@@ -1270,31 +1343,11 @@ def build_body_style_section_updates(
             "unmapped_source_text_paragraphs": max(0, len(source_paragraphs) - applied),
             "unmapped_target_text_paragraphs": max(0, len(target_paragraphs) - applied),
         })
-    total_applied = sum(int(row.get("applied_text_paragraphs") or 0) for row in section_reports)
-    total_para_pr_refs = sum(int(row.get("applied_para_pr_refs") or 0) for row in section_reports)
-    total_unresolved_para_pr_refs = sum(
-        int(row.get("unresolved_para_pr_ref_count") or 0) for row in section_reports
-    )
-    total_char_pr_refs = sum(int(row.get("applied_char_pr_refs") or 0) for row in section_reports)
-    total_unresolved_char_pr_refs = sum(
-        int(row.get("unresolved_char_pr_ref_count") or 0) for row in section_reports
-    )
-    total_split_runs = sum(int(row.get("split_char_shape_runs") or 0) for row in section_reports)
-    total_line_segment_arrays = sum(
-        int(row.get("line_segment_arrays") or 0) for row in section_reports
-    )
-    total_line_segments = sum(int(row.get("line_segments") or 0) for row in section_reports)
+    totals = _aggregate_body_style_totals(section_reports)
     report = {
-        "status": "PASS" if total_applied else "NO_BODY_STYLE_REFS_APPLIED",
+        "status": "PASS" if totals["applied_text_paragraphs"] else "NO_BODY_STYLE_REFS_APPLIED",
         "section_count": len(section_entries),
-        "applied_text_paragraphs": total_applied,
-        "applied_para_pr_refs": total_para_pr_refs,
-        "unresolved_para_pr_ref_count": total_unresolved_para_pr_refs,
-        "applied_char_pr_refs": total_char_pr_refs,
-        "unresolved_char_pr_ref_count": total_unresolved_char_pr_refs,
-        "split_char_shape_runs": total_split_runs,
-        "line_segment_arrays": total_line_segment_arrays,
-        "line_segments": total_line_segments,
+        **totals,
         "sections": section_reports,
         "policy": "sequential_text_paragraph_mapping",
         "full_fidelity": False,

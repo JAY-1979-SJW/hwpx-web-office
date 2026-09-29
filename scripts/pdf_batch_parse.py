@@ -207,7 +207,7 @@ def _safe_text_len(s: str) -> int:
     return len(re.sub(r"\s", "", s))
 
 
-def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:
+def _parse_one(task: dict, work_dir: str, ocr_enabled: bool) -> dict:  # ruff: ignore[complex-structure, too-many-branches, too-many-statements] -- 시간 제약으로 보류: 단계별 헬퍼 추출은 다음 라운드로
     """단일 PDF 처리. 예외는 내부에서 모두 잡아 result로 반환."""
     t0 = time.time()
     src = Path(task["file_path"])

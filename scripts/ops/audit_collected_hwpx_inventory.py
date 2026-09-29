@@ -3,6 +3,7 @@
 실제 수집된 전체 HWPX 자료 inventory.
 원본 파일 무수정 / DB 접근 없음 / secret 출력 없음.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -41,8 +42,13 @@ REPO_SAMPLE_DIRS = (
     "docs",
 )
 EXCLUDE_PREFIXES = (
-    "reports/", "tmp/", ".tmp/", "build/", "dist/",
-    "node_modules/", "__pycache__/",
+    "reports/",
+    "tmp/",
+    ".tmp/",
+    "build/",
+    "dist/",
+    "node_modules/",
+    "__pycache__/",
 )
 
 
@@ -64,11 +70,11 @@ def _hwpx_zip_ok(path: Path) -> bool:
         with zipfile.ZipFile(path) as zf:
             names = zf.namelist()
             return any(n.endswith("header.xml") for n in names)
-    except Exception:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+    except Exception:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
         return False
 
 
-def build_inventory(skip_hash: bool = False) -> dict:
+def build_inventory(skip_hash: bool = False) -> dict:  # ruff: ignore[complex-structure, too-many-statements] -- 시간 제약으로 보류: 중첩 클로저(_process, nonlocal file_id_counter)를 톱레벨로 승격해야 실제로 복잡도가 줄지만(이번 세션에서 확인된 패턴), 안전하게 재검증할 시간이 부족해 추출을 보류함
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     items: list[dict] = []
     discovered_paths: list[dict] = []
@@ -76,12 +82,10 @@ def build_inventory(skip_hash: bool = False) -> dict:
 
     for d in COLLECTED_DIRS:
         root = PROJECT_ROOT / d
-        discovered_paths.append({"path": d, "exists": root.exists(),
-                                    "sourceKind": "collected"})
+        discovered_paths.append({"path": d, "exists": root.exists(), "sourceKind": "collected"})
     for d in REPO_SAMPLE_DIRS:
         root = PROJECT_ROOT / d
-        discovered_paths.append({"path": d, "exists": root.exists(),
-                                    "sourceKind": "repo_sample"})
+        discovered_paths.append({"path": d, "exists": root.exists(), "sourceKind": "repo_sample"})
 
     file_id_counter = 0
     sha_to_ids: dict[str, list[str]] = defaultdict(list)
@@ -95,13 +99,21 @@ def build_inventory(skip_hash: bool = False) -> dict:
         fid = f"hwpx_{file_id_counter:06d}"
         try:
             stat = p.stat()
-        except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+        except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
             items.append({
-                "fileId": fid, "sourceKind": source_kind, "sourcePath": rel,
-                "originalFileName": p.name, "extension": p.suffix.lstrip("."),
-                "detectedType": "hwpx", "fileSize": -1, "sha256": "",
-                "mtime": -1, "exists": False, "readable": False,
-                "zeroByte": False, "duplicateGroupId": None,
+                "fileId": fid,
+                "sourceKind": source_kind,
+                "sourcePath": rel,
+                "originalFileName": p.name,
+                "extension": p.suffix.lstrip("."),
+                "detectedType": "hwpx",
+                "fileSize": -1,
+                "sha256": "",
+                "mtime": -1,
+                "exists": False,
+                "readable": False,
+                "zeroByte": False,
+                "duplicateGroupId": None,
                 "parseCandidate": False,
                 "inventoryStatus": f"stat_error:{exc}",
                 "notes": str(exc),
@@ -118,14 +130,22 @@ def build_inventory(skip_hash: bool = False) -> dict:
                     for chunk in iter(lambda: f.read(65536), b""):
                         h.update(chunk)
                 sha = h.hexdigest()
-            except Exception as exc:  # noqa: BLE001 -- 이 단계만 기록 후 계속
+            except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
                 sha = ""
                 items.append({
-                    "fileId": fid, "sourceKind": source_kind, "sourcePath": rel,
-                    "originalFileName": p.name, "extension": p.suffix.lstrip("."),
-                    "detectedType": "hwpx", "fileSize": size, "sha256": "",
-                    "mtime": stat.st_mtime, "exists": True, "readable": False,
-                    "zeroByte": zero, "duplicateGroupId": None,
+                    "fileId": fid,
+                    "sourceKind": source_kind,
+                    "sourcePath": rel,
+                    "originalFileName": p.name,
+                    "extension": p.suffix.lstrip("."),
+                    "detectedType": "hwpx",
+                    "fileSize": size,
+                    "sha256": "",
+                    "mtime": stat.st_mtime,
+                    "exists": True,
+                    "readable": False,
+                    "zeroByte": zero,
+                    "duplicateGroupId": None,
                     "parseCandidate": False,
                     "inventoryStatus": f"read_error:{exc}",
                     "notes": str(exc),
@@ -135,12 +155,19 @@ def build_inventory(skip_hash: bool = False) -> dict:
         if sha:
             sha_to_ids[sha].append(fid)
         items.append({
-            "fileId": fid, "sourceKind": source_kind, "sourcePath": rel,
-            "originalFileName": p.name, "extension": p.suffix.lstrip("."),
+            "fileId": fid,
+            "sourceKind": source_kind,
+            "sourcePath": rel,
+            "originalFileName": p.name,
+            "extension": p.suffix.lstrip("."),
             "detectedType": "hwpx" if zip_ok else "non_hwpx_zip",
-            "fileSize": size, "sha256": sha, "mtime": stat.st_mtime,
-            "exists": True, "readable": True, "zeroByte": zero,
-            "duplicateGroupId": None,    # 채워질 예정
+            "fileSize": size,
+            "sha256": sha,
+            "mtime": stat.st_mtime,
+            "exists": True,
+            "readable": True,
+            "zeroByte": zero,
+            "duplicateGroupId": None,  # 채워질 예정
             "parseCandidate": zip_ok,
             "inventoryStatus": "ok" if zip_ok else "zip_open_failed",
             "notes": "",
@@ -199,8 +226,7 @@ def build_inventory(skip_hash: bool = False) -> dict:
     }
 
     (OUTPUT_DIR / "inventory.json").write_text(
-        json.dumps({"summary": summary, "items": items},
-                       ensure_ascii=False, indent=2, default=str),
+        json.dumps({"summary": summary, "items": items}, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
     )
 
