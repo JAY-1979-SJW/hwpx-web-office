@@ -47,10 +47,14 @@ def check_locked_files(
     baseline_commit: str,
     cwd: Path,
     timeout: int = 20,
+    *,
+    rc_failure_code: str = "GIT_DIFF_RC",
 ) -> list[dict]:
     """잠금 파일이 기준 커밋에서 바뀌었는지 `git diff` 로 확인한다(읽기 전용).
 
-    반환 항목 코드: GIT_DIFF_FAILED(WARN) / GIT_DIFF_RC(WARN) / LOCKED_FILE_CHANGED(FAIL).
+    반환 항목 코드: GIT_DIFF_FAILED(WARN) / rc_failure_code(WARN, 기본 GIT_DIFF_RC) /
+    LOCKED_FILE_CHANGED(FAIL). rc≠0 일 때의 코드 문자열은 감사 보고서에 그대로 찍히므로,
+    그 코드로 `GIT_DIFF_FAILED` 를 쓰던 감사는 `rc_failure_code="GIT_DIFF_FAILED"` 로 보존한다.
     """
     findings: list[dict] = []
     for rel in locked_files:
@@ -70,7 +74,7 @@ def check_locked_files(
             continue
         if r.returncode != 0:
             findings.append({
-                "code": "GIT_DIFF_RC",
+                "code": rc_failure_code,
                 "level": "WARN",
                 "detail": f"{rel}: rc={r.returncode}",
             })

@@ -29,7 +29,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -38,6 +37,8 @@ from typing import Any
 PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
+
+from scripts.ops import ops_common_checks as occ
 
 BASELINE_COMMIT = "81e86e9"
 
@@ -135,39 +136,7 @@ def _check_pipeline_no_writer_defs() -> list[dict]:
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                cwd=str(PR),
-                timeout=20,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({
-                "code": "GIT_DIFF_FAILED",
-                "level": "WARN",
-                "detail": f"{rel}: {e}",
-            })
-            continue
-        if r.returncode != 0:
-            findings.append({
-                "code": "GIT_DIFF_FAILED",
-                "level": "WARN",
-                "detail": f"{rel}: rc={r.returncode}",
-            })
-            continue
-        if r.stdout.strip():
-            findings.append({
-                "code": "LOCKED_FILE_CHANGED",
-                "level": "FAIL",
-                "detail": rel,
-            })
-    return findings
+    return occ.check_locked_files(LOCKED_FILES, BASELINE_COMMIT, PR, rc_failure_code="GIT_DIFF_FAILED")
 
 
 def _pick_fixture() -> Path | None:
