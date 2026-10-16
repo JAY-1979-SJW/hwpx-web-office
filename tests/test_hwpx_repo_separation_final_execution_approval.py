@@ -18,7 +18,7 @@ def _review_approved_plan_decision(tmp_path: Path) -> dict[str, object]:
     return {
         "packetId": packet["packetId"],
         "decision": final_gate.draft_gate.approval_gate.DECISION_REVIEW_APPROVED,
-        "checks": {check: True for check in packet["requiredChecks"]},
+        "checks": dict.fromkeys(packet["requiredChecks"], True),
     }
 
 
@@ -64,7 +64,7 @@ def test_05_non_candidate_final_approval_is_blocked(tmp_path: Path) -> None:
             {
                 "packetId": packet_id,
                 "decision": final_gate.DECISION_APPROVE_FINAL_EXECUTION,
-                "checks": {check: True for check in final_gate.REQUIRED_FINAL_CHECKS},
+                "checks": dict.fromkeys(final_gate.REQUIRED_FINAL_CHECKS, True),
             }
         ],
     )
@@ -95,7 +95,7 @@ def test_07_candidate_with_all_final_checks_is_approved_without_commands(tmp_pat
             {
                 "packetId": plan_decision["packetId"],
                 "decision": final_gate.DECISION_APPROVE_FINAL_EXECUTION,
-                "checks": {check: True for check in final_gate.REQUIRED_FINAL_CHECKS},
+                "checks": dict.fromkeys(final_gate.REQUIRED_FINAL_CHECKS, True),
             }
         ],
     )
@@ -115,7 +115,7 @@ def test_08_blocked_plan_draft_fails_final_gate(tmp_path: Path) -> None:
             {
                 "packetId": hold_packet["packetId"],
                 "decision": final_gate.draft_gate.approval_gate.DECISION_REVIEW_APPROVED,
-                "checks": {check: True for check in hold_packet["requiredChecks"]},
+                "checks": dict.fromkeys(hold_packet["requiredChecks"], True),
             }
         ],
     )
@@ -173,7 +173,7 @@ def test_14_unknown_packet_is_blocked(tmp_path: Path) -> None:
             {
                 "packetId": "owner_review_unknown",
                 "decision": final_gate.DECISION_APPROVE_FINAL_EXECUTION,
-                "checks": {check: True for check in final_gate.REQUIRED_FINAL_CHECKS},
+                "checks": dict.fromkeys(final_gate.REQUIRED_FINAL_CHECKS, True),
             }
         ],
     )

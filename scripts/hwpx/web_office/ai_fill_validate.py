@@ -76,7 +76,7 @@ def verify_addresses(
 
     src = project_root / source_rel
     if not src.is_file():
-        return {pid: "SOURCE_FILE_MISSING" for pid in pids}
+        return dict.fromkeys(pids, "SOURCE_FILE_MISSING")
     pkg = HwpxPackage(src)
     entry_by_sec = _section_entry_by_number(pkg)
     tables_by_sec: dict[int, list | None] = {}

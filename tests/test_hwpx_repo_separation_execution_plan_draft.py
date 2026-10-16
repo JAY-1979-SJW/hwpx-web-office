@@ -48,7 +48,7 @@ def test_04_no_commands_generated(tmp_path: Path) -> None:
 def test_05_review_approved_non_hold_becomes_candidate(tmp_path: Path) -> None:
     owner = draft.approval_gate.owner_review.build_owner_review_packets(report_dir=tmp_path / "owner")
     packet = next(item for item in owner["ownerReviewPackets"] if item["reviewTrack"] != "HOLD_OWNER_REVIEW")
-    checks = {check: True for check in packet["requiredChecks"]}
+    checks = dict.fromkeys(packet["requiredChecks"], True)
     result = draft.build_execution_plan_draft(
         report_dir=tmp_path / "draft",
         decisions=[{"packetId": packet["packetId"], "decision": draft.approval_gate.DECISION_REVIEW_APPROVED, "checks": checks}],
@@ -62,7 +62,7 @@ def test_05_review_approved_non_hold_becomes_candidate(tmp_path: Path) -> None:
 def test_06_blocked_approval_blocks_draft(tmp_path: Path) -> None:
     owner = draft.approval_gate.owner_review.build_owner_review_packets(report_dir=tmp_path / "owner")
     packet = next(item for item in owner["ownerReviewPackets"] if item["reviewTrack"] == "HOLD_OWNER_REVIEW")
-    checks = {check: True for check in packet["requiredChecks"]}
+    checks = dict.fromkeys(packet["requiredChecks"], True)
     result = draft.build_execution_plan_draft(
         report_dir=tmp_path / "draft",
         decisions=[{"packetId": packet["packetId"], "decision": draft.approval_gate.DECISION_REVIEW_APPROVED, "checks": checks}],
