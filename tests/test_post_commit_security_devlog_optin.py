@@ -27,6 +27,8 @@ def _make_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q")
+    # post_commit.main() 이 `git config user.name` 을 읽는다 — 전역 설정이 없는 CI 에서도 읽히게 저장소 로컬로 둔다.
+    _git(repo, "config", "user.name", "dev")
     (repo / "a.txt").write_text("x", encoding="utf-8")
     _git(repo, "add", "a.txt")
     _git(repo, "commit", "-q", "-m", "feat: sample")
