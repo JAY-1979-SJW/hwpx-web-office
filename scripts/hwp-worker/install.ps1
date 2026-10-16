@@ -190,8 +190,7 @@ if (-not $selfTestHwp -or -not (Test-Path $selfTestHwp)) {
   $scriptDir  = Split-Path $MyInvocation.MyCommand.Path -Parent
   $candidates = @(
     (Join-Path $scriptDir "selftest\test.hwp"),
-    (Join-Path $scriptDir "test.hwp"),
-    "C:\Users\skyjw\AppData\Local\Temp\hancom_hwpx_poc\sample_input.hwp"
+    (Join-Path $scriptDir "test.hwp")
   )
   foreach ($c in $candidates) { if (Test-Path $c) { $selfTestHwp = $c; break } }
 }

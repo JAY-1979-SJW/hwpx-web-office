@@ -166,7 +166,7 @@ def main():
 
     commit_hash = run(["git", "rev-parse", "--short", "HEAD"])
     commit_body = run(["git", "log", "-1", "--pretty=%b"])
-    author = run(["git", "config", "user.name"])
+    author = "dev"  # 로컬 계정명 노출 방지: git 설정 값을 쓰지 않는다
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     raw_files = run(["git", "diff-tree", "--no-commit-id", "-r", "--name-only", "HEAD"])
     changed_files = [f for f in raw_files.splitlines() if f]
