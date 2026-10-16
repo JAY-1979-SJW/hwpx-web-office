@@ -36,5 +36,9 @@ jobs:
           bad=$(git ls-files -i -c --exclude-standard | grep -v '^data/reports/' || true)
           if [ -n "$bad" ]; then echo "$bad"; echo 'tracked files match .gitignore'; exit 1; fi
 
+      - name: Public hygiene audit
+        # 추적 파일에 개인 절대경로·비밀값이 들어갔는지 검사한다(값은 출력하지 않음).
+        run: python scripts/ops/audit_public_repo_hygiene.py
+
       - name: Run pytest
         run: python -m pytest -q
