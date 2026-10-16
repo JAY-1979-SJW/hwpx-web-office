@@ -141,7 +141,7 @@ def test_noise_never_swallows_real_inputs():
             for f in form["fields"]:
                 if f["role"] == "noise":
                     continue
-                present = f["label"] in labels or any(l.endswith(" " + f["label"]) for l in labels)
+                present = f["label"] in labels or any(ln.endswith(" " + f["label"]) for ln in labels)
                 kept += present
                 dropped += not present
     total = kept + dropped

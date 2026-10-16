@@ -36,7 +36,7 @@ def test_lines_have_finite_coords_and_text_slices():
         assert all(_finite(line[k]) for k in ("x", "y", "w", "h"))
         assert line["y"] >= 0
     # 어떤 줄엔 실제 텍스트가 있어야 함(textpos 슬라이스 동작)
-    assert any(l["text"].strip() for l in out["lines"])
+    assert any(ln["text"].strip() for ln in out["lines"])
 
 
 def test_lines_carry_charpr_segments_and_defs():
@@ -52,7 +52,7 @@ def test_lines_carry_charpr_segments_and_defs():
         if segs:
             assert "".join(s["text"] for s in segs) == line["text"]
     # 실제 서식(charPr 참조)이 붙은 줄이 존재하고, 그 참조가 defs 에 있음
-    styled = [s for l in out["lines"] for s in (l.get("segments") or [])
+    styled = [s for ln in out["lines"] for s in (ln.get("segments") or [])
               if s.get("charPr") is not None]
     assert styled, "charPr 참조가 붙은 조각 없음"
     assert any(s["charPr"] in defs for s in styled), "조각 charPr 가 defs 미해결"
@@ -64,7 +64,7 @@ def test_lines_carry_hancom_baseline():
     baseline 은 줄 상단 기준 offset(px)이며 줄 높이 h 안에 있어야 한다.
     한컴 실행 화면과 수직 위치를 맞추기 위한 데이터."""
     out = extract(str(PR / FORM))
-    withbl = [l for l in out["lines"] if l.get("baseline", 0) > 0]
+    withbl = [ln for ln in out["lines"] if ln.get("baseline", 0) > 0]
     assert withbl, "baseline 반출 없음"
     for line in withbl:
         assert 0 < line["baseline"] <= line["h"] + 1, \
@@ -76,12 +76,12 @@ def test_nested_table_placed_at_container_not_top():
     배치되고 상단으로 새지 않는지. _nearest_tbl/_nearest_cell 회귀 가드."""
     out = extract(str(PR / FORM))
     ph = out["pageHeightPx"]
-    flow = [l for l in out["lines"]
-            if any(k in l["text"] for k in ("지정서", "갱신 허가"))]
+    flow = [ln for ln in out["lines"]
+            if any(k in ln["text"] for k in ("지정서", "갱신 허가"))]
     assert flow, "처리절차 흐름 텍스트를 찾지 못함"
     # 흐름 스텝은 문서 하단(페이지 60% 이하)에 있어야 한다(상단 유출 아님).
-    assert all(l["y"] > ph * 0.6 for l in flow), \
-        f"중첩표가 상단으로 유출됨: {[(l['text'], round(l['y'])) for l in flow]}"
+    assert all(ln["y"] > ph * 0.6 for ln in flow), \
+        f"중첩표가 상단으로 유출됨: {[(ln['text'], round(ln['y'])) for ln in flow]}"
 
 
 def test_table_total_size_matches_declared_sz():
@@ -168,8 +168,8 @@ def test_nested_table_below_preceding_cell_text():
     담긴 문단 vertpos 에 두는 회귀 가드."""
     stamp = "tests/fixtures/hwpx/corpus/fx_stamp_approval_legal.hwpx"
     out = extract(str(PR / stamp))
-    body = next((l for l in out["lines"] if "증명합니다" in l["text"]), None)
-    sign = next((l for l in out["lines"] if "특별자치시장" in l["text"]), None)
+    body = next((ln for ln in out["lines"] if "증명합니다" in ln["text"]), None)
+    sign = next((ln for ln in out["lines"] if "특별자치시장" in ln["text"]), None)
     assert body is not None and sign is not None, "본문/서명 줄을 찾지 못함"
     assert sign["y"] > body["y"] + 20, \
         f"서명(y={sign['y']:.0f})이 본문(y={body['y']:.0f}) 아래에 있어야 함"

@@ -117,7 +117,7 @@ def _check_a03_a10(ar, lt, lc) -> bool:
         "A04",
         "top field mappings exist (taskName/number/... → correct fields)",
         field_ok,
-        str({f: lt.classify_label(l).semanticField for f, l in top_labels.items()}),
+        str({f: lt.classify_label(ln).semanticField for f, ln in top_labels.items()}),
     )
 
     # A05. sample header mappings
@@ -129,28 +129,28 @@ def _check_a03_a10(ar, lt, lc) -> bool:
         "A05",
         "sample header mappings (종별/시험종목/시험방법)",
         sample_ok,
-        str({f: lt.classify_label(l).semanticField for f, l in sample_labels.items()}),
+        str({f: lt.classify_label(ln).semanticField for f, ln in sample_labels.items()}),
     )
 
     # A06. public doc meta labels separated
     meta_labels = ["접수", "직인", "결재", "담당", "승인", "통보"]
-    meta_ok = all(lt.classify_label(l).classification == lt.CLS_META for l in meta_labels)
+    meta_ok = all(lt.classify_label(ln).classification == lt.CLS_META for ln in meta_labels)
     ar.check(
         "A06",
         "공문서 메타 라벨(접수/직인/결재/...) 분리",
         meta_ok,
-        str({l: lt.classify_label(l).classification for l in meta_labels}),
+        str({ln: lt.classify_label(ln).classification for ln in meta_labels}),
         "FAIL_LOW_CONFIDENCE_AUTO_PROMOTED",
     )
 
     # A07. back-side form hints separated
     back_labels = ["(뒤쪽)", "뒤쪽", "뒷면", "(제2쪽)", "(8쪽중제3쪽)"]
-    back_ok = all(lt.classify_label(l).classification == lt.CLS_BACK for l in back_labels)
+    back_ok = all(lt.classify_label(ln).classification == lt.CLS_BACK for ln in back_labels)
     ar.check(
         "A07",
         "뒷면/앞면 마커 분리",
         back_ok,
-        str({l: lt.classify_label(l).classification for l in back_labels}),
+        str({ln: lt.classify_label(ln).classification for ln in back_labels}),
     )
 
     # A08. gantt/schedule hints separated
@@ -202,14 +202,14 @@ def _check_a03_a10(ar, lt, lc) -> bool:
     # A10. low confidence not auto-promoted
     low_conf_labels = ["기타업종", "알수없는항목123"]
     low_ok = all(
-        lt.classify_label(l).classification not in (lt.CLS_HIGH, lt.CLS_MEDIUM)
-        for l in low_conf_labels
+        lt.classify_label(ln).classification not in (lt.CLS_HIGH, lt.CLS_MEDIUM)
+        for ln in low_conf_labels
     )
     ar.check(
         "A10",
         "low confidence 라벨 자동 확정 없음",
         low_ok,
-        str({l: lt.classify_label(l).classification for l in low_conf_labels}),
+        str({ln: lt.classify_label(ln).classification for ln in low_conf_labels}),
         "FAIL_LOW_CONFIDENCE_AUTO_PROMOTED",
     )
 
