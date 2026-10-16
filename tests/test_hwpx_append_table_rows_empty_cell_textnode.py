@@ -268,8 +268,8 @@ def test_append_row_preserves_charPrIDRef_paraPrIDRef(tmp_path):
         section = ET.fromstring(zf.read("Contents/section0.xml"))
         header = ET.fromstring(zf.read("Contents/header.xml"))
 
-    char_ids = {cp.attrib.get("id") for cp in header.iter(f"{{http://www.hancom.co.kr/hwpml/2011/head}}charPr")}
-    para_ids = {pp.attrib.get("id") for pp in header.iter(f"{{http://www.hancom.co.kr/hwpml/2011/head}}paraPr")}
+    char_ids = {cp.attrib.get("id") for cp in header.iter("{http://www.hancom.co.kr/hwpml/2011/head}charPr")}
+    para_ids = {pp.attrib.get("id") for pp in header.iter("{http://www.hancom.co.kr/hwpml/2011/head}paraPr")}
     referenced_chars = {run.attrib.get("charPrIDRef") for run in section.iter(f"{{{NS_HP}}}run") if run.attrib.get("charPrIDRef")}
     referenced_paras = {p.attrib.get("paraPrIDRef") for p in section.iter(f"{{{NS_HP}}}p") if p.attrib.get("paraPrIDRef")}
     assert referenced_chars <= char_ids, f"dangling charPrIDRef: {referenced_chars - char_ids}"

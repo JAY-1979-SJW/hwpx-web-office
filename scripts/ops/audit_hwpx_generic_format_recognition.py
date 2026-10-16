@@ -74,7 +74,7 @@ backlog_src = backlog_path.read_text(encoding="utf-8") if backlog_path.exists() 
 has_findings = ("HALIGN" in backlog_src or "FILLCOLOR" in backlog_src
                 or "CHAR_STYLE" in backlog_src or "FONTFACE" in backlog_src)
 check("C09", "인식 결함 식별됨 (감사 효용)",
-      has_findings, f"no findings detected in backlog")
+      has_findings, "no findings detected in backlog")
 
 # ── C10: BLOCKER_EDIT_UNSAFE 미발견 (현재 단계 안전) ────────────────────────
 blocker = cov_data.get("blockerEditUnsafe", -1)

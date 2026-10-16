@@ -89,7 +89,7 @@ def run_audit() -> dict:
     findings.append({
         "check": "set_cell_paragraph_text_not_used",
         "ok": len(hits) == 0,
-        "detail": (f"no occurrences" if not hits
+        "detail": ("no occurrences" if not hits
                      else f"occurrences in: {hits}"),
     })
 

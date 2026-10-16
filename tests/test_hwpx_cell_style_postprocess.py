@@ -158,7 +158,7 @@ def test_set_cells_by_label_solid_fill_op(synthetic_label_fill_result):
     assert out.exists()
     ops = result.get("operations", [])
     fill_ops = [o for o in ops if o.get("status") in ("SOLID_FILL_PASS", "REUSED_EXISTING")]
-    assert len(fill_ops) >= 1, f"set_cells_by_label solid fill op 없음"
+    assert len(fill_ops) >= 1, "set_cells_by_label solid fill op 없음"
 
 
 # ── 3. set_cells_by_text + solid_fill ────────────────────────────────────────

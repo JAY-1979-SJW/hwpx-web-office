@@ -44,11 +44,11 @@ def create_empty_hwpx():
 def run_security_smoke(base_url, out_dir):
     """Main security test function"""
 
-    print(f"[test_hwpx_security] Starting security tests...", file=sys.stderr)
+    print("[test_hwpx_security] Starting security tests...", file=sys.stderr)
     print(f"[test_hwpx_security] Base URL: {base_url}", file=sys.stderr)
 
     # Create test files
-    print(f"[test_hwpx_security] Creating test files...", file=sys.stderr)
+    print("[test_hwpx_security] Creating test files...", file=sys.stderr)
 
     invalid_zip_path = create_invalid_zip()
     non_hwpx_zip_path = create_non_hwpx_zip()
@@ -116,17 +116,17 @@ def run_security_smoke(base_url, out_dir):
                 # Check: ok should be False
                 if not resp_json.get("ok", True):
                     result["ok_check"] = "PASS"
-                    print(f"✅ PASS (ok=false)", file=sys.stderr)
+                    print("✅ PASS (ok=false)", file=sys.stderr)
                 else:
                     result["ok_check"] = "FAIL"
-                    print(f"❌ FAIL (ok should be false)", file=sys.stderr)
+                    print("❌ FAIL (ok should be false)", file=sys.stderr)
 
                 # Check: should have errors
                 if resp_json.get("errorCount", 0) > 0:
                     result["error_check"] = "PASS"
                 else:
                     result["error_check"] = "WARN"
-                    print(f"   Warning: No errors reported", file=sys.stderr)
+                    print("   Warning: No errors reported", file=sys.stderr)
 
                 # Check: HTTP status
                 if 200 <= response.status_code < 300:
@@ -158,7 +158,7 @@ def run_security_smoke(base_url, out_dir):
         results.append(result)
 
     # Cleanup
-    print(f"[test_hwpx_security] Cleaning up temp files...", file=sys.stderr)
+    print("[test_hwpx_security] Cleaning up temp files...", file=sys.stderr)
     for path in [invalid_zip_path, non_hwpx_zip_path, empty_hwpx_path]:
         try:
             os.remove(path)
@@ -193,16 +193,16 @@ def run_security_smoke(base_url, out_dir):
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("# HWPX Security Defense Test\n\n")
         f.write(f"**Test Time**: {summary['test_time']}\n\n")
-        f.write(f"## Summary\n\n")
-        f.write(f"| 항목 | 결과 |\n")
-        f.write(f"|-----|------|\n")
+        f.write("## Summary\n\n")
+        f.write("| 항목 | 결과 |\n")
+        f.write("|-----|------|\n")
         f.write(f"| Total Tests | {summary['total_tests']} |\n")
         f.write(f"| Passed | {summary['passed']} |\n")
         f.write(f"| Failed | {summary['failed']} |\n")
         f.write(f"| Pass Rate | {summary['pass_rate']} |\n")
         f.write(f"| Judgment | {summary['judgment']} |\n\n")
 
-        f.write(f"## Test Results\n\n")
+        f.write("## Test Results\n\n")
         for result in results:
             status = "✅" if result.get("is_pass", False) else "❌"
             f.write(f"{status} {result['test_name']}\n")
@@ -215,7 +215,7 @@ def run_security_smoke(base_url, out_dir):
             if result.get("errors"):
                 f.write(f"  - errors: {result['errors']}\n")
 
-    print(f"\n[test_hwpx_security] Summary:", file=sys.stderr)
+    print("\n[test_hwpx_security] Summary:", file=sys.stderr)
     print(f"  Total: {summary['total_tests']}", file=sys.stderr)
     print(f"  Passed: {summary['passed']}", file=sys.stderr)
     print(f"  Failed: {summary['failed']}", file=sys.stderr)

@@ -50,7 +50,7 @@ def cmd_build_index() -> int:
 def cmd_stats() -> int:
     idx = FormIndex.load(DEFAULT_JSONL)
     s = idx.stats()
-    print(f"\n[인덱스 통계]")
+    print("\n[인덱스 통계]")
     print(f"  전체 서식: {s['totalForms']}개\n")
     print("  도메인별:")
     for d, c in s["domainCounts"].items():
