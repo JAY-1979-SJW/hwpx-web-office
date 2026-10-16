@@ -1,7 +1,6 @@
 """HWPX-RECOGNITION-LABEL-DICTIONARY-PROMOTION-GATE-01 tests."""
 from __future__ import annotations
 
-import json
 import sqlite3
 import sys
 from pathlib import Path

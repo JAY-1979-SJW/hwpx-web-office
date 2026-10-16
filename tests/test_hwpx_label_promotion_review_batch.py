@@ -1,11 +1,9 @@
 """HWPX-RECOGNITION-LABEL-PROMOTION-CANDIDATE-REVIEW-BATCH-01 tests."""
 from __future__ import annotations
 
-import sqlite3
 import sys
 from pathlib import Path
 
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))

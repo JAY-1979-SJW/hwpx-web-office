@@ -21,8 +21,7 @@ sys.path.insert(0, str(PR / "scripts/hwpx"))
 from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
     import_hwpx_as_ro_view)
 from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
-    run_para_edit_e2e, _ro_paragraph_to_model, _build_target,
-    SCENARIO_TYPE)
+    run_para_edit_e2e, SCENARIO_TYPE)
 from scripts.hwpx.web_office.paragraph_writer_adapter import (  # noqa: E402
     apply_paragraph_edits_plan,
     REASON_UNSAFE_RUN_CHILDREN,

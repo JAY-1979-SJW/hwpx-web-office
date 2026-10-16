@@ -277,7 +277,6 @@ def test_border_fill_reuse_same_color(tmp_path):
 
 def test_border_fill_create_new_color(tmp_path):
     from hwpx_edit_tool import apply_edit_plan
-    from hwpx.parser import parse_hwpx_v2
     out = tmp_path / "out.hwpx"
     plan = {
         "set_cell_styles": [

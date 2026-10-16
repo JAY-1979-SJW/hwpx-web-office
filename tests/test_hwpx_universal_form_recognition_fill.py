@@ -262,9 +262,8 @@ def test_no_target_no_plan():
 
 def test_duplicate_candidates_review_required():
     """동일 fieldGuess 후보가 여러 개이면 reviewRequiredReasons에 기록된다."""
-    from hwpx.parser import parse_hwpx_v2
     from hwpx.pipeline.form_recognizer import (
-        recognize_form, EnhancedSlot, FormRecognitionResult
+        EnhancedSlot, FormRecognitionResult
     )
     from hwpx.pipeline.plan_builder import build_edit_plan_from_form
 

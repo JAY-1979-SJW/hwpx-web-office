@@ -299,7 +299,7 @@ def test_corpus_db_build_script_exists():
 
 def test_low_confidence_not_auto_promoted():
     from hwpx.recognition_corpus.label_taxonomy import (
-        classify_label, CLS_HIGH, CLS_MEDIUM, CLS_LOW,
+        classify_label, CLS_HIGH, CLS_MEDIUM,
     )
     # 애매한 단어는 REVIEW_REQUIRED 또는 UNKNOWN이어야 함
     r = classify_label("기타업종")

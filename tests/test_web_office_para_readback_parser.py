@@ -28,7 +28,7 @@ from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
     _match_output_paragraph,
     _readback_verify_paragraph,
     SCENARIO_TYPE, SCENARIO_REPLACE, SCENARIO_DELETE,
-    READBACK_PASS, READBACK_FAIL, READBACK_DEFERRED)
+    READBACK_PASS, READBACK_FAIL)
 
 
 def _fixture() -> Path | None:

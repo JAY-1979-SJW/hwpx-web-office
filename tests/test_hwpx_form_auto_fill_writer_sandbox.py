@@ -1,13 +1,10 @@
 """HWPX-FORM-AUTO-FILL-WRITER-SANDBOX-01 — 테스트."""
 from __future__ import annotations
 
-import hashlib
 import io
 import json
-import os
 import re
 import sys
-import time
 import zipfile
 from pathlib import Path
 
@@ -123,7 +120,7 @@ def test_sandbox_write_creates_output_copy(tmp_path):
 # ── T04. source_path == output_path 거부 ─────────────────────────────────────
 
 def test_same_path_rejected(tmp_path):
-    from hwpx.pipeline.form_auto_fill_writer_sandbox import _do_write, WriteTarget
+    from hwpx.pipeline.form_auto_fill_writer_sandbox import _do_write
     tmpl = _write_hwpx(tmp_path / "tpl.hwpx", [["시공자", ""]])
     with pytest.raises((ValueError, AssertionError)):
         _do_write(tmpl, tmpl, {}, [])
@@ -157,7 +154,7 @@ def test_source_mtime_unchanged(tmp_path):
 # ── T07. writerEligible=true 필드만 입력 ─────────────────────────────────────
 
 def test_writer_eligible_true_only(tmp_path):
-    from hwpx.pipeline.form_auto_fill_writer_sandbox import run_sandbox_write, _RB_PASS
+    from hwpx.pipeline.form_auto_fill_writer_sandbox import run_sandbox_write
     from hwpx.pipeline.approval_gate import (
         ApprovedField, ACTION_CONFIRM,
     )

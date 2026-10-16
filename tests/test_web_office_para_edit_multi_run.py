@@ -22,15 +22,13 @@ from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
     import_hwpx_as_ro_view)
 from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # noqa: E402
     run_para_edit_e2e, _ro_paragraph_to_model, _build_target,
-    SCENARIO_TYPE, SCENARIO_REPLACE, SCENARIO_DELETE)
+    SCENARIO_REPLACE, SCENARIO_DELETE)
 from scripts.hwpx.web_office.paragraph_writer_adapter import (  # noqa: E402
     REASON_REQUIRES_REVIEW, REASON_UNSAFE_RUN_CHILDREN,
     REASON_TYPE_TEXT_MULTI_RUN_NOT_SUPPORTED,
-    REASON_MULTI_RUN_RANGE_NOT_SUPPORTED,
     apply_paragraph_edits_plan)
 from scripts.hwpx.web_office.para_edit_model import (  # noqa: E402
     make_replace_text_range_command,
-    make_delete_text_range_command,
     POLICY_ANCHOR_CHARPR, POLICY_FOCUS_CHARPR, POLICY_REQUIRES_REVIEW)
 
 
