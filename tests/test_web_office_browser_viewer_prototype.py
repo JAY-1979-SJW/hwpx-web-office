@@ -134,7 +134,8 @@ def test_merged_cell_rendered_as_rowspan_or_colspan(tmp_path):
 @pytest.mark.skipif(len(FIXTURES) < 1, reason="need ≥1 fixture")
 def test_source_sha_and_mtime_unchanged_after_render(tmp_path):
     f = FIXTURES[0]
-    sha_before = _sha(f); mt_before = f.stat().st_mtime_ns
+    sha_before = _sha(f)
+    mt_before = f.stat().st_mtime_ns
     doc = import_hwpx_as_ro_view(f)
     payload = build_render_payload(doc)
     pj = tmp_path / "payload.json"

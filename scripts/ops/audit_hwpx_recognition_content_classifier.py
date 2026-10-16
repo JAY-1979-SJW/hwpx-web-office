@@ -13,7 +13,9 @@ OUTPUT_DIR = PROJECT_ROOT / "reports/hwpx_recognition_content_classifier_audit"
 
 class _Cell:
     def __init__(self, r, c, t, tid="t"):
-        self.tableId = tid; self.row = r; self.col = c
+        self.tableId = tid
+        self.row = r
+        self.col = c
         self.normalizedText = t
 
 
@@ -23,12 +25,14 @@ class _Para:
 
 class _Table:
     def __init__(self, cells, tid="t"):
-        self.tableId = tid; self.cells = cells
+        self.tableId = tid
+        self.cells = cells
 
 
 class _Res:
     def __init__(self, tables, paras=()):
-        self.tables = tables; self.paragraphs = list(paras)
+        self.tables = tables
+        self.paragraphs = list(paras)
 
 
 def _fillable_fixture():

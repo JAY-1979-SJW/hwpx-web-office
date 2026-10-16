@@ -171,7 +171,9 @@ def main() -> None:
             continue
         _log(f"[corpus] {cfg['dir']} 색인 시작 …")
         ok, fail, skip = index_corpus(con, cfg)
-        tot_ok += ok; tot_fail += fail; tot_skip += skip
+        tot_ok += ok
+        tot_fail += fail
+        tot_skip += skip
         _log(f"[corpus] {cfg['dir']} 완료 — OK {ok} · 실패 {fail} · 스킵 {skip}")
     con.close()
     _log(f"[done] 전체 색인 OK {tot_ok} · 실패 {tot_fail} · 스킵 {tot_skip} · {(time.time()-t0)/60:.1f}분")

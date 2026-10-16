@@ -69,7 +69,8 @@ def test_t12_unknown_type(se):
 
 
 def test_t13_forbidden_field(se):
-    s = _src(); s["apiKey"] = "sk-..."
+    s = _src()
+    s["apiKey"] = "sk-..."
     errs = se.validate_source_descriptor(s)
     assert any(e.startswith("FORBIDDEN_FIELD:apiKey") for e in errs)
 

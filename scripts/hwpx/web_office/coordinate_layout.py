@@ -814,11 +814,11 @@ def _build_section_result(ctx):
     # 감사·회귀 호환을 위해 병행 유지.
     pages_detail = [{"no": i + 1, "lines": [], "boxes": []} for i in range(total_pages)]
     if page_h > 0:
-        for l in ctx.lines:
-            p = int(l["y"] // page_h)
+        for lx in ctx.lines:
+            p = int(lx["y"] // page_h)
             if 0 <= p < total_pages:
-                q = dict(l)
-                q["y"] = round(l["y"] - p * page_h, 1)
+                q = dict(lx)
+                q["y"] = round(lx["y"] - p * page_h, 1)
                 pages_detail[p]["lines"].append(q)
         for b in ctx.boxes:
             top, bot = b["y"], b["y"] + b["h"]
@@ -920,20 +920,20 @@ def layout_quality(layout):
             cid = b.get("cellId")
             if cid:
                 pb.setdefault(cid, []).append(b)
-        for l in pd["lines"]:
-            cid = l.get("cellId")
+        for lx in pd["lines"]:
+            cid = lx.get("cellId")
             if cid and cid in pb:
                 if not any(
-                    b["y"] - 1.5 <= l["y"] and l["y"] + l["h"] <= b["y"] + b["h"] + 1.5
+                    b["y"] - 1.5 <= lx["y"] and lx["y"] + lx["h"] <= b["y"] + b["h"] + 1.5
                     for b in pb[cid]
                 ):
                     viol += 1
                     max_over = max(
-                        max_over, min(abs(l["y"] + l["h"] - (b["y"] + b["h"])) for b in pb[cid])
+                        max_over, min(abs(lx["y"] + lx["h"] - (b["y"] + b["h"])) for b in pb[cid])
                     )
             elif (
-                not l.get("cell") and (l.get("text") or "").strip()
-                and any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13 for b in pd["boxes"])
+                not lx.get("cell") and (lx.get("text") or "").strip()
+                and any(b["y"] + 3 < lx["y"] < b["y"] + b["h"] - 13 for b in pd["boxes"])
             ):
                 ovl += 1
     return {

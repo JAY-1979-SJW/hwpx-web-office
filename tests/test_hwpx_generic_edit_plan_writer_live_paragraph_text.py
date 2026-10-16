@@ -468,7 +468,8 @@ def test_set_cell_text_regression_under_extension(stages, tmp_path):
     for t in parsed.tables:
         for c in t.cells:
             if c.normalizedText == "교육기관대행갱신신청서":
-                target = (t.tableId, c); break
+                target = (t.tableId, c)
+                break
         if target: break
     t_id, cell = target
     sha = hashlib.sha256(METADATA_FORM.read_bytes()).hexdigest()
@@ -496,7 +497,8 @@ def test_align_regression_under_extension(stages, tmp_path):
     for t in parsed.tables:
         for c in t.cells:
             if c.normalizedText == "교육기관대행갱신신청서":
-                target = (t.tableId, c); break
+                target = (t.tableId, c)
+                break
         if target: break
     t_id, cell = target
     sha = hashlib.sha256(METADATA_FORM.read_bytes()).hexdigest()
@@ -524,7 +526,8 @@ def test_setcellfillcolor_still_unsupported_in_live(stages, tmp_path):
     for t in parsed.tables:
         for c in t.cells:
             if c.normalizedText == "교육기관대행갱신신청서":
-                target = (t.tableId, c); break
+                target = (t.tableId, c)
+                break
         if target: break
     t_id, cell = target
     plan = stages["contract"].empty_plan_skeleton(
@@ -560,7 +563,8 @@ def test_object_cell_mapper_does_not_invoke_writer(stages, tmp_path):
     orig = stages["live"].execute_writer_call_plan_live_sandbox
 
     def _trap(*a, **k):
-        call_log.append("live"); return orig(*a, **k)
+        call_log.append("live")
+        return orig(*a, **k)
 
     # mapper / confirmation gate 동작이 live executor를 호출하지 않음을 확인
     r = object_cell_mapper.map_objects_to_cells_with_geometry(METADATA_FORM)

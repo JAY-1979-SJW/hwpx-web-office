@@ -17,7 +17,9 @@ from scripts.hwpx.recognition_corpus import corpus_schema as cs
 
 class FCell:
     def __init__(self, row, col, text, tid="t"):
-        self.tableId = tid; self.row = row; self.col = col
+        self.tableId = tid
+        self.row = row
+        self.col = col
         self.normalizedText = text
 
 
@@ -33,7 +35,8 @@ class FRes:
 
 class FTable:
     def __init__(self, cells, tid="t"):
-        self.tableId = tid; self.cells = cells
+        self.tableId = tid
+        self.cells = cells
 
 
 def _make_fillable(filename="samples/[별지 1] 신청서.hwpx"):

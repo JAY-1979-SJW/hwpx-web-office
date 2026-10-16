@@ -347,11 +347,11 @@ def test_no_write_package_import():
         src = py_file.read_text(encoding="utf-8")
         # docstring/comment 라인은 제외하고 실제 코드 라인에서만 검사
         code_lines = [
-            l
-            for l in src.splitlines()
-            if not l.strip().startswith("#")
-            and not l.strip().startswith('"""')
-            and not l.strip().startswith("'''")
+            line
+            for line in src.splitlines()
+            if not line.strip().startswith("#")
+            and not line.strip().startswith('"""')
+            and not line.strip().startswith("'''")
         ]
         code_src = "\n".join(code_lines)
         assert not re.search(r"\bwrite_package\s*\(", code_src), (

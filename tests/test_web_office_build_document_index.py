@@ -90,7 +90,7 @@ def test_build_index_writes_jsonl_and_markdown_incrementally(tmp_path, monkeypat
     path = D.build_index(targets, out_dir=out)
     lines = path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
-    assert {json.loads(l)["formId"] for l in lines} == {1, 2}
+    assert {json.loads(line)["formId"] for line in lines} == {1, 2}
     md = (out / "document_index.md").read_text(encoding="utf-8")
     assert "#1" in md and "#2" in md and "합계" in md
 

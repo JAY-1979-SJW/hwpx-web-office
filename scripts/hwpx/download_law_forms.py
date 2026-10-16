@@ -191,7 +191,7 @@ def main():
     args = ap.parse_args()
 
     HWP_DIR.mkdir(parents=True, exist_ok=True)
-    rows = [json.loads(l) for l in INDEX.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(ln) for ln in INDEX.read_text(encoding="utf-8").splitlines() if ln.strip()]
     if args.ministry:
         rows = [r for r in rows if args.ministry in (r.get("ministry") or "")]
 

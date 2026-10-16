@@ -201,7 +201,8 @@ def test_live_command_final_text_e2e_v1_to_v7(tmp_path):
           and p.parPrIDRef and p.runs and p.runs[0].charPrIDRef
           and len(p.text or "") >= 2), None)
     assert ro_p is not None
-    sha_b = _sha(FIXTURE); mt_b = FIXTURE.stat().st_mtime_ns
+    sha_b = _sha(FIXTURE)
+    mt_b = FIXTURE.stat().st_mtime_ns
     out = tmp_path / "ime_e2e.hwpx"
     res = run_para_edit_e2e(
         source_path=FIXTURE, output_path=out,

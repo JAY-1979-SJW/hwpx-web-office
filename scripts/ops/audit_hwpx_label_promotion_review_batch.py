@@ -94,7 +94,8 @@ def run_audit() -> dict:
                                 "normalizedLabel": "공사명",
                                 "proposedSemantic": "PROJECT_NAME",
                                 "decision": "APPROVE"}]}
-    bad = dict(good); bad["approvedBy"] = ""
+    bad = dict(good)
+    bad["approvedBy"] = ""
     v_ok = rb.validate_human_approval_batch_input(good, review_batch=b)
     v_bad = rb.validate_human_approval_batch_input(bad, review_batch=b)
     findings.append({"check": "approval_input_validation",

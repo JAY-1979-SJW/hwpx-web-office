@@ -150,7 +150,7 @@ def test_t33_hwp_disabled_default(src_adapters, ac):
 
 
 def test_t34_default_registry_empty_when_all_unset(src_adapters, ac):
-    with mock.patch.dict(os.environ, {f: "" for f in ac.ALL_ENV_FLAGS},
+    with mock.patch.dict(os.environ, dict.fromkeys(ac.ALL_ENV_FLAGS, ""),
                               clear=False):
         registry = src_adapters.build_default_registry()
         assert registry == {}
@@ -165,7 +165,7 @@ def test_t35_default_registry_includes_kprc_when_enabled(src_adapters, ac):
 # ── adapter status snapshot ────────────────────────────────────────
 
 def test_t40_dump_status_all_disabled(ac):
-    with mock.patch.dict(os.environ, {f: "" for f in ac.ALL_ENV_FLAGS},
+    with mock.patch.dict(os.environ, dict.fromkeys(ac.ALL_ENV_FLAGS, ""),
                               clear=False):
         snap = ac.dump_adapter_status()
         assert snap["anyEnabled"] is False

@@ -118,8 +118,8 @@ def hug_name_map(max_pages: int = 10) -> dict[str, str]:
         if not links:
             break
         before = len(out)
-        for l in links:
-            q = urllib.parse.parse_qs(urllib.parse.urlparse("?" + l.split("?", 1)[1]).query)
+        for ln in links:
+            q = urllib.parse.parse_qs(urllib.parse.urlparse("?" + ln.split("?", 1)[1]).query)
             onm, snm = q.get("onm", [""])[0], q.get("snm", [""])[0]
             if not onm or not snm:
                 continue

@@ -103,15 +103,15 @@ def fixture_scan_result(tmp_path_factory):
     catalog_path = out / "table_catalog.jsonl"
     catalog = []
     if catalog_path.exists():
-        catalog = [json.loads(l) for l in catalog_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        catalog = [json.loads(line) for line in catalog_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     inv_path = out / "inventory.jsonl"
     inv = []
     if inv_path.exists():
-        inv = [json.loads(l) for l in inv_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        inv = [json.loads(line) for line in inv_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     fails_path = out / "parse_failures.jsonl"
     fails = []
     if fails_path.exists():
-        fails = [json.loads(l) for l in fails_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        fails = [json.loads(line) for line in fails_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     return {"result": result, "catalog": catalog, "inv": inv, "fails": fails, "out": out}
 
 
