@@ -174,7 +174,7 @@ def _check_git_state() -> list[dict]:
             errors="replace",
             cwd=str(PROJECT_ROOT),
         )
-        hwpx_changed = [l for l in r.stdout.splitlines() if l.endswith(".hwpx")]
+        hwpx_changed = [ln for ln in r.stdout.splitlines() if ln.endswith(".hwpx")]
         checks.append(_check("A11_original_hwpx_unchanged", not hwpx_changed, str(hwpx_changed)))
     except Exception as exc:  # ruff: ignore[blind-except] -- report-and-continue
         checks.append(_check("A11_original_hwpx_unchanged", False, str(exc)))

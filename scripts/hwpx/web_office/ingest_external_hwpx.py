@@ -108,8 +108,8 @@ def apply_manifest() -> dict:
     """복사 결과를 카탈로그에 반영 — source_path 교체 + 재분석 대상으로 표시."""
     if not MANIFEST.is_file():
         raise SystemExit(f"매니페스트 없음: {MANIFEST} — 먼저 복사하세요")
-    recs = [json.loads(l) for l in
-            MANIFEST.read_text(encoding="utf-8").splitlines() if l.strip()]
+    recs = [json.loads(line) for line in
+            MANIFEST.read_text(encoding="utf-8").splitlines() if line.strip()]
     con = sqlite3.connect(CATALOG, timeout=600)
     con.execute("PRAGMA journal_mode=WAL")
     moved = marked = 0

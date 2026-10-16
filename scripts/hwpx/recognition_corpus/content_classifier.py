@@ -137,7 +137,7 @@ def extract_content_features(parser_result, rel_path: str = "") -> dict:
     question_count = len(QUESTION_REGEX.findall(para_joined))
     empty_para_ratio = sum(1 for t in para_texts if not t.strip()) / max(len(para_texts), 1)
 
-    application_hits = sum(1 for l in label_texts if l in APPLICATION_LABELS)
+    application_hits = sum(1 for line in label_texts if line in APPLICATION_LABELS)
     inspection_hits = sum(1 for kw in INSPECTION_KEYWORDS if kw in para_joined)
     checklist_hits = sum(1 for kw in CHECKLIST_KEYWORDS if kw in para_joined)
     plan_hits = sum(1 for kw in PLAN_KEYWORDS if kw in para_joined)

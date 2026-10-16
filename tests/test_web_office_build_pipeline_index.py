@@ -102,7 +102,7 @@ def test_write_index_covers_all_rows_and_is_valid_jsonl(tmp_path, monkeypatch):
     jsonl_path, md_path = P.write_index(rows, out_dir=tmp_path / "out")
     lines = jsonl_path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 7
-    parsed = [json.loads(l) for l in lines]
+    parsed = [json.loads(line) for line in lines]
     assert {p["form_id"] for p in parsed} == {1, 2, 3, 4, 5, 6, 7}
     md = md_path.read_text(encoding="utf-8")
     assert "전체 7건" in md

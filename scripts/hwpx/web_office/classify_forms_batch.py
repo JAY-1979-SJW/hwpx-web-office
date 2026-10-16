@@ -78,8 +78,8 @@ def apply_stash() -> dict:
     import json
     if not STASH.exists():
         raise SystemExit(f"stash 없음: {STASH} — 먼저 --stash 로 계산하세요")
-    updates = [tuple(json.loads(l)) for l in
-               STASH.read_text(encoding="utf-8").splitlines() if l.strip()]
+    updates = [tuple(json.loads(line)) for line in
+               STASH.read_text(encoding="utf-8").splitlines() if line.strip()]
     con = sqlite3.connect(CATALOG, timeout=300)
     con.execute("PRAGMA journal_mode=WAL")
     ensure_schema(con)

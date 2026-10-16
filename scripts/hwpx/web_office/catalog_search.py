@@ -289,7 +289,7 @@ def match_form(
     if not catalog_ready():
         return {"ready": False, "candidates": []}
     field_labels = field_labels or []
-    norm_labels = {_norm(l) for l in field_labels if _norm(l)}
+    norm_labels = {_norm(line) for line in field_labels if _norm(line)}
     try:
         con = _con()
         result: dict[str, Any] = {"ready": True, "candidates": []}

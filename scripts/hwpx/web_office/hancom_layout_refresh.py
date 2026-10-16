@@ -421,10 +421,10 @@ def _stitch_one_row_pair(
     dy0 = boxes0[0]["y"] - orig_box_pos[id(boxes0[0])][1] if id(boxes0[0]) in orig_box_pos else 0.0
     dy1 = boxes1[0]["y"] - orig_box_pos[id(boxes1[0])][1] if id(boxes1[0]) in orig_box_pos else 0.0
     content_bottom0 = max(
-        (l["y"] + l["h"] + dy0 for l in lines if l.get("cellId") in cids0),
+        (line["y"] + line["h"] + dy0 for line in lines if line.get("cellId") in cids0),
         default=None,
     )
-    content_top1 = min((l["y"] + dy1 for l in lines if l.get("cellId") in cids1), default=None)
+    content_top1 = min((line["y"] + dy1 for line in lines if line.get("cellId") in cids1), default=None)
     if content_bottom0 is not None and shared < content_bottom0:
         shared = content_bottom0
     if content_top1 is not None and shared > content_top1 >= (content_bottom0 or 0):
@@ -500,12 +500,12 @@ def _sync_lines_to_boxes(boxes: list[dict], lines: list[dict], orig_box_pos: dic
         if abs(dx) > 0.05 or abs(dy) > 0.05:
             delta_by_cell[cid] = (dx, dy)
     if delta_by_cell:
-        for l in lines:
-            cid = l.get("cellId")
+        for line in lines:
+            cid = line.get("cellId")
             d = delta_by_cell.get(cid) if cid else None
             if d:
-                l["x"] = round(l["x"] + d[0], 1)
-                l["y"] = round(l["y"] + d[1], 1)
+                line["x"] = round(line["x"] + d[0], 1)
+                line["y"] = round(line["y"] + d[1], 1)
                 changed = True
     return changed
 
