@@ -177,9 +177,8 @@ def classify_form_kind(
     name: str, doc_model: dict | None = None, render_payload: dict | None = None
 ) -> str:
     """서식 종류 — 구조(접수장치) 우선, 이름 어휘는 보조."""
-    if doc_model is not None and render_payload is not None:
-        if has_application_markers(doc_model, render_payload):
-            return KIND_APPLICATION
+    if doc_model is not None and render_payload is not None and has_application_markers(doc_model, render_payload):
+        return KIND_APPLICATION
     t = _norm(name or "")
     t = re.sub(r"^\d+[_\s]*", "", t)
     t = re.sub(r"\.hwpx?$", "", t, flags=re.I).replace("_", " ")

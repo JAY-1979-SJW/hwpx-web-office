@@ -103,19 +103,22 @@ def validate_supplied_field(label: str, value: str) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
     if not text:
         return warnings
-    if any(token in normalized_label for token in ("일자", "착공일", "완공일", "반입일")):
-        if not re.fullmatch(r"(?:20)?\d{2}[.\-/년]\s*\d{1,2}[.\-/월]\s*\d{1,2}\s*일?", text):
-            warnings.append({"type": "DATE_FORMAT_WARN", "label": label, "value": value, "expected": "YYYY.MM.DD or YYYY년 MM월 DD일"})
-    if "전화번호" in normalized_label:
-        if not re.fullmatch(r"0\d{1,2}-?\d{3,4}-?\d{4}", text):
-            warnings.append({"type": "PHONE_FORMAT_WARN", "label": label, "value": value, "expected": "02-0000-0000 or 010-0000-0000"})
+    if (
+        any(token in normalized_label for token in ("일자", "착공일", "완공일", "반입일"))
+        and not re.fullmatch(r"(?:20)?\d{2}[.\-/년]\s*\d{1,2}[.\-/월]\s*\d{1,2}\s*일?", text)
+    ):
+        warnings.append({"type": "DATE_FORMAT_WARN", "label": label, "value": value, "expected": "YYYY.MM.DD or YYYY년 MM월 DD일"})
+    if "전화번호" in normalized_label and not re.fullmatch(r"0\d{1,2}-?\d{3,4}-?\d{4}", text):
+        warnings.append({"type": "PHONE_FORMAT_WARN", "label": label, "value": value, "expected": "02-0000-0000 or 010-0000-0000"})
     if any(token in normalized_label for token in ("면적", "설계량", "반입량", "합격량", "불합격량")):
         number_text = text.replace(",", "").replace("㎡", "").replace("m2", "").strip()
         if number_text and not re.fullmatch(r"\d+(?:\.\d+)?", number_text):
             warnings.append({"type": "NUMBER_FORMAT_WARN", "label": label, "value": value, "expected": "numeric value"})
-    if any(token in normalized_label for token in ("등록번호", "신고번호", "자격발급번호", "문서번호", "접수번호")):
-        if len(re.sub(r"\s+", "", text)) < 3:
-            warnings.append({"type": "IDENTIFIER_TOO_SHORT_WARN", "label": label, "value": value})
+    if (
+        any(token in normalized_label for token in ("등록번호", "신고번호", "자격발급번호", "문서번호", "접수번호"))
+        and len(re.sub(r"\s+", "", text)) < 3
+    ):
+        warnings.append({"type": "IDENTIFIER_TOO_SHORT_WARN", "label": label, "value": value})
     return warnings
 
 

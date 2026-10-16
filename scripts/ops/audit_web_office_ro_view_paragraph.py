@@ -180,10 +180,9 @@ def _process_fixture(f: Path) -> dict:
     # block paragraph 에 대해 containerScope 키 존재 확인.
     missing_scope_block_id = None
     for blk in payload.get("blocks", []):
-        if blk.get("type") == "paragraph" and "paragraph" in blk:
-            if "containerScope" not in blk["paragraph"]:
-                missing_scope_block_id = blk.get("blockId")
-                break
+        if blk.get("type") == "paragraph" and "paragraph" in blk and "containerScope" not in blk["paragraph"]:
+            missing_scope_block_id = blk.get("blockId")
+            break
 
     return {
         "mutated": mutated,

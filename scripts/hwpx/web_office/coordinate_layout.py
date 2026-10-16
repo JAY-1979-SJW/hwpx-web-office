@@ -745,11 +745,13 @@ def _walk(ctx, el):
         # 원본의 명시적 페이지 나눔(hp:p @pageBreak) — 한컴이 저장한 강제
         # 페이지 구분을 권위있게 반영한다. 이 문단부터 새 페이지 최상단으로
         # (page_idx 전진 + vertpos 리셋). "0"/미지정이면 자동 흐름(무변화).
-        if child.attrib.get("pageBreak", "0") not in ("0", ""):
-            if ctx.page_h and ctx.st["max_y"] > ctx.st["page_idx"] * ctx.page_h + ctx.m_top:
-                ctx.st["page_idx"] += 1
-                ctx.st["prev_vpos"] = -1
-                ctx.st["flow_y"] = ctx.st["page_idx"] * ctx.page_h + ctx.m_top
+        if (
+            child.attrib.get("pageBreak", "0") not in ("0", "")
+            and ctx.page_h and ctx.st["max_y"] > ctx.st["page_idx"] * ctx.page_h + ctx.m_top
+        ):
+            ctx.st["page_idx"] += 1
+            ctx.st["prev_vpos"] = -1
+            ctx.st["flow_y"] = ctx.st["page_idx"] * ctx.page_h + ctx.m_top
         # 이 문단의 최상위 표만(중첩표는 walk_table 이 재귀 배치)
         top_tbls = [t for t in child.iter() if ln(t.tag) == "tbl" and _nearest_tbl(ctx, t) is None]
         if top_tbls:
@@ -929,9 +931,11 @@ def layout_quality(layout):
                     max_over = max(
                         max_over, min(abs(l["y"] + l["h"] - (b["y"] + b["h"])) for b in pb[cid])
                     )
-            elif not l.get("cell") and (l.get("text") or "").strip():
-                if any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13 for b in pd["boxes"]):
-                    ovl += 1
+            elif (
+                not l.get("cell") and (l.get("text") or "").strip()
+                and any(b["y"] + 3 < l["y"] < b["y"] + b["h"] - 13 for b in pd["boxes"])
+            ):
+                ovl += 1
     return {
         "cellOverflow": viol,
         "cellOverflowMaxPx": round(max_over, 1),
