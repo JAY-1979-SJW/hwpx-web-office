@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from scripts.ops import ops_common_checks as occ
+
 MANIFEST = ROOT / "scripts" / "ops" / "audit_hwpx_form_auto_fill_module_manifest.json"
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_module_audits"
 LOCAL_TEMP_ROOT = ROOT / "data" / "tmp" / "hwpx_form_auto_fill_module_audits"
@@ -45,7 +49,7 @@ def _safe_text(text: str) -> str:
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _run_pytest(paths: list[str], timeout: int) -> dict[str, Any]:
@@ -333,10 +337,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe report payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe report payload")
 
 
 def _parse_args() -> argparse.Namespace:

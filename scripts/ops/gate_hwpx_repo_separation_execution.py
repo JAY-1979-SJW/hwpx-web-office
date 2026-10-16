@@ -17,6 +17,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ
 from scripts.ops import plan_hwpx_repo_detailed_separation as separation_plan  # noqa: E402
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_separation_execution_gate"
@@ -131,14 +132,11 @@ def run_execution_gate(
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"{FAIL_UNSAFE_REPORT}: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, FAIL_UNSAFE_REPORT)
 
 
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:

@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
+from scripts.ops import ops_common_checks as occ
 
 MANIFEST = ROOT / "scripts" / "ops" / "gate_hwpx_form_auto_fill_zones_manifest.json"
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_zone_gates"
@@ -32,7 +33,7 @@ def load_manifest(path: Path = MANIFEST) -> dict[str, Any]:
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def gate_zone(zone: dict[str, Any], timeout: int) -> dict[str, Any]:
@@ -113,10 +114,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe report payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe report payload")
 
 
 def _parse_args() -> argparse.Namespace:
