@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,6 +11,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
 from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as manifest_promotion_builder  # noqa: E402
 from scripts.ops import gate_hwpx_repo_classification_contract as repo_contract_gate  # noqa: E402
@@ -29,12 +29,9 @@ REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_persistent_gates"
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED"
 FAIL_VERDICT = "FAIL_HWPX_FORM_AUTO_FILL_PERSISTENT_GATES_INSTALLED"
 
-ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
-RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
-PII_RE = re.compile(
-    r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
-    r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
-)
+ABS_PATH_RE = occ.ABS_PATH_RE
+RAW_FILENAME_RE = occ.RAW_FILENAME_RE
+PII_RE = occ.PII_RE
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -42,7 +39,7 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:

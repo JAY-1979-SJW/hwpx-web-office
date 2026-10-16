@@ -12,6 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 from scripts.ops import gate_hwpx_form_auto_fill_fail_fast as fail_fast_gate  # noqa: E402
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_prepush_guard"
@@ -66,11 +67,7 @@ def _run_core(report_dir: Path) -> dict[str, Any]:
 
 
 def _no_leak(text: str) -> bool:
-    return not (
-        fail_fast_gate.ABS_PATH_RE.search(text)
-        or fail_fast_gate.RAW_FILENAME_RE.search(text)
-        or fail_fast_gate.PII_RE.search(text)
-    )
+    return occ.no_leak(text, fail_fast_gate.ABS_PATH_RE, fail_fast_gate.RAW_FILENAME_RE, fail_fast_gate.PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:

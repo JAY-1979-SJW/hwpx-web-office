@@ -16,6 +16,27 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
+# 유출 탐지 정규식의 정본. 감사/게이트가 파일마다 같은 리터럴을 복사해 쓰던 것을 한 곳에 둔다.
+# RAW_FILENAME_RE 는 ".hwpx" 뒤에 하이픈·글자·점이 이어지는 이름(`a.hwpx-bak` 류)까지 잡는 쪽이다.
+# 저장소 목록을 만드는 classify_hwpx_repo_inventory 만은 좁은 `(?![-\w.])` 변형을 따로 쓴다 —
+# 저장소에 `Dockerfile.hwpx-ro-view` 가 실제로 있어, 넓은 쪽으로 합치면 그 보고서 쓰기가 막힌다(실측).
+ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
+RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
+PII_RE = re.compile(
+    r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
+    r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
+)
+
+
+def redact_text(text: str, abs_re: re.Pattern[str], raw_re: re.Pattern[str], pii_re: re.Pattern[str]) -> str:
+    """경로·hwpx 파일명·개인정보 패턴을 각각 `<abs-path>`·`<hwpx-file>`·`<masked>` 로 바꾼 문자열.
+
+    정규식은 기본값 없는 필수 인자다 — 마스킹 강도는 호출하는 감사가 정하고, 여기서 정하지 않는다.
+    """
+    text = abs_re.sub("<abs-path>", text)
+    text = raw_re.sub("<hwpx-file>", text)
+    return pii_re.sub("<masked>", text)
+
 
 def no_leak(text: str, *patterns: re.Pattern[str]) -> bool:
     """어느 패턴에도 걸리지 않으면 True. 패턴이 하나도 없으면 ValueError.

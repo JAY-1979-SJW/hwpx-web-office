@@ -11,6 +11,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 from scripts.ops import gate_hwpx_repo_separation_execution as execution_gate  # noqa: E402
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_separation_owner_review"
@@ -119,7 +120,7 @@ def build_owner_review_packets(report_dir: Path = REPORT_DIR) -> dict[str, Any]:
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:
