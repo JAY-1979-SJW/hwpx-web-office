@@ -328,7 +328,8 @@ def test_range_oob_reject(tmp_path):
 def test_paragraph_not_found(tmp_path):
     fx = _find_first_nonempty_cell_para()
     src_hash = _src_sha()
-    bad = dict(fx); bad["paragraphIndex"] = 999
+    bad = dict(fx)
+    bad["paragraphIndex"] = 999
     item = _plan_item(
         fx=bad, command_type="TYPE_TEXT",
         range_start=0, range_end=0,
@@ -349,7 +350,8 @@ def test_paragraph_not_found(tmp_path):
 def test_run_not_found(tmp_path):
     fx = _find_first_nonempty_cell_para()
     src_hash = _src_sha()
-    bad = dict(fx); bad["runIndex"] = 999
+    bad = dict(fx)
+    bad["runIndex"] = 999
     item = _plan_item(
         fx=bad, command_type="TYPE_TEXT",
         range_start=0, range_end=0,

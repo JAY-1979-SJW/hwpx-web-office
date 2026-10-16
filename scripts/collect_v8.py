@@ -12,7 +12,9 @@ try:
     from collect_logger import get_logger
     log = get_logger("collect_v8")
 except ImportError:
-    import logging; log = logging.getLogger("collect_v8"); logging.basicConfig(level=logging.INFO)
+    import logging
+    log = logging.getLogger("collect_v8")
+    logging.basicConfig(level=logging.INFO)
 
 BASE = Path.home() / "app/haehan-platform/storage/templates/inspection"
 

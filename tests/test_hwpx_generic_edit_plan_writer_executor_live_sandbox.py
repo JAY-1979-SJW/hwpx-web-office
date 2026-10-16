@@ -130,7 +130,8 @@ def test_readback_target_cell_text_changed(stages, parsed_metadata, tmp_path):
     for t in reread.tables:
         for c in t.cells:
             if t.tableId == t_id and c.row == cell.row and c.col == cell.col:
-                found = c; break
+                found = c
+                break
         if found: break
     assert found is not None
     assert "검증된변경값" in found.normalizedText

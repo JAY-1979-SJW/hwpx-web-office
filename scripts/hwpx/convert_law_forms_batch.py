@@ -145,11 +145,13 @@ def convert(chunk_size: int, limit: int, strategy: str) -> None:
                 if not first_missing_marked:
                     # 이 청크에서 한컴이 멈춘 지점 → 즉시 영구 격리
                     first_missing_marked = True
-                    bad.add(p.stem); skipped_bad += 1
+                    bad.add(p.stem)
+                    skipped_bad += 1
                     records.append({"stem": p.stem, "status": "SKIP_BAD",
                                     "attempt": att, "reason": "chunk_hang_suspect"})
                 elif att >= MAX_ATTEMPTS:
-                    bad.add(p.stem); skipped_bad += 1
+                    bad.add(p.stem)
+                    skipped_bad += 1
                     records.append({"stem": p.stem, "status": "SKIP_BAD",
                                     "attempt": att, "reason": "max_attempts"})
                 else:

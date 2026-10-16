@@ -178,7 +178,8 @@ def test_force_recreates_db(tmp_path):
     db = tmp_path / "corpus.sqlite3"
     build(db, fixture_minimal=False, force=False, dry_run=False)
     mtime1 = db.stat().st_mtime_ns
-    import time; time.sleep(0.01)
+    import time
+    time.sleep(0.01)
     result = build(db, fixture_minimal=True, force=True, dry_run=False)
     assert result["status"] == "PASS"
     mtime2 = db.stat().st_mtime_ns

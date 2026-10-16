@@ -52,7 +52,8 @@ def run_audit() -> dict:
           {"input": valid})
 
     # 5. forbidden field
-    bad = dict(valid); bad["apiKey"] = "sk-..."
+    bad = dict(valid)
+    bad["apiKey"] = "sk-..."
     errs = apc.validate_proposal_envelope(bad)
     add("forbidden_field_blocked",
           any(e.startswith("FORBIDDEN_FIELD:apiKey") for e in errs),

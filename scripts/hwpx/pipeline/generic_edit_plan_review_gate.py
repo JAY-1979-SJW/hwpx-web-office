@@ -295,11 +295,14 @@ def apply_review_decisions(dry_run_result, decisions: list[dict]) -> ReviewGateR
             continue
         verdict = d["decision"]
         if verdict == DECISION_APPROVE:
-            approved.append(op_id); bucket_after = "approved"
+            approved.append(op_id)
+            bucket_after = "approved"
         elif verdict == DECISION_REJECT:
-            rejected.append(op_id); bucket_after = "rejected"
+            rejected.append(op_id)
+            bucket_after = "rejected"
         else:
-            held.append(op_id); bucket_after = "held"
+            held.append(op_id)
+            bucket_after = "held"
         result.auditLog.append(AuditLogEntry(
             operationId=op_id, bucketBefore="review", bucketAfter=bucket_after,
             decisionId=d["decisionId"], reviewer=d["reviewer"],

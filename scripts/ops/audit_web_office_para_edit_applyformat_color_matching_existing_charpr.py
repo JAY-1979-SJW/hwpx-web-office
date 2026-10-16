@@ -203,7 +203,8 @@ def _run_fixture_stats() -> dict[str, Any]:
         return {"ok": False, "reason": str(e)}
     from scripts.hwpx.web_office.charpr_inventory import (  # noqa: E402
         char_pr_defs_only)
-    matched = 0; total = 0
+    matched = 0
+    total = 0
     per_avg: list[float] = []
     for (sp,) in rows:
         p = PR / sp
