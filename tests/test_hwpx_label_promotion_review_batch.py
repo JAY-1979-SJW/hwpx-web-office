@@ -85,7 +85,8 @@ def _seed_low(conn):
 
 def test_t01_batch_build_smoke():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert b["candidateCount"] == 1
     assert b["reviewableCount"] >= 1
@@ -111,7 +112,8 @@ def test_t02_ranking_descending():
 
 def test_t03_high_priority_bucket():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert len(b["buckets"]["HIGH_PRIORITY_REVIEW"]) == 1
 
@@ -119,7 +121,8 @@ def test_t03_high_priority_bucket():
 def test_t04_medium_priority_bucket():
     conn = _open()
     _add_cand(conn, "성명", "FREE_TEXT", 50, 10, 0.5)
-    _add_doc(conn, "dM"); _add_occ(conn, "dM", "성명")
+    _add_doc(conn, "dM")
+    _add_occ(conn, "dM", "성명")
     conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert len(b["buckets"]["MEDIUM_PRIORITY_REVIEW"]) == 1
@@ -128,7 +131,8 @@ def test_t04_medium_priority_bucket():
 def test_t05_low_priority_bucket():
     conn = _open()
     _add_cand(conn, "기타라벨", "FREE_TEXT", 10, 3, 0.45)
-    _add_doc(conn, "dLp"); _add_occ(conn, "dLp", "기타라벨")
+    _add_doc(conn, "dLp")
+    _add_occ(conn, "dLp", "기타라벨")
     conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert len(b["buckets"]["LOW_PRIORITY_REVIEW"]) == 1
@@ -136,7 +140,8 @@ def test_t05_low_priority_bucket():
 
 def test_t06_unknown_semantic_blocked():
     conn = _open()
-    _seed_unknown(conn); conn.commit()
+    _seed_unknown(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert len(b["buckets"]["BLOCKED_UNKNOWN_SEMANTIC"]) == 1
     assert b["unknownSemanticCount"] == 1
@@ -144,7 +149,8 @@ def test_t06_unknown_semantic_blocked():
 
 def test_t07_conflict_bucket():
     conn = _open()
-    _seed_conflict(conn); conn.commit()
+    _seed_conflict(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     assert len(b["buckets"]["BLOCKED_CONFLICT"]) == 1
 
@@ -152,7 +158,8 @@ def test_t07_conflict_bucket():
 def test_t08_disagreement_only_bucket():
     conn = _open()
     _add_cand(conn, "라벨D", "PROJECT_NAME", 100, 10, 0.7)
-    _add_doc(conn, "dD"); _add_occ(conn, "dD", "라벨D")
+    _add_doc(conn, "dD")
+    _add_occ(conn, "dD", "라벨D")
     conn.commit()
     b = rb.build_promotion_review_batch(
         conn, tainted_disagreement={"dD"})
@@ -162,7 +169,8 @@ def test_t08_disagreement_only_bucket():
 def test_t09_ambiguous_only_bucket():
     conn = _open()
     _add_cand(conn, "라벨A", "PROJECT_NAME", 100, 10, 0.7)
-    _add_doc(conn, "dA"); _add_occ(conn, "dA", "라벨A")
+    _add_doc(conn, "dA")
+    _add_occ(conn, "dA", "라벨A")
     conn.commit()
     b = rb.build_promotion_review_batch(
         conn, tainted_ambiguous={"dA"})
@@ -173,7 +181,9 @@ def test_t10_mixed_clean_and_tainted_reviewable():
     conn = _open()
     _add_cand(conn, "라벨M", "PROJECT_NAME", 500, 50, 0.8)
     for i in range(5):
-        did = f"dm{i}"; _add_doc(conn, did); _add_occ(conn, did, "라벨M")
+        did = f"dm{i}"
+        _add_doc(conn, did)
+        _add_occ(conn, did, "라벨M")
     conn.commit()
     b = rb.build_promotion_review_batch(
         conn, tainted_ambiguous={"dm0"})
@@ -185,7 +195,8 @@ def test_t10_mixed_clean_and_tainted_reviewable():
 def test_t11_multi_meaning_flag():
     conn = _open()
     _add_cand(conn, "성명", "FREE_TEXT", 500, 100, 0.7)
-    _add_doc(conn, "dg"); _add_occ(conn, "dg", "성명")
+    _add_doc(conn, "dg")
+    _add_occ(conn, "dg", "성명")
     conn.commit()
     b = rb.build_promotion_review_batch(conn)
     cand = b["topReviewCandidates"][0]
@@ -197,7 +208,8 @@ def test_t12_example_labels_limit():
     conn = _open()
     _add_cand(conn, "X", "PROJECT_NAME", 500, 100, 0.7)
     for i in range(20):
-        did = f"dx{i}"; _add_doc(conn, did)
+        did = f"dx{i}"
+        _add_doc(conn, did)
         _add_occ(conn, did, "X")
     conn.commit()
     b = rb.build_promotion_review_batch(conn)
@@ -209,7 +221,8 @@ def test_t13_example_documents_limit():
     conn = _open()
     _add_cand(conn, "X", "PROJECT_NAME", 500, 100, 0.7)
     for i in range(20):
-        did = f"dx{i}"; _add_doc(conn, did)
+        did = f"dx{i}"
+        _add_doc(conn, did)
         _add_occ(conn, did, "X")
     conn.commit()
     b = rb.build_promotion_review_batch(conn)
@@ -221,7 +234,8 @@ def test_t14_top_contexts_generated():
     conn = _open()
     _add_cand(conn, "공사명", "PROJECT_NAME", 500, 100, 0.7)
     for i in range(5):
-        did = f"dc{i}"; _add_doc(conn, did)
+        did = f"dc{i}"
+        _add_doc(conn, did)
         _add_occ(conn, did, "공사명",
                     neighbor=f"공사명 주변문맥 예시 {i}")
     conn.commit()
@@ -232,7 +246,8 @@ def test_t14_top_contexts_generated():
 
 def test_t15_review_candidate_required_fields():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     c = b["topReviewCandidates"][0]
     for k in ("candidateId", "normalizedLabel", "proposedSemantic",
@@ -245,7 +260,8 @@ def test_t15_review_candidate_required_fields():
 
 def test_t16_review_batch_required_fields():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     for k in ("schemaVersion", "engineVersion", "requestId",
                  "sourceCorpusSha", "generatedAt", "candidateCount",
@@ -258,7 +274,8 @@ def test_t16_review_batch_required_fields():
 
 def test_t17_markdown_generated():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     md = rb.build_review_markdown(b)
     assert "| candidateId | normalizedLabel" in md
@@ -310,7 +327,8 @@ def test_t21_approve_unknown_blocked():
 
 def test_t22_label_id_mismatch():
     conn = _open()
-    _seed_high(conn); conn.commit()
+    _seed_high(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     cid = b["buckets"]["HIGH_PRIORITY_REVIEW"][0]["candidateId"]
     a = {"schemaVersion": rb.APPROVAL_INPUT_SCHEMA_VERSION,
@@ -325,7 +343,8 @@ def test_t22_label_id_mismatch():
 
 def test_t23_approve_conflict_blocked():
     conn = _open()
-    _seed_conflict(conn); conn.commit()
+    _seed_conflict(conn)
+    conn.commit()
     b = rb.build_promotion_review_batch(conn)
     cid = b["buckets"]["BLOCKED_CONFLICT"][0]["candidateId"]
     a = {"schemaVersion": rb.APPROVAL_INPUT_SCHEMA_VERSION,
@@ -341,7 +360,8 @@ def test_t23_approve_conflict_blocked():
 def test_t24_approve_disagreement_only_blocked():
     conn = _open()
     _add_cand(conn, "라벨D", "PROJECT_NAME", 100, 10, 0.7)
-    _add_doc(conn, "dD"); _add_occ(conn, "dD", "라벨D")
+    _add_doc(conn, "dD")
+    _add_occ(conn, "dD", "라벨D")
     conn.commit()
     b = rb.build_promotion_review_batch(
         conn, tainted_disagreement={"dD"})
@@ -360,7 +380,8 @@ def test_t24_approve_disagreement_only_blocked():
 def test_t25_approve_ambiguous_only_blocked():
     conn = _open()
     _add_cand(conn, "라벨A", "PROJECT_NAME", 100, 10, 0.7)
-    _add_doc(conn, "dA"); _add_occ(conn, "dA", "라벨A")
+    _add_doc(conn, "dA")
+    _add_occ(conn, "dA", "라벨A")
     conn.commit()
     b = rb.build_promotion_review_batch(
         conn, tainted_ambiguous={"dA"})

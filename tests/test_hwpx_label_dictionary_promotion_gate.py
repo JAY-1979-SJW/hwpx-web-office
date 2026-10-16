@@ -146,8 +146,10 @@ def test_t09_ambiguous_only_blocks_via_taint():
 def test_t10_mixed_clean_and_tainted_allows():
     conn = _open()
     _add_human(conn, "공사명", "PROJECT_NAME", "APPROVED")
-    _add_doc(conn, "doc-bad"); _add_occ(conn, "doc-bad", "공사명")
-    _add_doc(conn, "doc-ok"); _add_occ(conn, "doc-ok", "공사명")
+    _add_doc(conn, "doc-bad")
+    _add_occ(conn, "doc-bad", "공사명")
+    _add_doc(conn, "doc-ok")
+    _add_occ(conn, "doc-ok", "공사명")
     conn.commit()
     r = pg.evaluate_promotion_candidate(
         conn, _candidate(),
