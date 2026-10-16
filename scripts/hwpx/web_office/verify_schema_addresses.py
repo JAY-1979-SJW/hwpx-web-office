@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sqlite3
 import sys
@@ -37,7 +38,6 @@ from scripts.hwpx.web_office.form_direct_fill import (  # ruff: ignore[module-im
     _tables_in_root,
     parse_paragraph_id,
 )
-import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 TABLE = "schema_address_verification"

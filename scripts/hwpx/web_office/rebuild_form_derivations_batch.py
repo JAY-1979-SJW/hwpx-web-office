@@ -44,6 +44,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sqlite3
 import sys
@@ -59,7 +60,6 @@ from scripts.hwpx.web_office.form_field_roles import _subject_of  # ruff: ignore
 from scripts.hwpx.web_office.form_input_schema import build_input_schema  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.form_requirements import extract_requirements  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.form_taxonomy import classify_document  # ruff: ignore[module-import-not-at-top-of-file]
-import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 

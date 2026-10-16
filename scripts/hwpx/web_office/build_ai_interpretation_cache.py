@@ -39,6 +39,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sqlite3
@@ -57,7 +58,6 @@ from scripts.hwpx.web_office.ai_field_interpretation import (  # ruff: ignore[mo
     should_demote,
     should_promote_to_user,
 )
-import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"

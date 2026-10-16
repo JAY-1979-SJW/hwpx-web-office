@@ -11,6 +11,7 @@ should_promote_to_user, 2차 검증 일치 반영)을 그대로 재사용하되,
 API 호출 없음(순수 DB 병합) - 이미 스테이징된 해석 결과를 옮길 뿐이다.
 """
 
+import contextlib
 import json
 import re
 import sqlite3
@@ -22,7 +23,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.hwpx.web_office.ai_field_interpretation import should_demote, should_promote_to_user  # ruff: ignore[module-import-not-at-top-of-file]
-import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"

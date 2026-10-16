@@ -10,6 +10,7 @@ id 해석(문서에 이미 있는지 찾기, 없으면 append)은 이 브리지�
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import zipfile
 from pathlib import Path
@@ -29,7 +30,6 @@ from scripts.hwpx.web_office.charpr_append import (  # ruff: ignore[module-impor
 )
 from scripts.hwpx.web_office.para_edit_e2e_pipeline import SCENARIO_APPLY_FORMAT, run_para_edit_e2e  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
-import contextlib
 
 
 def _current_char_pr_id(doc, paragraph_id: str, range_anchor: int) -> str | None:

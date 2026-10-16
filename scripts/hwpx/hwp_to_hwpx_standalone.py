@@ -9,6 +9,7 @@ and rebuilds a valid text-only HWPX package.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import hashlib
 import importlib
@@ -45,7 +46,6 @@ from extract_hwp_body_fields import extract_hwp_text  # ruff: ignore[module-impo
 from hwpx_element_factory import create_table_paragraph  # ruff: ignore[module-import-not-at-top-of-file]
 from hwpx_package import HwpxValidator  # ruff: ignore[module-import-not-at-top-of-file]
 from hwpx_spine_repair import repair_hwpx_spine  # ruff: ignore[module-import-not-at-top-of-file]
-import contextlib
 
 LOGGER = logging.getLogger("hwp_to_hwpx")
 MIMETYPE = "application/owpml"
