@@ -122,6 +122,59 @@ def test_09_git_unavailable_or_timeout_is_warn_failed(
     assert found[0]["level"] == "WARN"
 
 
+def test_09b_rc_failure_code_default_keeps_git_diff_rc(tmp_path: Path) -> None:
+    _repo_with(tmp_path, {"a.txt": "one\n"})
+    explicit = occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path, rc_failure_code="GIT_DIFF_RC")
+    assert explicit == occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path)
+
+
+def test_09c_rc_failure_code_changes_only_the_code(tmp_path: Path) -> None:
+    _repo_with(tmp_path, {"a.txt": "one\n"})
+    default = occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path)
+    custom = occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path, rc_failure_code="GIT_DIFF_FAILED")
+    assert [f["code"] for f in custom] == ["GIT_DIFF_FAILED"]
+    assert [{k: v for k, v in f.items() if k != "code"} for f in custom] == [
+        {k: v for k, v in f.items() if k != "code"} for f in default
+    ]
+
+
+def test_09d_rc_failure_code_is_keyword_only(tmp_path: Path) -> None:
+    with pytest.raises(TypeError):
+        occ.check_locked_files(["a.txt"], "HEAD", tmp_path, 20, "GIT_DIFF_FAILED")  # type: ignore[misc]
+
+
+def test_09e_rc_failure_code_does_not_affect_changed_or_clean(tmp_path: Path) -> None:
+    base = _repo_with(tmp_path, {"a.txt": "one\n", "b.txt": "one\n"})
+    (tmp_path / "a.txt").write_text("two\n", encoding="utf-8")
+    assert occ.check_locked_files(["b.txt", "a.txt"], base, tmp_path, rc_failure_code="GIT_DIFF_FAILED") == [
+        {"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": "a.txt"}
+    ]
+
+
+# rc≠0 코드로 GIT_DIFF_FAILED 를 쓰던 감사 3개 - 보고서에 찍히는 이 문자열이 바뀌지 않게 고정한다.
+_B_AUDITS = [
+    "audit_web_office_para_adapter_applycharpr",
+    "audit_web_office_para_edit_e2e_integration",
+    "audit_web_office_para_readback_parser",
+]
+
+
+@pytest.mark.parametrize("name", _B_AUDITS)
+def test_09f_b_group_audits_report_git_diff_failed_on_rc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    import importlib
+
+    mod = importlib.import_module("scripts.ops." + name)
+    _repo_with(tmp_path, {"a.txt": "one\n"})
+    monkeypatch.setattr(mod, "PR", tmp_path)
+    monkeypatch.setattr(mod, "BASELINE_COMMIT", "no-such-rev")
+    monkeypatch.setattr(mod, "LOCKED_FILES", ["a.txt"])
+    assert mod._check_locked_files() == [
+        {"code": "GIT_DIFF_FAILED", "level": "WARN", "detail": "a.txt: rc=128"}
+    ]
+
+
 # --- 이름이 감사 수집 패턴에 섞이지 않는다 ---------------------------------------
 
 
