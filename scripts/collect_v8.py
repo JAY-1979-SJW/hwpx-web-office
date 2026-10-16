@@ -48,7 +48,7 @@ def detect_doc_ext(data: bytes):
             if "xl/" in names:
                 return ".xlsx"
             return ".hwpx"
-        except:
+        except Exception:
             return None
     return None
 

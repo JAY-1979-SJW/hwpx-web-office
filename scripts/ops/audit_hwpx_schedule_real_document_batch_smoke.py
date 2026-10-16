@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SMOKE_DIR = PROJECT_ROOT / "reports" / "hwpx_schedule_real_document_batch_smoke"
@@ -25,10 +26,8 @@ batch_json_path = SMOKE_DIR / "batch_summary.json"
 summary_src = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
 batch_data: dict = {}
 if batch_json_path.exists():
-    try:
+    with contextlib.suppress(Exception):
         batch_data = json.loads(batch_json_path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
 
 # ── C01: batch_summary.json 생성 ─────────────────────────────────────────────
 check("C01", "batch_summary.json 생성",

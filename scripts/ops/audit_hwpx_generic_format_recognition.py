@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AUDIT_DIR = PROJECT_ROOT / "reports" / "hwpx_generic_format_recognition_audit"
@@ -27,10 +28,8 @@ audit_script = PROJECT_ROOT / "scripts" / "local" / "hwpx_generic_format_recogni
 
 cov_data: dict = {}
 if cov_path.exists():
-    try:
+    with contextlib.suppress(Exception):
         cov_data = json.loads(cov_path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
 
 # ── C01: 감사 스크립트 존재 ──────────────────────────────────────────────────
 check("C01", "감사 스크립트 존재",

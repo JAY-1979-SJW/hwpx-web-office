@@ -37,6 +37,7 @@ from scripts.hwpx.web_office.form_direct_fill import (  # ruff: ignore[module-im
     _tables_in_root,
     parse_paragraph_id,
 )
+import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 TABLE = "schema_address_verification"
@@ -92,10 +93,8 @@ def _flush(con: sqlite3.Connection, pending: list[dict], retries: int = 10) -> N
             pending.clear()
             return
         except sqlite3.OperationalError as e:
-            try:
+            with contextlib.suppress(sqlite3.Error):
                 con.execute("ROLLBACK")
-            except sqlite3.Error:
-                pass
             if "locked" not in str(e).lower() and "busy" not in str(e).lower():
                 raise
             time.sleep(0.4 * (attempt + 1))

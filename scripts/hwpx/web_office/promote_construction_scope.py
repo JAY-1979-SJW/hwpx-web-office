@@ -22,6 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.hwpx.web_office.ai_field_interpretation import should_demote, should_promote_to_user  # ruff: ignore[module-import-not-at-top-of-file]
+import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -68,10 +69,8 @@ def _verified_by_form(con, scope_ids: set) -> dict:
     ):
         if fid not in scope_ids:
             continue
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             verified_by_form[fid] = set(json.loads(agreed))
-        except (json.JSONDecodeError, TypeError):
-            pass
     return verified_by_form
 
 

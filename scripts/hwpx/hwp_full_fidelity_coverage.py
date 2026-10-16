@@ -6,6 +6,7 @@ from collections import Counter
 from typing import Any
 
 from extract_hwp_body_fields import FIDELITY_RISK_TAGS, HWP_RECORD_TAGS, TEXT_ONLY_SUPPORTED_TAGS
+import contextlib
 
 REQUIRED_RECORD_FAMILIES: dict[str, dict[str, Any]] = {
     "document_properties": {
@@ -1502,10 +1503,8 @@ def _bindata_picture_numeric_ids(
         if not token:
             continue
         for base in (10, 16):
-            try:
+            with contextlib.suppress(ValueError):
                 ids.add(int(token, base))
-            except ValueError:
-                pass
     if isinstance(decoded_docinfo, dict):
         records = (
             decoded_docinfo.get("binary_data")

@@ -29,6 +29,7 @@ from hwp_full_fidelity_section_updates import (
     build_table_layout_section_updates,
 )
 from hwpx_element_factory import create_picture_paragraph
+import contextlib
 
 OPF_NS = "http://www.idpf.org/2007/opf/"
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -983,10 +984,8 @@ def _rewrite_zip_entries(path: Path, updates: dict[str, bytes]) -> list[str]:
                 break
             time.sleep(0.2 * (attempt + 1))
     path.write_bytes(temp_path.read_bytes())
-    try:
+    with contextlib.suppress(PermissionError):
         temp_path.unlink(missing_ok=True)
-    except PermissionError:
-        pass
     return written
 
 

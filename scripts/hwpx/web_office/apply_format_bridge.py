@@ -29,6 +29,7 @@ from scripts.hwpx.web_office.charpr_append import (  # ruff: ignore[module-impor
 )
 from scripts.hwpx.web_office.para_edit_e2e_pipeline import SCENARIO_APPLY_FORMAT, run_para_edit_e2e  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
+import contextlib
 
 
 def _current_char_pr_id(doc, paragraph_id: str, range_anchor: int) -> str | None:
@@ -104,10 +105,8 @@ def resolve_and_apply_format(  # ruff: ignore[too-many-arguments] (다른 파일
         allow_writer=True,
     )
     if char_pr_created and apply_source != source_path:
-        try:
+        with contextlib.suppress(OSError):
             apply_source.unlink()
-        except OSError:
-            pass
     result["resolvedCharPrIDRef"] = target_id
     result["charPrCreated"] = char_pr_created
     return result

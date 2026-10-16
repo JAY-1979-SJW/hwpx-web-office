@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -168,11 +169,9 @@ def _process_one(file_path: Path, sandbox_dir: Path,
             with zipfile.ZipFile(str(sandbox_path)) as z:
                 for name in z.namelist():
                     if name.endswith(".xml"):
-                        try:
+                        with contextlib.suppress(Exception):
                             xml_blobs.append(
                                 z.read(name).decode("utf-8", "ignore"))
-                        except Exception:
-                            pass
             blob = "\n".join(xml_blobs)
             for sc in plan["set_cells"]:
                 if sc["value"] in blob:
@@ -278,10 +277,8 @@ def run_batch(limit: int, sandbox_dir: Path, report_jsonl: Path) -> dict:
 def main():
     limit = 1
     if len(sys.argv) > 1:
-        try:
+        with contextlib.suppress(ValueError):
             limit = int(sys.argv[1])
-        except ValueError:
-            pass
     suffix = "_form" if "--form" in sys.argv else ""
     sandbox = PROJECT_ROOT / f"data/drafts/hwpx_e2e_demo_sandbox{suffix}"
     report = PROJECT_ROOT / f"data/drafts/hwpx_e2e_demo_report{suffix}.jsonl"

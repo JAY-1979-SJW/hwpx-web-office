@@ -14,6 +14,7 @@ from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 from .errors import ErrCode, WarnCode
 from .parser_contract import PackageInfo, ParserWarning
+import contextlib
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
 NS_OPF = "http://www.idpf.org/2007/opf/"
@@ -140,8 +141,6 @@ def read_section_xmls(path: Path) -> dict[str, bytes]:
     """section XML 파일들을 {entry_name: bytes} 로 반환."""
     result = {}
     for entry in list_section_files(path):
-        try:
+        with contextlib.suppress(_ZIP_READ_ERRORS):
             result[entry] = read_xml_entry(path, entry)
-        except _ZIP_READ_ERRORS:
-            pass
     return result

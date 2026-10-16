@@ -8,6 +8,7 @@ import os
 import sqlite3
 import sys
 from pathlib import Path
+import contextlib
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -242,8 +243,6 @@ def test_broken_db_is_not_skipped(tmp_path):
         is_broken = True
     finally:
         if conn:
-            try:
+            with contextlib.suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
     assert is_broken, "file with garbage content should be recognized as broken DB"

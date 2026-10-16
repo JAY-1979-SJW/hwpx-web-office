@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 # B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
 from defusedxml.ElementTree import fromstring as _dx_fromstring
+import contextlib
 
 try:
     from .coord_styles import (
@@ -236,10 +237,8 @@ def _container_object_heights(p):
             continue
         sz_el = next((e for e in ctrl_container.iter() if ln(e.tag) == "curSz"), None)
         if sz_el is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 _obj_heights.add(int(float(sz_el.attrib.get("height", 0))))
-            except (TypeError, ValueError):
-                pass
     return _obj_heights
 
 

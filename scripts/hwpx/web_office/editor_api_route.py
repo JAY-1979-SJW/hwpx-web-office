@@ -22,6 +22,7 @@ from typing import Any
 from .editor_file_bridge import load_hwpx_for_editor
 from .para_save_apply_bridge import apply_para_save_request
 from .save_apply_bridge import apply_cell_save_request
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA_VERSION = "web_office_editor_api_v1"
@@ -107,10 +108,8 @@ def _apply_in_place_if_requested(
     import shutil
 
     shutil.copyfile(out_path, src_path)
-    try:
+    with contextlib.suppress(OSError):
         out_path.unlink()
-    except OSError:
-        pass
     result["outputPath"] = str(src_path)
     result["editedInPlace"] = True
     return source_rel
@@ -380,10 +379,8 @@ def call_apply_format(
         import shutil
 
         shutil.copyfile(out_path, source_path)
-        try:
+        with contextlib.suppress(OSError):
             out_path.unlink()
-        except OSError:
-            pass
         public["sourcePath"] = source_rel
         public["editedInPlace"] = True
     else:

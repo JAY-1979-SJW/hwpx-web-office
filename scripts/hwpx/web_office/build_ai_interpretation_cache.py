@@ -57,6 +57,7 @@ from scripts.hwpx.web_office.ai_field_interpretation import (  # ruff: ignore[mo
     should_demote,
     should_promote_to_user,
 )
+import contextlib
 
 CATALOG = PROJECT_ROOT / "data" / "drafts" / "form_library" / "catalog.sqlite"
 STAGING = "ai_field_interpretation"
@@ -171,10 +172,8 @@ def _flush(
             pending.clear()
             return
         except sqlite3.OperationalError as e:
-            try:
+            with contextlib.suppress(sqlite3.Error):
                 con.execute("ROLLBACK")
-            except sqlite3.Error:
-                pass
             if "locked" not in str(e).lower() and "busy" not in str(e).lower():
                 raise
             time.sleep(0.4 * (attempt + 1))

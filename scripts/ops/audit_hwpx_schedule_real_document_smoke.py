@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SMOKE_DIR = PROJECT_ROOT / "reports" / "hwpx_schedule_real_document_smoke"
@@ -26,10 +27,8 @@ parse_before_path = SMOKE_DIR / "parse_before.json"
 summary_src = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
 parse_before = {}
 if parse_before_path.exists():
-    try:
+    with contextlib.suppress(Exception):
         parse_before = json.loads(parse_before_path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
 
 # ── C01: summary.md 생성 ──────────────────────────────────────────────────────
 check("C01", "summary.md 생성 여부",

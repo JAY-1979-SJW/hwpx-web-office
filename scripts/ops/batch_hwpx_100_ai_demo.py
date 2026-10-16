@@ -13,6 +13,7 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
+import contextlib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -184,10 +185,8 @@ def run_batch_with_ai(limit: int = 100) -> dict:
 def main():
     limit = 100
     if len(sys.argv) > 1:
-        try:
+        with contextlib.suppress(ValueError):
             limit = int(sys.argv[1])
-        except ValueError:
-            pass
     report = run_batch_with_ai(limit=limit)
     print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
     return 0 if report["status"] == "PASS" else 1
