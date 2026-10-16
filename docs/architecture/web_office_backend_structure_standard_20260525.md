@@ -66,6 +66,7 @@ The backend API surface is limited to:
 - `POST /api/web-office/catalog-match` — 업로드 서식 ↔ 카탈로그 대조(read-only)
 - `POST /api/web-office/catalog-by-category` — 도메인별 서식 조회(read-only)
 - `POST /api/web-office/catalog-ai-search` — 자연어 질의 → 키워드 해석 후 검색(§9 Haiku only, read-only)
+- `POST /api/web-office/catalog-fill` — 참조 hwpx(referencePath)의 값을 카탈로그 매칭된 대상 서식(sourcePath) 칸에 채움 제안(규칙 기반, AI/OCR 미사용, 응답 SUCCESS/FAILED, 미매칭은 CATALOG_NOT_MATCHED)
 - `POST /api/web-office/prepare-form` — 온디맨드 서식 준비(HWP→한컴 COM 변환 또는 HWPX 복사); 산출물은 sandbox `tmp/web_office_forms/` 한정, 내부 경로 미노출
 - `GET /api/web-office/download/{filename}` — 편집 산출물 다운로드; sandbox 파일만 제공, 경로 조작 방어
 
