@@ -43,12 +43,7 @@ def _no_leak(text: str) -> bool:
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
-    return {
-        "code": code,
-        "desc": desc,
-        "status": "PASS" if ok else "FAIL",
-        "failCode": None if ok else fail_code,
-    }
+    return occ.check_result(code, desc, ok, fail_code)
 
 
 def _module_ids(module_manifest: dict[str, Any]) -> set[str]:

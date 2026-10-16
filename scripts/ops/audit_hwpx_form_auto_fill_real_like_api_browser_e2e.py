@@ -13,6 +13,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from hwpx.pipeline import form_auto_fill_real_file_preflight as pf  # noqa: E402
 
+sys.path.append(str(ROOT))
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_real_like_api_browser_e2e"
 PAGE = ROOT / "frontend" / "web_office_viewer" / "form_autofill_real_like_batch_smoke.html"
 JS = ROOT / "frontend" / "web_office_viewer" / "form_autofill_real_like_batch_smoke.mjs"
@@ -49,10 +52,7 @@ def _run_pytest(paths: list[str], timeout: int = 900) -> dict[str, Any]:
 
 
 def _safe_text(text: str) -> str:
-    text = pf.ABS_PATH_RE.sub("<abs-path>", text)
-    text = pf.RAW_FILENAME_RE.sub("<hwpx-file>", text)
-    text = pf.PII_RE.sub("<masked>", text)
-    return text
+    return occ.redact_text(text, pf.ABS_PATH_RE, pf.RAW_FILENAME_RE, pf.PII_RE)
 
 
 def _dirty_baseline() -> dict[str, Any]:
@@ -94,12 +94,7 @@ def _dirty_baseline() -> dict[str, Any]:
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
-    return {
-        "code": code,
-        "desc": desc,
-        "status": "PASS" if ok else "FAIL",
-        "failCode": fail_code if not ok else None,
-    }
+    return occ.check_result(code, desc, ok, fail_code)
 
 
 def _safe_report_write(path: Path, payload: Any) -> None:

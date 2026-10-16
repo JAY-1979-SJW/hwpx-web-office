@@ -249,11 +249,7 @@ def _run_dynamic() -> dict[str, Any]:
 
 
 def _required_key_findings(mapping: dict, keys, code: str, name: str) -> list[dict]:
-    return [
-        {"code": code, "level": "FAIL", "detail": f"{name}: {k}={mapping.get(k)}"}
-        for k in keys
-        if mapping.get(k) != "PASS"
-    ]
+    return occ.required_key_findings(mapping, keys, code, name)
 
 
 def _check_one_scenario(scope_kind: str, sc: dict) -> list[dict]:

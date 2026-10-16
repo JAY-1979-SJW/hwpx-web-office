@@ -13,10 +13,10 @@ playwright/headless chrome 은 본 단지 환경 미설치이므로 사용하지
 
 from __future__ import annotations
 
-import hashlib
 import json
 import socket
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -26,6 +26,10 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 PR = Path(__file__).resolve().parents[2]
+sys.path.append(str(PR))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 VIEWER_DIR = PR / "frontend/web_office_viewer"
 SAMPLE_JSON = VIEWER_DIR / "payload.sample.json"
 RUNTIME_SMOKE_JS = VIEWER_DIR / "runtime_smoke.mjs"
@@ -34,7 +38,7 @@ FORBIDDEN_DOM_TOKENS = ["save", "apply", "edit-command"]
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return occ.sha256_file(p)
 
 
 def _free_port() -> int:
