@@ -25,6 +25,7 @@ from scripts.hwpx.web_office.coordinate_layout import (  # noqa: E402
 from scripts.hwpx.web_office.hancom_layout_refresh import (  # noqa: E402
     calibrate_row_scale, get_row_scale, hancom_available,
     normalize_for_layout, render_truth_pages)
+import contextlib
 
 PASS_VERDICT = "PASS_WEB_OFFICE_HANCOM_PRECACHE"
 FAIL_VERDICT = "FAIL_WEB_OFFICE_HANCOM_PRECACHE"
@@ -42,11 +43,9 @@ def precache_one(path: Path, project_root: Path) -> dict:
         rec["truthCached"] = truth_dir is not None
         hancom_pages = None
         if truth_dir is not None:
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 hancom_pages = int(
                     (truth_dir / "DONE").read_text(encoding="ascii").strip())
-            except (OSError, ValueError):
-                pass
         rec["hancomPages"] = hancom_pages
         # 캘리브레이션 — 쪽수 불일치 시 배율 탐색(공장 1회), 이후 적용 추출
         k = get_row_scale(path, project_root=project_root)

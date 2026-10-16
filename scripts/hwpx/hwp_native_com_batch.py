@@ -24,6 +24,7 @@ from hancom_hwp_to_hwpx_batch import HWP_CONVERSION_PROVIDER, convert_one_with_s
 from hancom_visual_verification_gate import build_gate_report
 from hwp_to_hwpx_standalone import file_snapshot
 from hwpx_package import HwpxValidator
+import contextlib
 
 DEFAULT_WORK_ROOT = Path(os.environ.get("TEMP", "tmp")) / "hwp_native_com_batch"
 DEFAULT_LOCK_FILE = DEFAULT_WORK_ROOT / "hwp_native_com_batch.lock"
@@ -53,10 +54,8 @@ def try_replace_or_direct_write(tmp_path: Path, path: Path, text: str, *, encodi
         except PermissionError:
             time.sleep(0.1)
     path.write_text(text, encoding=encoding)
-    try:
+    with contextlib.suppress(OSError):
         tmp_path.unlink()
-    except OSError:
-        pass
 
 
 def write_csv_report(path: Path, results: list[dict[str, Any]]) -> None:
@@ -105,10 +104,8 @@ def write_csv_report(path: Path, results: list[dict[str, Any]]) -> None:
         except PermissionError:
             time.sleep(0.1)
     path.write_text(tmp_path.read_text(encoding="utf-8-sig"), encoding="utf-8-sig")
-    try:
+    with contextlib.suppress(OSError):
         tmp_path.unlink()
-    except OSError:
-        pass
 
 
 class BatchLock:

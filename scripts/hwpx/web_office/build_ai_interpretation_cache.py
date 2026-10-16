@@ -39,6 +39,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sqlite3
@@ -171,10 +172,8 @@ def _flush(
             pending.clear()
             return
         except sqlite3.OperationalError as e:
-            try:
+            with contextlib.suppress(sqlite3.Error):
                 con.execute("ROLLBACK")
-            except sqlite3.Error:
-                pass
             if "locked" not in str(e).lower() and "busy" not in str(e).lower():
                 raise
             time.sleep(0.4 * (attempt + 1))

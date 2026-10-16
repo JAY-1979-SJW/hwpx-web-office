@@ -12,6 +12,7 @@ from hwpx_element_factory import append_generated_table as append_generated_tabl
 from hwpx_element_factory import next_paragraph_id
 from hwpx_package import HwpxPackage, local_name, text_nodes
 from hwpx_special_text import sanitize_hwpx_text
+import contextlib
 
 
 def table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Element]]:
@@ -808,12 +809,10 @@ def ensure_solid_border_fill(
     cloned.attrib["id"] = new_id
     _set_fill_color_on_border_fill(cloned, norm_color)
     container.append(cloned)
-    try:
+    with contextlib.suppress(AttributeError, TypeError):
         container.attrib["itemCnt"] = str(
             len([c for c in list(container) if local_name(c.tag) == "borderFill"])
         )
-    except (AttributeError, TypeError):
-        pass
     package.write_xml(entry, root)
     return {
         "status": "CREATED_NEW",

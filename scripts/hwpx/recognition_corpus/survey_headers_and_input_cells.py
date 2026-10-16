@@ -34,6 +34,7 @@ from typing import Any
 # B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
 # 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
 from defusedxml.ElementTree import fromstring as _dx_fromstring
+import contextlib
 
 # ── namespaces ────────────────────────────────────────────────────────────────
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -631,10 +632,8 @@ def _survey_file(
     inputs: list[InputCell] = []
 
     size = 0
-    try:
+    with contextlib.suppress(OSError):
         size = path.stat().st_size
-    except OSError:
-        pass
 
     fhash = file_content_hash(path)
 

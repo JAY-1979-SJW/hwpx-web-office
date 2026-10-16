@@ -9,6 +9,7 @@ and rebuilds a valid text-only HWPX package.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import hashlib
 import importlib
@@ -363,10 +364,8 @@ def repair_output_package(path: Path, *, expected_text: str = "") -> dict[str, A
     except Exception as exc:  # ruff: ignore[blind-except]
         safe_unlink(repaired)
         if backup.exists() and not path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 backup.replace(path)
-            except OSError:
-                pass
         return {
             "status": "FAIL",
             "error": "HWPX_PACKAGE_REPAIR_EXCEPTION",
@@ -528,10 +527,8 @@ def write_forensic_item_audit(
 
 
 def safe_unlink(path: Path) -> None:
-    try:
+    with contextlib.suppress(OSError):
         path.unlink(missing_ok=True)
-    except OSError:
-        pass
 
 
 def cleanup_temp_files(root: Path, *, retries: int = 3, delay_sec: float = 0.1) -> dict[str, Any]:

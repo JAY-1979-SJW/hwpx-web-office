@@ -11,6 +11,7 @@ should_promote_to_user, 2차 검증 일치 반영)을 그대로 재사용하되,
 API 호출 없음(순수 DB 병합) - 이미 스테이징된 해석 결과를 옮길 뿐이다.
 """
 
+import contextlib
 import json
 import re
 import sqlite3
@@ -68,10 +69,8 @@ def _verified_by_form(con, scope_ids: set) -> dict:
     ):
         if fid not in scope_ids:
             continue
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             verified_by_form[fid] = set(json.loads(agreed))
-        except (json.JSONDecodeError, TypeError):
-            pass
     return verified_by_form
 
 

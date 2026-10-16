@@ -16,6 +16,7 @@ import zipfile
 import tempfile
 import requests
 from datetime import datetime
+import contextlib
 
 __test__ = False
 
@@ -160,10 +161,8 @@ def run_security_smoke(base_url, out_dir):
     # Cleanup
     print("[test_hwpx_security] Cleaning up temp files...", file=sys.stderr)
     for path in [invalid_zip_path, non_hwpx_zip_path, empty_hwpx_path]:
-        try:
+        with contextlib.suppress(Exception):
             os.remove(path)
-        except:
-            pass
 
     # Generate summary
     summary = {

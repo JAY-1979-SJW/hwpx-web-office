@@ -10,6 +10,7 @@ id 해석(문서에 이미 있는지 찾기, 없으면 append)은 이 브리지�
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import zipfile
 from pathlib import Path
@@ -104,10 +105,8 @@ def resolve_and_apply_format(  # ruff: ignore[too-many-arguments] (다른 파일
         allow_writer=True,
     )
     if char_pr_created and apply_source != source_path:
-        try:
+        with contextlib.suppress(OSError):
             apply_source.unlink()
-        except OSError:
-            pass
     result["resolvedCharPrIDRef"] = target_id
     result["charPrCreated"] = char_pr_created
     return result
