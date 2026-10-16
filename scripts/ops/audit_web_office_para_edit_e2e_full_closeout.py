@@ -145,9 +145,7 @@ def _check_safety_gate_patterns() -> list[dict]:
 
 def _check_audit_no_writer_calls() -> list[dict]:
     """본 audit 모듈 자체가 writer 호출/import 를 하지 않음을 보장."""
-    me = Path(__file__).read_text(encoding="utf-8")
-    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
-    return findings
+    return occ.check_audit_no_writer_calls(__file__, FORBIDDEN_WRITER_SYMBOLS)
 
 
 def _check_locked_files() -> list[dict]:
