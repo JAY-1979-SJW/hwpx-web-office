@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -82,3 +83,57 @@ def check_locked_files(
         if r.stdout.strip():
             findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
     return findings
+
+
+def check_result(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
+    """감사 점검 한 건의 결과 dict. `ok` 가 참이면 PASS, 아니면 FAIL 이고 그때만 `failCode` 가 채워진다.
+
+    `ok` 는 불리언 변환 규칙 그대로 참/거짓을 가른다(복사본의 `"PASS" if ok` 와 같다).
+    """
+    return {"code": code, "desc": desc, "status": "PASS" if ok else "FAIL", "failCode": fail_code if not ok else None}
+
+
+def load_json_file(path: str | None) -> Any:
+    """`path` 가 비어 있지 않으면 UTF-8 JSON 파일을 읽어 돌려주고, None/빈 문자열이면 None.
+
+    파일이 없거나 JSON 이 깨졌으면 OSError/JSONDecodeError 가 그대로 올라온다.
+    """
+    if not path:
+        return None
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def missing_phrase_findings(src: str, phrases: list[str], code: str) -> list[dict]:
+    """`src` 에 들어 있지 않은 문구마다 FAIL 항목(`code`, 문구는 detail)을 `phrases` 순서대로 돌려준다."""
+    return [{"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src]
+
+
+def node_available() -> bool:
+    """`node --version` 이 성공(종료코드 0)하면 True. node 가 없거나 10초 안에 안 끝나면 False."""
+    try:
+        r = subprocess.run(
+            ["node", "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+        return r.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def pick_cell_paragraph(doc: Any) -> Any:
+    """표 셀 안의 첫 문단 중 문단/글자 속성 참조와 2자 이상 텍스트가 있는 것을 돌려준다. 없으면 None."""
+    for p in doc.paragraphs:
+        cs = p.containerScope or {}
+        if cs.get("kind") == "cell" and p.parPrIDRef and p.runs and p.runs[0].charPrIDRef and (len(p.text or "") >= 2):
+            return p
+    return None
+
+
+def sha256_file(path: Path) -> str:
+    """파일 내용의 sha256 16진수 문자열."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()

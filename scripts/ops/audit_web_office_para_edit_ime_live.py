@@ -73,18 +73,7 @@ REQUIRED_SMOKE_IMPORTS = [
 
 
 def _node_ok() -> bool:
-    try:
-        r = subprocess.run(
-            ["node", "--version"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=10,
-        )
-        return r.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return occ.node_available()
 
 
 def _check_smoke_script() -> list[dict]:

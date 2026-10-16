@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 import scripts.ops.hwpx_form_autofill_batch_api_route as api  # ruff: ignore[module-import-not-at-top-of-file]
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_real_like_api_batch"
@@ -98,12 +100,7 @@ def _dirty_baseline() -> dict[str, Any]:
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
-    return {
-        "code": code,
-        "desc": desc,
-        "status": "PASS" if ok else "FAIL",
-        "failCode": fail_code if not ok else None,
-    }
+    return occ.check_result(code, desc, ok, fail_code)
 
 
 def _batch_result(  # ruff: ignore[too-many-arguments] — 독립된 실패 카운터 6개, **kwargs로 동적 전달되어 묶음 불필요

@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import sys
@@ -21,6 +20,8 @@ PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 from scripts.hwpx.web_office import ENGINE_VERSION, SCHEMA_VERSION
 from scripts.hwpx.web_office.render_payload import build_render_payload
 from scripts.hwpx.web_office.ro_view_importer import (
@@ -29,7 +30,7 @@ from scripts.hwpx.web_office.ro_view_importer import (
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return occ.sha256_file(p)
 
 
 def _resolve_fixtures(limit: int = 3) -> list[Path]:

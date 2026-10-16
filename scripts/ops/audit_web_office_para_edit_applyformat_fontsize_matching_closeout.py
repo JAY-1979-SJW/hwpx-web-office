@@ -112,9 +112,7 @@ FORBIDDEN_AUDIT_WRITER_SYMBOLS = [
 
 
 def _missing_phrase_findings(src: str, phrases: list[str], code: str) -> list[dict]:
-    return [
-        {"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src
-    ]
+    return occ.missing_phrase_findings(src, phrases, code)
 
 
 def _check_required_doc() -> list[dict]:

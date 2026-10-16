@@ -11,6 +11,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 from scripts.ops import gate_hwpx_repo_separation_approval_decision as approval_gate  # noqa: E402
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_separation_execution_plan_draft"
@@ -155,9 +157,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _load_decisions(path: str | None) -> list[dict[str, Any]] | None:
-    if not path:
-        return None
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return occ.load_json_file(path)
 
 
 def main() -> int:

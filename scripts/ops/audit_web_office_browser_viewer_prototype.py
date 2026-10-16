@@ -13,7 +13,6 @@ node 로 frontend/web_office_viewer/render_smoke.mjs 를 실행해 실제 HTML
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import subprocess
@@ -24,6 +23,8 @@ from pathlib import Path
 PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 
 from scripts.hwpx.web_office.render_payload import build_render_payload  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
@@ -53,7 +54,7 @@ FORBIDDEN_SRC_TOKENS = [
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return occ.sha256_file(p)
 
 
 def _resolve_fixtures(limit: int = 3) -> list[Path]:
