@@ -12,8 +12,7 @@ sys.path.insert(0, str(PR))
 
 from scripts.ops.audit_web_office_para_edit_spec import (  # noqa: E402
     audit, SPEC_DOC, RISK_DOC,
-    REQUIRED_SPEC_SECTIONS, REQUIRED_SPEC_TOKENS,
-    REQUIRED_RISK_TOKENS,
+    REQUIRED_SPEC_SECTIONS,
 )
 
 

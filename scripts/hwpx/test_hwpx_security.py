@@ -15,7 +15,6 @@ import json
 import zipfile
 import tempfile
 import requests
-from pathlib import Path
 from datetime import datetime
 
 __test__ = False

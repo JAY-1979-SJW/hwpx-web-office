@@ -4,7 +4,6 @@
 """
 from __future__ import annotations
 import hashlib
-import sqlite3
 import sys
 from pathlib import Path
 import pytest
@@ -24,8 +23,6 @@ from scripts.hwpx.web_office.para_edit_model import (  # noqa: E402
 from scripts.hwpx.web_office.edit_command_model import (  # noqa: E402
     make_set_cell_text_command)
 from scripts.hwpx.web_office.paragraph_edit_plan import (  # noqa: E402
-    build_dry_run_paragraph_plan,
-    PARA_DRY_RUN_NOOP, PARA_DRY_RUN_REJECTED, PARA_DRY_RUN_READY,
     REASON_EXPECTED_BEFORE_MISMATCH_PARAGRAPH,
     REASON_SOURCE_HASH_MISMATCH, REASON_UNSUPPORTED_TYPE,
     BLOCKED_NO_PARAGRAPH_WRITER_SUPPORT,

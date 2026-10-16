@@ -21,7 +21,6 @@ sys.path.insert(0, str(ROOT / "scripts" / "hwpx"))
 from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
 from scripts.hwpx.web_office.paragraph_writer_adapter import (  # noqa: E402
     _SUPPORTED_COMMAND_TYPES,
-    _read_header_para_pr_ids,
     apply_paragraph_edits_plan,
 )
 from scripts.hwpx.web_office.paragraph_save_verify7 import (  # noqa: E402

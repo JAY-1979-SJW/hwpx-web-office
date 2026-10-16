@@ -12,7 +12,6 @@ import sys
 import zipfile
 from pathlib import Path
 import pytest
-import xml.etree.ElementTree as ET
 
 PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
@@ -20,12 +19,6 @@ sys.path.insert(0, str(PR / "scripts/hwpx"))
 
 from scripts.hwpx import hwpx_edit_tool as _edit_tool  # noqa: E402
 from scripts.hwpx.hwpx_package import HwpxPackage, local_name  # noqa: E402
-from scripts.hwpx.web_office.paragraph_writer_adapter import (  # noqa: E402
-    apply_paragraph_edits_plan,
-)
-from scripts.hwpx.web_office.ro_view_importer import (  # noqa: E402
-    import_hwpx_as_ro_view,
-)
 from scripts.hwpx.web_office import (  # noqa: E402
     paragraph_save_pipeline as _para_pipe,
 )
@@ -414,7 +407,6 @@ def test_parpr_preserved(tmp_path):
 @need_fx
 def test_output_equals_source_blocked(tmp_path):
     # paragraph_save_pipeline 게이트 — source==output reject
-    from scripts.hwpx.web_office.para_edit_model import Paragraph
     res = _para_pipe.save_paragraph_edits(
         source_path=FIXTURE, output_path=FIXTURE,
         command_log=[], paragraphs_by_id={},

@@ -1,15 +1,11 @@
 """HWPX-RECOGNITION-CORPUS-PROFILING-PREFLIGHT-01 — profiling preflight 테스트."""
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import sqlite3
 import sys
 import zipfile
 from pathlib import Path
 
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))

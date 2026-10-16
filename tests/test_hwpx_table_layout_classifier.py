@@ -12,8 +12,6 @@ from hwpx_corpus_profiler import (
     classify_table_layout,
     _compute_table_scores,
     detect_header_rows,
-    normalize_header,
-    cell_text,
     cell_has_nested_table,
 )
 

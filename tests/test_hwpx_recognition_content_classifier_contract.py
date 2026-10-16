@@ -1,8 +1,6 @@
 """HWPX-RECOGNITION-CONTENT-CLASSIFIER-CONTRACT-01 tests."""
 from __future__ import annotations
 
-import json
-import sqlite3
 import sys
 from pathlib import Path
 

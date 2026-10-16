@@ -5,7 +5,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -85,7 +84,7 @@ def test_direct_key_match_auto():
 # ── T03. alias 매칭 ────────────────────────────────────────────────────────────
 
 def test_alias_match():
-    from hwpx.pipeline.form_field_mapper import map_fields, STATUS_AUTO, STATUS_REVIEW
+    from hwpx.pipeline.form_field_mapper import map_fields
     # 파서가 fieldKey를 잘못 추정했지만 sourceLabel은 alias에 포함
     ef = _make_extracted_field("unknown_field", "대한소방", 0.85, "시공업체")
     pr = _make_parse_result([ef])
@@ -117,7 +116,7 @@ def test_confidence_auto_threshold():
 # ── T05. 0.60 <= confidence < 0.80 → NEEDS_REVIEW ────────────────────────────
 
 def test_confidence_review_threshold():
-    from hwpx.pipeline.form_field_mapper import map_fields, STATUS_REVIEW, CONF_REVIEW
+    from hwpx.pipeline.form_field_mapper import map_fields, CONF_REVIEW
     ef = _make_extracted_field("contractorName", "대한소방", CONF_REVIEW + 0.01, "시공자")
     pr = _make_parse_result([ef])
     ce = _make_catalog_entry(fields=[
@@ -131,7 +130,7 @@ def test_confidence_review_threshold():
 # ── T06. MISSING_REQUIRED 생성 ────────────────────────────────────────────────
 
 def test_missing_required():
-    from hwpx.pipeline.form_field_mapper import map_fields, STATUS_MISS
+    from hwpx.pipeline.form_field_mapper import map_fields
     pr = _make_parse_result([])  # 추출값 없음
     ce = _make_catalog_entry(fields=[
         _make_catalog_field("contractorName", "시공자", required=True)

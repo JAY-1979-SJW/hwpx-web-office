@@ -5,7 +5,6 @@ import json
 import zipfile
 from pathlib import Path
 
-import pytest
 
 from scripts.ops.run_web_office_hwpx_corpus_candidate_scan import (
     build_background_command,
