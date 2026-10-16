@@ -18,7 +18,7 @@ Port/process inspection using `Get-NetTCPConnection` was blocked by local permis
 
 The first Gradle startup attempt failed because the Gradle wrapper could not access the user-home Gradle lock file:
 
-- path: `C:\Users\skyjw\.gradle\wrapper\dists\gradle-8.7-bin\...\gradle-8.7-bin.zip.lck`
+- path: `C:\Users\<USER>\.gradle\wrapper\dists\gradle-8.7-bin\...\gradle-8.7-bin.zip.lck`
 - error: access denied
 
 The server was then started with external execution approval.

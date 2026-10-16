@@ -43,7 +43,7 @@
 
 ### 대상 파일
 
-- Input: `C:\Users\skyjw\OneDrive\03. PYTHON\35. haehan-ai-orchestrator\tmp\g2b_user_present_downloads_20260508\0026_R26BK01418850_000_긴급입찰사유서.hwp`
+- Input: `C:\Users\<USER>\OneDrive\03. PYTHON\35. haehan-ai-orchestrator\tmp\g2b_user_present_downloads_20260508\0026_R26BK01418850_000_긴급입찰사유서.hwp`
 - Size: `26112` bytes
 - Reason: smallest ordinary HWP candidate from the local download set.
 
