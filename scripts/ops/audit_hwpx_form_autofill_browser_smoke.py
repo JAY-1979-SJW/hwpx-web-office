@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_autofill_browser_smoke"
 FRONTEND_HTML = ROOT / "frontend" / "web_office_viewer" / "form_autofill_browser_smoke.html"
 FRONTEND_JS = ROOT / "frontend" / "web_office_viewer" / "form_autofill_browser_smoke.mjs"
@@ -62,12 +66,7 @@ def _safe_text(text: str) -> str:
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
-    return {
-        "code": code,
-        "desc": desc,
-        "status": "PASS" if ok else "FAIL",
-        "failCode": fail_code if not ok else None,
-    }
+    return occ.check_result(code, desc, ok, fail_code)
 
 
 def build_button_matrix() -> dict[str, dict[str, Any]]:

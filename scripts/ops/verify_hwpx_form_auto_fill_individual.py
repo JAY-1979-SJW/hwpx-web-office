@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_individual_verification"
 
 ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
@@ -183,8 +187,7 @@ def _audit_summary(output: str) -> str:
 
 
 def _is_transient_error(text: str) -> bool:
-    lower = text.lower()
-    return any(marker.lower() in lower for marker in TRANSIENT_ERROR_MARKERS)
+    return occ.is_transient_error(text, TRANSIENT_ERROR_MARKERS)
 
 
 def _strip_raw_output(items: list[dict[str, Any]]) -> list[dict[str, Any]]:

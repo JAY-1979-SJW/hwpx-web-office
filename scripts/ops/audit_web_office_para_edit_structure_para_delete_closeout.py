@@ -16,6 +16,8 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_structure_para_delete_closeout.md"
 BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 FEATURE_COMMIT = "1f442ec"
@@ -136,9 +138,7 @@ FORBIDDEN_SCAN_TARGETS = [
 
 
 def _missing_phrase_findings(src: str, phrases, code: str) -> list[dict]:
-    return [
-        {"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src
-    ]
+    return occ.missing_phrase_findings(src, phrases, code)
 
 
 def _check_required_doc() -> list[dict]:
@@ -221,20 +221,7 @@ def _check_forbidden_patterns() -> list[dict]:
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        r = subprocess.run(
-            ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            cwd=str(PR),
-            timeout=20,
-        )
-        if r.returncode != 0 or r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR, fail_closed=True)
 
 
 def _check_staged_zero() -> list[dict]:

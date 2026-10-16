@@ -15,6 +15,8 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 BASELINE_COMMIT = "84f6345"  # 웹뷰어 JS/HTML 품질수정(ESLint/html-validate) 준공 후 갱신 (334d665 → 84f6345)
 
 SCOPE_REASON_VALUES = [
@@ -100,15 +102,7 @@ def _check_forbidden_patterns() -> list[dict]:
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        r = subprocess.run(
-            ["git", "diff", BASELINE_COMMIT, "--", rel],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
-        if r.returncode != 0 or r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                             "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR, fail_closed=True)
 
 
 def _check_staged_zero() -> list[dict]:

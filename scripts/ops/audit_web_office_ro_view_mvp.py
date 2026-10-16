@@ -61,11 +61,7 @@ def _resolve_fixtures(limit: int = 3) -> list[Path]:
 
 
 def _resolve_checked_in_fixtures(limit: int) -> list[Path]:
-    fixture_dir = PR / "tests/fixtures/hwpx/corpus"
-    if not fixture_dir.is_dir():
-        return []
-    fixtures = sorted(p for p in fixture_dir.glob("*.hwpx") if 30000 <= p.stat().st_size <= 120000)
-    return fixtures[:limit]
+    return occ.resolve_checked_in_fixtures(PR / "tests/fixtures/hwpx/corpus", limit, 30000, 120000)
 
 
 def _stable_id_lists(doc) -> list[tuple[str, list]]:

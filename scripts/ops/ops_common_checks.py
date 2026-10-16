@@ -86,15 +86,34 @@ def check_locked_files(
     timeout: int = 20,
     *,
     rc_failure_code: str = "GIT_DIFF_RC",
+    fail_closed: bool = False,
 ) -> list[dict]:
     """잠금 파일이 기준 커밋에서 바뀌었는지 `git diff` 로 확인한다(읽기 전용).
 
     반환 항목 코드: GIT_DIFF_FAILED(WARN) / rc_failure_code(WARN, 기본 GIT_DIFF_RC) /
     LOCKED_FILE_CHANGED(FAIL). rc≠0 일 때의 코드 문자열은 감사 보고서에 그대로 찍히므로,
     그 코드로 `GIT_DIFF_FAILED` 를 쓰던 감사는 `rc_failure_code="GIT_DIFF_FAILED"` 로 보존한다.
+
+    `fail_closed=True` 는 git 을 실행하지 못했을 때를 경고로 넘기지 않는다: git 없음·시간초과는 예외가
+    그대로 올라오고, rc≠0 이거나 diff 가 있으면 둘 다 LOCKED_FILE_CHANGED(FAIL) 이다(`rc_failure_code` 는
+    쓰이지 않는다). 기본값 False 가 기존 동작이다.
     """
     findings: list[dict] = []
     for rel in locked_files:
+        if fail_closed:
+            r = subprocess.run(
+                ["git", "diff", baseline_commit, "--", rel],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(cwd),
+                timeout=timeout,
+                check=False,
+            )
+            if r.returncode != 0 or r.stdout.strip():
+                findings.append({"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": rel})
+            continue
         try:
             r = subprocess.run(
                 ["git", "diff", baseline_commit, "--", rel],
@@ -142,6 +161,38 @@ def load_json_file(path: str | None) -> Any:
 def missing_phrase_findings(src: str, phrases: list[str], code: str) -> list[dict]:
     """`src` 에 들어 있지 않은 문구마다 FAIL 항목(`code`, 문구는 detail)을 `phrases` 순서대로 돌려준다."""
     return [{"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src]
+
+
+def required_key_findings(mapping: dict, keys: Iterable[str], code: str, name: str) -> list[dict]:
+    """`mapping[key]` 가 "PASS" 가 아닌 키마다 FAIL 항목(`code`, detail `name: key=값`)을 `keys` 순서대로 돌려준다.
+
+    키가 없으면 값은 None 으로 찍힌다(없는 것도 PASS 가 아니다).
+    """
+    return [
+        {"code": code, "level": "FAIL", "detail": f"{name}: {k}={mapping.get(k)}"}
+        for k in keys
+        if mapping.get(k) != "PASS"
+    ]
+
+
+def is_transient_error(text: str, markers: Iterable[str]) -> bool:
+    """`text` 에 `markers` 중 하나가 (대소문자 무시로) 들어 있으면 True.
+
+    `markers` 는 기본값 없는 필수 인자다 — 어떤 오류를 일시적이라 볼지는 호출하는 쪽이 정한다.
+    """
+    lower = text.lower()
+    return any(marker.lower() in lower for marker in markers)
+
+
+def resolve_checked_in_fixtures(fixture_dir: Path, limit: int, min_size: int, max_size: int) -> list[Path]:
+    """`fixture_dir` 의 `*.hwpx` 중 크기가 [min_size, max_size] 바이트인 것을 이름순으로 `limit` 개까지.
+
+    폴더가 없으면 빈 목록. 크기 범위와 개수는 기본값 없는 필수 인자다(감사마다 표본 범위가 정해져 있다).
+    """
+    if not fixture_dir.is_dir():
+        return []
+    fixtures = sorted(p for p in fixture_dir.glob("*.hwpx") if min_size <= p.stat().st_size <= max_size)
+    return fixtures[:limit]
 
 
 def node_available() -> bool:

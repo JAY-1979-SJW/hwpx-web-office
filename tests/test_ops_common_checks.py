@@ -431,9 +431,12 @@ _SMALL_HELPER_CALLS = {
     "_check": "occ.check_result(code, desc, ok, fail_code)",
     "_load_decisions": "occ.load_json_file(path)",
     "_load_paths": "occ.load_json_file(path)",
+    "_is_transient_error": "occ.is_transient_error(text, TRANSIENT_ERROR_MARKERS)",
     "_missing_phrase_findings": "occ.missing_phrase_findings(src, phrases, code)",
     "_node_ok": "occ.node_available()",
     "_pick_paragraph": "occ.pick_cell_paragraph(doc)",
+    "_required_key_findings": "occ.required_key_findings(mapping, keys, code, name)",
+    "_resolve_checked_in_fixtures": "occ.resolve_checked_in_fixtures(PR / 'tests/fixtures/hwpx/corpus', limit, 30000, 120000)",
 }
 
 
@@ -468,10 +471,13 @@ def test_13i_small_helpers_stay_delegated_to_the_shared_implementation() -> None
     found = _delegating_helpers()
     # 이 PR 에서 위임한 개수 아래로 줄면(복사본이 다시 생기면) 실패한다.
     minimum = {
-        "_check": 4,
-        "_sha": 7,
+        "_check": 9,
+        "_sha": 8,
         "_pick_paragraph": 3,
-        "_missing_phrase_findings": 5,
+        "_missing_phrase_findings": 6,
+        "_required_key_findings": 2,
+        "_is_transient_error": 2,
+        "_resolve_checked_in_fixtures": 2,
         "_node_ok": 6,
         "_load_decisions": 2,
         "_load_paths": 3,
@@ -571,3 +577,83 @@ def test_14d_leak_helpers_and_pattern_definitions_stay_delegated() -> None:
     assert no_leak >= 20, no_leak
     assert safe_text >= 6, safe_text
     assert alias_files >= 6, alias_files
+
+
+def test_15a_fail_closed_turns_git_failures_into_fail_or_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _repo_with(tmp_path, {"a.txt": "one\n", "b.txt": "one\n"})
+    # 변경 없음 → 빈 목록, 변경 있음 → FAIL(두 모드 공통)
+    assert occ.check_locked_files(["a.txt", "b.txt"], base, tmp_path, fail_closed=True) == []
+    (tmp_path / "a.txt").write_text("two\n", encoding="utf-8")
+    changed = [{"code": "LOCKED_FILE_CHANGED", "level": "FAIL", "detail": "a.txt"}]
+    assert occ.check_locked_files(["a.txt", "b.txt"], base, tmp_path, fail_closed=True) == changed
+    # rc≠0(기준 커밋을 못 찾음): 기본은 WARN, fail_closed 는 FAIL — rc_failure_code 는 쓰이지 않는다
+    assert [f["level"] for f in occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path)] == ["WARN"]
+    closed = occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path, rc_failure_code="X", fail_closed=True)
+    assert closed == changed
+    # git 을 실행하지 못한 경우는 경고로 삼키지 않고 예외가 그대로 올라온다
+    def _boom(exc: BaseException):
+        def run(*args: object, **kwargs: object) -> None:
+            raise exc
+
+        return run
+
+    monkeypatch.setattr(subprocess, "run", _boom(FileNotFoundError("git")))
+    with pytest.raises(FileNotFoundError):
+        occ.check_locked_files(["a.txt"], base, tmp_path, fail_closed=True)
+    assert [f["code"] for f in occ.check_locked_files(["a.txt"], base, tmp_path)] == ["GIT_DIFF_FAILED"]
+    monkeypatch.setattr(subprocess, "run", _boom(subprocess.TimeoutExpired("git", 20)))
+    with pytest.raises(subprocess.TimeoutExpired):
+        occ.check_locked_files(["a.txt"], base, tmp_path, fail_closed=True)
+
+
+def test_15b_fail_closed_is_keyword_only_and_off_by_default(tmp_path: Path) -> None:
+    with pytest.raises(TypeError):
+        occ.check_locked_files(["a.txt"], "HEAD", tmp_path, 20, "GIT_DIFF_RC", True)  # type: ignore[misc]
+    _repo_with(tmp_path, {"a.txt": "one\n"})
+    assert occ.check_locked_files(["a.txt"], "no-such-rev", tmp_path) == occ.check_locked_files(
+        ["a.txt"], "no-such-rev", tmp_path, fail_closed=False
+    )
+
+
+def test_15c_required_key_findings_flags_every_non_pass_key_in_order() -> None:
+    mapping = {"a": "PASS", "b": "FAIL", "c": None, "e": "pass"}
+    assert occ.required_key_findings(mapping, ["a", "b", "c", "d", "e"], "K", "nm") == [
+        {"code": "K", "level": "FAIL", "detail": "nm: b=FAIL"},
+        {"code": "K", "level": "FAIL", "detail": "nm: c=None"},
+        {"code": "K", "level": "FAIL", "detail": "nm: d=None"},
+        {"code": "K", "level": "FAIL", "detail": "nm: e=pass"},
+    ]
+    assert occ.required_key_findings({"a": "PASS"}, [], "K", "nm") == []
+
+
+def test_15d_is_transient_error_ignores_case_and_requires_markers() -> None:
+    markers = ("Permission Denied", "timed out")
+    assert occ.is_transient_error("xx PERMISSION denied yy", markers)
+    assert occ.is_transient_error("Timed Out", markers)
+    assert not occ.is_transient_error("plain failure", markers)
+    assert not occ.is_transient_error("anything", ())
+    with pytest.raises(TypeError):
+        occ.is_transient_error("x")  # type: ignore[call-arg]
+
+
+def test_15e_resolve_checked_in_fixtures_filters_by_size_and_sorts_by_name(tmp_path: Path) -> None:
+    assert occ.resolve_checked_in_fixtures(tmp_path / "missing", 5, 1, 10) == []
+    for name, size in (("c.hwpx", 10), ("a.hwpx", 5), ("b.hwpx", 1), ("small.hwpx", 0), ("big.hwpx", 11), ("n.txt", 5)):
+        (tmp_path / name).write_bytes(b"x" * size)
+    assert [p.name for p in occ.resolve_checked_in_fixtures(tmp_path, 10, 1, 10)] == ["a.hwpx", "b.hwpx", "c.hwpx"]
+    assert [p.name for p in occ.resolve_checked_in_fixtures(tmp_path, 2, 1, 10)] == ["a.hwpx", "b.hwpx"]
+    assert occ.resolve_checked_in_fixtures(tmp_path, 0, 1, 10) == []
+
+
+def test_15f_locked_file_audits_stay_fail_closed_and_delegated() -> None:
+    import ast
+
+    closed = 0
+    for path in sorted((ROOT / "scripts" / "ops").glob("*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.FunctionDef) and node.name == "_check_locked_files" and len(node.body) == 1:
+                call = ast.unparse(node.body[0].value) if isinstance(node.body[0], ast.Return) and node.body[0].value else ""
+                if call.endswith("fail_closed=True)") and call.startswith("occ.check_locked_files("):
+                    closed += 1
+    # fail-closed 로 돌려야 하는 두 감사가 다시 자체 복사본으로 돌아가면 실패한다.
+    assert closed >= 2, closed

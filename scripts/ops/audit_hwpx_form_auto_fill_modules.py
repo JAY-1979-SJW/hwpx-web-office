@@ -126,8 +126,7 @@ def _run_pytest_combined(paths: list[str], timeout: int) -> dict[str, Any]:
 
 
 def _is_transient_error(text: str) -> bool:
-    lower = text.lower()
-    return any(marker.lower() in lower for marker in TRANSIENT_ERROR_MARKERS)
+    return occ.is_transient_error(text, TRANSIENT_ERROR_MARKERS)
 
 
 def _is_pytest_cleanup_permission_only(text: str) -> bool:
