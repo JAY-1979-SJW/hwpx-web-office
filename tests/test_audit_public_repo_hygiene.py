@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import zipfile
@@ -12,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.ops import audit_public_repo_hygiene as hyg  # noqa: E402
+from scripts.ops import audit_public_repo_hygiene as hyg
 
 BS = chr(92)
 # 매칭 값이 출력에 새지 않는지 보려고 쓰는 표식 — 실제 비밀·계정이 아닌 가짜 값이다.
@@ -129,3 +130,22 @@ def test_10_binary_and_oversized_files_are_skipped(tmp_path: Path, monkeypatch: 
 def test_11_real_repo_head_has_no_violations() -> None:
     """이 저장소의 추적 파일 자체가 감사를 통과해야 한다(허용 목록 밖 위반 0)."""
     assert hyg.violations(hyg.scan(ROOT)) == []
+
+
+def test_12_korean_warning_does_not_crash_on_cp1252_console(tmp_path: Path) -> None:
+    """CI 윈도우 콘솔(cp1252)에서 한글 경고 출력이 인코딩 오류로 죽던 결함의 회귀 시험."""
+    root = _repo(tmp_path, {"a.txt": "hello\n"})
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "x"],
+        cwd=root,
+        check=True,
+    )
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "ops" / "audit_public_repo_hygiene.py"), "--root", str(root)],
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", errors="replace")
+    assert b"Traceback" not in proc.stderr

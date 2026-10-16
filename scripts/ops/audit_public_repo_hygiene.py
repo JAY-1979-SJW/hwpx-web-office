@@ -132,6 +132,11 @@ def non_noreply_author_count(root: Path, limit: int = 200) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # CI 의 윈도우 콘솔(cp1252)에서 한글 출력이 인코딩 오류로 죽지 않게 UTF-8 로 고정한다.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", default=".", help="검사할 git 저장소 경로")
     args = ap.parse_args(argv)
