@@ -51,7 +51,7 @@ FAIL = "FAIL"
 CRITICAL_IMPORTS = {
     "fastapi": "web_office 백엔드 API (scripts/hwpx/web_office/service.py 등)",
     "olefile": "HWP(바이너리) 파싱 (scripts/extract_hwp_body_fields.py)",
-    "fitz": "PDF 파싱 — pip 패키지명은 pymupdf (scripts/kpi_parse.py 등)",
+    "fitz": "PDF 파싱 — pip 패키지명은 pymupdf (scripts/hwpx/web_office/hancom_layout_refresh.py)",
     "pytest": "회귀 스위트 실행 자체",
 }
 
