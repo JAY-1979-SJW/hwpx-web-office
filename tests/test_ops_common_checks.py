@@ -50,8 +50,10 @@ def test_02_no_leak_false_when_any_pattern_matches() -> None:
     assert occ.no_leak("hello zzz", re.compile("qqq"), re.compile("zzz")) is False
 
 
-def test_03_no_leak_without_patterns_is_true() -> None:
-    assert occ.no_leak("anything") is True
+def test_03_no_leak_without_patterns_raises() -> None:
+    # 패턴 없이 부르면 통과(True)가 아니라 실패 - 정규식을 빠뜨린 교체가 검사를 조용히 끄지 못한다.
+    with pytest.raises(ValueError):
+        occ.no_leak("anything")
 
 
 # --- safe_write_json ----------------------------------------------------------
@@ -70,6 +72,14 @@ def test_05_safe_write_json_refuses_leak_and_does_not_echo_value(tmp_path: Path)
         occ.safe_write_json(out, {"k": secret_like}, lambda t: secret_like not in t, "FAIL_UNSAFE_REPORT")
     assert str(exc.value) == "FAIL_UNSAFE_REPORT: r.json"
     assert secret_like not in str(exc.value)
+    assert not out.exists()
+
+
+@pytest.mark.parametrize("bad", [None, "not-callable", 0])
+def test_05b_safe_write_json_requires_callable_leak_check(tmp_path: Path, bad: object) -> None:
+    out = tmp_path / "r.json"
+    with pytest.raises(TypeError):
+        occ.safe_write_json(out, {"a": 1}, bad, "unsafe")  # type: ignore[arg-type]
     assert not out.exists()
 
 

@@ -17,7 +17,13 @@ from typing import Any
 
 
 def no_leak(text: str, *patterns: re.Pattern[str]) -> bool:
-    """어느 패턴에도 걸리지 않으면 True. 패턴이 없으면 검사할 것이 없으므로 True."""
+    """어느 패턴에도 걸리지 않으면 True. 패턴이 하나도 없으면 ValueError.
+
+    패턴 없이 호출하면 아무것도 검사하지 않고 통과해 유출 검사가 조용히 꺼지므로, 호출 실수를
+    통과가 아니라 실패로 드러낸다.
+    """
+    if not patterns:
+        raise ValueError("no_leak: at least one pattern is required")
     return not any(p.search(text) for p in patterns)
 
 
@@ -26,7 +32,10 @@ def safe_write_json(path: Path, payload: Any, leak_free: Callable[[str], bool], 
 
     `leak_free` 는 문자열을 받아 bool 을 돌려주는 함수다(각 감사의 `_no_leak`). 거짓이면
     파일을 쓰지 않고 `ValueError(f"{error_prefix}: {path.name}")` — 값은 메시지에 넣지 않는다.
+    `leak_free` 가 None 이거나 호출할 수 없으면 검사가 꺼진 채 쓰이지 않도록 쓰기 전에 TypeError.
     """
+    if not callable(leak_free):
+        raise TypeError("safe_write_json: leak_free must be callable")
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if not leak_free(text):
         raise ValueError(f"{error_prefix}: {path.name}")
