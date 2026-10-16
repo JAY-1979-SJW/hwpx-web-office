@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.ops import hwpx_form_auto_fill_module_audit_history as history  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_module_log_contract"
 DEFAULT_MODULE_AUDIT_REPORT = (
@@ -123,7 +124,7 @@ def _validate_entry(entry: dict[str, Any], zone_by_module: dict[str, str]) -> li
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def validate_module_log_contract(
@@ -203,10 +204,7 @@ def run_module_log_contract_gate(
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"{FAIL_UNSAFE_REPORT}: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, FAIL_UNSAFE_REPORT)
 
 
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:

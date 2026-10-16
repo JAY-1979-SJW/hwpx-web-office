@@ -35,6 +35,7 @@ from scripts.ops import (
 )
 from scripts.ops import hwpx_form_auto_fill_module_audit_history as history
 from scripts.ops import install_hwpx_form_auto_fill_persistent_gates as persistent
+from scripts.ops import ops_common_checks as occ
 from scripts.ops import plan_hwpx_repo_detailed_separation as separation_plan
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_fail_fast_gate"
@@ -50,7 +51,7 @@ PII_RE = re.compile(
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _step(name: str, verdict: str, fail_code: str | None = None) -> dict[str, Any]:
@@ -542,10 +543,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe fail-fast payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe fail-fast payload")
 
 
 def main() -> int:

@@ -9,9 +9,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from hwpx.pipeline import form_auto_fill_real_file_preflight as pf  # noqa: E402
+
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_user_flow_closeout"
 CLOSEOUT = ROOT / "docs" / "reports" / "HWPX_FORM_AUTO_FILL_USER_FLOW_CLOSEOUT_14.md"
@@ -122,7 +125,7 @@ def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict
 
 
 def _no_leak(text: str) -> bool:
-    return not (pf.ABS_PATH_RE.search(text) or pf.RAW_FILENAME_RE.search(text) or pf.PII_RE.search(text))
+    return occ.no_leak(text, pf.ABS_PATH_RE, pf.RAW_FILENAME_RE, pf.PII_RE)
 
 
 def _safe_report_write(path: Path, payload: Any) -> None:

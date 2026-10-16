@@ -6,8 +6,14 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate"
 
@@ -35,7 +41,7 @@ SUPPORTED_PACKAGE_KINDS = {"HWPX_PACKAGE", "SANITIZED_REAL_LIKE_PACKAGE", "SYNTH
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _safe_id(seed: str) -> str:
@@ -203,10 +209,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe upload gate payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe upload gate payload")
 
 
 def main() -> int:
