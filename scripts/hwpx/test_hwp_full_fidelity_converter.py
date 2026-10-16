@@ -9,6 +9,7 @@ from zipfile import ZipFile
 from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 import hwp_full_fidelity_converter as full
+import hwp_full_fidelity_decoders as decoders
 import hwp_full_fidelity_package as full_package
 
 
@@ -123,31 +124,31 @@ def test_docinfo_extension_tags_are_known_and_audited() -> None:
             "index": 0,
             "tag_id": 30,
             "tag_name": "COMPATIBLE_DOCUMENT",
-            "decoded": full.decode_known_record(30, b"\x02\x00\x00\x00"),
+            "decoded": decoders.decode_known_record(30, b"\x02\x00\x00\x00"),
         },
         {
             "index": 1,
             "tag_id": 31,
             "tag_name": "LAYOUT_COMPATIBILITY",
-            "decoded": full.decode_known_record(31, b"\x00" * 20),
+            "decoded": decoders.decode_known_record(31, b"\x00" * 20),
         },
         {
             "index": 2,
             "tag_id": 32,
             "tag_name": "TRACK_CHANGE",
-            "decoded": full.decode_known_record(32, b"\x03\x00\x00\x00" + b"\x00" * 1028),
+            "decoded": decoders.decode_known_record(32, b"\x03\x00\x00\x00" + b"\x00" * 1028),
         },
         {
             "index": 3,
             "tag_id": 92,
             "tag_name": "MEMO_SHAPE",
-            "decoded": full.decode_known_record(92, b"\x00" * 22),
+            "decoded": decoders.decode_known_record(92, b"\x00" * 22),
         },
         {
             "index": 4,
             "tag_id": 94,
             "tag_name": "FORBIDDEN_CHAR",
-            "decoded": full.decode_known_record(94, b"\x00" * 4),
+            "decoded": decoders.decode_known_record(94, b"\x00" * 4),
         },
     ]
     decoded = full.build_decoded_docinfo(records)
@@ -862,7 +863,7 @@ def test_decode_eqedit_extracts_formula_text() -> None:
         + app.encode("utf-16le")
     )
 
-    decoded = full.decode_known_record(88, payload)
+    decoded = decoders.decode_known_record(88, payload)
 
     assert decoded["formula"] == formula
     assert decoded["version"] == version
@@ -1057,9 +1058,9 @@ def test_docinfo_decoders_parse_core_records() -> None:
         + "-".encode("utf-16le")
     )
 
-    assert full.decode_document_properties(doc_props)["section_count"] == 2
-    assert full.decode_id_mappings(mappings)["counts"]["style"] == 14
-    binary_data = full.decode_binary_data(
+    assert decoders.decode_document_properties(doc_props)["section_count"] == 2
+    assert decoders.decode_id_mappings(mappings)["counts"]["style"] == 14
+    binary_data = decoders.decode_binary_data(
         (0x0111).to_bytes(2, "little")
         + (7).to_bytes(2, "little")
         + (3).to_bytes(2, "little")
@@ -1072,7 +1073,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert binary_data["extension"] == "png"
     assert binary_data["stream_name"] == "BinData/BIN0007.png"
     assert binary_data["manifest_id"] == "BIN0007"
-    face_name = full.decode_face_name(
+    face_name = decoders.decode_face_name(
         bytes([0xE0])
         + (4).to_bytes(2, "little")
         + "Main".encode("utf-16le")
@@ -1089,12 +1090,12 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert face_name["type_info_names"][:4] == ["UNKNOWN", "TTF", "HFT", "BOTH"]
     assert face_name["font_type"] == "TTF"
     assert face_name["base_font"] == "Base"
-    assert full.decode_char_shape(char_shape)["bold"] is True
-    assert full.decode_char_shape(char_shape)["text_color"]["hex"] == "#112233"
-    assert full.decode_numbering(numbering_level * 7)["levels"][0]["text"] == "^1."
-    assert full.decode_numbering(numbering_level * 7)["level_count"] == 7
-    assert full.decode_bullet(bullet)["bullet_char"] == "-"
-    border_fill = full.decode_border_fill(
+    assert decoders.decode_char_shape(char_shape)["bold"] is True
+    assert decoders.decode_char_shape(char_shape)["text_color"]["hex"] == "#112233"
+    assert decoders.decode_numbering(numbering_level * 7)["levels"][0]["text"] == "^1."
+    assert decoders.decode_numbering(numbering_level * 7)["level_count"] == 7
+    assert decoders.decode_bullet(bullet)["bullet_char"] == "-"
+    border_fill = decoders.decode_border_fill(
         (
             (1 << 0) | (1 << 1) | (2 << 2) | (7 << 5) | (1 << 8) | (1 << 10) | (1 << 11) | (1 << 12)
         ).to_bytes(2, "little")
@@ -1119,9 +1120,9 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert border_fill["diagonal_type_name"] == "DASH"
     assert border_fill["diagonal_width_name"] == "0.2 mm"
     assert border_fill["fill"]["solid"]["pattern_name"] == "CROSS"
-    assert full.decode_para_shape(para_shape)["align"] == 1
+    assert decoders.decode_para_shape(para_shape)["align"] == 1
     assert (
-        full.decode_para_header(
+        decoders.decode_para_header(
             (3).to_bytes(4, "little")
             + b"\x00" * 4
             + (2).to_bytes(2, "little")
@@ -1132,7 +1133,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
         == 2
     )
     ctrl_properties = 1 | (2 << 3) | (2 << 8) | (1 << 14) | (5 << 21) | (2 << 24)
-    ctrl_header = full.decode_ctrl_header(
+    ctrl_header = decoders.decode_ctrl_header(
         b" gso"
         + ctrl_properties.to_bytes(4, "little")
         + (200).to_bytes(4, "little", signed=True)
@@ -1155,12 +1156,12 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert ctrl_header["layout"]["text_wrap"] == "TOP_AND_BOTTOM"
     assert ctrl_header["layout"]["text_flow"] == "RIGHT_ONLY"
     assert (
-        full.decode_para_char_shape((0).to_bytes(4, "little") + (7).to_bytes(4, "little"))[
+        decoders.decode_para_char_shape((0).to_bytes(4, "little") + (7).to_bytes(4, "little"))[
             "first_char_shape_id"
         ]
         == 7
     )
-    list_header = full.decode_list_header(
+    list_header = decoders.decode_list_header(
         (1).to_bytes(4, "little")
         + (32).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
@@ -1175,7 +1176,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert list_header["cell_addr"] == {"col": 2, "row": 3}
     assert list_header["cell_span"] == {"col": 4, "row": 1}
     assert list_header["border_fill_id"] == 9
-    page_def = full.decode_page_def(
+    page_def = decoders.decode_page_def(
         (59528).to_bytes(4, "little", signed=True)
         + (84188).to_bytes(4, "little", signed=True)
         + (5669).to_bytes(4, "little", signed=True) * 3
@@ -1184,7 +1185,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     )
     assert page_def["orientation"] == "portrait"
     assert page_def["margins"]["left"] == 5669
-    page_border_fill = full.decode_page_border_fill(
+    page_border_fill = decoders.decode_page_border_fill(
         (0x7).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
         + (1417).to_bytes(4, "little", signed=True)
@@ -1197,7 +1198,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert page_border_fill["header_inside"] is True
     assert page_border_fill["footer_inside"] is True
     assert page_border_fill["margins"]["bottom"] == 1420
-    footnote_shape = full.decode_footnote_shape(
+    footnote_shape = decoders.decode_footnote_shape(
         ((2 << 10) | (1 << 12) | (1 << 13)).to_bytes(4, "little")
         + "*".encode("utf-16le")
         + "[".encode("utf-16le")
@@ -1222,7 +1223,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert footnote_shape["separator_line_type"] == "DASH"
     assert footnote_shape["separator_line_width"] == "0.2 mm"
     assert footnote_shape["separator_line_color"]["hex"] == "#112233"
-    table = full.decode_table(
+    table = decoders.decode_table(
         (0).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
         + (3).to_bytes(2, "little")
@@ -1238,7 +1239,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert table["row_cell_counts"] == [1, 2]
     assert table["row_cell_count_total"] == 3
     assert table["table_zone_u16"] == [99]
-    rectangle = full.decode_shape_component_rectangle(
+    rectangle = decoders.decode_shape_component_rectangle(
         bytes([12])
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little", signed=True)
@@ -1258,7 +1259,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
         "width": 2000,
         "height": 1000,
     }
-    fixed_point_rectangle = full.decode_shape_component_rectangle(
+    fixed_point_rectangle = decoders.decode_shape_component_rectangle(
         bytes([0])
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little", signed=True)
@@ -1271,7 +1272,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     )
     assert fixed_point_rectangle["bbox"]["width"] == 2000
     assert fixed_point_rectangle["bbox"]["height"] == 1000
-    picture = full.decode_picture(
+    picture = decoders.decode_picture(
         (0).to_bytes(4, "little")
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little")
