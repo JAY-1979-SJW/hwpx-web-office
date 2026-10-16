@@ -10,7 +10,6 @@ DELETE_TEXT_RANGE) × (cell / body) × (single-run / multi-run) 전 범위
 from __future__ import annotations
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,8 @@ from typing import Any
 PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
+
+from scripts.ops import ops_common_checks as occ
 
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_content_closeout.md")
@@ -159,24 +160,7 @@ def _check_required_files() -> list[dict]:
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
-            continue
-        if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
-            continue
-        if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR)
 
 
 def _check_forbidden_features() -> list[dict]:
