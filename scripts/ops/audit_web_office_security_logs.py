@@ -103,7 +103,7 @@ def audit(
 ) -> dict[str, Any]:
     project_root = project_root.resolve()
     log_results: list[dict[str, Any]] = []
-    total_counts = {name: 0 for name in SUSPICIOUS_PATTERNS}
+    total_counts = dict.fromkeys(SUSPICIOUS_PATTERNS, 0)
     warnings: list[dict[str, str]] = []
 
     for candidate in DEFAULT_LOG_CANDIDATES:

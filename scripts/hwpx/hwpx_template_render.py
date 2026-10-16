@@ -25,7 +25,7 @@ def normalize_table_config(table_json: Path | None, inline_tables: list[dict[str
 
 
 def count_placeholders(package: HwpxPackage, mapping: dict[str, Any]) -> dict[str, int]:
-    counts = {key: 0 for key in mapping}
+    counts = dict.fromkeys(mapping, 0)
     for entry in package.xml_entries():
         text = package.read_text(entry)
         for key in mapping:
