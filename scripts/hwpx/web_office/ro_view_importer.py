@@ -272,9 +272,8 @@ def _find_table_elem(
     ]
     if not tables:
         return None
-    if table_position_in_section is not None:
-        if 0 <= table_position_in_section < len(tables):
-            return tables[table_position_in_section]
+    if table_position_in_section is not None and 0 <= table_position_in_section < len(tables):
+        return tables[table_position_in_section]
     return tables[0]
 
 
@@ -1324,7 +1323,7 @@ def import_hwpx_as_ro_view(
                 counts[pidx] = c
         host_counts_by_section[sec_i] = counts
     # section 별 표 emit 커서 — 각 표를 정확히 1회만 emit (누락/중복 방지)
-    section_table_cursor: dict[int, int] = {s: 0 for s in tables_by_section}
+    section_table_cursor: dict[int, int] = dict.fromkeys(tables_by_section, 0)
 
     for b in parsed.blocks or []:
         ref = None
