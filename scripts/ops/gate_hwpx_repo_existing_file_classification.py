@@ -232,9 +232,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _load_paths(path: str | None) -> list[str] | None:
-    if not path:
-        return None
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return occ.load_json_file(path)
 
 
 def main() -> int:

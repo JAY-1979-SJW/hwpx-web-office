@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 from hwpx.pipeline import form_auto_fill_real_file_preflight as pf  # noqa: E402
 from hwpx.pipeline import form_auto_fill_real_like_sandbox_batch as batch  # noqa: E402
 
@@ -93,12 +95,7 @@ def _dirty_baseline() -> dict[str, Any]:
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
-    return {
-        "code": code,
-        "desc": desc,
-        "status": "PASS" if ok else "FAIL",
-        "failCode": fail_code if not ok else None,
-    }
+    return occ.check_result(code, desc, ok, fail_code)
 
 
 def _write_zip(path: Path, files: dict[str, str]) -> Path:

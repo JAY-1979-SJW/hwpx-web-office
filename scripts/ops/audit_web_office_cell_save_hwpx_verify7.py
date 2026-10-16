@@ -7,7 +7,6 @@ audit log append 모두 검증한다.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import sys
@@ -18,6 +17,8 @@ PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 from scripts.hwpx.web_office.cell_save_audit import append_save_audit_record  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.cell_save_pipeline import VERDICT_PASS, save_cell_edits  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.edit_command_model import make_set_cell_text_command  # ruff: ignore[module-import-not-at-top-of-file]
@@ -26,7 +27,7 @@ from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # r
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return occ.sha256_file(p)
 
 
 def _resolve_fixture() -> Path | None:

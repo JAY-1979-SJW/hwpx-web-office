@@ -9,7 +9,6 @@ Runs one real safe-HWPX cell replace scenario and validates:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 import tempfile
@@ -19,6 +18,8 @@ from pathlib import Path
 PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 
 from scripts.hwpx.web_office.cell_save_pipeline import save_cell_edits  # ruff: ignore[module-import-not-at-top-of-file]
 from scripts.hwpx.web_office.edit_command_model import (  # ruff: ignore[module-import-not-at-top-of-file]
@@ -36,7 +37,7 @@ REPLACE_AFTER = "CELL_VERIFY_OK_005"
 
 
 def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return occ.sha256_file(path)
 
 
 def _pipeline_result_findings(res: dict, out: Path, target_cell_id: str) -> list[dict]:

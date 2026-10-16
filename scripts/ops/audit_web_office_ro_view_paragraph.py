@@ -13,7 +13,6 @@ return {"verdict": "PASS"|"FAIL", "findings": [...], "summary": {...}}
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import subprocess
@@ -25,6 +24,8 @@ if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 if str(PR / "scripts/hwpx") not in sys.path:
     sys.path.insert(0, str(PR / "scripts/hwpx"))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 
 from scripts.hwpx.web_office.render_payload import (  # ruff: ignore[module-import-not-at-top-of-file]
     build_render_payload,
@@ -64,7 +65,7 @@ BASELINE = "bb0939b"  # PARA_INSERT 준공 후 갱신 (2a0cde8 → bb0939b)
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return occ.sha256_file(p)
 
 
 def _resolve_fixtures(limit: int = 3) -> list[Path]:

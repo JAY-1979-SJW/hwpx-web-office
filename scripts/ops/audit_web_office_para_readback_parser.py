@@ -138,13 +138,7 @@ def _pick_fixture() -> Path | None:
 
 
 def _pick_paragraph(doc) -> Any:
-    for p in doc.paragraphs:
-        cs = p.containerScope or {}
-        if (cs.get("kind") == "cell" and p.parPrIDRef
-                and p.runs and p.runs[0].charPrIDRef
-                and len(p.text or "") >= 2):
-            return p
-    return None
+    return occ.pick_cell_paragraph(doc)
 
 
 def _run_dynamic() -> dict[str, Any]:

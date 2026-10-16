@@ -5,7 +5,6 @@ HTTP against a real HWPX fixture.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import socket
@@ -22,6 +21,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 SOURCE_PATH = "tests/fixtures/hwpx/corpus/fx_metadata_form.hwpx"
 FIXTURE = ROOT / SOURCE_PATH
 PASS_VERDICT = "PASS_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE"
@@ -29,7 +30,7 @@ FAIL_VERDICT = "FAIL_HWPX_EDITOR_BACKEND_RUNTIME_SMOKE"
 
 
 def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return occ.sha256_file(path)
 
 
 def _free_port() -> int:

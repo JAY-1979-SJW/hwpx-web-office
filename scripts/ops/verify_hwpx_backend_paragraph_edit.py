@@ -9,7 +9,6 @@ Runs one real safe-HWPX paragraph replace scenario and validates:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 import tempfile
@@ -19,6 +18,8 @@ from pathlib import Path
 PR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PR))
 sys.path.insert(0, str(PR / "scripts/hwpx"))
+
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 
 from scripts.hwpx.web_office.para_edit_e2e_pipeline import (  # ruff: ignore[module-import-not-at-top-of-file]
     SCENARIO_REPLACE,
@@ -34,7 +35,7 @@ LOCAL_TMP_ROOT = Path(tempfile.gettempdir()) / "hwpx-web-office"
 
 
 def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return occ.sha256_file(path)
 
 
 def _check_pipeline_result(res: dict) -> list[dict]:
