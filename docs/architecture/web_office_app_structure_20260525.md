@@ -169,6 +169,7 @@ AI 자동채움 / 소스 추출 (WEB-OFFICE-AI-FILL-01, §9 Claude Code CLI Haik
 - `POST /api/web-office/catalog-match`
 - `POST /api/web-office/catalog-by-category`
 - `POST /api/web-office/catalog-ai-search` (자연어 → 키워드 해석 후 검색)
+- `POST /api/web-office/catalog-fill` (참조 hwpx 값 → 카탈로그 매칭 대상 서식 칸 채움 제안, 규칙 기반·AI 미사용)
 
 온디맨드 서식 준비 / 다운로드 (WEB-OFFICE-CONVERT-01):
 

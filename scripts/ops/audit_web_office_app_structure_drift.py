@@ -81,6 +81,8 @@ REQUIRED_ENDPOINTS = [
     "POST /api/web-office/catalog-match",
     "POST /api/web-office/catalog-by-category",
     "POST /api/web-office/catalog-ai-search",
+    # WEB-OFFICE-CATALOG-FILL-01: 참조 hwpx 값 -> 카탈로그 매칭 대상 서식 칸 채움 제안(규칙 기반, AI 미사용).
+    "POST /api/web-office/catalog-fill",
     # WEB-OFFICE-CONVERT-01: 온디맨드 서식 준비(HWP→한컴 COM 변환) + 산출물 다운로드.
     "POST /api/web-office/prepare-form",
     "GET /api/web-office/download/{filename}",
