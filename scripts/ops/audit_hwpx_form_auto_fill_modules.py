@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -23,12 +22,9 @@ LOCAL_TEMP_ROOT = ROOT / "data" / "tmp" / "hwpx_form_auto_fill_module_audits"
 
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
 FAIL_VERDICT = "FAIL_HWPX_FORM_AUTO_FILL_MODULE_AUDITS"
-ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
-RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
-PII_RE = re.compile(
-    r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
-    r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
-)
+ABS_PATH_RE = occ.ABS_PATH_RE
+RAW_FILENAME_RE = occ.RAW_FILENAME_RE
+PII_RE = occ.PII_RE
 TRANSIENT_ERROR_MARKERS = (
     "PermissionError: [WinError 5]",
     "winerror 5",
@@ -42,10 +38,7 @@ def load_manifest(path: Path = MANIFEST) -> dict[str, Any]:
 
 
 def _safe_text(text: str) -> str:
-    text = ABS_PATH_RE.sub("<abs-path>", text)
-    text = RAW_FILENAME_RE.sub("<hwpx-file>", text)
-    text = PII_RE.sub("<masked>", text)
-    return text
+    return occ.redact_text(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _no_leak(text: str) -> bool:

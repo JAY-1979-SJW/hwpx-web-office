@@ -51,10 +51,7 @@ def _run_pytest(paths: list[str], timeout: int = 900) -> dict[str, Any]:
 
 
 def _safe_text(text: str) -> str:
-    text = pf.ABS_PATH_RE.sub("<abs-path>", text)
-    text = pf.RAW_FILENAME_RE.sub("<hwpx-file>", text)
-    text = pf.PII_RE.sub("<masked>", text)
-    return text
+    return occ.redact_text(text, pf.ABS_PATH_RE, pf.RAW_FILENAME_RE, pf.PII_RE)
 
 
 def _dirty_baseline() -> dict[str, Any]:

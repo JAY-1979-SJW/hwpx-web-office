@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -21,12 +20,9 @@ REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_construction_work_
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN"
 FAIL_VERDICT = "FAIL_HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN"
 
-ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
-RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
-PII_RE = re.compile(
-    r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
-    r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
-)
+ABS_PATH_RE = occ.ABS_PATH_RE
+RAW_FILENAME_RE = occ.RAW_FILENAME_RE
+PII_RE = occ.PII_RE
 
 REQUIRED_TOKENS = {
     "A01": ("construction master design exists", "HWPX Form Auto Fill Construction Work Master Design"),
@@ -72,10 +68,7 @@ def _run_pytest(paths: list[str], timeout: int = 300) -> dict[str, Any]:
 
 
 def _safe_text(text: str) -> str:
-    text = ABS_PATH_RE.sub("<abs-path>", text)
-    text = RAW_FILENAME_RE.sub("<hwpx-file>", text)
-    text = PII_RE.sub("<masked>", text)
-    return text
+    return occ.redact_text(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _no_leak(text: str) -> bool:

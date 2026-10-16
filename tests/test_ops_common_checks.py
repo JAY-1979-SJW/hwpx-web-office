@@ -516,3 +516,58 @@ def test_13j_every_file_importing_occ_can_resolve_it_from_a_foreign_cwd(tmp_path
     )
     assert r.returncode == 0, r.stderr[-300:]
     assert r.stdout.strip() == "BAD=", r.stdout[-300:]
+
+
+def test_14a_shared_patterns_are_pinned_and_catch_suffixed_hwpx_names() -> None:
+    assert occ.ABS_PATH_RE.pattern == r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)"
+    assert occ.RAW_FILENAME_RE.pattern == r"\b[^\\/:\s]+\.hwpx\b"
+    assert occ.RAW_FILENAME_RE.flags & re.IGNORECASE
+    # 좁은 변형이 놓치던 이름까지 잡는다.
+    for name in ("a.hwpx", "A.HWPX", "a.hwpx-bak", "a.hwpx.bak"):
+        assert occ.RAW_FILENAME_RE.search(name), name
+    for text in ("C:\\data\\x", "/home/u/f", "/tmp/x", "/var/a", "/Users/me"):
+        assert occ.ABS_PATH_RE.search(text), text
+    for text in ("900101-1234567", "123-45-67890", "010-1234-5678", "a@b.co"):
+        assert occ.PII_RE.search(text), text
+    assert not occ.PII_RE.search("plain text") and not occ.ABS_PATH_RE.search("abC:\\x")
+
+
+def test_14b_inventory_keeps_its_narrow_filename_pattern_for_dockerfile_hwpx_ro_view() -> None:
+    # 저장소에 실제로 있는 `Dockerfile.hwpx-ro-view` 가 넓은 패턴에 걸려 classify 보고서 쓰기가 막히므로
+    # 이 모듈만 좁은 패턴을 따로 쓴다. 합치면 이 시험이 먼저 실패한다.
+    assert not inventory.RAW_FILENAME_RE.search("Dockerfile.hwpx-ro-view")
+    assert occ.RAW_FILENAME_RE.search("Dockerfile.hwpx-ro-view")
+    assert inventory.RAW_FILENAME_RE.search("a.hwpx")
+
+
+def test_14c_redact_text_masks_in_fixed_order_and_requires_all_patterns() -> None:
+    text = "C:\\a\\b.hwpx 900101-1234567 a@b.co"
+    out = occ.redact_text(text, occ.ABS_PATH_RE, occ.RAW_FILENAME_RE, occ.PII_RE)
+    assert out == "<abs-path> <masked> <masked>"
+    assert occ.redact_text("x.hwpx", occ.ABS_PATH_RE, occ.RAW_FILENAME_RE, occ.PII_RE) == "<hwpx-file>"
+    with pytest.raises(TypeError):
+        occ.redact_text(text, occ.ABS_PATH_RE, occ.RAW_FILENAME_RE)  # type: ignore[call-arg]
+
+
+def test_14d_leak_helpers_and_pattern_definitions_stay_delegated() -> None:
+    import ast
+
+    no_leak = safe_text = alias_files = 0
+    for path in sorted((ROOT / "scripts" / "ops").glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if path.name != "ops_common_checks.py" and any(
+            isinstance(n, ast.Assign) and ast.unparse(n) in ("ABS_PATH_RE = occ.ABS_PATH_RE",) for n in tree.body
+        ):
+            alias_files += 1
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef) or len(node.body) != 1 or not isinstance(node.body[0], ast.Return):
+                continue
+            call = ast.unparse(node.body[0].value) if node.body[0].value is not None else ""
+            if node.name == "_no_leak" and call.startswith("occ.no_leak(text, "):
+                no_leak += 1
+            if node.name == "_safe_text" and call.startswith("occ.redact_text(text, "):
+                safe_text += 1
+    # 이 PR 에서 위임한 개수 아래로 줄면(복사본이 다시 생기면) 실패한다.
+    assert no_leak >= 20, no_leak
+    assert safe_text >= 6, safe_text
+    assert alias_files >= 6, alias_files

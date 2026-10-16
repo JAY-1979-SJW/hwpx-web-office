@@ -29,7 +29,7 @@ WARNINGS = [
     "WARN_DEPLOY_NOT_PERFORMED",
 ]
 
-ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/]|/(home|tmp|var|Users)/)")
+ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
 RAW_HWPX_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
 PII_RE = re.compile(
     r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"

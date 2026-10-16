@@ -12,6 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 from scripts.ops import classify_hwpx_repo_inventory as inventory  # noqa: E402
 from scripts.ops import gate_hwpx_repo_classification_contract as contract_gate  # noqa: E402
 
@@ -108,11 +109,7 @@ def build_manifest_promotion_candidates(
 
 
 def _no_leak(text: str) -> bool:
-    return not (
-        inventory.ABS_PATH_RE.search(text)
-        or inventory.RAW_FILENAME_RE.search(text)
-        or inventory.PII_RE.search(text)
-    )
+    return occ.no_leak(text, inventory.ABS_PATH_RE, inventory.RAW_FILENAME_RE, inventory.PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:

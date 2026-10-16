@@ -117,7 +117,7 @@ def build_execution_plan_draft(
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:

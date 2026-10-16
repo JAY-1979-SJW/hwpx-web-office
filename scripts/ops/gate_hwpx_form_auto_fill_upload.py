@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,12 +30,9 @@ BLOCKED_UNSANITIZED_SAMPLE = "BLOCKED_UNSANITIZED_SAMPLE"
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_UPLOAD_GATE"
 FAIL_VERDICT = "FAIL_HWPX_FORM_AUTO_FILL_UPLOAD_GATE"
 
-ABS_PATH_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]:[\\/][^\s\"']*|/(home|tmp|var|Users)/[^\s\"']*)")
-RAW_FILENAME_RE = re.compile(r"\b[^\\/:\s]+\.hwpx\b", re.IGNORECASE)
-PII_RE = re.compile(
-    r"(\d{6}-\d{7}|\d{3}-\d{2}-\d{5}|\d{2,3}-\d{3,4}-\d{4}|"
-    r"\d{2,6}-\d{2,6}-\d{2,6}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
-)
+ABS_PATH_RE = occ.ABS_PATH_RE
+RAW_FILENAME_RE = occ.RAW_FILENAME_RE
+PII_RE = occ.PII_RE
 SUPPORTED_PACKAGE_KINDS = {"HWPX_PACKAGE", "SANITIZED_REAL_LIKE_PACKAGE", "SYNTHETIC_PACKAGE"}
 
 

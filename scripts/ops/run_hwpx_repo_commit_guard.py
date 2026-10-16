@@ -11,6 +11,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
 from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as promotion_builder  # noqa: E402
 from scripts.ops import gate_hwpx_repo_classification_contract as contract_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_manifest_drift_zero as drift_zero_gate  # noqa: E402
@@ -108,11 +109,7 @@ def _run_core(report_dir: Path | None) -> dict[str, Any]:
 
 
 def _no_leak(text: str) -> bool:
-    return not (
-        contract_gate.inventory.ABS_PATH_RE.search(text)
-        or contract_gate.inventory.RAW_FILENAME_RE.search(text)
-        or contract_gate.inventory.PII_RE.search(text)
-    )
+    return occ.no_leak(text, contract_gate.inventory.ABS_PATH_RE, contract_gate.inventory.RAW_FILENAME_RE, contract_gate.inventory.PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:
