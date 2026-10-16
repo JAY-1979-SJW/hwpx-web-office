@@ -28,5 +28,13 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Tracked files must not match .gitignore
+        # 추적 중인 파일이 무시 규칙에 걸리면 같은 폴더의 새 파일이 조용히 커밋에서 빠진다.
+        # data/reports/ 는 `data/` 규칙 아래 게이트가 강제 추가한 산출물이라 제외(그 외는 0 이어야 한다).
+        shell: bash
+        run: |
+          bad=$(git ls-files -i -c --exclude-standard | grep -v '^data/reports/' || true)
+          if [ -n "$bad" ]; then echo "$bad"; echo 'tracked files match .gitignore'; exit 1; fi
+
       - name: Run pytest
         run: python -m pytest -q

@@ -5,8 +5,8 @@ HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOP="$(git rev-parse --show-toplevel)"
 CHK="$TOP/.githooks/commit_checklist.py"
 [ -f "$CHK" ] || CHK="$TOP/scripts/ops/commit_checklist/commit_checklist.py"
-# 워크트리·다른 브랜치엔 사본이 없을 수 있어 설치 시점 원본 절대경로로 대체(없는 브랜치 커밋 전면차단 방지)
-[ -f "$CHK" ] || CHK="C:/work/02. hwpx-web-office/.githooks/commit_checklist.py"
+# 워크트리·다른 브랜치엔 사본이 없을 수 있어 메인 작업 폴더(공통 .git 의 상위)의 원본으로 대체(없는 브랜치 커밋 전면차단 방지)
+[ -f "$CHK" ] || CHK="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.githooks/commit_checklist.py"
 PY=python
 command -v python >/dev/null 2>&1 || PY=py
 if [ -f "$CHK" ]; then
