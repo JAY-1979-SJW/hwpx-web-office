@@ -116,7 +116,7 @@ pass_count = sum(1 for _, _, s in results if s == "PASS")
 fail_count = len(results) - pass_count
 
 print(f"\n{'='*60}")
-print(f"HWPX-PARSER-V2-SKELETON-01 감사 결과")
+print("HWPX-PARSER-V2-SKELETON-01 감사 결과")
 print(f"{'='*60}")
 for cid, desc, status in results:
     mark = "✓" if status == "PASS" else "✗"

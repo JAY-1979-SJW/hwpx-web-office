@@ -72,7 +72,7 @@ def _run_write_and_verify(tmp_path, rows, confirmed=None, edited=None):
     tmpl = _write_hwpx(tmp_path / "tpl.hwpx", rows)
     ar   = _make_approval_result(confirmed=confirmed, edited=edited)
     wr   = run_sandbox_write(ar, tmpl, tmp_path / "out")
-    out_path = tmp_path / "out" / "output" / f"sandbox_tpl.hwpx"
+    out_path = tmp_path / "out" / "output" / "sandbox_tpl.hwpx"
     hr = verify_readback(tmpl, out_path, ar.approvedFields, wr.to_dict())
     return wr, hr
 

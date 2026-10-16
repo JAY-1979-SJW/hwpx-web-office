@@ -82,7 +82,7 @@ def main():
     spec_path.write_text(json.dumps(spec, ensure_ascii=False, indent=2), encoding='utf-8')
 
     print("=" * 70)
-    print(f"패턴 기반 '입력 불필요' 판정 (API 미호출, 토큰 0)")
+    print("패턴 기반 '입력 불필요' 판정 (API 미호출, 토큰 0)")
     print("=" * 70)
     print(f"전체 필드: {total_fields}개")
     print(f"판정됨(입력 불필요): {sum(flagged.values())}개")

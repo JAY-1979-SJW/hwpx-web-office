@@ -35,9 +35,9 @@ def _check_schemas() -> list[str]:
     if not SCHEMA_DIR.is_dir():
         errors.append(f"FAIL_CORPUS_DB_SCHEMA_MISSING: schema dir not found: {SCHEMA_DIR}")
     if not INIT_SQL.is_file():
-        errors.append(f"FAIL_CORPUS_DB_SCHEMA_MISSING: 001_init.sql not found")
+        errors.append("FAIL_CORPUS_DB_SCHEMA_MISSING: 001_init.sql not found")
     if not MIGRATION_002_SQL.is_file():
-        errors.append(f"FAIL_CORPUS_DB_SCHEMA_MISSING: 002_audit_learning_logs.sql not found")
+        errors.append("FAIL_CORPUS_DB_SCHEMA_MISSING: 002_audit_learning_logs.sql not found")
     return errors
 
 

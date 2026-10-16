@@ -46,7 +46,7 @@ _required_classes = [
     "ScheduleBarPlanBuildResult",
 ]
 for cls in _required_classes:
-    check(f"C07", f"{cls} 계약 존재", f"class {cls}" in contract_src)
+    check("C07", f"{cls} 계약 존재", f"class {cls}" in contract_src)
 # Use first class for C07 (multiple checks aggregated)
 results_c07 = [r for r in results if r[0] == "C07"]
 if len(results_c07) > 1:
