@@ -334,13 +334,16 @@ def apply_text_range_edit_multi_run(
                   "expectedBefore": expected_before}
 
     # run span 분해
-    anchor_idx = -1; focus_idx = -1
-    anchor_local_s = 0; focus_local_e = 0
+    anchor_idx = -1
+    focus_idx = -1
+    anchor_local_s = 0
+    focus_local_e = 0
     pos = 0
     span_offsets: list[tuple[int, int]] = []
     for i, r in enumerate(runs):
         rt = run_text(r)
-        rs = pos; re_ = pos + len(rt)
+        rs = pos
+        re_ = pos + len(rt)
         span_offsets.append((rs, re_))
         if anchor_idx < 0 and range_start < re_:
             # anchor 위치: range_start 가 들어가는 run.

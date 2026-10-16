@@ -24,7 +24,7 @@ from scripts.hwpx.web_office.render_payload import build_render_payload  # ruff:
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 PREVIEW_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatPreview.tsx"
-BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
+BASELINE_COMMIT = "4ad2de9"  # P5-1g 잠금 소스 lint 정리 후 갱신 (3114298 → 4ad2de9)
 
 
 def _sha(p: Path) -> str:

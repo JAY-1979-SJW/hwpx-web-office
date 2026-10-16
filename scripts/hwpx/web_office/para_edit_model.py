@@ -499,7 +499,8 @@ def make_apply_format_command(
     before_segments: list[dict[str, Any]] = []
     pos = 0
     for r in paragraph.runs:
-        rs = pos; re_ = pos + len(r.text)
+        rs = pos
+        re_ = pos + len(r.text)
         if rs >= b:
             break
         if re_ <= a or rs == re_:
@@ -644,7 +645,8 @@ def _apply_format(paragraph: Paragraph, fwd: dict) -> Paragraph:
     new_runs: list[ParaTextRun] = []
     pos = 0
     for r in p.runs:
-        rs = pos; re_ = pos + len(r.text)
+        rs = pos
+        re_ = pos + len(r.text)
         if rs >= a and re_ <= b and r.text:
             new_runs.append(ParaTextRun(
                 runId=r.runId, text=r.text, charPrIDRef=target_pr))

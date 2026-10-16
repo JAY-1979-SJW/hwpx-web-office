@@ -23,7 +23,7 @@ PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "para_edit_apply_format_smoke.mjs")
-BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
+BASELINE_COMMIT = "4ad2de9"  # P5-1g 잠금 소스 lint 정리 후 갱신 (3114298 → 4ad2de9)
 
 REQUIRED_STATE_PATTERNS = [
     r"export\s+function\s+applyFormatToSelection\(",
