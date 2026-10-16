@@ -616,7 +616,7 @@ Implement HWPX XML table extraction via `hp:tbl` / `hp:tr` / `hp:tc` navigation,
 - ✅ npm build PASS, pytest PASS
 
 **Fixtures**:
-- `C:\Users\<USER>\OneDrive\문서\카카오톡 받은 파일\HWP 문서\repair_specimen_form.hwpx`
+- `<LOCAL_PATH>/repair_specimen_form.hwpx`
 - (+ 4 additional fixtures to be confirmed from phase2e samples)
 
 **Estimated Duration**: 6-8 hours

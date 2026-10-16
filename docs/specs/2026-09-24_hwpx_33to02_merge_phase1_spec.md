@@ -25,7 +25,7 @@
 
 | # | 02 대상 경로 | 출처 | 동작 |
 |---|---|---|---|
-| 1 | `scripts/hwpx/web_office/ro_view_importer.py` | `C:\Users\<USER>\AppData\Local\Temp\claude\C--work\6a5ef39e-ece7-4407-b8ca-038087d40809\scratchpad\merge\candidate.py` | 바이트 그대로 교체(CRLF 유지) |
+| 1 | `scripts/hwpx/web_office/ro_view_importer.py` | `<LOCAL_PATH>/candidate.py` | 바이트 그대로 교체(CRLF 유지) |
 | 2 | `scripts/hwpx/web_office/service.py` | 33 `git show HEAD:scripts/hwpx/web_office/service.py` | 신규 |
 | 3 | `scripts/hwpx/web_office/requirements.txt` | 33 HEAD 동일 경로 | 신규 |
 | 4 | `Dockerfile.hwpx-ro-view` (저장소 루트) | 33 HEAD 루트 | 신규 |

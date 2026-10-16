@@ -26,7 +26,7 @@ HWPX Reader의 `/parse-hwpx` API를 실제 감리 표준 서식 HWPX 샘플(27�
 
 ### 2.1 샘플 출처
 
-- **경로**: `C:\Users\<USER>\Downloads\감리 표준서식`
+- **경로**: `<LOCAL_PATH>/감리 표준서식`
 - **파일 형식**: HWPX (Hancom Office 문서)
 - **총 파일 수**: 27개
 - **문서 유형**: 건설공사 품질관리 감리 표준 서식
