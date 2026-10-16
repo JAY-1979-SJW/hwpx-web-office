@@ -8,8 +8,10 @@ on:
 jobs:
   pytest:
     # 저장소가 Windows 전용 도구(COM 자동화, .ps1 스크립트, 한컴 연동)에
-    # 의존하는 부분이 있어 windows-latest 로 고정한다.
-    runs-on: windows-latest
+    # 의존하는 부분이 있어 Windows 에서 돌린다.
+    # 2026-10-16 대표님 지시: 러너 전용 PC(해한소프트)의 자체 호스팅 러너(haehan-win-hwpx, 서비스)로 옮긴다.
+    # 그 러너의 toolcache 에 Python 3.13.5 를 넣어 두어 setup-python 이 새로 설치하지 않는다.
+    runs-on: [self-hosted, Windows, X64, haehan-win-hwpx]
     timeout-minutes: 40
 
     steps:
