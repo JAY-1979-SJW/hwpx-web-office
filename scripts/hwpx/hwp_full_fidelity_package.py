@@ -101,14 +101,16 @@ def _ensure_manifest_item(manifest: ET.Element, entry: str) -> dict[str, Any]:
     href = _manifest_href(entry)
     item_id = _manifest_id(entry)
     for child in list(manifest):
-        if child.tag.endswith("}item") or child.tag == "item":
-            if child.attrib.get("href") == href or child.attrib.get("id") == item_id:
-                child.attrib.setdefault("media-type", _manifest_media_type(entry))
-                return {
-                    "status": "EXISTS",
-                    "id": child.attrib.get("id"),
-                    "href": child.attrib.get("href"),
-                }
+        if (
+            (child.tag.endswith("}item") or child.tag == "item")
+            and (child.attrib.get("href") == href or child.attrib.get("id") == item_id)
+        ):
+            child.attrib.setdefault("media-type", _manifest_media_type(entry))
+            return {
+                "status": "EXISTS",
+                "id": child.attrib.get("id"),
+                "href": child.attrib.get("href"),
+            }
     existing_ids = {
         child.attrib.get("id", "")
         for child in list(manifest)

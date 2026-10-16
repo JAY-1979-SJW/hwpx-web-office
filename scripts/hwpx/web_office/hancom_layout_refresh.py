@@ -313,11 +313,10 @@ def _snap_bordered_boxes(
         y1 = _snap(b["y"] + b["h"], ys, tol_y)
         x0 = _snap(b["x"], xs, tol_x)
         x1 = _snap(b["x"] + b["w"], xs, tol_x)
-        if y1 - y0 > 4 and x1 - x0 > 4:
-            if (y0, y1 - y0, x0, x1 - x0) != (b["y"], b["h"], b["x"], b["w"]):
-                b["y"], b["h"] = round(y0, 1), round(y1 - y0, 1)
-                b["x"], b["w"] = round(x0, 1), round(x1 - x0, 1)
-                changed = True
+        if y1 - y0 > 4 and x1 - x0 > 4 and (y0, y1 - y0, x0, x1 - x0) != (b["y"], b["h"], b["x"], b["w"]):
+            b["y"], b["h"] = round(y0, 1), round(y1 - y0, 1)
+            b["x"], b["w"] = round(x0, 1), round(x1 - x0, 1)
+            changed = True
     return changed
 
 

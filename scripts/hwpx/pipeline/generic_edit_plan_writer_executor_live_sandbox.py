@@ -371,9 +371,8 @@ def _modify_paragraph_text_in_section_xml(
         return section_xml, False, "target_not_found"
     target_p = paragraphs[paragraph_idx]
     current_visible = _paragraph_visible_text(target_p)
-    if expected_before is not None:
-        if _parser_normalize(current_visible) != _parser_normalize(str(expected_before)):
-            return section_xml, False, "expected_before_mismatch"
+    if expected_before is not None and _parser_normalize(current_visible) != _parser_normalize(str(expected_before)):
+        return section_xml, False, "expected_before_mismatch"
     ts = _paragraph_text_run_elements(target_p)
     if ts:
         ts[0].text = new_value if new_value is not None else ""
@@ -412,9 +411,8 @@ def _replace_text_run_in_section_xml(
         return section_xml, False, "target_not_found"
     target_p = paragraphs[paragraph_idx]
     visible_raw = _paragraph_visible_text(target_p)
-    if expected_before is not None:
-        if _parser_normalize(visible_raw) != _parser_normalize(str(expected_before)):
-            return section_xml, False, "expected_before_mismatch"
+    if expected_before is not None and _parser_normalize(visible_raw) != _parser_normalize(str(expected_before)):
+        return section_xml, False, "expected_before_mismatch"
     occurrences = visible_raw.count(find_str)
     if occurrences == 0:
         return section_xml, False, "find_text_not_found"

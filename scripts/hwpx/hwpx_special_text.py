@@ -42,17 +42,16 @@ def text_special_char_profile(text: str) -> dict[str, Any]:
         if code > 127:
             profile["non_ascii_count"] += 1
         category = unicodedata.category(ch)
-        if code > 127 and (category.startswith(("S", "P")) or "SIGN" in unicodedata.name(ch, "")):
-            if ch not in seen:
-                seen.add(ch)
-                profile["special_chars"].append(
-                    {
-                        "char": ch,
-                        "codepoint": f"U+{code:04X}",
-                        "name": unicodedata.name(ch, "UNKNOWN"),
-                        "category": category,
-                    }
-                )
+        if code > 127 and (category.startswith(("S", "P")) or "SIGN" in unicodedata.name(ch, "")) and ch not in seen:
+            seen.add(ch)
+            profile["special_chars"].append(
+                {
+                    "char": ch,
+                    "codepoint": f"U+{code:04X}",
+                    "name": unicodedata.name(ch, "UNKNOWN"),
+                    "category": category,
+                }
+            )
     profile["ok"] = profile["invalid_xml_char_count"] == 0 and profile["control_char_count"] == 0
     return profile
 

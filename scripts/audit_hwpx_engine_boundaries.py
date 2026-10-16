@@ -96,9 +96,8 @@ def py_import_graph(files: list[Path]) -> dict[str, set[str]]:
                 names = [node.module]
             for name in names:
                 for mod, target in module_to_file.items():
-                    if mod == name or mod.endswith("." + name):
-                        if target != src:
-                            graph[src].add(target)
+                    if (mod == name or mod.endswith("." + name)) and target != src:
+                        graph[src].add(target)
     return graph
 
 
