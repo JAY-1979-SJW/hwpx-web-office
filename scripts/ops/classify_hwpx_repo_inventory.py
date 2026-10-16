@@ -169,6 +169,10 @@ def _classify_frontend_path(lower: str) -> tuple[str, str, str] | None:
 def _classify_scripts_ops_path(lower: str, path: str) -> tuple[str, str, str] | None:
     if not lower.startswith("scripts/ops/"):
         return None
+    # 2026-10-16: 감사들이 가져다 쓰는 공용 검사 모듈. 파일 이름이 audit_/gate_ 로 시작하지 않으므로
+    # 토큰 규칙에 걸리지 않는다 - 정확한 경로 1건만 감사 지원 모듈로 지정한다(와일드카드 금지).
+    if lower == "scripts/ops/ops_common_checks.py":
+        return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
     # scripts/ops/hooks/ 는 게이트를 자동 집행하는 감리 기반시설이다
     # (편집 시점에 게이트를 돌려 규칙 위반을 즉시 잡는다) — 이름이
     # `gate_` 로 시작하지 않아도 성격은 AUDIT_GATE 다.
@@ -291,6 +295,9 @@ _ZONE_TOKEN_RULES: list[tuple[str, tuple[str, ...]]] = [
             "persistent_gates",
             "fail_fast",
             "zone_gates",
+            # 2026-10-16: 감사들이 가져다 쓰는 공용 검사 모듈(ops_common_checks.py). 넓은 'ops_common'
+            # 가 아니라 정확한 이름만 넣어, 이후 생기는 ops_common_* 파일이 자동 편입되지 않게 한다.
+            "ops_common_checks",
         ),
     ),
     (
