@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Post-commit devlog writer.
 
-Default behavior writes change history and devlog files only. It never creates
-an additional commit unless ALLOW_POST_COMMIT_AUTO_COMMIT=1 is explicitly set.
+Default behavior writes the local change history only. The devlog (which sends the
+commit message and diff to the external `claude` CLI) is generated only when
+HWPX_DEVLOG_GENERATE=1 is explicitly set. It never creates an additional commit
+unless ALLOW_POST_COMMIT_AUTO_COMMIT=1 is explicitly set.
 """
 
 import json
@@ -17,6 +19,7 @@ from pathlib import Path
 KST = timezone(timedelta(hours=9))
 DIFF_MAX_CHARS = 8000
 AUTO_COMMIT_ENV = "ALLOW_POST_COMMIT_AUTO_COMMIT"
+DEVLOG_GENERATE_ENV = "HWPX_DEVLOG_GENERATE"
 KNOWN_SECRET_PREFIXES = ("s" + "k-", "gh" + "p_", "AI" + "za")
 SECRET_LITERAL_RE = re.compile(
     r'"(?:' + "|".join(re.escape(prefix) for prefix in KNOWN_SECRET_PREFIXES) + r')[^"\r\n]*"'
@@ -34,6 +37,11 @@ def mask_secret_literals(text: str) -> str:
 def auto_commit_enabled(env: dict[str, str] | None = None) -> bool:
     values = os.environ if env is None else env
     return values.get(AUTO_COMMIT_ENV) == "1"
+
+
+def devlog_generation_enabled(env: dict[str, str] | None = None) -> bool:
+    values = os.environ if env is None else env
+    return values.get(DEVLOG_GENERATE_ENV) == "1"
 
 
 def commit_generated_devlog(
@@ -195,6 +203,9 @@ def main():
         if existing:
             f.write(existing)
     print(f"[post-commit] change_history.jsonl <- {commit_hash}  {commit_msg}")
+
+    if not devlog_generation_enabled():
+        return
 
     devlog_dir = repo / "docs" / "devlog"
     devlog_dir.mkdir(parents=True, exist_ok=True)
