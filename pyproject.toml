@@ -13,3 +13,36 @@ packages = ["scripts.hwpx"]
 # 로 보고됨(2026-09-30 9단계 AI 리뷰에서 발견) — support 역할로 명시 지정.
 [tool.audit-kit.support]
 scripts = [".githooks/*"]
+
+# import-linter 계층 계약 (P5-0, 2026-10-16). 현재 import 그래프에서 위반 0 으로 시작하며 느슨하게 고치지 않는다.
+# 실행: PYTHONPATH=".:scripts" lint-imports  (Windows 는 ";")
+# 같은 파일이 두 표기로 import 되므로 표기마다 계약 1개씩 둔다: `from hwpx.x` (scripts/ 가 sys.path) / `from scripts.hwpx.x`.
+# 계약 밖(P5-3 에서 패키지 import 로 정리하며 계약에 편입):
+#   - `from hwpx_package import ...` 처럼 형제 모듈을 이름만으로 import 하는 곳(sys.path 의존, 74곳 등)은 도구가 못 본다
+#   - 최상위 hwpx_*.py 모듈: hwpx_edit_tool <-> web_office 양방향이 있어 계층에서 제외
+#   - 숫자로 시작하는 diagnostics 파일 9개는 파이썬 모듈 이름이 될 수 없어 그래프에서 빠진다
+[tool.importlinter]
+root_packages = ["hwpx", "scripts"]
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "hwpx 계층 (hwpx.* 표기)"
+type = "layers"
+containers = ["hwpx"]
+layers = [
+    "master_orchestration",
+    "web_office | fill_review | orchestration",
+    "pipeline",
+    "parser | recognition_corpus | ai_proposal | source_extractor | api_contract",
+]
+
+[[tool.importlinter.contracts]]
+name = "hwpx 계층 (scripts.hwpx.* 표기)"
+type = "layers"
+containers = ["scripts.hwpx"]
+layers = [
+    "master_orchestration",
+    "web_office | fill_review | orchestration",
+    "pipeline",
+    "parser | recognition_corpus | ai_proposal | source_extractor | api_contract",
+]
