@@ -175,6 +175,116 @@ def test_09f_b_group_audits_report_git_diff_failed_on_rc(
     ]
 
 
+# --- check_audit_no_writer_calls --------------------------------------------------
+
+
+def test_09g_no_writer_calls_requires_both_arguments(tmp_path: Path) -> None:
+    f = tmp_path / "x.py"
+    f.write_text("", encoding="utf-8")
+    with pytest.raises(TypeError):
+        occ.check_audit_no_writer_calls()  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        occ.check_audit_no_writer_calls(f)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        occ.check_audit_no_writer_calls(symbols=["a"])  # type: ignore[call-arg]
+
+
+def test_09h_no_writer_calls_reports_matches_in_symbol_order(tmp_path: Path) -> None:
+    f = tmp_path / "x.py"
+    f.write_text("b_call()\nzzz\na_call()\n", encoding="utf-8")
+    expected = [
+        {"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": "a_call"},
+        {"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": r"b_call\("},
+    ]
+    assert occ.check_audit_no_writer_calls(f, ["a_call", r"b_call\(", "absent"]) == expected
+    assert occ.check_audit_no_writer_calls(str(f), ("a_call", r"b_call\(")) == expected  # str 경로·튜플도 같은 결과
+    assert occ.check_audit_no_writer_calls(f, []) == []
+    assert occ.check_audit_no_writer_calls(f, ["absent"]) == []
+
+
+def test_09i_no_writer_calls_missing_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        occ.check_audit_no_writer_calls(tmp_path / "nope.py", ["a"])
+
+
+def _no_writer_audits() -> list[str]:
+    names = []
+    for p in sorted((ROOT / "scripts" / "ops").glob("*.py")):
+        if re.search(r"^def _check_audit_no_writer_calls\(", p.read_text(encoding="utf-8"), re.M):
+            names.append(p.stem)
+    return names
+
+
+def _symbols_of(mod: object) -> tuple[str, list[str]]:
+    found = [k for k in ("FORBIDDEN_AUDIT_WRITER_SYMBOLS", "FORBIDDEN_WRITER_SYMBOLS") if hasattr(mod, k)]
+    assert len(found) == 1
+    return found[0], list(getattr(mod, found[0]))
+
+
+def _realize(sym: str) -> str:
+    cand = re.sub(r"\\(.)", r"\1", sym)
+    return cand if re.search(sym, cand) else sym
+
+
+def test_09j_every_no_writer_audit_delegates_with_own_file_and_own_constant() -> None:
+    names = _no_writer_audits()
+    assert len(names) >= 20
+    for name in names:
+        src = (ROOT / "scripts" / "ops" / (name + ".py")).read_text(encoding="utf-8")
+        m = re.search(r"return occ\.check_audit_no_writer_calls\(__file__, (FORBIDDEN_\w+)\)", src)
+        assert m, name  # 자기 복사본을 다시 만들지 않고 공용 함수로 위임한다
+
+
+@pytest.mark.parametrize("name", _no_writer_audits())
+def test_09k_no_writer_audit_uses_its_own_symbol_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    import importlib
+
+    mod = importlib.import_module("scripts.ops." + name)
+    const, mine = _symbols_of(mod)
+    other_const = "FORBIDDEN_WRITER_SYMBOLS" if const == "FORBIDDEN_AUDIT_WRITER_SYMBOLS" else "FORBIDDEN_AUDIT_WRITER_SYMBOLS"
+    other = [
+        s
+        for n in _no_writer_audits()
+        for s in (_symbols_of(importlib.import_module("scripts.ops." + n))[1])
+        if other_const in vars(importlib.import_module("scripts.ops." + n))
+    ]
+    cases = {
+        "empty": "",
+        "mine_all": "\n".join(_realize(s) for s in mine),
+        "other_group_all": "\n".join(_realize(s) for s in other),
+    }
+    for label, text in cases.items():
+        f = tmp_path / f"{label}.py"
+        f.write_text(text, encoding="utf-8")
+        monkeypatch.setattr(mod, "__file__", str(f))
+        expected = [
+            {"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": s} for s in mine if re.search(s, text)
+        ]
+        assert mod._check_audit_no_writer_calls() == expected, (name, label)
+    # 자기 목록의 심볼은 전부 잡힌다(= 빈 결과로 무력화되지 않았다)
+    monkeypatch.setattr(mod, "__file__", str(tmp_path / "mine_all.py"))
+    assert [d["detail"] for d in mod._check_audit_no_writer_calls()] == [s for s in mine if re.search(s, cases["mine_all"])]
+    assert mine
+    monkeypatch.setattr(mod, "__file__", str(tmp_path / "does_not_exist.py"))
+    with pytest.raises(FileNotFoundError):
+        mod._check_audit_no_writer_calls()
+
+
+def test_09l_the_two_audit_groups_keep_different_symbol_values() -> None:
+    import importlib
+
+    by_const: dict[str, set[str]] = {}
+    for n in _no_writer_audits():
+        const, syms = _symbols_of(importlib.import_module("scripts.ops." + n))
+        by_const.setdefault(const, set()).add("\n".join(syms))
+    # 두 상수는 값이 서로 다르고 각 그룹 안에서는 값이 하나로 같다 - 합치면 검사 강도가 바뀐다.
+    assert set(by_const) == {"FORBIDDEN_AUDIT_WRITER_SYMBOLS", "FORBIDDEN_WRITER_SYMBOLS"}
+    assert all(len(v) == 1 for v in by_const.values())
+    assert by_const["FORBIDDEN_AUDIT_WRITER_SYMBOLS"] != by_const["FORBIDDEN_WRITER_SYMBOLS"]
+
+
 # --- 이름이 감사 수집 패턴에 섞이지 않는다 ---------------------------------------
 
 
