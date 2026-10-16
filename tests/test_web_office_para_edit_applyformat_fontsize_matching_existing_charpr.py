@@ -22,7 +22,7 @@ sys.path.insert(0, str(PR))
 MATCHER_MJS = PR / "frontend/web_office_viewer/format_charpr_matcher.mjs"
 TOOLBAR_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatToolbar.tsx"
 SMOKE_JS = PR / "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs"
-BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
+BASELINE_COMMIT = "4ad2de9"  # P5-1g 잠금 소스 lint 정리 후 갱신 (3114298 → 4ad2de9)
 
 
 def _node_ok() -> bool:

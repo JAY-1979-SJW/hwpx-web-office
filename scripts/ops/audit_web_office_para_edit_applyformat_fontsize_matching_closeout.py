@@ -19,7 +19,7 @@ from scripts.ops import ops_common_checks as occ
 CLOSEOUT_DOC = (
     PR / "docs/architecture/web_office_para_edit_applyformat_fontsize_matching_closeout.md"
 )
-BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
+BASELINE_COMMIT = "4ad2de9"  # P5-1g 잠금 소스 lint 정리 후 갱신 (3114298 → 4ad2de9)
 
 DOC_REQUIRED_IN_SCOPE = [
     "matchAxisChange",

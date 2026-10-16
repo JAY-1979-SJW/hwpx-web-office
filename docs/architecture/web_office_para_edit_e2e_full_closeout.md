@@ -187,3 +187,5 @@ PARA-EDIT 동 (cell containerScope · 단일 run)
 ## 재고정 이력 (append-only)
 
 - 2026-07-24: baseline → `f119308` (lineseg 추정 보정 로그 + 페이지 초과 가드 준공)
+
+- 잠금 기준선 갱신 (P5-1g, 잠금 소스 lint 정리, 동작 변경 없음): `4ad2de9`
