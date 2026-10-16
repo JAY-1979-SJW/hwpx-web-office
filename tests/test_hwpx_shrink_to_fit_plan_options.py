@@ -33,12 +33,12 @@ def fixture_path() -> Path:
     """굴착공사 협의서 hancom-converted hwpx fixture path.
 
     실제 변환 결과물이 있는 로컬 개발자 PC에서만 존재하는 수동 비교용
-    자재라 저장소에 커밋되지 않는다 — 환경변수로 위치를 지정하고, 없으면
-    (원래 있던) 특정 PC 개인 경로를 폴백으로만 시도한다. 못 찾으면 skip.
+    자재라 저장소에 커밋되지 않는다 — 환경변수 HWPX_COMPARE_FIXTURE_DIR 로
+    위치를 지정한다. 지정하지 않았거나 못 찾으면 skip.
     """
     override = os.environ.get("HWPX_COMPARE_FIXTURE_DIR")
-    base = Path(override) if override else Path(r"C:\Users\skyjw\Downloads\hwpx_compare")
-    matches = list(base.glob("08_*/*.hwpx")) if base.is_dir() else []
+    base = Path(override) if override else None
+    matches = list(base.glob("08_*/*.hwpx")) if base is not None and base.is_dir() else []
     if not matches:
         pytest.skip("fixture HWPX not available")
     return matches[0]

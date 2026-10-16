@@ -3,7 +3,7 @@
 # primary_trade: common
 """커밋 전 체크리스트 — 모든 저장소 공통 pre-commit 검사기(표준 라이브러리만).
 
-기준서: C:/work/03. cad-program/docs/specs/2026-09-13_커밋전_체크리스트_전저장소_훅강제_spec.md
+기준서: 03. cad-program 저장소 docs/specs/2026-09-13_커밋전_체크리스트_전저장소_훅강제_spec.md
 원본: 03. cad-program/scripts/ops/commit_checklist/commit_checklist.py — 각 저장소 .githooks/ 에 사본 배포.
 
 스테이징된 파일을 검사하고 결과를 .git/commit_checklist_last.md 로 생성한다. 차단 항목이 하나라도

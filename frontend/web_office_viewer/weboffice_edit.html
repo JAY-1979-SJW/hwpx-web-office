@@ -222,7 +222,7 @@ let state = null, defs = {}, blocks = [], tables = {}, lastReason = "";
 let aiFilled = new Set();   // AI가 채운 paragraphId
 let aiProposals = [];       // 검토용 [{pid, label, value, confidence}]
 let sourceData = null;      // 연결된 소스(사업자등록증 등) 실제 값
-const DEFAULT_SRC = "C:/Users/skyjw/OneDrive/01. PROJECT_FILE/01. HAEHAN_ENGNEERING/해한AI엔지니어링 사업자 등록증.jpg";
+const DEFAULT_SRC = "";
 
 const setStatus = (k, m) => { const e = $("status"); e.dataset.k = k; e.textContent = m; };
 function normDefs(raw){ const o={}; for(const [id,d] of Object.entries(raw||{})) o[id]={...d,charPrId:id}; return o; }
