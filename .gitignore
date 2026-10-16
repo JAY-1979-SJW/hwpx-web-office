@@ -23,8 +23,12 @@ audit-reports/
 # 데이터 디렉토리 (data/reports/와 data/cache/는 제외)
 data/
 !data/reports/
+# `/reports/` 앵커 전환으로 새로 노출된 로컬 일회성 보고서 1개 — 기존 동작(무시) 유지
+docs/reports/web_office_operational_report_rule_20260525.json
 !data/cache/
-reports/
+# 루트 전용(앵커 /) — 앵커 없이 쓰면 docs/reports/ 등 추적 중인 하위 폴더까지 걸려
+# 추적 파일 172개가 무시 규칙과 모순됐다(2026-10-16 실측; data/reports/ 100개는 `data/` 규칙 때문이라 CI 검사에서 제외).
+/reports/
 
 # recognition_corpus DB/내보내기 (위 data/ 규칙으로 이미 제외되지만,
 # HWPX-RECOGNITION-CORPUS-DB-SCHEMA-CONTRACT-01 이 명시적 항목을 요구함)
@@ -50,8 +54,11 @@ reparse_supervision_forms.py
 test-results/
 playwright-report/
 
-# 프론트엔드 프로토타입 (UI 검증용)
-frontend/web_office_viewer/*.html
+# 프론트엔드 프로토타입(UI 검증용) — 예전 `frontend/web_office_viewer/*.html` 일괄 무시는 추적 중인
+# 뷰어 html 10개와 모순이라 삭제하고, 아직 추적하지 않는 로컬 프로토타입 3개만 개별 경로로 둔다.
+frontend/web_office_viewer/form_question_panel_supervision.html
+frontend/web_office_viewer/hwpx_data_inline.html
+frontend/web_office_viewer/index_supervision.html
 package.json
 package-lock.json
 
@@ -65,6 +72,11 @@ docs/supervision_form_*.md
 smart_field_mapping.py
 tests/supervision_form_ui.spec.js
 update_supervision_cache.py
+# 위 임시 스크립트·로컬 산출물에 의존하는 시험 — 추적하면 깨끗한 CI 에서 실패한다
+# (앞쪽은 무시된 apply_form_data_to_cells.py 를 import, 뒤쪽은 미추적
+# data/cache/supervision_documents.json 을 단언). 개별 경로만 둔다.
+tests/test_apply_form_data_to_cells.py
+tests/test_supervision_cache.py
 
 # 감리 서류 검증 스크립트 (임시)
 docs/SUPERVISION_READINESS.md
