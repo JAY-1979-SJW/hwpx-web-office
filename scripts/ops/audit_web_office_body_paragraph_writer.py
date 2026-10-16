@@ -33,6 +33,8 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ  # noqa: E402
+
 ADAPTER = PR / "scripts/hwpx/web_office/paragraph_writer_adapter.py"
 
 REQUIRED_ADAPTER_PATTERNS = [
@@ -83,9 +85,7 @@ def _check_static() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    me = Path(__file__).read_text(encoding="utf-8")
-    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
-    return findings
+    return occ.check_audit_no_writer_calls(__file__, FORBIDDEN_WRITER_SYMBOLS)
 
 
 def _pick_body_fixture() -> tuple[Path | None, Any]:

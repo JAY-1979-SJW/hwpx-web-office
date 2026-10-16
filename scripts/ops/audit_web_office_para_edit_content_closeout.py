@@ -179,10 +179,7 @@ def _check_forbidden_features() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    me = Path(__file__).read_text(encoding="utf-8")
-    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
-    return findings
+    return occ.check_audit_no_writer_calls(__file__, FORBIDDEN_WRITER_SYMBOLS)
 
 
 # 핵심 회귀 테스트 파일에 multi-run / IME 시나리오 함수가 실제로

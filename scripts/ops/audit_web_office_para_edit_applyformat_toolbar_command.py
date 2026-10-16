@@ -157,10 +157,7 @@ def _check_locked_files() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    me = Path(__file__).read_text(encoding="utf-8")
-    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
-    return findings
+    return occ.check_audit_no_writer_calls(__file__, FORBIDDEN_AUDIT_WRITER_SYMBOLS)
 
 
 def _node_ok() -> bool:

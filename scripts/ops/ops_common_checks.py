@@ -43,6 +43,21 @@ def safe_write_json(path: Path, payload: Any, leak_free: Callable[[str], bool], 
     path.write_text(text, encoding="utf-8")
 
 
+def check_audit_no_writer_calls(source_file: str | Path, symbols: Iterable[str]) -> list[dict]:
+    """감사 모듈 자신(`source_file`)의 소스에 금지된 writer 심볼(정규식)이 있으면 FAIL 항목으로 돌려준다.
+
+    `source_file` 과 `symbols` 는 기본값 없는 필수 인자다 — 감사마다 금지 심볼 목록이 달라(두 그룹의 값이
+    서로 다르다) 여기서 합치거나 기본값을 두지 않는다. 호출하는 감사가 `__file__` 과 자기 상수를 넘긴다.
+    파일을 읽지 못하면 OSError 가 그대로 올라온다.
+    """
+    me = Path(source_file).read_text(encoding="utf-8")
+    return [
+        {"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym}
+        for sym in symbols
+        if re.search(sym, me)
+    ]
+
+
 def check_locked_files(
     locked_files: Iterable[str],
     baseline_commit: str,
