@@ -24,6 +24,7 @@ _TAG_TC = f"{{{NS_HP}}}tc"
 _TAG_T = f"{{{NS_HP}}}t"
 _TAG_CELLSPAN = f"{{{NS_HP}}}cellSpan"
 _TAG_CELLADDR = f"{{{NS_HP}}}cellAddr"
+_TAG_CELLSZ = f"{{{NS_HP}}}cellSz"
 _TAG_RUN = f"{{{NS_HP}}}run"
 _TAG_P = f"{{{NS_HP}}}p"
 _TAG_SUBLIST = f"{{{NS_HP}}}subList"
@@ -104,6 +105,14 @@ def _cell_span(tc: ET.Element) -> tuple[int, int]:
             except ValueError:
                 return 1, 1
     return 1, 1
+
+
+def _cell_height(tc: ET.Element) -> int:
+    sz = tc.find(_TAG_CELLSZ)
+    try:
+        return int(sz.get("height", "0")) if sz is not None else 0
+    except ValueError:
+        return 0
 
 
 def _cell_addr(tc: ET.Element, default_row: int, default_col: int) -> tuple[int, int]:
@@ -303,6 +312,7 @@ def _parse_table_element(
                     marginBottom=style["marginBottom"],
                     borderSummary=style["borderSummary"],
                     hasNestedTable=nested,
+                    cellHeight=_cell_height(tc),
                     isLikelyLabel=is_label,
                     isLikelyInputSlot=is_slot,
                 )

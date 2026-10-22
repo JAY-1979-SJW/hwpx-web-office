@@ -310,6 +310,18 @@ def find_cell_text_style_reference(cell: ET.Element) -> dict[str, Any]:
     }
 
 
+def _node_full_text(node: ET.Element) -> str:
+    return (node.text or "") + "".join(child.tail or "" for child in node)
+
+
+def _set_node_text(node: ET.Element, value: str) -> None:
+    """hp:t 글자를 value 로 바꾼다. <hp:t>가<hp:fwSpace/>나</hp:t> 처럼 글자 사이에 낀 표시(fwSpace·tab 등)와
+    그 뒤쪽 글자(tail)가 남아 중복되지 않도록 함께 지운다."""
+    for child in list(node):
+        node.remove(child)
+    node.text = value
+
+
 def set_cell_single_text(cell: ET.Element, value: str) -> dict[str, Any] | None:
     sanitized = sanitize_hwpx_text(value)
     value = sanitized["text"]
@@ -323,13 +335,13 @@ def set_cell_single_text(cell: ET.Element, value: str) -> dict[str, Any] | None:
     if style_reference["source"] == "existing_run_without_text_node":
         style_reference = find_cell_text_style_reference(cell)
         style_reference["source"] = "created_text_node_in_original_run"
-    before_text = "".join(node.text or "" for node in nodes)
-    first_node.text = value
+    before_text = "".join(_node_full_text(node) for node in nodes)
+    _set_node_text(first_node, value)
     cleared_nodes = 0
     for node in nodes[1:]:
-        if node.text:
+        if _node_full_text(node):
             cleared_nodes += 1
-        node.text = ""
+        _set_node_text(node, "")
     return {
         "before_text": before_text,
         "after_text": value,
@@ -454,7 +466,7 @@ def set_table_cell_text(
             }
         nodes = all_cell_text_nodes(cells[col_index])
         before_text = "".join(node.text or "" for node in nodes)
-        first_node.text = value
+        _set_node_text(first_node, value)
         mutation = {
             "before_text": before_text,
             "after_text": value,
@@ -525,7 +537,7 @@ def set_table_visual_cell_text(
             }
         nodes = all_cell_text_nodes(cell)
         before_text = "".join(node.text or "" for node in nodes)
-        first_node.text = value
+        _set_node_text(first_node, value)
         mutation = {
             "before_text": before_text,
             "after_text": value,

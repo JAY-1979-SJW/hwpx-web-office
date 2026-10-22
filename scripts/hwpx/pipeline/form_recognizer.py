@@ -75,6 +75,9 @@ class EnhancedSlot:
     # 편집기(hwpx_table_ops.find_table)가 쓰는 문서 전체 표 순번. -1 이면 아직 계산 전.
     # tableId(t_s{구역}_{구역 안 순번})만으로는 구역이 둘 이상일 때 이 순번을 알 수 없다.
     tableOrdinal: int = -1
+    # 칸에 쓰는 방식(set/append/unit/choice)과 칸에 원래 있던 글자 — parser_contract.InputSlotCandidate 와 같은 뜻
+    writeMode: str = "set"
+    cellText: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -99,6 +102,7 @@ class EnhancedSlot:
             "reviewRequiredReason": self.reviewRequiredReason,
             "unsafeReason": self.unsafeReason,
             "evidence": self.evidence,
+            **({"writeMode": self.writeMode, "cellText": self.cellText} if self.writeMode != "set" else {}),
         }
 
 
@@ -421,6 +425,8 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
             or ("low_confidence" if conf < 0.70 else None),
             unsafeReason=getattr(slot, "unsafeReason", None),
             evidence=evidence,
+            writeMode=getattr(slot, "writeMode", "set"),
+            cellText=getattr(slot, "cellText", ""),
         )
         enhanced.append(es)
 
@@ -457,6 +463,8 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
                 reviewRequiredReason=slot.reviewRequiredReason,
                 unsafeReason=slot.unsafeReason,
                 evidence=slot.evidence,
+                writeMode=slot.writeMode,
+                cellText=slot.cellText,
             )
         )
 

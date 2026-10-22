@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from ..parser.slot_modes import mark_choice
 from .pipeline_contract import PlanResult, RecognitionResult
 
 _AUTO_THRESHOLD = 0.90
@@ -54,6 +55,19 @@ def _table_index_of(slot: object, table_id: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def _final_cell_text(slot: object, value: str) -> str | None:
+    """writeMode 별로 칸에 들어갈 최종 글자. 만들 수 없으면 None(선택 항목을 찾지 못함 등)."""
+    mode = getattr(slot, "writeMode", "set")
+    base = getattr(slot, "cellText", "") or ""
+    if mode == "append":
+        return f"{base} {value}".strip()
+    if mode == "unit":
+        return f"{value}{base}"
+    if mode == "choice":
+        return mark_choice(base, value)
+    return value
+
+
 def _build_slot_item(
     slot: object,
     field_name: str,
@@ -67,7 +81,14 @@ def _build_slot_item(
     col = getattr(slot, "col", 0)
     label_text = getattr(slot, "labelText", "")
 
-    if conf >= _AUTO_THRESHOLD and field_counts.get(field_name, 1) == 1:
+    mode = getattr(slot, "writeMode", "set")
+    if mode != "set":
+        # 칸 안에 이어 쓰거나 상자를 체크하는 칸은 옆 칸 라벨 경로(set_cells_by_label)로는 쓸 수 없다 — 항상 칸 주소로 쓴다
+        final = _final_cell_text(slot, value)
+        if final is None:
+            return None, None
+        value = final
+    if mode != "set" or (conf >= _AUTO_THRESHOLD and field_counts.get(field_name, 1) == 1):
         v_row = getattr(slot, "visualRow", row)
         v_col = getattr(slot, "visualCol", col)
         item: dict = {

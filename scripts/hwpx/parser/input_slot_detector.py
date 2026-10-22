@@ -17,6 +17,7 @@ import re
 
 from .cell_kind import grid_of, rows_index, slot_block_reason, table_exclusion
 from .parser_contract import CellInfo, InputSlotCandidate, TableInfo
+from .slot_modes import detect_choice_slots, detect_group_header_slots, detect_same_cell_slots
 
 _AUTO_EDIT_THRESHOLD = 0.90
 _REVIEW_REQUIRED_THRESHOLD = 0.70
@@ -696,6 +697,10 @@ def detect_input_slots(
         candidate_slots.extend(detect_label_below_slots(table))
         candidate_slots.extend(detect_label_value_pair_slots(table))
         candidate_slots.extend(detect_merged_input_cells(table))
+        # 칸 안에 쓰는 방식이 다른 입력칸 — 위 탐지기가 먼저 잡은 칸이 우선(중복 좌표는 아래에서 걸러짐)
+        candidate_slots.extend(detect_choice_slots(table))
+        candidate_slots.extend(detect_group_header_slots(table))
+        candidate_slots.extend(detect_same_cell_slots(table))
         # 확장 탐지: 안전한 레이아웃 또는 명시적 역할이 있는 표만 추가 실행
         layout = getattr(table, "layoutGuess", "")
         is_extended = layout in _SAFE_EXTENDED_LAYOUTS or table_role in ("basic_info", "data_table")

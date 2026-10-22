@@ -138,6 +138,7 @@ class CellInfo:
     borderSummary: str = ""
     hasNestedTable: bool = False
     nestedTableIds: list[str] = field(default_factory=list)
+    cellHeight: int = 0  # hp:cellSz height (HWPUNIT). 0 = 알 수 없음. 간격용 얇은 행과 쓸 자리가 있는 칸을 가른다
     isLikelyLabel: bool = False
     isLikelyInputSlot: bool = False
     warnings: list[str] = field(default_factory=list)
@@ -302,6 +303,9 @@ class InputSlotCandidate:
     unsafeReason: str | None = None
     evidence: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # 칸에 쓰는 방식: set(칸 전체 교체) / append(원래 글자 뒤에 이어 씀) / unit(값 뒤에 단위 유지) / choice(상자 체크)
+    writeMode: str = "set"
+    cellText: str = ""  # append/unit/choice 에서 칸에 원래 있던 글자
 
     def to_dict(self) -> dict:
         return {
@@ -333,6 +337,7 @@ class InputSlotCandidate:
             "unsafeReason": self.unsafeReason,
             "evidence": self.evidence,
             "warnings": self.warnings,
+            **({"writeMode": self.writeMode, "cellText": self.cellText} if self.writeMode != "set" else {}),
         }
 
 

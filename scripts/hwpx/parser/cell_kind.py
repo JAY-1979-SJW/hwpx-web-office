@@ -110,6 +110,18 @@ def table_exclusion(table) -> str:
     return ""
 
 
+_THIN_ROW_HEIGHT = 700  # HWPUNIT. 이보다 낮은 행은 글자를 쓸 자리가 아니라 구역 사이 간격이다
+
+
+def is_spacer_cell(cell, row_cells: list, n_cols: int) -> bool:
+    """구역 사이 간격용 얇은 빈 행 — 글자가 없고, 행에 칸이 하나뿐이며 표 폭 대부분을 덮고, 높이가 낮다."""
+    if (getattr(cell, "normalizedText", "") or "").strip() or n_cols <= 0:
+        return False
+    height = getattr(cell, "cellHeight", 0) or 0
+    span = getattr(cell, "colSpan", 1) or 1
+    return 0 < height < _THIN_ROW_HEIGHT and len(row_cells) == 1 and span * 10 >= n_cols * 8
+
+
 def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
     """입력칸 후보 1개를 칸 단위로 막을 사유. 막지 않으면 ''.
 
@@ -127,8 +139,13 @@ def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
         return "title_label"
     row, col = grid_of(slot)
     span = getattr(slot, "colSpan", 1) or 1
+    mode = getattr(slot, "writeMode", "set")
     if cells_by_row is None:
         cells_by_row = rows_index(table)
+    n_cols = max((grid_of(c)[1] + (getattr(c, "colSpan", 1) or 1) for c in _cells_of(table)), default=0)
+    for c in cells_by_row.get(row, []):
+        if grid_of(c) == (row, col) and is_spacer_cell(c, cells_by_row.get(row, []), n_cols):
+            return "spacer_row"
     for c in cells_by_row.get(row, []):
         if grid_of(c) == (row, col) and getattr(c, "hasNestedTable", False):
             # 안쪽 표를 품은 칸은 쓴 글자가 안쪽 표의 첫 칸으로 들어가 라벨을 덮어쓴다
@@ -140,7 +157,8 @@ def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
             return "row_notice"
         c_col = grid_of(c)[1]
         c_span = getattr(c, "colSpan", 1) or 1
-        if is_pure_sign_marker(t) and (c_col + c_span == col or c_col == col + span):
+        # 글자가 이미 있는 칸(이어 쓰기·선택 상자)은 도장 찍는 빈 자리가 아니라서 서명 표시 옆이어도 막지 않는다
+        if mode in ("set", "unit") and is_pure_sign_marker(t) and (c_col + c_span == col or c_col == col + span):
             return "next_to_sign_marker"
     return ""
 

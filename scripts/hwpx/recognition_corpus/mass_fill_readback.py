@@ -62,6 +62,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
     from hwpx_edit_tool import apply_edit_plan
 
     from hwpx.parser import parse_hwpx_v2
+    from hwpx.parser.slot_modes import choice_options
     from hwpx.pipeline.form_recognizer import recognize_form
     from hwpx.pipeline.plan_builder import _build_slot_item
     from hwpx.pipeline.recognition_pipeline import run_pipeline
@@ -96,15 +97,18 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
         row_cells.setdefault((tid, r), []).append(c)
 
     # ── 가짜값 입력(기존 plan_builder 가 만드는 항목 그대로) ──────────────
-    items, targets, sign_targets = [], {}, 0
+    items, targets, sign_targets = [], [], 0
     for i, s in enumerate(slots):
-        val = f"@{i:03d}"
+        mode = getattr(s, "writeMode", "set")
+        options = choice_options(getattr(s, "cellText", "")) if mode == "choice" else []
+        val = options[0] if options else f"@{i:03d}"
         item, dest = _build_slot_item(s, "mass", val, 0.95, {"mass": 1})
         if item is None or dest != "visual":
             res["failures"].append("PLAN_NO_ITEM")
             continue
         items.append(item)
-        targets[val] = (s.tableId, s.visualRow, s.visualCol)
+        # (위치, 칸에 들어가야 할 최종 글자, 원래 글자를 덮어써도 되는 방식인지)
+        targets.append(((s.tableId, s.visualRow, s.visualCol), item["value"], mode == "set"))
         if _is_sign_target(s, cell_by_pos, row_cells):
             sign_targets += 1
     res["planned"] = len(items)
@@ -119,7 +123,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
                 res["failures"].append("EDIT_FAIL")
             after = parse_hwpx_v2(out)
             after_pos = {(t.tableId, c.visualRow, c.visualCol): c for t in after.tables for c in t.cells}
-            for val, pos in targets.items():
+            for pos, val, replaces in targets:
                 written = after_pos.get(pos)
                 if written is None:
                     mismatch += 1
@@ -130,10 +134,10 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
                     mismatch += 1
                     res["failures"].append("TEXT_MISMATCH")
                 b = cell_by_pos.get(pos)
-                if b is not None and (b.normalizedText or ""):
+                if replaces and b is not None and (b.normalizedText or ""):
                     overwrote += 1
                     res["failures"].append("LABEL_OVERWRITE")
-            tpos = set(targets.values())
+            tpos = {t[0] for t in targets}
             for pos, c in after_pos.items():
                 b = cell_by_pos.get(pos)
                 if pos not in tpos and b is not None and (b.normalizedText or "") != (c.normalizedText or ""):

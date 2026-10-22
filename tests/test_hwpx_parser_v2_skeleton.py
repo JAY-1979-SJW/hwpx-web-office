@@ -252,6 +252,9 @@ def test_input_slot_confidence_range(fx_metadata):
             "schedule_bar_range",
             "status_cell",
             "manual_candidate",
+            "group_header",
+            "choice",
+            "same_cell",
         )
 
 
