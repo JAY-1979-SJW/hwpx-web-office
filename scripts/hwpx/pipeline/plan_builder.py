@@ -7,6 +7,7 @@ slot 기반 set_cells를 우선하고, fallback으로 set_cells_by_label을 사�
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .pipeline_contract import PlanResult, RecognitionResult
@@ -44,6 +45,15 @@ def _apply_field_flags(item: dict, field_name: str) -> None:
         item["solid_fill"] = {"color": _HIGHLIGHT_COLOR}
 
 
+def _table_index_of(slot: object, table_id: str) -> int:
+    """편집기 table_index. tableId 는 't_s0_001' 꼴이라 예전의 '_t' 분리는 늘 0 을 돌려줬다."""
+    ordinal = getattr(slot, "tableOrdinal", -1)
+    if isinstance(ordinal, int) and ordinal >= 0:
+        return ordinal
+    m = re.fullmatch(r"t_s\d+_(\d+)", str(table_id))
+    return int(m.group(1)) if m else 0
+
+
 def _build_slot_item(
     slot: object,
     field_name: str,
@@ -61,7 +71,7 @@ def _build_slot_item(
         v_row = getattr(slot, "visualRow", row)
         v_col = getattr(slot, "visualCol", col)
         item: dict = {
-            "table": int(table_id.split("_t")[-1]) if "_t" in str(table_id) else 0,
+            "table": _table_index_of(slot, table_id),
             "visual_row": v_row,
             "visual_col": v_col,
             "value": value,

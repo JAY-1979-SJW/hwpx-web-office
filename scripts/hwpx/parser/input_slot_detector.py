@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 
+from .cell_kind import grid_of, rows_index, slot_block_reason, table_exclusion
 from .parser_contract import CellInfo, InputSlotCandidate, TableInfo
 
 _AUTO_EDIT_THRESHOLD = 0.90
@@ -119,19 +120,27 @@ def _is_layout_unsafe(table: TableInfo) -> bool:
 
 
 def _is_unsafe_table(table: TableInfo) -> tuple[bool, str]:
-    """텍스트 패턴 포함 전체 unsafe 판정 (detect_input_slots 외부에서 사용)."""
+    """표 전체가 쪽 표시·결재란·안내문 묶음인지 (detect_input_slots 외부에서 사용).
+
+    요청 121: 표 어딘가에 서명·쪽·법령 글자가 있다는 이유만으로 표를 통째로 빼던 규칙을
+    cell_kind.table_exclusion 으로 바꿨다. 개별 칸은 slot_block_reason 이 칸/행 단위로 막는다.
+    """
     layout = getattr(table, "layoutGuess", "")
-    if layout in _UNSAFE_LAYOUTS:
+    if layout in _UNSAFE_LAYOUTS and not _layout_overreach(table):
         return True, layout
-    for cell in getattr(table, "cells", []):
-        t = getattr(cell, "normalizedText", "") or ""
-        if any(k in t for k in ("직인", "결재", "서명", "인감")):
-            return True, "stamp_keyword"
-        if any(k in t.lower() for k in ("쪽", "페이지", "page")) and len(t) <= 10:
-            return True, "page_marker_keyword"
-        if _LEGAL_PATTERN.search(t):
-            return True, "legal_notice_pattern"
+    kind = table_exclusion(table)
+    if kind == "stamp":
+        return True, "stamp_keyword"
+    if kind == "page":
+        return True, "page_marker_keyword"
+    if kind == "notice":
+        return True, "legal_notice_pattern"
     return False, ""
+
+
+def _layout_overreach(table: TableInfo) -> bool:
+    """레이아웃 판정이 page_marker_table 인데 표가 쪽 표시 하나보다 훨씬 큰 경우(오판)."""
+    return getattr(table, "layoutGuess", "") == "page_marker_table" and len(getattr(table, "cells", [])) > 4 and not table_exclusion(table)
 
 
 def _make_slot(  # ruff: ignore[too-many-arguments] -- 8곳 호출부(동일 파일, 위치 인자), 슬롯 생성자 성격상 번들링 실익 낮아 보류
@@ -179,6 +188,9 @@ def _make_slot(  # ruff: ignore[too-many-arguments] -- 8곳 호출부(동일 파
     )
 
 
+_grid = grid_of
+
+
 # ── 공개 탐지 함수 ────────────────────────────────────────────────────────────
 
 
@@ -188,7 +200,7 @@ def detect_label_right_slots(table: TableInfo) -> list[InputSlotCandidate]:
         return []
 
     slots: list[InputSlotCandidate] = []
-    cell_map = {(c.row, c.col): c for c in table.cells}
+    cell_map = {_grid(c): c for c in table.cells}
     tid = getattr(table, "tableId", "")
 
     for cell in table.cells:
@@ -196,7 +208,7 @@ def detect_label_right_slots(table: TableInfo) -> list[InputSlotCandidate]:
             continue
         if not getattr(cell, "isLikelyLabel", False) and len(cell.normalizedText) > 20:
             continue
-        right = cell_map.get((cell.row, cell.col + getattr(cell, "colSpan", 1)))
+        right = cell_map.get((_grid(cell)[0], _grid(cell)[1] + getattr(cell, "colSpan", 1)))
         if not right or right.normalizedText or getattr(right, "isCoveredByMerge", False):
             continue
         field_guess = _guess_field(cell.normalizedText)
@@ -227,13 +239,13 @@ def detect_label_below_slots(table: TableInfo) -> list[InputSlotCandidate]:
         return []
 
     slots: list[InputSlotCandidate] = []
-    cell_map = {(c.row, c.col): c for c in table.cells}
+    cell_map = {_grid(c): c for c in table.cells}
     tid = getattr(table, "tableId", "")
 
     for cell in table.cells:
         if not cell.normalizedText or len(cell.normalizedText) > 20:
             continue
-        below = cell_map.get((cell.row + getattr(cell, "rowSpan", 1), cell.col))
+        below = cell_map.get((_grid(cell)[0] + getattr(cell, "rowSpan", 1), _grid(cell)[1]))
         if not below or below.normalizedText or getattr(below, "isCoveredByMerge", False):
             continue
         field_guess = _guess_field(cell.normalizedText)
@@ -264,7 +276,7 @@ def detect_label_value_pair_slots(table: TableInfo) -> list[InputSlotCandidate]:
 
     cells = table.cells
     tid = getattr(table, "tableId", "")
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {_grid(c): c for c in cells}
     slots: list[InputSlotCandidate] = []
     seen: set[tuple] = set()
 
@@ -273,8 +285,7 @@ def detect_label_value_pair_slots(table: TableInfo) -> list[InputSlotCandidate]:
             continue
         if getattr(cell, "isCoveredByMerge", False):
             continue
-        col = getattr(cell, "col", 0)
-        row = getattr(cell, "row", 0)
+        row, col = _grid(cell)
         if col % 2 != 0:
             continue
         right = cell_map.get((row, col + 1))
@@ -318,7 +329,7 @@ def detect_merged_input_cells(table: TableInfo) -> list[InputSlotCandidate]:
 
     cells = table.cells
     tid = getattr(table, "tableId", "")
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {_grid(c): c for c in cells}
     slots: list[InputSlotCandidate] = []
 
     for cell in cells:
@@ -328,7 +339,7 @@ def detect_merged_input_cells(table: TableInfo) -> list[InputSlotCandidate]:
         fg = _guess_field(text)
         if fg == "unknown":
             continue
-        row, col = cell.row, cell.col
+        row, col = _grid(cell)
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
         if (
             right
@@ -359,7 +370,7 @@ def detect_blank_after_known_header_slots(table: TableInfo) -> list[InputSlotCan
 
     cells = table.cells
     tid = getattr(table, "tableId", "")
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {_grid(c): c for c in cells}
     slots: list[InputSlotCandidate] = []
     seen: set[tuple] = set()
 
@@ -368,7 +379,7 @@ def detect_blank_after_known_header_slots(table: TableInfo) -> list[InputSlotCan
         fg = _guess_field(text)
         if fg == "unknown":
             continue
-        row, col = cell.row, cell.col
+        row, col = _grid(cell)
         # 오른쪽 다음 칸 확인
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
         if (
@@ -376,7 +387,7 @@ def detect_blank_after_known_header_slots(table: TableInfo) -> list[InputSlotCan
             and not getattr(right, "normalizedText", "")
             and not getattr(right, "isCoveredByMerge", False)
         ):
-            key = (right.row, right.col)
+            key = _grid(right)
             if key not in seen:
                 seen.add(key)
                 slots.append(
@@ -398,7 +409,7 @@ def detect_blank_after_known_header_slots(table: TableInfo) -> list[InputSlotCan
             and not getattr(below, "normalizedText", "")
             and not getattr(below, "isCoveredByMerge", False)
         ):
-            key = (below.row, below.col)
+            key = _grid(below)
             if key not in seen:
                 seen.add(key)
                 slots.append(
@@ -437,7 +448,7 @@ def detect_metadata_form_slots(table: TableInfo) -> list[InputSlotCandidate]:
     if not is_metadata and known_label_count < 3:
         return []
 
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {_grid(c): c for c in cells}
     slots: list[InputSlotCandidate] = []
     seen: set[tuple] = set()
 
@@ -446,7 +457,7 @@ def detect_metadata_form_slots(table: TableInfo) -> list[InputSlotCandidate]:
         fg = _guess_field(text)
         if fg == "unknown":
             continue
-        row, col = cell.row, cell.col
+        row, col = _grid(cell)
         # 오른쪽 빈칸
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
         if (
@@ -454,7 +465,7 @@ def detect_metadata_form_slots(table: TableInfo) -> list[InputSlotCandidate]:
             and not getattr(right, "normalizedText", "")
             and not getattr(right, "isCoveredByMerge", False)
         ):
-            key = (right.row, right.col)
+            key = _grid(right)
             if key not in seen:
                 seen.add(key)
                 conf = 0.90 if is_metadata else 0.82
@@ -569,7 +580,7 @@ def detect_status_cells(table: TableInfo) -> list[InputSlotCandidate]:
 
     cells = table.cells
     tid = getattr(table, "tableId", "")
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {_grid(c): c for c in cells}
     slots: list[InputSlotCandidate] = []
 
     for cell in cells:
@@ -577,7 +588,7 @@ def detect_status_cells(table: TableInfo) -> list[InputSlotCandidate]:
         fg = _guess_status_field(text)
         if fg == "unknown":
             continue
-        row, col = cell.row, cell.col
+        row, col = _grid(cell)
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
         if right and not getattr(right, "normalizedText", ""):
             slots.append(
@@ -694,11 +705,14 @@ def detect_input_slots(
             candidate_slots.extend(detect_data_table_append_slots(table))
             candidate_slots.extend(detect_status_cells(table))
 
+        row_index = rows_index(table)
         for slot in candidate_slots:
             key = (slot.tableId, slot.row, slot.col)
             if key in seen:
                 continue
             seen.add(key)
+            if slot_block_reason(table, slot, row_index):
+                continue  # 서명·안내문·관청기재·쪽 표시 칸 — 칸 단위 차단
             if slot.tableRole == "unknown" and table_role != "unknown":
                 slot.tableRole = table_role
             score_slot(slot, table)

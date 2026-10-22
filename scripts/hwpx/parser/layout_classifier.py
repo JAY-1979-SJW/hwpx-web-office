@@ -97,7 +97,9 @@ def _fallback_classify(table_info: TableInfo) -> tuple[str, float, list[str]]:
     if table_info.hasNestedTables:
         return "nested_container_table", 0.7, ["has_nested_tables"]
 
-    if any("쪽" in c.text for c in cells if c.text):
+    # 쪽 표시는 작은 표(셀 4개 이하)일 때만. 별지 양식은 본문 표 안에 '(앞쪽)' 글자가 들어 있는
+    # 경우가 많아 표 전체를 쪽 표시로 판정하면 입력칸이 모두 사라진다(요청 121 기준선 실측).
+    if len(cells) <= 4 and any("쪽" in c.text for c in cells if c.text):
         return "page_marker_table", 0.85, ["page_marker_text_detected"]
 
     merged_count = sum(1 for c in cells if c.isMergedOrigin)

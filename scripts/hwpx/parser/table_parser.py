@@ -23,6 +23,7 @@ _TAG_TR = f"{{{NS_HP}}}tr"
 _TAG_TC = f"{{{NS_HP}}}tc"
 _TAG_T = f"{{{NS_HP}}}t"
 _TAG_CELLSPAN = f"{{{NS_HP}}}cellSpan"
+_TAG_CELLADDR = f"{{{NS_HP}}}cellAddr"
 _TAG_RUN = f"{{{NS_HP}}}run"
 _TAG_P = f"{{{NS_HP}}}p"
 _TAG_SUBLIST = f"{{{NS_HP}}}subList"
@@ -103,6 +104,25 @@ def _cell_span(tc: ET.Element) -> tuple[int, int]:
             except ValueError:
                 return 1, 1
     return 1, 1
+
+
+def _cell_addr(tc: ET.Element, default_row: int, default_col: int) -> tuple[int, int]:
+    """hp:cellAddr 의 (rowAddr, colAddr). 편집기(hwpx_table_ops)가 쓰는 격자 주소와 같다.
+
+    row/col 은 행 안 순번(웹 오피스·적재 스키마 키가 의존)이라 그대로 두고, 격자 주소는
+    visualRow/visualCol 에 싣는다. 병합 칸이 있는 행에서는 둘이 달라, 순번으로 쓰면
+    값이 엉뚱한 칸에 들어간다. cellAddr 가 없으면 순번을 그대로 쓴다.
+    """
+    for child in tc:
+        if child.tag == _TAG_CELLADDR:
+            try:
+                return (
+                    int(child.attrib.get("rowAddr", default_row)),
+                    int(child.attrib.get("colAddr", default_col)),
+                )
+            except ValueError:
+                break
+    return default_row, default_col
 
 
 def _extract_cell_style(tc: ET.Element, style_defs: dict) -> dict:
@@ -232,6 +252,7 @@ def _parse_table_element(
     for ri, row in enumerate(raw_rows):
         for ci, tc in enumerate(row):
             col_span, row_span = _cell_span(tc)
+            addr_row, addr_col = _cell_addr(tc, ri, ci)
             if col_span > 1 or row_span > 1:
                 has_merged = True
             nested = _has_nested_table(tc)
@@ -254,8 +275,8 @@ def _parse_table_element(
                     cellId=cell_id,
                     row=ri,
                     col=ci,
-                    visualRow=ri,
-                    visualCol=ci,
+                    visualRow=addr_row,
+                    visualCol=addr_col,
                     rowSpan=row_span,
                     colSpan=col_span,
                     isMergedOrigin=(col_span > 1 or row_span > 1),

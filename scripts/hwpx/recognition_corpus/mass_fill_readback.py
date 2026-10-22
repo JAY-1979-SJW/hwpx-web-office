@@ -51,8 +51,8 @@ def select_forms(library: Path, n: int, seed: int) -> list[Path]:
 def _is_sign_target(slot, cell_by_pos: dict, row_cells: dict) -> bool:
     if _SIGN_RE.search(getattr(slot, "labelText", "") or ""):
         return True
-    for c in row_cells.get((slot.tableId, slot.row), []):
-        if _SIGN_RE.search(c.normalizedText or "") and abs(c.col - slot.col) <= 1:
+    for c in row_cells.get((slot.tableId, slot.visualRow), []):
+        if _SIGN_RE.search(c.normalizedText or "") and abs(c.visualCol - slot.visualCol) <= 1:
             return True
     return False
 
@@ -84,13 +84,13 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
     res["parse_ok"] = True
 
     fr = recognize_form(before)
-    slots = [s for s in fr.enhancedSlots]
+    slots = list(fr.enhancedSlots)
     res["slots"] = len(slots)
     res["tables"] = len(before.tables)
     if not slots:
         res["failures"].append("ZERO_SLOTS")
 
-    cell_by_pos = {(t.tableId, c.row, c.col): c for t in before.tables for c in t.cells}
+    cell_by_pos = {(t.tableId, c.visualRow, c.visualCol): c for t in before.tables for c in t.cells}
     row_cells: dict = {}
     for (tid, r, _c), c in cell_by_pos.items():
         row_cells.setdefault((tid, r), []).append(c)
@@ -104,7 +104,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
             res["failures"].append("PLAN_NO_ITEM")
             continue
         items.append(item)
-        targets[val] = (s.tableId, s.row, s.col)
+        targets[val] = (s.tableId, s.visualRow, s.visualCol)
         if _is_sign_target(s, cell_by_pos, row_cells):
             sign_targets += 1
     res["planned"] = len(items)
@@ -118,13 +118,13 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
             if rep.get("status") == "FAIL" or rep.get("errors"):
                 res["failures"].append("EDIT_FAIL")
             after = parse_hwpx_v2(out)
-            after_pos = {(t.tableId, c.row, c.col): c for t in after.tables for c in t.cells}
+            after_pos = {(t.tableId, c.visualRow, c.visualCol): c for t in after.tables for c in t.cells}
             for val, pos in targets.items():
-                c = after_pos.get(pos)
-                if c is None:
+                written = after_pos.get(pos)
+                if written is None:
                     mismatch += 1
                     res["failures"].append("CELL_NOT_FOUND")
-                elif (c.normalizedText or "") == val:
+                elif (written.normalizedText or "") == val:
                     matched += 1
                 else:
                     mismatch += 1

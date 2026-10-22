@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..parser.cell_kind import grid_of, table_exclusion
+
 # ── 상수 ──────────────────────────────────────────────────────────────────────
 
 _KNOWN_FIELD_HINTS: dict[str, tuple[str, ...]] = {
@@ -70,6 +72,9 @@ class EnhancedSlot:
     reviewRequiredReason: str | None = None
     unsafeReason: str | None = None
     evidence: list[str] = field(default_factory=list)
+    # 편집기(hwpx_table_ops.find_table)가 쓰는 문서 전체 표 순번. -1 이면 아직 계산 전.
+    # tableId(t_s{구역}_{구역 안 순번})만으로는 구역이 둘 이상일 때 이 순번을 알 수 없다.
+    tableOrdinal: int = -1
 
     def to_dict(self) -> dict:
         return {
@@ -148,6 +153,13 @@ def _is_unsafe_table(table) -> bool:
     return False
 
 
+class _CellsView:
+    """table_exclusion 이 읽는 최소 표 모양(cells 만)."""
+
+    def __init__(self, cells: list) -> None:
+        self.cells = cells
+
+
 def _classify_generic_table_role(layout: str, cells: list) -> str:
     total = len(cells)
 
@@ -159,13 +171,14 @@ def _classify_generic_table_role(layout: str, cells: list) -> str:
     empty_count = sum(1 for c in cells if not getattr(c, "normalizedText", ""))
     empty_ratio = empty_count / total if total else 0
 
-    # 법령 안내 패턴
-    all_text = " ".join(getattr(c, "normalizedText", "") or "" for c in cells)
-    if _UNSAFE_TEXT_PATTERNS.search(all_text):
+    # 표 전체가 안내문 묶음·결재란·쪽 표시일 때만 제외 역할을 준다. 표 어딘가에 서명·쪽·법령
+    # 글자가 있다는 이유만으로는 빼지 않는다(요청 121 — 해당 칸/행만 slot_block_reason 이 막음).
+    excluded = table_exclusion(_CellsView(cells))
+    if excluded == "notice":
         return "legal_notice"
-    if any(k in all_text for k in _UNSAFE_TABLE_KEYWORDS):
+    if excluded == "stamp":
         return "approval_stamp"
-    if any(k.lower() in all_text.lower() for k in _PAGE_MARKER_KEYWORDS) and total <= 4:
+    if excluded == "page":
         return "page_marker"
     if known_label_count >= 2 and empty_ratio >= 0.2:
         return "basic_info"
@@ -181,7 +194,7 @@ def _classify_one_table_role(tbl: Any) -> str:
 
     if layout == "stamp_or_approval_table":
         return "approval_stamp"
-    if layout == "page_marker_table":
+    if layout == "page_marker_table" and len(getattr(tbl, "cells", []) or []) <= 4:
         return "page_marker"
     if layout == "nested_container_table":
         # 내부 셀을 보고 기본정보표 여부 판단
@@ -252,7 +265,7 @@ def _detect_label_value_pair_slots(table, table_role: str) -> list[EnhancedSlot]
     if cols not in (2, 4):
         return []
 
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {grid_of(c): c for c in cells}
     slots: list[EnhancedSlot] = []
     seen_pairs: set[tuple] = set()
 
@@ -261,12 +274,11 @@ def _detect_label_value_pair_slots(table, table_role: str) -> list[EnhancedSlot]
             continue
         if getattr(cell, "isCoveredByMerge", False):
             continue
-        col = getattr(cell, "col", 0)
-        row = getattr(cell, "row", 0)
+        row, col = grid_of(cell)
         # 짝수 열이 라벨, 홀수 열이 값인 패턴
         if col % 2 != 0:
             continue
-        value_col = col + 1
+        value_col = col + (getattr(cell, "colSpan", 1) or 1)
         right = cell_map.get((row, value_col))
         if (
             right
@@ -311,7 +323,7 @@ def _detect_merged_input_slots(table, table_role: str) -> list[EnhancedSlot]:
         return []
     cells = getattr(table, "cells", [])
     tid = getattr(table, "tableId", "")
-    cell_map = {(c.row, c.col): c for c in cells}
+    cell_map = {grid_of(c): c for c in cells}
     slots: list[EnhancedSlot] = []
 
     for cell in cells:
@@ -321,7 +333,7 @@ def _detect_merged_input_slots(table, table_role: str) -> list[EnhancedSlot]:
         fg = _guess_field(text)
         if fg == "unknown":
             continue
-        row, col = cell.row, cell.col
+        row, col = grid_of(cell)
         # 오른쪽 병합 셀
         right = cell_map.get((row, col + getattr(cell, "colSpan", 1)))
         if (
@@ -451,6 +463,17 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
     return enhanced
 
 
+def table_ordinals(tables) -> dict[str, int]:
+    """tableId → 문서 전체 표 순번(구역 순서, 구역 안 문서 순서). 편집기 table_index 와 같은 체계."""
+
+    def _key(t) -> tuple[int, int]:
+        m = re.fullmatch(r"t_s(\d+)_(\d+)", str(getattr(t, "tableId", "")))
+        return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+    ordered = sorted(tables, key=_key)
+    return {t.tableId: i for i, t in enumerate(ordered)}
+
+
 def recognize_form(parser_result) -> FormRecognitionResult:
     """ParserV2Result를 받아 FormRecognitionResult를 반환한다."""
     tables = getattr(parser_result, "tables", []) or []
@@ -470,6 +493,9 @@ def recognize_form(parser_result) -> FormRecognitionResult:
 
     # 4. 입력칸 보강
     slots = enhance_input_slots(parser_result, table_roles)
+    ordinals = table_ordinals(tables)
+    for slot in slots:
+        slot.tableOrdinal = ordinals.get(slot.tableId, -1)
     safe_slots = [s for s in slots if s.tableId not in unsafe_ids]
 
     # 5. 전체 confidence
