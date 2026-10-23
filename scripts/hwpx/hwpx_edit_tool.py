@@ -959,7 +959,6 @@ def apply_edit_plan(input_path: Path, output_path: Path, plan: dict[str, Any], *
                 visual_col,
                 value,
                 bool(item.get("clear_remaining", True)),
-                item.get("text_edits") or None,
             )
         )
         operations.extend(_apply_cell_post_edit_options(package, table_index, visual_row, visual_col, value, item))

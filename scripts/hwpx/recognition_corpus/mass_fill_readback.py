@@ -59,11 +59,10 @@ def _is_sign_target(slot, cell_by_pos: dict, row_cells: dict) -> bool:
 
 def run_one(path_str: str, work_dir_str: str) -> dict:
     """서식 1개 — 순수 함수(프로세스 풀에서 실행)."""
-    from hwpx_edit_tool import apply_edit_plan
-
     from hwpx.parser import parse_hwpx_v2
     from hwpx.parser.cell_kind import has_notice_exception
     from hwpx.parser.slot_modes import choice_options
+    from hwpx.pipeline.edit_runner import apply_plan
     from hwpx.pipeline.form_recognizer import recognize_form
     from hwpx.pipeline.plan_builder import _build_slot_item, edit_base, merge_edit_item
     from hwpx.pipeline.recognition_pipeline import run_pipeline
@@ -135,7 +134,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
     if items:
         out = work / "out.hwpx"
         try:
-            rep = apply_edit_plan(copy, out, {"set_visual_cells": items})
+            rep = apply_plan(copy, out, {"set_visual_cells": items})
             if rep.get("status") == "FAIL" or rep.get("errors"):
                 res["failures"].append("EDIT_FAIL")
             after = parse_hwpx_v2(out)

@@ -212,9 +212,9 @@ def run_pipeline(
 
     # ── 4. edit ─────────────────────────────────────────────────────────────
     try:
-        from hwpx_edit_tool import apply_edit_plan  # type: ignore
+        from .edit_runner import apply_plan
 
-        edit_report = apply_edit_plan(input_path, output_path, plan_result.editPlan)
+        edit_report = apply_plan(input_path, output_path, plan_result.editPlan)
         if edit_report.get("status") == "FAIL" and not edit_report.get("errors"):
             # 편집기가 일부 작업 실패(예: LABEL_CELL_NOT_FOUND)를 status 로만 알리는 경우
             failed = [
