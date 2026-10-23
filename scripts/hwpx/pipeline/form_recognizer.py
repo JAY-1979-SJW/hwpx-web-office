@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..parser.cell_kind import grid_of, table_exclusion
+from ..parser.slot_modes import slot_key
 
 # ── 상수 ──────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,9 @@ class EnhancedSlot:
     # 칸에 쓰는 방식(set/append/unit/choice)과 칸에 원래 있던 글자 — parser_contract.InputSlotCandidate 와 같은 뜻
     writeMode: str = "set"
     cellText: str = ""
+    anchorText: str = ""
+    valueTemplate: str = "{v}"
+    cellRawText: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -102,7 +106,17 @@ class EnhancedSlot:
             "reviewRequiredReason": self.reviewRequiredReason,
             "unsafeReason": self.unsafeReason,
             "evidence": self.evidence,
-            **({"writeMode": self.writeMode, "cellText": self.cellText} if self.writeMode != "set" else {}),
+            **(
+                {
+                    "writeMode": self.writeMode,
+                    "cellText": self.cellText,
+                    "anchorText": self.anchorText,
+                    "valueTemplate": self.valueTemplate,
+                    "cellRawText": self.cellRawText,
+                }
+                if self.writeMode != "set"
+                else {}
+            ),
         }
 
 
@@ -390,7 +404,7 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
         if tid in unsafe_tables:
             continue
         row, col = getattr(slot, "row", 0), getattr(slot, "col", 0)
-        key = (tid, row, col)
+        key = slot_key(slot)
         if key in seen_targets:
             continue
         seen_targets.add(key)
@@ -427,6 +441,9 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
             evidence=evidence,
             writeMode=getattr(slot, "writeMode", "set"),
             cellText=getattr(slot, "cellText", ""),
+            anchorText=getattr(slot, "anchorText", ""),
+            valueTemplate=getattr(slot, "valueTemplate", "{v}"),
+            cellRawText=getattr(slot, "cellRawText", ""),
         )
         enhanced.append(es)
 
@@ -436,7 +453,7 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
     for slot in new_slots:
         if slot.tableId in unsafe_tables:
             continue
-        key = (slot.tableId, slot.row, slot.col)
+        key = slot_key(slot)
         if key in seen_targets:
             continue
         seen_targets.add(key)
@@ -465,6 +482,9 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
                 evidence=slot.evidence,
                 writeMode=slot.writeMode,
                 cellText=slot.cellText,
+                anchorText=slot.anchorText,
+                valueTemplate=slot.valueTemplate,
+                cellRawText=slot.cellRawText,
             )
         )
 

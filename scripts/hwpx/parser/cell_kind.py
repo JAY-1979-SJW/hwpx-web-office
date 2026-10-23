@@ -137,6 +137,8 @@ def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
         return "label_is_value"
     if label and _is_title_label(table, label):
         return "title_label"
+    if re.match(r"^\s*년\s*월\s*일\s*$", label):
+        return "label_blank_date"  # 날짜 자리표시 칸이지 아래 칸의 라벨이 아니다(날짜는 칸 안에서 바로 바꾼다)
     row, col = grid_of(slot)
     span = getattr(slot, "colSpan", 1) or 1
     mode = getattr(slot, "writeMode", "set")
@@ -158,7 +160,13 @@ def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
         c_col = grid_of(c)[1]
         c_span = getattr(c, "colSpan", 1) or 1
         # 글자가 이미 있는 칸(이어 쓰기·선택 상자)은 도장 찍는 빈 자리가 아니라서 서명 표시 옆이어도 막지 않는다
-        if mode in ("set", "unit") and is_pure_sign_marker(t) and (c_col + c_span == col or c_col == col + span):
+        # 머리글 아래 열(group_header)은 열 이름이 값칸임을 밝혀 주므로 옆 칸이 서명 표시여도 도장 자리가 아니다
+        if (
+            mode in ("set", "unit")
+            and getattr(slot, "source", "") != "group_header"
+            and is_pure_sign_marker(t)
+            and (c_col + c_span == col or c_col == col + span)
+        ):
             return "next_to_sign_marker"
     return ""
 

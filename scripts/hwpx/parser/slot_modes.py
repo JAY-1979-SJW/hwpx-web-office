@@ -6,6 +6,8 @@
                  머리글 경로 '하도급내용 > 요율' 을 라벨로 삼는다. 단위만 적힌 칸('%', '원')도 빈 칸으로 본다.
 - same_cell    : 라벨 글자 뒤 같은 칸에 값을 이어 쓰는 서식('건축주' 칸에 '건축주 홍길동').
 - choice       : '[  ] 일괄  [  ] 개별', '□ 대상' 처럼 칸 안의 선택 상자.
+- inline       : 한 칸 안에 '도급액: / 하도급금액: / 하도급률:' 처럼 라벨이 줄지어 있고 값 자리가 라벨 뒤인 칸(3차).
+- replace      : '(      )' · '    년   월   일' 처럼 칸 안의 자리표시 글자를 값으로 바꾸는 칸(3차).
 
 쓰는 방식(writeMode)과 칸에 원래 있던 글자(cellText)를 슬롯에 실어, 계획 단계가 칸 전체 글자를 만든다.
 """
@@ -21,6 +23,13 @@ SET = "set"
 APPEND = "append"
 UNIT = "unit"
 CHOICE = "choice"
+INLINE = "inline"
+REPLACE = "replace"
+EDIT_MODES = (INLINE, REPLACE)  # 칸 전체를 덮지 않고 글자 일부만 고치는 방식(hwpx_cell_text_edits)
+
+# 자리표시 글자 — 엔진(hwpx_cell_text_edits)이 칸 글자에서 이 정규식으로 자리를 찾는다
+PAREN_PATTERN = r"\(\s*\)"
+DATE_PATTERN = r"년\s*월\s*일"
 
 # '[  ]' '[ ]' '( )' 대신 □ ☐ 만 상자로 본다. '( )' 는 빈 괄호 자리 표시와 구분되지 않는다.
 _BOX_RE = re.compile(r"(\[\s*\]|□|☐)\s*([^\[\]□☐]{1,30}?)(?=\s*(?:\[\s*\]|□|☐|$))")
@@ -96,12 +105,32 @@ def _position_map(table: TableInfo) -> dict[tuple[int, int], CellInfo]:
     return pos
 
 
-def _slot(table: TableInfo, target: CellInfo, source: str, label: str, conf: float, mode: str, evidence: list[str]) -> InputSlotCandidate:
+def slot_key(slot: object) -> tuple:
+    """슬롯 중복 판정 키. 글자 일부만 고치는 슬롯은 한 칸에 여러 개일 수 있어 고칠 자리까지 키에 넣는다."""
+    key = (getattr(slot, "tableId", ""), getattr(slot, "row", 0), getattr(slot, "col", 0))
+    if getattr(slot, "writeMode", SET) in EDIT_MODES:
+        return (*key, getattr(slot, "anchorText", ""))
+    return key
+
+
+def _slot(
+    table: TableInfo,
+    target: CellInfo,
+    source: str,
+    label: str,
+    conf: float,
+    mode: str,
+    evidence: list[str],
+    *,
+    anchor: str = "",
+    template: str = "{v}",
+    suffix: str = "",
+) -> InputSlotCandidate:
     from .input_slot_detector import _guess_field  # 같은 패키지의 라벨→필드 추정 재사용
 
     tid = getattr(table, "tableId", "")
     return InputSlotCandidate(
-        slotId=f"slot_{tid}_r{target.row}c{target.col}_{source}",
+        slotId=f"slot_{tid}_r{target.row}c{target.col}_{source}{suffix}",
         tableId=tid,
         source=source,
         labelText=label,
@@ -116,6 +145,9 @@ def _slot(table: TableInfo, target: CellInfo, source: str, label: str, conf: flo
         evidence=evidence,
         writeMode=mode,
         cellText=(getattr(target, "normalizedText", "") or "").strip(),
+        anchorText=anchor,
+        valueTemplate=template,
+        cellRawText=(getattr(target, "text", "") or "") if mode in EDIT_MODES else "",
     )
 
 
@@ -215,6 +247,12 @@ def _is_column_header(cell: CellInfo, pos: dict[tuple[int, int], CellInfo], by_r
         if is_spacer_cell(below, by_row.get(grid_of(below)[0], []), n_cols):
             continue
         return True
+    # 머리글 줄 — 같은 줄이 라벨 글자뿐(3칸 이상)이고 바로 아래 줄에 값칸이 있으면, 아래 첫 칸이 '대표사' 같은 글자여도 열 머리글이다
+    own = by_row.get(row, [])
+    if len(own) >= 3 and all(unit_of(x) is None for x in own):
+        for r in range(r0, r0 + _HEADER_LOOKAHEAD):
+            if any(unit_of(x) is not None and not is_spacer_cell(x, by_row.get(r, []), n_cols) for x in by_row.get(r, [])):
+                return True
     return False
 
 
@@ -256,4 +294,117 @@ def detect_same_cell_slots(table: TableInfo) -> list[InputSlotCandidate]:
             continue
         text = cell.normalizedText.strip()
         slots.append(_slot(table, cell, "same_cell", text, 0.90, APPEND, ["label_only_wide_cell", "no_blank_in_row"]))
+    return slots
+
+
+# ── 글자 일부만 고치는 칸 (3차) ───────────────────────────────────────────────
+
+_LEAD_RE = re.compile(r"^[\s(（\[\-·ㆍ•※]+")
+_TAIL_BLANK_RE = re.compile(r"^[\s)）\]]*$")
+_MAX_ANCHOR = 24
+_MAX_PARAS = 6
+_MAX_PARA_LEN = 60
+# 여는 글자는 숫자(연도) 뒤가 아니어야 한다 — 이미 채워진 '2026년 10월' 같은 글자는 자리표시가 아니다
+_BLANK_DATE_RE = re.compile(r"(?<![가-힣\d\s])\s*" + DATE_PATTERN)
+_BLANK_DATE_LABEL_RE = re.compile(r"^\s*" + DATE_PATTERN + r"\s*$")
+
+
+def is_blank_date_label(text: str | None) -> bool:
+    """'년 월 일' 만 적힌 글자 — 날짜를 쓸 자리표시이지 아래 칸의 라벨이 아니다."""
+    return bool(_BLANK_DATE_LABEL_RE.match(text or ""))
+
+
+def _nearest_label(cell: CellInfo, pos: dict[tuple[int, int], CellInfo], default: str) -> str:
+    """칸의 왼쪽(없으면 위쪽)에서 가장 가까운 라벨 글자."""
+    row, col = grid_of(cell)
+    for c in range(col - 1, -1, -1):
+        left = pos.get((row, c))
+        if left is not None and left is not cell and _is_label_like(left):
+            return left.normalizedText.strip()
+    for r in range(row - 1, max(row - 1 - _MAX_HEADER_ROWS, -1), -1):
+        up = pos.get((r, col))
+        if up is not None and up is not cell and _is_label_like(up):
+            return up.normalizedText.strip()
+    return default
+
+
+def _colon_anchors(cell: CellInfo) -> list[str]:
+    """줄(문단)마다 '라벨:' 로 끝나 값 자리가 비어 있는 라벨 글자. 한 줄에 콜론이 둘 이상이면 건너뛴다."""
+    out: list[str] = []
+    for para in getattr(cell, "paragraphs", None) or []:
+        if len(re.findall(r"[:：]", para)) != 1:
+            continue
+        head, _colon, tail = re.split(r"([:：])", para, maxsplit=1)
+        if not _TAIL_BLANK_RE.match(tail):
+            continue  # 콜론 뒤에 이미 글자가 있다 — 값 자리가 아니다
+        label = _LEAD_RE.sub("", head).strip()
+        if not label or len(label) > _MAX_ANCHOR or is_value_like(label) or cell_kind(label):
+            continue
+        out.append(f"{label}:")
+    return out
+
+
+def detect_inline_slots(table: TableInfo) -> list[InputSlotCandidate]:
+    """한 칸 안에 '라벨:' 이 줄지어 있고 값 자리가 라벨 뒤인 칸 — 라벨마다 슬롯 1개(같은 칸에 여러 개 가능).
+
+    옆·아래에 따로 값칸이 있는 라벨 칸은 그쪽이 값칸이므로 제외한다. 선택 상자·서명 문구가 든 칸도 제외한다.
+    """
+    pos = _position_map(table)
+    by_row: dict[int, list[CellInfo]] = {}
+    for c in table.cells:
+        if not getattr(c, "isCoveredByMerge", False):
+            by_row.setdefault(grid_of(c)[0], []).append(c)
+    n_cols = _grid_width(table)
+    slots: list[InputSlotCandidate] = []
+    for cell in table.cells:
+        if getattr(cell, "isCoveredByMerge", False) or getattr(cell, "hasNestedTable", False):
+            continue
+        text = (getattr(cell, "normalizedText", "") or "").strip()
+        if not text or choice_options(text) or _SIGN_TEXT_RE.search(text):
+            continue
+        anchors = _colon_anchors(cell)
+        if not anchors or len(set(anchors)) != len(anchors):
+            continue
+        paras = [p.strip() for p in (getattr(cell, "paragraphs", None) or []) if p.strip()]
+        if len(paras) > _MAX_PARAS or any(len(p) > _MAX_PARA_LEN for p in paras):
+            continue  # 작성방법·안내문 칸 — 라벨 줄이 아니라 설명 문장이 든 칸
+        row, col = grid_of(cell)
+        span = getattr(cell, "colSpan", 1) or 1
+        right = pos.get((row, col + span))
+        below = pos.get((row + (getattr(cell, "rowSpan", 1) or 1), col))
+        if right is not None and unit_of(right) is not None:
+            continue  # 옆에 비어 있는 값칸이 따로 있다
+        if len(anchors) == 1 and below is not None and unit_of(below) is not None and not is_spacer_cell(below, by_row.get(grid_of(below)[0], []), n_cols):
+            # 아래 빈 칸은 라벨 1개짜리 칸의 값칸일 수 있다 — 단 그 칸의 왼쪽에 자기 라벨이 있으면 그 라벨의 값칸이다
+            below_left = pos.get((grid_of(below)[0], grid_of(below)[1] - 1))
+            if below_left is None or not (getattr(below_left, "normalizedText", "") or "").strip():
+                continue
+        for i, anchor in enumerate(anchors):
+            label = anchor.rstrip(":").strip()
+            slots.append(_slot(table, cell, "inline", label, 0.88, INLINE, ["colon_label_blank_after"], anchor=anchor, suffix=f"_i{i}"))
+    return slots
+
+
+def detect_placeholder_slots(table: TableInfo) -> list[InputSlotCandidate]:
+    """'(      )' · '    년   월   일' — 칸 안의 자리표시 글자를 값으로 바꾸는 칸.
+
+    서명·날인 문구가 같이 든 칸(신청 문장·결재 줄)은 칸 단위로 막는다.
+    """
+    pos = _position_map(table)
+    slots: list[InputSlotCandidate] = []
+    for cell in table.cells:
+        if getattr(cell, "isCoveredByMerge", False) or getattr(cell, "hasNestedTable", False):
+            continue
+        norm = (getattr(cell, "normalizedText", "") or "").strip()
+        raw = getattr(cell, "text", "") or ""
+        if not norm or _SIGN_TEXT_RE.search(norm):
+            continue
+        if re.fullmatch(PAREN_PATTERN, norm):
+            label = _nearest_label(cell, pos, "")
+            if not label:
+                continue
+            slots.append(_slot(table, cell, "placeholder", label, 0.85, REPLACE, ["empty_parentheses"], anchor=PAREN_PATTERN, template="({v})"))
+        elif _BLANK_DATE_RE.search(raw):
+            label = _nearest_label(cell, pos, "일자")
+            slots.append(_slot(table, cell, "placeholder", label, 0.85, REPLACE, ["blank_date"], anchor=DATE_PATTERN))
     return slots

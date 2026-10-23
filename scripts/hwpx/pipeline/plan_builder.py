@@ -10,7 +10,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..parser.slot_modes import mark_choice
+from ..hwpx_cell_text_edits import (  # 편집 엔진(L4)의 순수 글자 편집 — 계획과 편집기가 같은 함수를 쓴다
+    AFTER,
+    REPLACE,
+    apply_edit,
+    apply_edits,
+)
+from ..parser.slot_modes import DATE_PATTERN, EDIT_MODES, INLINE, mark_choice
+from ..parser.table_parser import (
+    _normalize as normalize_text,  # 칸 글자를 읽을 때 쓰는 것과 같은 정규화
+)
 from .pipeline_contract import PlanResult, RecognitionResult
 
 _AUTO_THRESHOLD = 0.90
@@ -55,6 +64,58 @@ def _table_index_of(slot: object, table_id: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+_DATE_RE = re.compile(r"(\d{4})\D+(\d{1,2})\D+(\d{1,2})")
+
+
+def format_blank_date(value: str) -> str:
+    """'2026-10-23' 같은 날짜를 '    년  월  일' 자리에 들어갈 '2026년 10월 23일' 로. 날짜 꼴이 아니면 그대로."""
+    m = _DATE_RE.search(value or "")
+    if not m:
+        return value
+    return f"{m.group(1)}년 {int(m.group(2))}월 {int(m.group(3))}일"
+
+
+def edit_base(slot: object) -> str:
+    """편집 전 칸 글자 — 원문(공백 그대로)이 있으면 원문, 없으면 정규화된 칸 글자."""
+    return getattr(slot, "cellRawText", "") or getattr(slot, "cellText", "") or ""
+
+
+def text_edit_for(slot: object, value: str) -> dict | None:
+    """글자 일부만 고치는 칸(inline·replace)의 편집 1건. 그런 칸이 아니면 None."""
+    mode = getattr(slot, "writeMode", "set")
+    anchor = getattr(slot, "anchorText", "") or ""
+    if mode not in EDIT_MODES or not anchor:
+        return None
+    if mode == INLINE:
+        return {"kind": AFTER, "anchor": anchor, "value": value}
+    if anchor == DATE_PATTERN:
+        value = format_blank_date(value)
+    template = getattr(slot, "valueTemplate", "{v}") or "{v}"
+    return {"kind": REPLACE, "pattern": anchor, "value": template.replace("{v}", value)}
+
+
+def merge_edit_item(items: list[dict], bases: dict, item: dict, base: str) -> bool:
+    """글자 일부 편집 항목을 계획에 넣는다. 같은 칸의 앞선 편집이 있으면 편집을 합치고 예상 글자를 다시 계산한다.
+
+    같은 칸을 칸 전체 덮어쓰기 항목이 이미 쓰고 있거나, 합친 편집이 맞지 않으면 False(넣지 않음).
+    """
+    key = (item["table"], item["visual_row"], item["visual_col"])
+    prior = next((i for i in items if (i["table"], i["visual_row"], i["visual_col"]) == key), None)
+    if prior is None:
+        bases[key] = base
+        items.append(item)
+        return True
+    if key not in bases:
+        return False
+    edits = list(prior["text_edits"]) + list(item["text_edits"])
+    final = apply_edits(base, edits)
+    if final is None:
+        return False
+    prior["text_edits"] = edits
+    prior["value"] = normalize_text(final)
+    return True
+
+
 def _final_cell_text(slot: object, value: str) -> str | None:
     """writeMode 별로 칸에 들어갈 최종 글자. 만들 수 없으면 None(선택 항목을 찾지 못함 등)."""
     mode = getattr(slot, "writeMode", "set")
@@ -82,6 +143,19 @@ def _build_slot_item(
     label_text = getattr(slot, "labelText", "")
 
     mode = getattr(slot, "writeMode", "set")
+    if mode in EDIT_MODES:
+        edit = text_edit_for(slot, value)
+        final = apply_edit(edit_base(slot), edit) if edit else None
+        if final is None:
+            return None, None
+        edit_item = {
+            "table": _table_index_of(slot, table_id),
+            "visual_row": getattr(slot, "visualRow", row),
+            "visual_col": getattr(slot, "visualCol", col),
+            "value": normalize_text(final),
+            "text_edits": [edit],
+        }
+        return edit_item, "visual"
     if mode != "set":
         # 칸 안에 이어 쓰거나 상자를 체크하는 칸은 옆 칸 라벨 경로(set_cells_by_label)로는 쓸 수 없다 — 항상 칸 주소로 쓴다
         final = _final_cell_text(slot, value)
@@ -116,6 +190,7 @@ class _PlanAccumulator:
     planned: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     review_reasons: dict[str, str] = field(default_factory=dict)
+    edit_bases: dict = field(default_factory=dict)
 
 
 def _process_slotted_field(
@@ -136,7 +211,14 @@ def _process_slotted_field(
         acc.skipped.append(field_name)
         acc.review_reasons[field_name] = "no_label_found"
         return
-    if dest == "visual":
+    if item is None:
+        return
+    if dest == "visual" and item.get("text_edits"):
+        if not merge_edit_item(acc.set_cells, acc.edit_bases, item, edit_base(slot)):
+            acc.skipped.append(field_name)
+            acc.review_reasons[field_name] = "cell_edit_conflict"
+            return
+    elif dest == "visual":
         acc.set_cells.append(item)
     else:
         acc.set_cells_by_label.append(item)

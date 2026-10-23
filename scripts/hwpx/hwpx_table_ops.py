@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 from hwpx_element_factory import append_generated_table as append_generated_table_to_package
+from hwpx_cell_text_edits import apply_edit
 from hwpx_element_factory import next_paragraph_id
 from hwpx_package import HwpxPackage, local_name, text_nodes
 from hwpx_special_text import sanitize_hwpx_text
@@ -356,6 +357,38 @@ def set_cell_single_text(cell: ET.Element, value: str) -> dict[str, Any] | None:
     }
 
 
+def apply_cell_text_edits(cell: ET.Element, edits: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """칸 글자 일부만 고친다(라벨 뒤 끼우기·자리표시 바꾸기). 다른 줄·문구는 그대로 둔다.
+
+    edit 마다 그 글자가 들어 있는 첫 글자 노드 한 곳만 고친다. 한 edit 라도 자리를 못 찾으면 칸을
+    바꾸지 않고 None 을 돌려준다(일부만 반영된 칸이 남지 않게 먼저 모두 계산한 뒤 쓴다).
+    """
+    nodes = all_cell_text_nodes(cell)
+    texts = {id(node): _node_full_text(node) for node in nodes}
+    changed: dict[int, ET.Element] = {}
+    for edit in edits:
+        sanitized = sanitize_hwpx_text(str(edit.get("value", "")))
+        edit = {**edit, "value": sanitized["text"]}
+        for node in nodes:
+            new = apply_edit(texts[id(node)], edit)
+            if new is not None:
+                texts[id(node)] = new
+                changed[id(node)] = node
+                break
+        else:
+            return None
+    before_text = "".join(_node_full_text(node) for node in nodes)
+    for key, node in changed.items():
+        _set_node_text(node, texts[key])
+    return {
+        "before_text": before_text,
+        "after_text": "".join(texts[id(node)] for node in nodes),
+        "text_node_count": len(nodes),
+        "cleared_text_nodes": 0,
+        "edited_text_nodes": len(changed),
+    }
+
+
 def parent_map(root: ET.Element) -> dict[ET.Element, ET.Element]:
     return {child: parent for parent in root.iter() for child in list(parent)}
 
@@ -503,6 +536,7 @@ def set_table_visual_cell_text(
     visual_col: int,
     value: str,
     clear_remaining: bool = True,
+    text_edits: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     found = find_table(package, table_index)
     if not found:
@@ -517,7 +551,16 @@ def set_table_visual_cell_text(
             "visual_col": visual_col,
         }
     row_index, col_index, cell = located
-    if clear_remaining:
+    if text_edits:
+        mutation = apply_cell_text_edits(cell, text_edits)
+        if mutation is None:
+            return {
+                "status": "CELL_EDIT_ANCHOR_NOT_FOUND",
+                "table_index": table_index,
+                "visual_row": visual_row,
+                "visual_col": visual_col,
+            }
+    elif clear_remaining:
         mutation = set_cell_single_text(cell, value)
         if mutation is None:
             return {

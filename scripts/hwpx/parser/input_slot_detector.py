@@ -17,7 +17,15 @@ import re
 
 from .cell_kind import grid_of, rows_index, slot_block_reason, table_exclusion
 from .parser_contract import CellInfo, InputSlotCandidate, TableInfo
-from .slot_modes import detect_choice_slots, detect_group_header_slots, detect_same_cell_slots
+from .slot_modes import (
+    EDIT_MODES,
+    detect_choice_slots,
+    detect_group_header_slots,
+    detect_inline_slots,
+    detect_placeholder_slots,
+    detect_same_cell_slots,
+    slot_key,
+)
 
 _AUTO_EDIT_THRESHOLD = 0.90
 _REVIEW_REQUIRED_THRESHOLD = 0.70
@@ -709,15 +717,18 @@ def detect_input_slots(
             candidate_slots.extend(detect_metadata_form_slots(table))
             candidate_slots.extend(detect_data_table_append_slots(table))
             candidate_slots.extend(detect_status_cells(table))
+        # 글자 일부만 고치는 칸은 다른 탐지기가 잡은 칸이 없을 때만 — 칸 전체를 덮는 슬롯과 한 칸에 겹치지 않게 맨 뒤에 둔다
+        candidate_slots.extend(detect_inline_slots(table))
+        candidate_slots.extend(detect_placeholder_slots(table))
 
         row_index = rows_index(table)
         for slot in candidate_slots:
-            key = (slot.tableId, slot.row, slot.col)
-            if key in seen:
+            key = slot_key(slot)
+            if key in seen or (slot.writeMode in EDIT_MODES and key[:3] in seen):
                 continue
-            seen.add(key)
             if slot_block_reason(table, slot, row_index):
-                continue  # 서명·안내문·관청기재·쪽 표시 칸 — 칸 단위 차단
+                continue  # 서명·안내문·관청기재·쪽 표시 칸 — 칸 단위 차단(막힌 슬롯은 같은 자리의 다른 탐지기를 가리지 않는다)
+            seen.add(key)
             if slot.tableRole == "unknown" and table_role != "unknown":
                 slot.tableRole = table_role
             score_slot(slot, table)

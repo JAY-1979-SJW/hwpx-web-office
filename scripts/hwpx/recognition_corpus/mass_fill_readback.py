@@ -64,7 +64,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
     from hwpx.parser import parse_hwpx_v2
     from hwpx.parser.slot_modes import choice_options
     from hwpx.pipeline.form_recognizer import recognize_form
-    from hwpx.pipeline.plan_builder import _build_slot_item
+    from hwpx.pipeline.plan_builder import _build_slot_item, edit_base, merge_edit_item
     from hwpx.pipeline.recognition_pipeline import run_pipeline
 
     src = Path(path_str)
@@ -97,7 +97,7 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
         row_cells.setdefault((tid, r), []).append(c)
 
     # ── 가짜값 입력(기존 plan_builder 가 만드는 항목 그대로) ──────────────
-    items, targets, sign_targets = [], [], 0
+    items, targets, sign_targets, bases = [], [], 0, {}
     for i, s in enumerate(slots):
         mode = getattr(s, "writeMode", "set")
         options = choice_options(getattr(s, "cellText", "")) if mode == "choice" else []
@@ -106,9 +106,18 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
         if item is None or dest != "visual":
             res["failures"].append("PLAN_NO_ITEM")
             continue
-        items.append(item)
-        # (위치, 칸에 들어가야 할 최종 글자, 원래 글자를 덮어써도 되는 방식인지)
-        targets.append(((s.tableId, s.visualRow, s.visualCol), item["value"], mode == "set"))
+        if item.get("text_edits"):
+            # 한 칸에 편집이 여러 개면 계획 단계가 하나로 합친다 — 합친 항목의 최종 글자가 기대값
+            if not merge_edit_item(items, bases, item, edit_base(s)):
+                res["failures"].append("PLAN_EDIT_CONFLICT")
+                continue
+            if any(t[0] == (s.tableId, s.visualRow, s.visualCol) for t in targets):
+                sign_targets += 1 if _is_sign_target(s, cell_by_pos, row_cells) else 0
+                continue
+        else:
+            items.append(item)
+        # (위치, 최종 글자를 담은 항목, 원래 글자를 덮어써도 되는 방식인지)
+        targets.append(((s.tableId, s.visualRow, s.visualCol), item, mode == "set"))
         if _is_sign_target(s, cell_by_pos, row_cells):
             sign_targets += 1
     res["planned"] = len(items)
@@ -123,7 +132,8 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
                 res["failures"].append("EDIT_FAIL")
             after = parse_hwpx_v2(out)
             after_pos = {(t.tableId, c.visualRow, c.visualCol): c for t in after.tables for c in t.cells}
-            for pos, val, replaces in targets:
+            for pos, titem, replaces in targets:
+                val = titem["value"]
                 written = after_pos.get(pos)
                 if written is None:
                     mismatch += 1

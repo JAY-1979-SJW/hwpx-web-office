@@ -255,6 +255,8 @@ def test_input_slot_confidence_range(fx_metadata):
             "group_header",
             "choice",
             "same_cell",
+            "inline",
+            "placeholder",
         )
 
 
