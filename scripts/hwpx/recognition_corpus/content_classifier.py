@@ -5,11 +5,13 @@
 production 로직(fill_review_contract / live pipeline)은 이 모듈을 import하지 않는다.
 AI API / OCR / writer 호출 없음. 운영 corpus DB write는 기본 비활성화.
 """
+
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 CLASSIFIER_VERSION = "content_classifier_v1"
 ENGINE_VERSION = "rule-deterministic-v1"
@@ -17,35 +19,58 @@ SCHEMA_VERSION = "content_classification_result_v1"
 
 # document_classifications.document_type CHECK 제약 (대분류 6종)
 ALLOWED_DOCUMENT_TYPES: tuple[str, ...] = (
-    "fillable_form", "reference_table", "empty_template",
-    "unknown", "broken", "non_hwpx",
+    "fillable_form",
+    "reference_table",
+    "empty_template",
+    "unknown",
+    "broken",
+    "non_hwpx",
 )
 # evidence_json.subType 에 들어가는 세부 유형
 ALLOWED_SUB_TYPES: tuple[str, ...] = (
-    "application_form", "inspection_form", "checklist_form",
-    "plan_form", "certification_form", "contract_form",
-    "generic_fillable", "generic_reference",
-    "gantt_template", "blank_template", "none",
+    "application_form",
+    "inspection_form",
+    "checklist_form",
+    "plan_form",
+    "certification_form",
+    "contract_form",
+    "generic_fillable",
+    "generic_reference",
+    "gantt_template",
+    "blank_template",
+    "none",
 )
 
 # rule keyword sets
 APPLICATION_LABELS = frozenset({
-    "신청인", "신청서", "신청", "접수번호", "접수일자", "접수일",
-    "대표자", "주소", "전화번호", "상호", "성명", "생년월일",
-    "등록번호", "신고인", "신고", "사업자등록번호",
+    "신청인",
+    "신청서",
+    "신청",
+    "접수번호",
+    "접수일자",
+    "접수일",
+    "대표자",
+    "주소",
+    "전화번호",
+    "상호",
+    "성명",
+    "생년월일",
+    "등록번호",
+    "신고인",
+    "신고",
+    "사업자등록번호",
 })
 INSPECTION_KEYWORDS = ("점검", "검사", "확인", "적합", "부적합", "양호", "불량")
 CHECKLIST_KEYWORDS = ("체크리스트", "checklist", "여부", "확인사항")
 PLAN_KEYWORDS = ("계획서", "관리계획", "품질관리계획", "시공계획", "안전관리계획")
-CONTRACT_KEYWORDS = ("계약", "계약금액", "공사명", "착공", "준공",
-                          "발주자", "시공자", "수급인")
+CONTRACT_KEYWORDS = ("계약", "계약금액", "공사명", "착공", "준공", "발주자", "시공자", "수급인")
 CERTIFICATION_KEYWORDS = ("인증서", "확인증", "증명서", "수료증", "자격증")
-REFERENCE_KEYWORDS = ("기준", "요령", "단위량", "보유기준", "작성기준",
-                          "산출기준", "별표")
+REFERENCE_KEYWORDS = ("기준", "요령", "단위량", "보유기준", "작성기준", "산출기준", "별표")
 QUESTION_REGEX = re.compile(r"(인가\?|입니까\?|합니까\?|있습니까\?|여부\b)")
 
 
 # ── filename heuristic ───────────────────────────────────────────────────
+
 
 def classify_by_filename(rel_path: str) -> str:
     p = rel_path.replace("\\", "/")
@@ -61,6 +86,7 @@ def classify_by_filename(rel_path: str) -> str:
 
 
 # ── feature extraction ──────────────────────────────────────────────────
+
 
 def _iter_cells(parser_result) -> Iterable[Any]:
     for t in getattr(parser_result, "tables", []) or []:
@@ -86,7 +112,7 @@ def extract_content_features(parser_result, rel_path: str = "") -> dict:
     by_pos: dict[tuple, Any] = {}
     for c in cells:
         tid = getattr(c, "tableId", None) or ""
-        by_pos[(tid, getattr(c, "row", -1), getattr(c, "col", -1))] = c
+        by_pos[tid, getattr(c, "row", -1), getattr(c, "col", -1)] = c
 
     label_texts: list[str] = []
     right_empty = 0
@@ -96,10 +122,8 @@ def extract_content_features(parser_result, rel_path: str = "") -> dict:
         if not txt or len(txt) > 25:
             continue
         tid = getattr(c, "tableId", None) or ""
-        right = by_pos.get((tid, getattr(c, "row", -1),
-                                getattr(c, "col", -1) + 1))
-        right_txt = (getattr(right, "normalizedText", "")
-                       if right is not None else None)
+        right = by_pos.get((tid, getattr(c, "row", -1), getattr(c, "col", -1) + 1))
+        right_txt = getattr(right, "normalizedText", "") if right is not None else None
         if right is not None and (right_txt or "").strip() == "":
             right_empty += 1
             label_texts.append(txt)
@@ -107,20 +131,15 @@ def extract_content_features(parser_result, rel_path: str = "") -> dict:
             label_value_pairs += 1
 
     para_texts = [
-        (getattr(p, "normalizedText", "") or getattr(p, "text", "") or "")
-        for p in paragraphs
+        (getattr(p, "normalizedText", "") or getattr(p, "text", "") or "") for p in paragraphs
     ]
     para_joined = " ".join(para_texts)
     question_count = len(QUESTION_REGEX.findall(para_joined))
-    empty_para_ratio = (
-        sum(1 for t in para_texts if not t.strip()) / max(len(para_texts), 1)
-    )
+    empty_para_ratio = sum(1 for t in para_texts if not t.strip()) / max(len(para_texts), 1)
 
     application_hits = sum(1 for l in label_texts if l in APPLICATION_LABELS)
-    inspection_hits = sum(1 for kw in INSPECTION_KEYWORDS
-                              if kw in para_joined)
-    checklist_hits = sum(1 for kw in CHECKLIST_KEYWORDS
-                              if kw in para_joined)
+    inspection_hits = sum(1 for kw in INSPECTION_KEYWORDS if kw in para_joined)
+    checklist_hits = sum(1 for kw in CHECKLIST_KEYWORDS if kw in para_joined)
     plan_hits = sum(1 for kw in PLAN_KEYWORDS if kw in para_joined)
     contract_hits = sum(1 for kw in CONTRACT_KEYWORDS if kw in para_joined)
     cert_hits = sum(1 for kw in CERTIFICATION_KEYWORDS if kw in para_joined)
@@ -156,9 +175,9 @@ def extract_content_features(parser_result, rel_path: str = "") -> dict:
 
 # ── classification ──────────────────────────────────────────────────────
 
+
 def _score_types(f: dict) -> dict[str, float]:
     """대분류 score 산출 (0~1+ 범위, 정규화 전)."""
-    cell_count = max(f["cellCount"], 1)
     fillable = (
         0.6 * min(f["rightNeighborEmptyCount"] / 8, 1.0)
         + 0.3 * min(f["labelValuePairCandidateCount"] / 10, 1.0)
@@ -166,8 +185,7 @@ def _score_types(f: dict) -> dict[str, float]:
     )
     reference = (
         0.5 * min(f["referenceKeywordHits"] / 3, 1.0)
-        + 0.3 * (1.0 if f["blankNeighborRatio"] < 0.05
-                       and f["labelOccurrenceCount"] >= 3 else 0.0)
+        + 0.3 * (1.0 if f["blankNeighborRatio"] < 0.05 and f["labelOccurrenceCount"] >= 3 else 0.0)
         + 0.2 * min(f["cellCount"] / 200, 1.0)
     )
     if f["labelOccurrenceCount"] < 3 and f["referenceKeywordHits"] == 0:
@@ -196,8 +214,7 @@ def _classify_subtype(f: dict, main_type: str) -> str:
         return "generic_reference"
     if main_type == "fillable_form":
         scores = {
-            "checklist_form": (f["checklistKeywordHits"] * 2
-                                  + f["questionSentenceCount"]),
+            "checklist_form": (f["checklistKeywordHits"] * 2 + f["questionSentenceCount"]),
             "inspection_form": f["inspectionKeywordHits"],
             "plan_form": f["planKeywordHits"] * 2,
             "contract_form": f["contractKeywordHits"] * 2,
@@ -211,18 +228,13 @@ def _classify_subtype(f: dict, main_type: str) -> str:
     return "none"
 
 
-def classify_document_content(features: dict,
-                                  filename_type: str | None = None,
-                                  document_id: str = "") -> dict:
-    """feature dict → ContentClassificationResult."""
-    if filename_type is None:
-        filename_type = classify_by_filename(features.get("filenamePath", ""))
-
-    scores = _score_types(features)
-    ranked = sorted(scores.items(), key=lambda x: -x[1])
-    top, top_score = ranked[0]
-    second_score = ranked[1][1] if len(ranked) > 1 else 0.0
-
+def _classify_type_and_warnings(
+    top: str,
+    top_score: float,
+    second_score: float,
+    features: dict,
+    filename_type: str | None,
+) -> tuple[str, float, list[str], bool, bool]:
     warnings: list[str] = []
 
     if top_score < 0.15:
@@ -254,6 +266,44 @@ def classify_document_content(features: dict,
         warnings.append("FILENAME_CONTENT_DISAGREEMENT")
         warnings.append("NEEDS_HUMAN_REVIEW")
 
+    return content_type, confidence, warnings, ambiguous, disagreement
+
+
+def _compute_evidence_signals(
+    features: dict, content_type: str
+) -> tuple[list[str], list[str], list[str]]:
+    positive_signals: list[str] = []
+    negative_signals: list[str] = []
+    matched_rules: list[str] = []
+    if content_type == "fillable_form":
+        matched_rules.append("rule:right_neighbor_empty>=threshold")
+        if features["applicationLabelHits"] > 0:
+            positive_signals.append(f"applicationLabelHits={features['applicationLabelHits']}")
+    if content_type == "reference_table":
+        matched_rules.append("rule:reference_keywords_dominant")
+    if content_type == "empty_template":
+        matched_rules.append("rule:sparse_cells_and_paragraphs")
+    if features["blankNeighborRatio"] < 0.02 and content_type == "fillable_form":
+        negative_signals.append("low_blank_neighbor_ratio")
+    return matched_rules, positive_signals, negative_signals
+
+
+def classify_document_content(
+    features: dict, filename_type: str | None = None, document_id: str = ""
+) -> dict:
+    """feature dict → ContentClassificationResult."""
+    if filename_type is None:
+        filename_type = classify_by_filename(features.get("filenamePath", ""))
+
+    scores = _score_types(features)
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    top, top_score = ranked[0]
+    second_score = ranked[1][1] if len(ranked) > 1 else 0.0
+
+    content_type, confidence, warnings, ambiguous, disagreement = _classify_type_and_warnings(
+        top, top_score, second_score, features, filename_type
+    )
+
     sub_type = _classify_subtype(features, content_type)
 
     feature_summary = {
@@ -268,20 +318,9 @@ def classify_document_content(features: dict,
         "unknownLabelCount": features["unknownLabelCount"],
     }
 
-    positive_signals: list[str] = []
-    negative_signals: list[str] = []
-    matched_rules: list[str] = []
-    if content_type == "fillable_form":
-        matched_rules.append("rule:right_neighbor_empty>=threshold")
-        if features["applicationLabelHits"] > 0:
-            positive_signals.append(
-                f"applicationLabelHits={features['applicationLabelHits']}")
-    if content_type == "reference_table":
-        matched_rules.append("rule:reference_keywords_dominant")
-    if content_type == "empty_template":
-        matched_rules.append("rule:sparse_cells_and_paragraphs")
-    if features["blankNeighborRatio"] < 0.02 and content_type == "fillable_form":
-        negative_signals.append("low_blank_neighbor_ratio")
+    matched_rules, positive_signals, negative_signals = _compute_evidence_signals(
+        features, content_type
+    )
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -310,22 +349,18 @@ def classify_document_content(features: dict,
 
 # ── helpers ─────────────────────────────────────────────────────────────
 
-def compare_filename_and_content_classification(
-        filename_type: str, content_type: str) -> bool:
+
+def compare_filename_and_content_classification(filename_type: str, content_type: str) -> bool:
     """disagreement 판단. filename이 unknown이면 disagreement False."""
     if filename_type == "unknown":
         return False
     return filename_type != content_type
 
 
-def build_document_classification_record(result: dict,
-                                              classified_at: str) -> dict:
+def build_document_classification_record(result: dict, classified_at: str) -> dict:
     """document_classifications INSERT용 dict."""
     if result["contentType"] not in ALLOWED_DOCUMENT_TYPES:
-        raise ValueError(
-            f"contentType {result['contentType']!r} not in "
-            f"ALLOWED_DOCUMENT_TYPES"
-        )
+        raise ValueError(f"contentType {result['contentType']!r} not in ALLOWED_DOCUMENT_TYPES")
     evidence = {
         "subType": result["subType"],
         "scores": result["scores"],

@@ -22,38 +22,38 @@ OUTPUT_DIR = Path("frontend/web_office_viewer/forms")
 # 게이트(감사 인프라)를 고치는 대신 산출 파일명을 ASCII로 고정한다.
 # 문서명(한글)은 HTML <title>/<h1> 안에 그대로 표시된다.
 ASCII_SLUG_OVERRIDE = {
-    '공사 감리자 지정 신청서': 'supervisor-designation-application',
-    '소방시설공사 완공검사신청서': 'fire-facility-completion-inspection-application',
-    '특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서': 'outdoor-tank-safety-inspection-extension-application',
+    "공사 감리자 지정 신청서": "supervisor-designation-application",
+    "소방시설공사 완공검사신청서": "fire-facility-completion-inspection-application",
+    "특정ㆍ준특정옥외탱크저장소 구조안전점검시기 연장신청서": "outdoor-tank-safety-inspection-extension-application",
 }
 
 ROLE_ICON = {
-    'agency': '🏛️',
-    'signature': '✍️',
-    'user': '✏️',
+    "agency": "🏛️",
+    "signature": "✍️",
+    "user": "✏️",
 }
 
 
 def slugify_filename(name: str) -> str:
     """문서명을 안전한 파일명으로 변환"""
-    name = name.replace('ㆍ', '_').replace('·', '_')
-    name = re.sub(r'[\\/:*?"<>|]', '', name)
-    name = re.sub(r'\s+', '_', name.strip())
+    name = name.replace("ㆍ", "_").replace("·", "_")
+    name = re.sub(r'[\\/:*?"<>|]', "", name)
+    name = re.sub(r"\s+", "_", name.strip())
     return name
 
 
 def render_field_html(field):
-    cell = field['cell']
-    name = field['field_name']
-    ftype = 'date' if field['type'] == 'date' else 'text'
-    icon = ROLE_ICON.get(field['role'], '✏️')
-    guidance = field.get('ai_guidance') or field['guidance']
-    fillable = field.get('ai_fillable', True)
-    readonly = 'readonly' if (field['role'] == 'agency' or not fillable) else ''
+    cell = field["cell"]
+    name = field["field_name"]
+    ftype = "date" if field["type"] == "date" else "text"
+    icon = ROLE_ICON.get(field["role"], "✏️")
+    guidance = field.get("ai_guidance") or field["guidance"]
+    fillable = field.get("ai_fillable", True)
+    readonly = "readonly" if (field["role"] == "agency" or not fillable) else ""
 
     if not fillable:
         # 입력 불필요 항목(정형 문구/구획 제목/단위기호 등) - 안내문으로만 표시, 입력창 없음
-        return f'''
+        return f"""
                     <div class="form-field info-only">
                         <label class="field-label">
                             {name}
@@ -63,15 +63,16 @@ def render_field_html(field):
                         <div class="guidance-box">
                             <div class="guidance-text">ℹ️ {guidance}</div>
                         </div>
-                    </div>'''
+                    </div>"""
 
+    input_id = f"field-{cell}"
     return f'''
                     <div class="form-field">
-                        <label class="field-label">
+                        <label class="field-label" for="{input_id}">
                             {name}
                             <span class="cell-ref">[{cell}]</span>
                         </label>
-                        <input type="{ftype}" class="field-input" data-cell="{cell}" {readonly}>
+                        <input id="{input_id}" type="{ftype}" class="field-input" data-cell="{cell}" {readonly}>
                         <div class="guidance-box">
                             <div class="guidance-text">{icon} {guidance}</div>
                         </div>
@@ -79,17 +80,17 @@ def render_field_html(field):
 
 
 def render_form_html(form_id, form_spec, storage_key):
-    title = form_spec['form_name']
-    icon = form_spec['icon']
-    if form_spec['fields']:
-        fields_html = ''.join(render_field_html(f) for f in form_spec['fields'])
+    title = form_spec["form_name"]
+    icon = form_spec["icon"]
+    if form_spec["fields"]:
+        fields_html = "".join(render_field_html(f) for f in form_spec["fields"])
     else:
-        fields_html = '''
+        fields_html = """
                     <div class="form-field" style="grid-column: 1 / -1;">
                         <div class="guidance-box">⚠️ 자동 판별 결과 입력 필드를 찾지 못했습니다 (서명/도장 전용이거나 별지 서식일 수 있습니다).</div>
-                    </div>'''
+                    </div>"""
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -134,7 +135,7 @@ def render_form_html(form_id, form_spec, storage_key):
     <div class="container">
         <header>
             <h1>{icon} {title}</h1>
-            <p>기준서 기반 자동 생성 웹 입력 ({len(form_spec['fields'])}개 필드) · 필수 강제 없음</p>
+            <p>기준서 기반 자동 생성 웹 입력 ({len(form_spec["fields"])}개 필드) · 필수 강제 없음</p>
         </header>
         <form id="formMain" class="form-container">
 {fields_html}
@@ -174,23 +175,26 @@ def render_form_html(form_id, form_spec, storage_key):
     </script>
 </body>
 </html>
-'''
+"""
 
 
 def render_index_html(entries):
-    cards = ''.join(f'''
-            <a href="{e['file']}" class="form-card">
+    cards = "".join(
+        f'''
+            <a href="{e["file"]}" class="form-card">
                 <div class="form-card-header">
-                    <div class="form-card-icon">{e['icon']}</div>
-                    <div class="form-card-title">{e['name']}</div>
+                    <div class="form-card-icon">{e["icon"]}</div>
+                    <div class="form-card-title">{e["name"]}</div>
                 </div>
                 <div class="form-card-body">
-                    <div class="form-fields">입력 필드 {e['count']}개</div>
-                    <button class="form-card-button">📝 입력하기</button>
+                    <div class="form-fields">입력 필드 {e["count"]}개</div>
+                    <span class="form-card-button">📝 입력하기</span>
                 </div>
-            </a>''' for e in entries)
+            </a>'''
+        for e in entries
+    )
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -214,7 +218,7 @@ def render_index_html(entries):
         .form-card-title {{ font-size: 1.05em; font-weight: 700; }}
         .form-card-body {{ padding: 20px; text-align: center; }}
         .form-fields {{ color: #666; font-size: 0.9em; margin-bottom: 15px; }}
-        .form-card-button {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+        .form-card-button {{ display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
             border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; }}
     </style>
 </head>
@@ -229,33 +233,35 @@ def render_index_html(entries):
     </div>
 </body>
 </html>
-'''
+"""
 
 
 def main():
-    spec = json.loads(SPEC_FILE.read_text(encoding='utf-8'))
+    spec = json.loads(SPEC_FILE.read_text(encoding="utf-8"))
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     entries = []
     for form_id, form_spec in spec.items():
-        slug = ASCII_SLUG_OVERRIDE.get(form_spec['form_name']) or slugify_filename(form_spec['form_name'])
-        filename = slug + '.html'
+        slug = ASCII_SLUG_OVERRIDE.get(form_spec["form_name"]) or slugify_filename(
+            form_spec["form_name"]
+        )
+        filename = slug + ".html"
         storage_key = f"form_{slug}_data"
 
         html = render_form_html(form_id, form_spec, storage_key)
-        (OUTPUT_DIR / filename).write_text(html, encoding='utf-8')
+        (OUTPUT_DIR / filename).write_text(html, encoding="utf-8")
 
         entries.append({
-            'file': filename,
-            'name': form_spec['form_name'],
-            'icon': form_spec['icon'],
-            'count': form_spec['total_fields'],
+            "file": filename,
+            "name": form_spec["form_name"],
+            "icon": form_spec["icon"],
+            "count": form_spec["total_fields"],
         })
         print(f"✅ 생성: forms/{filename} ({form_spec['total_fields']}개 필드)")
 
-    (OUTPUT_DIR / 'index.html').write_text(render_index_html(entries), encoding='utf-8')
-    print(f"✅ 생성: forms/index.html")
+    (OUTPUT_DIR / "index.html").write_text(render_index_html(entries), encoding="utf-8")
+    print("✅ 생성: forms/index.html")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -10,25 +10,28 @@ HWPX-CORPUS-PROFILER-LOCAL-INVENTORY-01
 - 실패 파일이 있어도 전체 스캔은 중단되지 않음
 - 절대경로는 pathHash로 익명화, relativePath는 root 기준 상대값만 노출
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import hashlib
 import json
-import os
 import re
 import sys
 import traceback
 import unicodedata
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -39,12 +42,28 @@ NS_OCF = "urn:oasis:names:tc:opendocument:xmlns:container"
 
 SCHEDULE_FILENAME_KEYWORDS = ("공정표", "예정공정", "일정표", "공정관리", "schedule", "gantt")
 SCHEDULE_HEADER_KEYWORDS = (
-    "공종", "작업명", "공사명", "시작일", "착수일", "종료일", "완료일", "준공일",
-    "기간", "공기", "진행률", "진도율", "예정", "실적", "task", "start", "end", "duration",
+    "공종",
+    "작업명",
+    "공사명",
+    "시작일",
+    "착수일",
+    "종료일",
+    "완료일",
+    "준공일",
+    "기간",
+    "공기",
+    "진행률",
+    "진도율",
+    "예정",
+    "실적",
+    "task",
+    "start",
+    "end",
+    "duration",
 )
 DATE_HEADER_PATTERNS = [
     re.compile(r"^\d{4}[-./]\d{1,2}[-./]\d{1,2}"),
-    re.compile(r"^\d{4}[-./]\d{1,2}$"),   # 연-월 형식 (2026-01)
+    re.compile(r"^\d{4}[-./]\d{1,2}$"),  # 연-월 형식 (2026-01)
     re.compile(r"^\d{1,2}[-./]\d{1,2}"),
     re.compile(r"^\d{1,2}월"),
     re.compile(r"^\d{1,2}주차?"),
@@ -58,43 +77,74 @@ NUMERIC_HEADER_PATTERNS = [
 
 # 헤더 사전 추정용 필드 매핑 (정규화된 헤더 텍스트 일부 매칭 기준)
 FIELD_HINTS: list[tuple[str, tuple[str, ...]]] = [
-    ("projectName",   ("공사명", "사업명", "프로젝트명")),
-    ("siteName",      ("현장명", "현장",)),
-    ("contractorName",("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
-    ("reportDate",    ("작성일", "보고일", "제출일")),
+    ("projectName", ("공사명", "사업명", "프로젝트명")),
+    (
+        "siteName",
+        (
+            "현장명",
+            "현장",
+        ),
+    ),
+    ("contractorName", ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
+    ("reportDate", ("작성일", "보고일", "제출일")),
     ("receiptNumber", ("접수번호", "접수번", "문서번호", "접수")),
-    ("number",        ("번호",)),
-    ("trade",         ("공종", "공정", "trade")),
-    ("taskName",      ("작업명", "task", "내용", "항목")),
-    ("startDate",     ("시작일", "착수일", "착공일", "start")),
-    ("endDate",       ("종료일", "완료일", "준공일", "end")),
-    ("durationDays",  ("기간", "공기", "duration")),
-    ("responsiblePerson",("담당자", "책임자", "성명", "지정자")),
-    ("progressRate",  ("진행률", "진도율", "달성률", "progress")),
-    ("materialStatus",("자재", "재료", "material")),
-    ("inspectionStatus",("검측", "검사", "inspection")),
-    ("remarks",       ("비고", "참고", "remark", "note")),
-    ("quantity",      ("수량", "량")),
-    ("unit",          ("단위", "unit")),
-    ("spec",          ("규격", "사양", "spec")),
-    ("amount",        ("금액", "단가", "amount", "price")),
-    ("gasName",       ("가스명", "가스종류", "gas")),
-    ("pressure",      ("압력", "설계압력", "최고허용압력")),
-    ("material",      ("재질", "배관재질")),
-    ("nominalDiameter",("호칭지름", "호칭경", "관경")),
-    ("length",        ("연장", "길이", "length")),
-    ("location",      ("위치", "장소", "구간")),
+    ("number", ("번호",)),
+    ("trade", ("공종", "공정", "trade")),
+    ("taskName", ("작업명", "task", "내용", "항목")),
+    ("startDate", ("시작일", "착수일", "착공일", "start")),
+    ("endDate", ("종료일", "완료일", "준공일", "end")),
+    ("durationDays", ("기간", "공기", "duration")),
+    ("responsiblePerson", ("담당자", "책임자", "성명", "지정자")),
+    ("progressRate", ("진행률", "진도율", "달성률", "progress")),
+    ("materialStatus", ("자재", "재료", "material")),
+    ("inspectionStatus", ("검측", "검사", "inspection")),
+    ("remarks", ("비고", "참고", "remark", "note")),
+    ("quantity", ("수량", "량")),
+    ("unit", ("단위", "unit")),
+    ("spec", ("규격", "사양", "spec")),
+    ("amount", ("금액", "단가", "amount", "price")),
+    ("gasName", ("가스명", "가스종류", "gas")),
+    ("pressure", ("압력", "설계압력", "최고허용압력")),
+    ("material", ("재질", "배관재질")),
+    ("nominalDiameter", ("호칭지름", "호칭경", "관경")),
+    ("length", ("연장", "길이", "length")),
+    ("location", ("위치", "장소", "구간")),
 ]
 
 # 양식 표 식별용 라벨 키워드 (form_table / metadata_table)
 FORM_LABEL_KEYWORDS = (
-    "공사명", "현장명", "사업명", "시공사", "감리자",
-    "접수번호", "접수일", "발신", "수신", "문서번호", "보고일",
-    "작성자", "작성일", "승인자", "검토자", "제출일", "수신처",
+    "공사명",
+    "현장명",
+    "사업명",
+    "시공사",
+    "감리자",
+    "접수번호",
+    "접수일",
+    "발신",
+    "수신",
+    "문서번호",
+    "보고일",
+    "작성자",
+    "작성일",
+    "승인자",
+    "검토자",
+    "제출일",
+    "수신처",
 )
 METADATA_LABEL_KEYWORDS = (
-    "공사명", "현장명", "사업명", "접수번호", "작성일", "신청인",
-    "시공사", "발주처", "주소", "전화번호", "위치", "착공일", "준공일",
+    "공사명",
+    "현장명",
+    "사업명",
+    "접수번호",
+    "작성일",
+    "신청인",
+    "시공사",
+    "발주처",
+    "주소",
+    "전화번호",
+    "위치",
+    "착공일",
+    "준공일",
 )
 STAMP_KEYWORDS = ("직인", "서명", "날인", "결재", "승인", "인장", "검토", "확인인")
 PAGE_MARKER_RE = re.compile(
@@ -129,6 +179,7 @@ class CorpusContext:
 
 # ── ID/path helpers ────────────────────────────────────────────────────────────
 
+
 def make_file_id(path_hash: str, index: int) -> str:
     return f"f{index:05d}_{path_hash[:10]}"
 
@@ -146,6 +197,7 @@ def rel_path(path: Path, root: Path) -> str:
 
 
 # ── inventory / discovery ─────────────────────────────────────────────────────
+
 
 def discover_hwpx(root: Path, include_hidden: bool, max_files: int) -> list[Path]:
     if not root.exists():
@@ -168,46 +220,36 @@ def discover_hwpx(root: Path, include_hidden: bool, max_files: int) -> list[Path
 
 # ── package structure inspection ───────────────────────────────────────────────
 
-def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
-    names = zf.namelist()
-    has_mimetype = "mimetype" in names
-    mt_value = ""
-    mt_compress = -1
-    if has_mimetype:
-        try:
-            mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
-            mt_compress = zf.getinfo("mimetype").compress_type
-        except Exception:
-            pass
-    has_content_hpf = "Contents/content.hpf" in names
-    has_container = "META-INF/container.xml" in names
-    has_header = "Contents/header.xml" in names
-    section_files = [n for n in names if re.match(r"Contents/section\d+\.xml$", n)]
 
-    manifest_count = 0
-    spine_count = 0
-    char_pr_count = 0
-    para_pr_count = 0
-    border_fill_count = 0
-    xml_decode_ok = True
+def _inspect_package_xml_health(
+    zf: zipfile.ZipFile, names: list[str], has_content_hpf: bool, has_header: bool
+) -> tuple[dict[str, int], list[str], bool]:
+    counts = {
+        "manifest_count": 0,
+        "spine_count": 0,
+        "char_pr_count": 0,
+        "para_pr_count": 0,
+        "border_fill_count": 0,
+    }
     warnings: list[str] = []
+    xml_decode_ok = True
 
     if has_content_hpf:
         try:
-            opf = ET.fromstring(zf.read("Contents/content.hpf"))
-            manifest_count = len(opf.findall(f".//{{{NS_OPF}}}item"))
-            spine_count = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
-        except Exception as exc:
+            opf = _dx_fromstring(zf.read("Contents/content.hpf"))
+            counts["manifest_count"] = len(opf.findall(f".//{{{NS_OPF}}}item"))
+            counts["spine_count"] = len(opf.findall(f".//{{{NS_OPF}}}itemref"))
+        except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
             warnings.append(f"content.hpf parse failed: {exc}")
             xml_decode_ok = False
 
     if has_header:
         try:
-            header = ET.fromstring(zf.read("Contents/header.xml"))
-            char_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
-            para_pr_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
-            border_fill_count = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
-        except Exception as exc:
+            header = _dx_fromstring(zf.read("Contents/header.xml"))
+            counts["char_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}charPr"))
+            counts["para_pr_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}paraPr"))
+            counts["border_fill_count"] = sum(1 for _ in header.iter(f"{{{NS_HH}}}borderFill"))
+        except Exception as exc:  # ruff: ignore[blind-except] — 원인 무관하게 warning 기록 후 계속
             warnings.append(f"header.xml parse failed: {exc}")
             xml_decode_ok = False
 
@@ -218,6 +260,34 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
             except UnicodeDecodeError:
                 warnings.append(f"non-utf8 entry: {n}")
                 xml_decode_ok = False
+
+    return counts, warnings, xml_decode_ok
+
+
+def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
+    names = zf.namelist()
+    has_mimetype = "mimetype" in names
+    mt_value = ""
+    mt_compress = -1
+    if has_mimetype:
+        try:
+            mt_value = zf.read("mimetype").decode("ascii", errors="replace").strip()
+            mt_compress = zf.getinfo("mimetype").compress_type
+        except (KeyError, OSError):
+            pass
+    has_content_hpf = "Contents/content.hpf" in names
+    has_container = "META-INF/container.xml" in names
+    has_header = "Contents/header.xml" in names
+    section_files = [n for n in names if re.match(r"Contents/section\d+\.xml$", n)]
+
+    counts, warnings, xml_decode_ok = _inspect_package_xml_health(
+        zf, names, has_content_hpf, has_header
+    )
+    manifest_count = counts["manifest_count"]
+    spine_count = counts["spine_count"]
+    char_pr_count = counts["char_pr_count"]
+    para_pr_count = counts["para_pr_count"]
+    border_fill_count = counts["border_fill_count"]
 
     if has_mimetype and mt_compress != 0:
         warnings.append(f"mimetype not ZIP_STORED (compress_type={mt_compress})")
@@ -245,6 +315,7 @@ def inspect_package(zf: zipfile.ZipFile) -> dict[str, Any]:
 
 
 # ── parse / tables / scheduling ───────────────────────────────────────────────
+
 
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
@@ -295,7 +366,7 @@ def is_numeric_like(text: str) -> bool:
 
 def parse_section_xml(raw: bytes) -> ET.Element | None:
     try:
-        return ET.fromstring(raw)
+        return _dx_fromstring(raw)
     except ET.ParseError:
         return None
 
@@ -388,13 +459,44 @@ def _compute_table_scores(
     total_cells = sum(len(r) for r in grid)
     if total_cells == 0:
         return {
-            "text_cell_ratio": 0.0, "merge_ratio": 0.0, "page_marker_score": 0.0,
-            "stamp_score": 0.0, "label_value_pair_score": 0.0, "metadata_score": 0.0,
-            "legal_form_score": 0.0, "approval_stamp_score": 0.0,
-            "nested_table_count": 0, "max_col_span": 1, "max_row_span": 1,
-            "row_count": row_count, "col_count": col_count, "total_cells": 0,
+            "text_cell_ratio": 0.0,
+            "merge_ratio": 0.0,
+            "page_marker_score": 0.0,
+            "stamp_score": 0.0,
+            "label_value_pair_score": 0.0,
+            "metadata_score": 0.0,
+            "legal_form_score": 0.0,
+            "approval_stamp_score": 0.0,
+            "nested_table_count": 0,
+            "max_col_span": 1,
+            "max_row_span": 1,
+            "row_count": row_count,
+            "col_count": col_count,
+            "total_cells": 0,
         }
 
+    scan = _scan_table_cells(grid)
+    lvp_score = _label_value_pair_score(grid, col_count, row_count)
+
+    return {
+        "text_cell_ratio": scan["text_cells"] / total_cells,
+        "merge_ratio": scan["merged_cells"] / total_cells,
+        "page_marker_score": scan["page_marker_hits"] / total_cells,
+        "stamp_score": scan["stamp_hits"] / total_cells,
+        "label_value_pair_score": lvp_score,
+        "metadata_score": scan["metadata_hits"] / total_cells,
+        "legal_form_score": scan["legal_form_hits"] / total_cells,
+        "approval_stamp_score": scan["stamp_hits"] / total_cells,
+        "nested_table_count": scan["nested_table_count"],
+        "max_col_span": scan["max_col_span"],
+        "max_row_span": scan["max_row_span"],
+        "row_count": row_count,
+        "col_count": col_count,
+        "total_cells": total_cells,
+    }
+
+
+def _scan_table_cells(grid: list[list[ET.Element]]) -> dict[str, int]:
     text_cells = 0
     merged_cells = 0
     nested_table_count = 0
@@ -429,65 +531,43 @@ def _compute_table_scores(
             if raw_t and any(kw in raw_t for kw in LEGAL_FORM_KEYWORDS):
                 legal_form_hits += 1
 
-    # label-value-pair score: 2-col 표에서 왼쪽 셀이 짧은 라벨인 비율
-    lvp_score = 0.0
-    if col_count == 2 and row_count >= 2:
-        label_rows = 0
-        for row in grid:
-            if len(row) >= 1:
-                lt = normalize_header(cell_text(row[0]))
-                if lt and len(lt) <= 12:
-                    label_rows += 1
-        lvp_score = label_rows / row_count if row_count else 0.0
-
     return {
-        "text_cell_ratio": text_cells / total_cells,
-        "merge_ratio": merged_cells / total_cells,
-        "page_marker_score": page_marker_hits / total_cells,
-        "stamp_score": stamp_hits / total_cells,
-        "label_value_pair_score": lvp_score,
-        "metadata_score": metadata_hits / total_cells,
-        "legal_form_score": legal_form_hits / total_cells,
-        "approval_stamp_score": stamp_hits / total_cells,
+        "text_cells": text_cells,
+        "merged_cells": merged_cells,
         "nested_table_count": nested_table_count,
         "max_col_span": max_col_span,
         "max_row_span": max_row_span,
-        "row_count": row_count,
-        "col_count": col_count,
-        "total_cells": total_cells,
+        "page_marker_hits": page_marker_hits,
+        "stamp_hits": stamp_hits,
+        "metadata_hits": metadata_hits,
+        "legal_form_hits": legal_form_hits,
     }
 
 
-def classify_table_layout(
-    grid: list[list[ET.Element]],
-    header_texts: list[str],
-    paragraphs_around: list[str],
-) -> tuple[str, float, list[str]]:
-    """layoutGuess + confidence + classificationEvidence."""
-    if not grid:
-        return "unknown", 0.0, ["empty grid"]
+def _label_value_pair_score(grid: list[list[ET.Element]], col_count: int, row_count: int) -> float:
+    """label-value-pair score: 2-col 표에서 왼쪽 셀이 짧은 라벨인 비율."""
+    if not (col_count == 2 and row_count >= 2):
+        return 0.0
+    label_rows = 0
+    for row in grid:
+        if len(row) >= 1:
+            lt = normalize_header(cell_text(row[0]))
+            if lt and len(lt) <= 12:
+                label_rows += 1
+    return label_rows / row_count if row_count else 0.0
 
-    scores = _compute_table_scores(grid)
-    row_count = scores["row_count"]
-    col_count = scores["col_count"]
-    total_cells = scores["total_cells"]
 
-    norm_headers = [normalize_header(t) for t in header_texts]
-    header_text_blob = " ".join(norm_headers)
-    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in header_text_blob)
-    date_header_cols = sum(1 for t in norm_headers if is_date_like(t))
-
+def _classify_marker_stamp_or_noise(
+    scores: dict[str, Any], total_cells: int
+) -> tuple[str, float, list[str]] | None:
     evidence: list[str] = []
-
     # ── 1. page_marker_table ─────────────────────────────────────────────────
     if scores["page_marker_score"] > 0:
         evidence.append(f"page marker pattern in cells (score={scores['page_marker_score']:.2f})")
         return "page_marker_table", min(0.7 + scores["page_marker_score"], 0.95), evidence
 
     # ── 2. stamp_or_approval_table ───────────────────────────────────────────
-    if scores["stamp_score"] >= 0.15 or (
-        scores["stamp_score"] > 0 and total_cells <= 12
-    ):
+    if scores["stamp_score"] >= 0.15 or (scores["stamp_score"] > 0 and total_cells <= 12):
         conf = min(0.6 + scores["stamp_score"] * 2, 0.92)
         evidence.append(f"stamp/approval keywords (score={scores['stamp_score']:.2f})")
         return "stamp_or_approval_table", conf, evidence
@@ -496,7 +576,13 @@ def classify_table_layout(
     if total_cells == 1:
         evidence.append("single-cell table")
         return "layout_noise", 0.7, evidence
+    return None
 
+
+def _classify_schedule_variants(
+    date_header_cols: int, schedule_hits: int, col_count: int, row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 4. gantt_like_table ──────────────────────────────────────────────────
     if date_header_cols >= 3 and col_count >= 5:
         conf = min(0.6 + 0.05 * date_header_cols, 0.95)
@@ -511,7 +597,13 @@ def classify_table_layout(
     if date_header_cols >= 1 and schedule_hits >= 1:
         evidence.append(f"date_cols={date_header_cols}, schedule_hits={schedule_hits}")
         return "horizontal_schedule", 0.65, evidence
+    return None
 
+
+def _classify_metadata_form_or_legal(
+    scores: dict[str, Any], grid: list[list[ET.Element]], row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 6. metadata_table: 문서 기본정보 표 ─────────────────────────────────
     if scores["metadata_score"] >= 0.15:
         evidence.append(f"metadata labels (score={scores['metadata_score']:.2f})")
@@ -536,7 +628,13 @@ def classify_table_layout(
             f"merge_ratio={scores['merge_ratio']:.2f}"
         )
         return "legal_complex_table", 0.60, evidence
+    return None
 
+
+def _classify_structural_layout(
+    scores: dict[str, Any], col_count: int, row_count: int
+) -> tuple[str, float, list[str]] | None:
+    evidence: list[str] = []
     # ── 9. nested_container_table ────────────────────────────────────────────
     if scores["nested_table_count"] >= 1:
         evidence.append(f"nested_tables={scores['nested_table_count']}")
@@ -554,11 +652,45 @@ def classify_table_layout(
     if scores["label_value_pair_score"] >= 0.6 and row_count >= 3:
         evidence.append(f"label-value pair score={scores['label_value_pair_score']:.2f}")
         return "vertical_table", 0.55, evidence
+    return None
 
-    evidence.append(
+
+def classify_table_layout(
+    grid: list[list[ET.Element]],
+    header_texts: list[str],
+    paragraphs_around: list[str],
+) -> tuple[str, float, list[str]]:
+    """layoutGuess + confidence + classificationEvidence."""
+    if not grid:
+        return "unknown", 0.0, ["empty grid"]
+
+    scores = _compute_table_scores(grid)
+    row_count = scores["row_count"]
+    col_count = scores["col_count"]
+    total_cells = scores["total_cells"]
+
+    norm_headers = [normalize_header(t) for t in header_texts]
+    header_text_blob = " ".join(norm_headers)
+    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in header_text_blob)
+    date_header_cols = sum(1 for t in norm_headers if is_date_like(t))
+
+    result = _classify_marker_stamp_or_noise(scores, total_cells)
+    if result is not None:
+        return result
+    result = _classify_schedule_variants(date_header_cols, schedule_hits, col_count, row_count)
+    if result is not None:
+        return result
+    result = _classify_metadata_form_or_legal(scores, grid, row_count)
+    if result is not None:
+        return result
+    result = _classify_structural_layout(scores, col_count, row_count)
+    if result is not None:
+        return result
+
+    evidence = [
         f"no pattern matched: row={row_count} col={col_count} "
         f"merge={scores['merge_ratio']:.2f} text={scores['text_cell_ratio']:.2f}"
-    )
+    ]
     return "unknown", 0.3, evidence
 
 
@@ -574,7 +706,12 @@ def detect_schedule_candidate(
     body_hit = any(kw in body_blob for kw in SCHEDULE_FILENAME_KEYWORDS)
     for t in tables_info:
         layout = t.get("layoutGuess", "unknown")
-        if layout in ("gantt_like_table", "vertical_schedule", "horizontal_schedule", "calendar_like_table"):
+        if layout in (
+            "gantt_like_table",
+            "vertical_schedule",
+            "horizontal_schedule",
+            "calendar_like_table",
+        ):
             cand_type = {
                 "gantt_like_table": "gantt_bar_schedule",
                 "vertical_schedule": "vertical_schedule",
@@ -613,6 +750,7 @@ def detect_schedule_candidate(
 
 # ── per-file processing ────────────────────────────────────────────────────────
 
+
 def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
     ph = path_hash(path)
     file_id = make_file_id(ph, index)
@@ -620,12 +758,16 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
     try:
         stat = path.stat()
         size = stat.st_size
-        mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+        mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
     except OSError as exc:
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "FILE_DISCOVERY",
-            "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-            "tracebackShort": "", "recoverable": False, "suggestedFix": "check file access",
+            "fileId": file_id,
+            "stage": "FILE_DISCOVERY",
+            "errorType": exc.__class__.__name__,
+            "errorMessage": str(exc),
+            "tracebackShort": "",
+            "recoverable": False,
+            "suggestedFix": "check file access",
             "fixturePriority": "low",
         })
         return
@@ -663,19 +805,26 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
             record["hasContainerXml"] = pkg["hasContainerXml"]
             record["hasHeaderXml"] = pkg["hasHeaderXml"]
             record["sectionFileCount"] = pkg["sectionFileCount"]
-            ctx.package_records.append({"fileId": file_id, **{k: v for k, v in pkg.items() if k != "sectionFiles"}})
+            ctx.package_records.append({
+                "fileId": file_id,
+                **{k: v for k, v in pkg.items() if k != "sectionFiles"},
+            })
 
             # parse summary
             try:
                 _parse_and_catalog(ctx, file_id, path.name, zf, pkg)
                 record["status"] = "PASS"
-            except Exception as exc:
+            except Exception as exc:  # ruff: ignore[blind-except] — 원인 상세(traceback) 기록 후 다음 파일 계속
                 tb = traceback.format_exc(limit=3)
                 ctx.failure_records.append({
-                    "fileId": file_id, "stage": "SECTION_PARSE",
-                    "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-                    "tracebackShort": tb[-400:], "recoverable": True,
-                    "suggestedFix": "harden parse_summary path", "fixturePriority": "medium",
+                    "fileId": file_id,
+                    "stage": "SECTION_PARSE",
+                    "errorType": exc.__class__.__name__,
+                    "errorMessage": str(exc),
+                    "tracebackShort": tb[-400:],
+                    "recoverable": True,
+                    "suggestedFix": "harden parse_summary path",
+                    "fixturePriority": "medium",
                 })
                 record["status"] = "PARTIAL"
                 record["errorMessage"] = f"parse: {exc}"
@@ -683,9 +832,13 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
         record["status"] = "FAIL"
         record["errorMessage"] = f"BadZipFile: {exc}"
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "ZIP_OPEN",
-            "errorType": "BadZipFile", "errorMessage": str(exc),
-            "tracebackShort": "", "recoverable": False, "suggestedFix": "re-export from Hancom",
+            "fileId": file_id,
+            "stage": "ZIP_OPEN",
+            "errorType": "BadZipFile",
+            "errorMessage": str(exc),
+            "tracebackShort": "",
+            "recoverable": False,
+            "suggestedFix": "re-export from Hancom",
             "fixturePriority": "high",
         })
     except Exception as exc:
@@ -693,13 +846,146 @@ def process_file(ctx: CorpusContext, index: int, path: Path) -> None:
         record["errorMessage"] = str(exc)
         tb = traceback.format_exc(limit=3)
         ctx.failure_records.append({
-            "fileId": file_id, "stage": "PACKAGE_STRUCTURE",
-            "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-            "tracebackShort": tb[-400:], "recoverable": False,
-            "suggestedFix": "check package structure", "fixturePriority": "medium",
+            "fileId": file_id,
+            "stage": "PACKAGE_STRUCTURE",
+            "errorType": exc.__class__.__name__,
+            "errorMessage": str(exc),
+            "tracebackShort": tb[-400:],
+            "recoverable": False,
+            "suggestedFix": "check package structure",
+            "fixturePriority": "medium",
         })
         if ctx.fail_fast:
             raise
+
+
+def _process_one_table(
+    ctx: CorpusContext,
+    file_id: str,
+    sec_idx: int,
+    tbl_idx: int,
+    tbl: Any,
+    paragraphs: list[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """표 하나를 분석해 (table_record, stats) 반환.
+
+    stats 는 이 표 하나 기준값(호출부가 파일 전체로 누적):
+    rows, cols, cellsTotal, empty, merged, hasScheduleKeyword,
+    hasDateAxis, hasGantt.
+    """
+    grid = table_rows_cells(tbl)
+    rows = len(grid)
+    cols = max((len(r) for r in grid), default=0)
+
+    cells_total_local = 0
+    empty_local = 0
+    merged_local = 0
+    for row in grid:
+        for cell in row:
+            cells_total_local += 1
+            if not cell_text(cell).strip():
+                empty_local += 1
+            cs, rs = cell_span(cell)
+            if cs > 1 or rs > 1:
+                merged_local += 1
+
+    tbl_scores = _compute_table_scores(grid)
+    nested_count = tbl_scores["nested_table_count"]
+
+    header_rows = detect_header_rows(grid)
+    header_texts: list[str] = []
+    if header_rows:
+        first_header_row = grid[header_rows[0]]
+        for col_idx, cell in enumerate(first_header_row):
+            norm = normalize_header(cell_text(cell))
+            if norm:
+                header_texts.append(norm)
+                ctx.header_counter[norm][file_id] += 1
+                ctx.header_files[norm].add(file_id)
+                ctx.header_tables[norm].add(f"{file_id}:t{tbl_idx}")
+                ctx.header_col_positions[norm][col_idx] += 1
+
+    date_headers = [t for t in header_texts if is_date_like(t)]
+    numeric_headers = [t for t in header_texts if is_numeric_like(t)]
+    schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts))
+
+    layout, conf, evidence = classify_table_layout(grid, header_texts, paragraphs[:5])
+
+    first_rows_preview = [[normalize_header(cell_text(c))[:40] for c in r] for r in grid[:3]]
+    left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
+
+    table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
+    text_cell_count = sum(1 for row in grid for c in row if normalize_header(cell_text(c)))
+    table_record = {
+        "fileId": file_id,
+        "tableId": table_id,
+        "sectionIndex": sec_idx,
+        "blockIndex": tbl_idx,
+        "tableIndex": tbl_idx,
+        "rowCount": rows,
+        "colCount": cols,
+        "cellCount": cells_total_local,
+        "mergedCellCount": merged_local,
+        "emptyCellCount": empty_local,
+        "hasMergedCells": merged_local > 0,
+        "maxColSpan": tbl_scores["max_col_span"],
+        "maxRowSpan": tbl_scores["max_row_span"],
+        "hasNestedTables": nested_count > 0,
+        "nestedTableCount": nested_count,
+        "textCellRatio": round(tbl_scores["text_cell_ratio"], 3),
+        "denseCellRatio": round(
+            text_cell_count / cells_total_local if cells_total_local else 0.0, 3
+        ),
+        "labelValuePairScore": round(tbl_scores["label_value_pair_score"], 3),
+        "dateAxisScore": round(len(date_headers) / max(cols, 1), 3),
+        "approvalStampScore": round(tbl_scores["approval_stamp_score"], 3),
+        "pageMarkerScore": round(tbl_scores["page_marker_score"], 3),
+        "headerRowCandidates": header_rows,
+        "headerTexts": header_texts,
+        "firstRowsPreview": first_rows_preview,
+        "leftColumnPreview": left_col_preview,
+        "dateHeaderCandidates": date_headers,
+        "numericHeaderCandidates": numeric_headers,
+        "layoutGuess": layout,
+        "confidence": round(conf, 3),
+        "classificationEvidence": evidence,
+        "warnings": [],
+    }
+    stats = {
+        "rows": rows,
+        "cols": cols,
+        "cellsTotal": cells_total_local,
+        "empty": empty_local,
+        "merged": merged_local,
+        "hasScheduleKeyword": schedule_hits >= 2,
+        "hasDateAxis": bool(date_headers),
+        "hasGantt": layout == "gantt_like_table",
+    }
+    return table_record, stats
+
+
+def _read_section_root(
+    ctx: CorpusContext, file_id: str, zf: zipfile.ZipFile, sec_name: str
+) -> tuple[Any | None, str | None]:
+    """섹션 XML을 읽고 파싱. 실패 시 (None, 경고문자열) 반환."""
+    try:
+        raw = zf.read(sec_name)
+    except (KeyError, zipfile.BadZipFile, OSError) as exc:
+        return None, f"section read failed {sec_name}: {exc}"
+    root = parse_section_xml(raw)
+    if root is None:
+        ctx.failure_records.append({
+            "fileId": file_id,
+            "stage": "XML_DECODE",
+            "errorType": "ParseError",
+            "errorMessage": f"section {sec_name}",
+            "tracebackShort": "",
+            "recoverable": True,
+            "suggestedFix": "investigate non-utf8 or malformed XML",
+            "fixturePriority": "high",
+        })
+        return None, f"section parse failed {sec_name}"
+    return root, None
 
 
 def _parse_and_catalog(
@@ -728,21 +1014,10 @@ def _parse_and_catalog(
     paragraphs_for_schedule: list[str] = []
 
     for sec_idx, sec_name in enumerate(section_entries):
-        try:
-            raw = zf.read(sec_name)
-        except Exception as exc:
-            parser_warnings.append(f"section read failed {sec_name}: {exc}")
-            continue
-        root = parse_section_xml(raw)
+        root, warning = _read_section_root(ctx, file_id, zf, sec_name)
+        if warning:
+            parser_warnings.append(warning)
         if root is None:
-            parser_warnings.append(f"section parse failed {sec_name}")
-            ctx.failure_records.append({
-                "fileId": file_id, "stage": "XML_DECODE",
-                "errorType": "ParseError", "errorMessage": f"section {sec_name}",
-                "tracebackShort": "", "recoverable": True,
-                "suggestedFix": "investigate non-utf8 or malformed XML",
-                "fixturePriority": "high",
-            })
             continue
 
         paragraphs = collect_paragraphs(root)
@@ -757,101 +1032,20 @@ def _parse_and_catalog(
         tables = collect_tables(root)
         for tbl_idx, tbl in enumerate(tables):
             table_count += 1
-            grid = table_rows_cells(tbl)
-            rows = len(grid)
-            cols = max((len(r) for r in grid), default=0)
-            max_rows = max(max_rows, rows)
-            max_cols = max(max_cols, cols)
-
-            cells_total_local = 0
-            empty_local = 0
-            merged_local = 0
-            for row in grid:
-                for cell in row:
-                    cells_total_local += 1
-                    if not cell_text(cell).strip():
-                        empty_local += 1
-                    cs, rs = cell_span(cell)
-                    if cs > 1 or rs > 1:
-                        merged_local += 1
-            total_cells += cells_total_local
-            empty_cells += empty_local
-            merged_cells += merged_local
-
-            tbl_scores = _compute_table_scores(grid)
-            nested_count = tbl_scores["nested_table_count"]
-
-            header_rows = detect_header_rows(grid)
-            header_texts: list[str] = []
-            if header_rows:
-                first_header_row = grid[header_rows[0]]
-                for col_idx, cell in enumerate(first_header_row):
-                    norm = normalize_header(cell_text(cell))
-                    if norm:
-                        header_texts.append(norm)
-                        ctx.header_counter[norm][file_id] += 1
-                        ctx.header_files[norm].add(file_id)
-                        ctx.header_tables[norm].add(f"{file_id}:t{tbl_idx}")
-                        ctx.header_col_positions[norm][col_idx] += 1
-
-            date_headers = [t for t in header_texts if is_date_like(t)]
-            numeric_headers = [t for t in header_texts if is_numeric_like(t)]
-            if date_headers:
-                has_date_axis = True
-            schedule_hits = sum(1 for kw in SCHEDULE_HEADER_KEYWORDS if kw in " ".join(header_texts))
-            if schedule_hits >= 2:
-                has_schedule_keyword = True
-
-            layout, conf, evidence = classify_table_layout(grid, header_texts, paragraphs[:5])
-            if layout == "gantt_like_table":
-                has_gantt = True
-
-            first_rows_preview = []
-            for r in grid[:3]:
-                first_rows_preview.append([normalize_header(cell_text(c))[:40] for c in r])
-            left_col_preview = [normalize_header(cell_text(r[0]))[:40] for r in grid[:10] if r]
-
-            table_id = f"{file_id}:s{sec_idx}:t{tbl_idx}"
-            text_cell_count = sum(
-                1 for row in grid for c in row if normalize_header(cell_text(c))
+            table_record, stats = _process_one_table(
+                ctx, file_id, sec_idx, tbl_idx, tbl, paragraphs
             )
-            table_record = {
-                "fileId": file_id,
-                "tableId": table_id,
-                "sectionIndex": sec_idx,
-                "blockIndex": tbl_idx,
-                "tableIndex": tbl_idx,
-                "rowCount": rows,
-                "colCount": cols,
-                "cellCount": cells_total_local,
-                "mergedCellCount": merged_local,
-                "emptyCellCount": empty_local,
-                "hasMergedCells": merged_local > 0,
-                "maxColSpan": tbl_scores["max_col_span"],
-                "maxRowSpan": tbl_scores["max_row_span"],
-                "hasNestedTables": nested_count > 0,
-                "nestedTableCount": nested_count,
-                "textCellRatio": round(tbl_scores["text_cell_ratio"], 3),
-                "denseCellRatio": round(
-                    text_cell_count / cells_total_local if cells_total_local else 0.0, 3
-                ),
-                "labelValuePairScore": round(tbl_scores["label_value_pair_score"], 3),
-                "dateAxisScore": round(
-                    len(date_headers) / max(cols, 1), 3
-                ),
-                "approvalStampScore": round(tbl_scores["approval_stamp_score"], 3),
-                "pageMarkerScore": round(tbl_scores["page_marker_score"], 3),
-                "headerRowCandidates": header_rows,
-                "headerTexts": header_texts,
-                "firstRowsPreview": first_rows_preview,
-                "leftColumnPreview": left_col_preview,
-                "dateHeaderCandidates": date_headers,
-                "numericHeaderCandidates": numeric_headers,
-                "layoutGuess": layout,
-                "confidence": round(conf, 3),
-                "classificationEvidence": evidence,
-                "warnings": [],
-            }
+            max_rows = max(max_rows, stats["rows"])
+            max_cols = max(max_cols, stats["cols"])
+            total_cells += stats["cellsTotal"]
+            empty_cells += stats["empty"]
+            merged_cells += stats["merged"]
+            if stats["hasDateAxis"]:
+                has_date_axis = True
+            if stats["hasScheduleKeyword"]:
+                has_schedule_keyword = True
+            if stats["hasGantt"]:
+                has_gantt = True
             ctx.table_records.append(table_record)
             tables_for_schedule.append(table_record)
 
@@ -877,11 +1071,84 @@ def _parse_and_catalog(
     ctx.parse_records.append(parse_record)
 
     # schedule candidates per file
-    sch = detect_schedule_candidate(file_id, file_name, paragraphs_for_schedule, tables_for_schedule)
+    sch = detect_schedule_candidate(
+        file_id, file_name, paragraphs_for_schedule, tables_for_schedule
+    )
     ctx.schedule_records.extend(sch)
 
 
 # ── fixture candidate selection ───────────────────────────────────────────────
+
+
+def _select_simple_form_table(tables_by_file: dict[str, list[dict[str, Any]]], add: Any) -> None:
+    for fid, tables in tables_by_file.items():
+        if any(t["layoutGuess"] == "form_table" and t["rowCount"] <= 6 for t in tables):
+            add(fid, "simple_form_table", "form_table with <=6 rows detected", 0.85)
+            break
+
+
+def _select_schedule_categories(
+    tables_by_file: dict[str, list[dict[str, Any]]], used: set[str], add: Any
+) -> None:
+    for category, layout in (
+        ("vertical_schedule", "vertical_schedule"),
+        ("horizontal_schedule", "horizontal_schedule"),
+        ("gantt_bar_schedule", "gantt_like_table"),
+        ("calendar_schedule", "calendar_like_table"),
+    ):
+        for fid, tables in tables_by_file.items():
+            if fid in used:
+                continue
+            if any(t["layoutGuess"] == layout for t in tables):
+                add(fid, category, f"table layout {layout}", 0.8)
+                break
+
+
+def _select_merged_cell_complex(
+    by_file_parse: dict[str, dict[str, Any]], used: set[str], add: Any
+) -> None:
+    for fid, parse in by_file_parse.items():
+        if fid in used:
+            continue
+        if parse.get("mergedCellCount", 0) >= 5:
+            add(fid, "merged_cell_complex", f"merged_cell={parse['mergedCellCount']}", 0.7)
+            break
+
+
+def _select_many_tables_document(
+    by_file_parse: dict[str, dict[str, Any]], used: set[str], add: Any
+) -> None:
+    for fid, parse in sorted(
+        by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True
+    ):
+        if fid in used:
+            continue
+        if parse.get("tableCount", 0) >= 5:
+            add(fid, "many_tables_document", f"table_count={parse['tableCount']}", 0.65)
+            break
+
+
+def _select_parse_failure_high_priority(ctx: CorpusContext, used: set[str], add: Any) -> None:
+    failure_by_file: dict[str, list[dict]] = defaultdict(list)
+    for f in ctx.failure_records:
+        failure_by_file[f["fileId"]].append(f)
+    for fid, fails in failure_by_file.items():
+        if fid in used:
+            continue
+        high = [f for f in fails if f.get("fixturePriority") == "high"]
+        if high:
+            add(fid, "parse_failure_high_priority", f"failures={len(fails)}", 0.95)
+            break
+
+
+def _select_hancom_compatibility_edge_case(ctx: CorpusContext, used: set[str], add: Any) -> None:
+    for fid, pkg in ((p["fileId"], p) for p in ctx.package_records):
+        if fid in used:
+            continue
+        if pkg.get("warnings"):
+            add(fid, "hancom_compatibility_edge_case", f"warnings={pkg['warnings']}", 0.6)
+            break
+
 
 def select_fixture_candidates(ctx: CorpusContext) -> None:
     by_file_parse = {p["fileId"]: p for p in ctx.parse_records}
@@ -890,7 +1157,7 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
     for t in ctx.table_records:
         tables_by_file[t["fileId"]].append(t)
 
-    used = set()
+    used: set[str] = set()
 
     def add(fid: str, category: str, reason: str, confidence: float):
         if fid in used or fid not in by_file_inv:
@@ -907,64 +1174,16 @@ def select_fixture_candidates(ctx: CorpusContext) -> None:
             "copyRecommended": True,
         })
 
-    # 1. simple_form_table
-    for fid, tables in tables_by_file.items():
-        if any(t["layoutGuess"] == "form_table" and t["rowCount"] <= 6 for t in tables):
-            add(fid, "simple_form_table", "form_table with <=6 rows detected", 0.85)
-            break
-
-    # 2. vertical_schedule  3. horizontal_schedule  4. gantt_bar_schedule  5. calendar
-    for category, layout in (
-        ("vertical_schedule", "vertical_schedule"),
-        ("horizontal_schedule", "horizontal_schedule"),
-        ("gantt_bar_schedule", "gantt_like_table"),
-        ("calendar_schedule", "calendar_like_table"),
-    ):
-        for fid, tables in tables_by_file.items():
-            if fid in used:
-                continue
-            if any(t["layoutGuess"] == layout for t in tables):
-                add(fid, category, f"table layout {layout}", 0.8)
-                break
-
-    # 6. merged_cell_complex
-    for fid, parse in by_file_parse.items():
-        if fid in used:
-            continue
-        if parse.get("mergedCellCount", 0) >= 5:
-            add(fid, "merged_cell_complex", f"merged_cell={parse['mergedCellCount']}", 0.7)
-            break
-
-    # 7. many_tables_document
-    for fid, parse in sorted(by_file_parse.items(), key=lambda kv: kv[1].get("tableCount", 0), reverse=True):
-        if fid in used:
-            continue
-        if parse.get("tableCount", 0) >= 5:
-            add(fid, "many_tables_document", f"table_count={parse['tableCount']}", 0.65)
-            break
-
-    # 8. parse_failure_high_priority
-    failure_by_file: dict[str, list[dict]] = defaultdict(list)
-    for f in ctx.failure_records:
-        failure_by_file[f["fileId"]].append(f)
-    for fid, fails in failure_by_file.items():
-        if fid in used:
-            continue
-        high = [f for f in fails if f.get("fixturePriority") == "high"]
-        if high:
-            add(fid, "parse_failure_high_priority", f"failures={len(fails)}", 0.95)
-            break
-
-    # 9. hancom_compatibility_edge_case
-    for fid, pkg in ((p["fileId"], p) for p in ctx.package_records):
-        if fid in used:
-            continue
-        if pkg.get("warnings"):
-            add(fid, "hancom_compatibility_edge_case", f"warnings={pkg['warnings']}", 0.6)
-            break
+    _select_simple_form_table(tables_by_file, add)
+    _select_schedule_categories(tables_by_file, used, add)
+    _select_merged_cell_complex(by_file_parse, used, add)
+    _select_many_tables_document(by_file_parse, used, add)
+    _select_parse_failure_high_priority(ctx, used, add)
+    _select_hancom_compatibility_edge_case(ctx, used, add)
 
 
 # ── report writers ────────────────────────────────────────────────────────────
+
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -979,7 +1198,10 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) ->
         w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for r in rows:
-            row = {k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v) for k, v in r.items()}
+            row = {
+                k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v)
+                for k, v in r.items()
+            }
             w.writerow(row)
 
 
@@ -987,10 +1209,25 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
     out = ctx.out_dir
     paths = {}
 
-    inv_fields = ["fileId", "relativePath", "pathHash", "fileName", "sizeBytes", "modifiedTime",
-                  "zipOpenOk", "entryCount", "hasMimetype", "mimetypeValue", "mimetypeCompressType",
-                  "hasContentHpf", "hasContainerXml", "hasHeaderXml", "sectionFileCount",
-                  "status", "errorMessage"]
+    inv_fields = [
+        "fileId",
+        "relativePath",
+        "pathHash",
+        "fileName",
+        "sizeBytes",
+        "modifiedTime",
+        "zipOpenOk",
+        "entryCount",
+        "hasMimetype",
+        "mimetypeValue",
+        "mimetypeCompressType",
+        "hasContentHpf",
+        "hasContainerXml",
+        "hasHeaderXml",
+        "sectionFileCount",
+        "status",
+        "errorMessage",
+    ]
     if ctx.anonymize:
         inv_rows = [{**r, "relativePath": ""} for r in ctx.file_records]
     else:
@@ -1003,11 +1240,25 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
     _write_jsonl(out / "package_summary.jsonl", ctx.package_records)
     paths["package_summary"] = out / "package_summary.jsonl"
 
-    parse_fields = ["fileId", "documentTitleCandidate", "paragraphCount", "blockCount",
-                    "tableCount", "imageCount", "drawingCount", "totalCellCount",
-                    "mergedCellCount", "emptyCellCount", "maxTableRows", "maxTableCols",
-                    "hasScheduleKeyword", "hasDateAxisCandidate", "hasGanttCandidate",
-                    "parserStatus", "parserWarnings"]
+    parse_fields = [
+        "fileId",
+        "documentTitleCandidate",
+        "paragraphCount",
+        "blockCount",
+        "tableCount",
+        "imageCount",
+        "drawingCount",
+        "totalCellCount",
+        "mergedCellCount",
+        "emptyCellCount",
+        "maxTableRows",
+        "maxTableCols",
+        "hasScheduleKeyword",
+        "hasDateAxisCandidate",
+        "hasGanttCandidate",
+        "parserStatus",
+        "parserWarnings",
+    ]
     _write_csv(out / "parse_summary.csv", ctx.parse_records, parse_fields)
     _write_jsonl(out / "parse_summary.jsonl", ctx.parse_records)
     paths["parse_summary"] = out / "parse_summary.jsonl"
@@ -1043,9 +1294,21 @@ def write_reports(ctx: CorpusContext) -> dict[str, Path]:
             "documentTypeHints": type_hints,
         })
     header_rows.sort(key=lambda r: r["count"], reverse=True)
-    _write_csv(out / "header_dictionary.csv", header_rows,
-               ["normalizedHeader", "originalSamples", "count", "fileCount", "tableCount",
-                "commonColIndexes", "guessedField", "fieldConfidence", "documentTypeHints"])
+    _write_csv(
+        out / "header_dictionary.csv",
+        header_rows,
+        [
+            "normalizedHeader",
+            "originalSamples",
+            "count",
+            "fileCount",
+            "tableCount",
+            "commonColIndexes",
+            "guessedField",
+            "fieldConfidence",
+            "documentTypeHints",
+        ],
+    )
     paths["header_dictionary"] = out / "header_dictionary.csv"
 
     _write_jsonl(out / "schedule_candidates.jsonl", ctx.schedule_records)
@@ -1099,17 +1362,21 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
         out_lines.append(f"- {layout}: {cnt}")
     out_lines.append("")
     out_lines.append("## 가장 자주 나온 헤더 TOP 50")
-    for r in header_rows[:50]:
-        out_lines.append(f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
-                         f"guess={r['guessedField']}@{r['fieldConfidence']})")
+    out_lines.extend(
+        f"- `{r['normalizedHeader']}` × {r['count']} (files={r['fileCount']}, "
+        f"guess={r['guessedField']}@{r['fieldConfidence']})"
+        for r in header_rows[:50]
+    )
     out_lines.append("")
     out_lines.append("## 실패 유형 TOP 20")
     for et, cnt in failure_counter.most_common(20):
         out_lines.append(f"- {et}: {cnt}")
     out_lines.append("")
     out_lines.append("## fixture 후보")
-    for f in ctx.fixture_records:
-        out_lines.append(f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})")
+    out_lines.extend(
+        f"- [{f['category']}] {f['fileId']} — {f['reason']} (conf={f['confidence']})"
+        for f in ctx.fixture_records
+    )
     out_lines.append("")
     out_lines.append("## 다음 파서 개선 우선순위")
     priorities = []
@@ -1128,6 +1395,7 @@ def _build_summary_md(ctx: CorpusContext, header_rows: list[dict[str, Any]]) -> 
 
 # ── CLI entry ─────────────────────────────────────────────────────────────────
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="HWPX corpus profiler (read-only)")
     p.add_argument("--root", required=True, help="scan root directory")
@@ -1137,8 +1405,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--no-anonymize-paths", dest="anonymize", action="store_false")
     p.add_argument("--fail-fast", action="store_true", default=False)
     p.add_argument("--include-hidden", action="store_true", default=False)
-    p.add_argument("--copy-fixtures", action="store_true", default=False,
-                   help="reserved; not used in this stage")
+    p.add_argument(
+        "--copy-fixtures",
+        action="store_true",
+        default=False,
+        help="reserved; not used in this stage",
+    )
     return p.parse_args(argv)
 
 
@@ -1169,10 +1441,14 @@ def run_profiler(args: argparse.Namespace) -> dict[str, Any]:
         except Exception as exc:
             tb = traceback.format_exc(limit=3)
             ctx.failure_records.append({
-                "fileId": f"unknown_{i}", "stage": "FILE_DISCOVERY",
-                "errorType": exc.__class__.__name__, "errorMessage": str(exc),
-                "tracebackShort": tb[-400:], "recoverable": False,
-                "suggestedFix": "investigate", "fixturePriority": "high",
+                "fileId": f"unknown_{i}",
+                "stage": "FILE_DISCOVERY",
+                "errorType": exc.__class__.__name__,
+                "errorMessage": str(exc),
+                "tracebackShort": tb[-400:],
+                "recoverable": False,
+                "suggestedFix": "investigate",
+                "fixturePriority": "high",
             })
             if args.fail_fast:
                 raise

@@ -16,14 +16,11 @@ from scripts.hwpx.web_office.para_edit_model import (  # noqa: E402
     Paragraph, ParaTextRun, ParagraphTarget,
     make_type_text_command, make_replace_text_range_command,
     make_delete_text_range_command,
-    make_split_text_run_command, make_merge_text_runs_command,
     apply_command_to_paragraph, normalize_paragraph,
-    split_run, merge_runs, locate_offset,
-    validate_expected_before, validate_charpr_preserved,
+    split_run, merge_runs, validate_expected_before, validate_charpr_preserved,
     validate_parpr_preserved,
-    CT_TYPE_TEXT, CT_REPLACE_TEXT_RANGE, CT_DELETE_TEXT_RANGE,
-    CT_SPLIT_TEXT_RUN, CT_MERGE_TEXT_RUNS,
-    POLICY_ANCHOR_CHARPR, POLICY_FOCUS_CHARPR,
+    CT_TYPE_TEXT, CT_DELETE_TEXT_RANGE,
+    POLICY_FOCUS_CHARPR,
     POLICY_REQUIRES_REVIEW,
     REASON_MERGE_CHARPR_MISMATCH, REASON_REQUIRES_REVIEW,
 )
@@ -276,7 +273,7 @@ def test_python_model_does_not_import_hwpx_edit_tool_statically():
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

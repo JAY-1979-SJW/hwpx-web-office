@@ -16,21 +16,24 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
-from hwp_to_hwpx_standalone import (  # noqa: E402
+from hwp_to_hwpx_standalone import (  # ruff: ignore[module-import-not-at-top-of-file]
     convert_hwp_to_hwpx,
     normalize_roundtrip_text,
     read_hwpx_table_grids,
 )
-from hwpxjs_hwp_to_hwpx import convert_with_hwpxjs, discover_hwpxjs  # noqa: E402
+from hwpxjs_hwp_to_hwpx import convert_with_hwpxjs, discover_hwpxjs  # ruff: ignore[module-import-not-at-top-of-file]
 
 
 def sha256_file(path: Path) -> str:
@@ -47,7 +50,9 @@ def local_name(tag: str) -> str:
 
 def safe_report_stem(path: Path, index: int | None = None) -> str:
     prefix = f"{index:04d}_" if index is not None else ""
-    digest = hashlib.sha1(str(path.resolve()).encode("utf-8", errors="ignore")).hexdigest()[:10]
+    digest = hashlib.sha1(
+        str(path.resolve()).encode("utf-8", errors="ignore"), usedforsecurity=False
+    ).hexdigest()[:10]
     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in path.stem).strip("._")
     return f"{prefix}{safe[:80] or 'input'}_{digest}"
 
@@ -55,6 +60,22 @@ def safe_report_stem(path: Path, index: int | None = None) -> str:
 def normalize_text_lines(text: str) -> list[str]:
     normalized = normalize_roundtrip_text(text)
     return [line.strip() for line in normalized.splitlines() if line.strip()]
+
+
+def _count_element_tags(root, tag_counts: dict[str, int]) -> tuple[int, int, int, int]:
+    paragraph, table, picture, image_ref = 0, 0, 0, 0
+    for elem in root.iter():
+        local = local_name(elem.tag)
+        tag_counts[local] = tag_counts.get(local, 0) + 1
+        if local == "p":
+            paragraph += 1
+        elif local == "tbl":
+            table += 1
+        elif local == "pic":
+            picture += 1
+        elif local == "img":
+            image_ref += 1
+    return paragraph, table, picture, image_ref
 
 
 def summarize_hwpx(path: Path) -> dict[str, Any]:
@@ -87,22 +108,16 @@ def summarize_hwpx(path: Path) -> dict[str, Any]:
 
             for name in section_entries:
                 try:
-                    root = ET.fromstring(zf.read(name))
+                    root = _dx_fromstring(zf.read(name))
                 except ET.ParseError as exc:
                     xml_errors.append({"entry": name, "error": str(exc)})
                     continue
                 section_count += 1
-                for elem in root.iter():
-                    local = local_name(elem.tag)
-                    tag_counts[local] = tag_counts.get(local, 0) + 1
-                    if local == "p":
-                        paragraph_count += 1
-                    elif local == "tbl":
-                        table_count += 1
-                    elif local == "pic":
-                        picture_count += 1
-                    elif local == "img":
-                        image_ref_count += 1
+                p, tbl, pic, img = _count_element_tags(root, tag_counts)
+                paragraph_count += p
+                table_count += tbl
+                picture_count += pic
+                image_ref_count += img
                 text_parts.append("".join(text for text in root.itertext() if text))
     except zipfile.BadZipFile:
         return {"status": "FAIL", "path": str(path), "error": "HWPX_NOT_ZIP"}
@@ -150,12 +165,18 @@ def text_delta(standalone: dict[str, Any], reference: dict[str, Any]) -> dict[st
         "standalone_text_length": source_len,
         "reference_text_length": ref_len,
         "reference_to_standalone_ratio": ratio,
-        "longer_output": "reference" if ref_len > source_len else "standalone" if source_len > ref_len else "equal",
+        "longer_output": "reference"
+        if ref_len > source_len
+        else "standalone"
+        if source_len > ref_len
+        else "equal",
         "line_delta": line_delta,
     }
 
 
-def compare_text_lines(standalone_text: str, reference_text: str, *, sample_limit: int = 20) -> dict[str, Any]:
+def compare_text_lines(
+    standalone_text: str, reference_text: str, *, sample_limit: int = 20
+) -> dict[str, Any]:
     standalone_lines = normalize_text_lines(standalone_text)
     reference_lines = normalize_text_lines(reference_text)
     standalone_counter = Counter(standalone_lines)
@@ -169,13 +190,24 @@ def compare_text_lines(standalone_text: str, reference_text: str, *, sample_limi
         "unique_reference_line_count": len(reference_counter),
         "reference_lines_missing_in_standalone_count": sum(missing_counter.values()),
         "standalone_lines_missing_in_reference_count": sum(extra_counter.values()),
-        "reference_lines_missing_in_standalone_samples": list(missing_counter.elements())[:sample_limit],
-        "standalone_lines_missing_in_reference_samples": list(extra_counter.elements())[:sample_limit],
+        "reference_lines_missing_in_standalone_samples": list(missing_counter.elements())[
+            :sample_limit
+        ],
+        "standalone_lines_missing_in_reference_samples": list(extra_counter.elements())[
+            :sample_limit
+        ],
     }
 
 
 def feature_delta(standalone: dict[str, Any], reference: dict[str, Any]) -> dict[str, Any]:
-    keys = ["table_count", "bin_data_count", "picture_count", "image_ref_count", "paragraph_count", "entry_count"]
+    keys = [
+        "table_count",
+        "bin_data_count",
+        "picture_count",
+        "image_ref_count",
+        "paragraph_count",
+        "entry_count",
+    ]
     deltas = {}
     for key in keys:
         left = int(standalone.get(key) or 0)
@@ -221,15 +253,21 @@ def run_compare(
     )
 
     if reference != "hwpxjs":
-        reference_report = {"status": "SKIPPED", "error": f"Unsupported reference provider: {reference}"}
+        reference_report = {
+            "status": "SKIPPED",
+            "error": f"Unsupported reference provider: {reference}",
+        }
     else:
-        reference_report = convert_with_hwpxjs(input_path, reference_output, timeout_sec=timeout_sec)
+        reference_report = convert_with_hwpxjs(
+            input_path, reference_output, timeout_sec=timeout_sec
+        )
 
     standalone_summary = summarize_hwpx(standalone_output)
     reference_summary = summarize_hwpx(reference_output)
     comparison = {
         "status": "PASS"
-        if standalone_summary.get("status") in {"PASS", "WARN"} and reference_summary.get("status") in {"PASS", "WARN"}
+        if standalone_summary.get("status") in {"PASS", "WARN"}
+        and reference_summary.get("status") in {"PASS", "WARN"}
         else "WARN",
         "text_delta": text_delta(standalone_summary, reference_summary),
         "feature_delta": feature_delta(standalone_summary, reference_summary),
@@ -239,7 +277,10 @@ def run_compare(
     feature = comparison["feature_delta"]
     if feature["bin_data_count"]["delta_reference_minus_standalone"] > 0:
         comparison["reference_advantages"].append("reference_contains_more_bindata")
-    if feature["picture_count"]["delta_reference_minus_standalone"] > 0 or feature["image_ref_count"]["delta_reference_minus_standalone"] > 0:
+    if (
+        feature["picture_count"]["delta_reference_minus_standalone"] > 0
+        or feature["image_ref_count"]["delta_reference_minus_standalone"] > 0
+    ):
         comparison["reference_advantages"].append("reference_contains_more_picture_objects")
     if feature["table_count"]["delta_reference_minus_standalone"] > 0:
         comparison["reference_advantages"].append("reference_contains_more_tables")
@@ -249,7 +290,7 @@ def run_compare(
         comparison["reference_advantages"].append("reference_contains_text_lines_not_in_standalone")
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tool": "hwp_conversion_reference_compare",
         "input": str(input_path),
         "reference": reference,
@@ -309,19 +350,22 @@ def run_batch_compare(
         reports,
         key=lambda report: (
             int(
-                report.get("comparison", {})
+                report
+                .get("comparison", {})
                 .get("text_delta", {})
                 .get("line_delta", {})
                 .get("reference_lines_missing_in_standalone_count", 0)
             ),
             int(
-                report.get("comparison", {})
+                report
+                .get("comparison", {})
                 .get("feature_delta", {})
                 .get("picture_count", {})
                 .get("delta_reference_minus_standalone", 0)
             ),
             int(
-                report.get("comparison", {})
+                report
+                .get("comparison", {})
                 .get("feature_delta", {})
                 .get("table_count", {})
                 .get("delta_reference_minus_standalone", 0)
@@ -330,7 +374,7 @@ def run_batch_compare(
         reverse=True,
     )
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tool": "hwp_conversion_reference_compare",
         "mode": "batch" if input_path.expanduser().resolve().is_dir() else "single",
         "input": str(input_path.expanduser().resolve()),
@@ -342,12 +386,18 @@ def run_batch_compare(
             {
                 "input": report.get("input"),
                 "status": report.get("comparison", {}).get("status"),
-                "missing_reference_lines": report.get("comparison", {})
+                "missing_reference_lines": report
+                .get("comparison", {})
                 .get("text_delta", {})
                 .get("line_delta", {})
                 .get("reference_lines_missing_in_standalone_count"),
-                "text_ratio": report.get("comparison", {}).get("text_delta", {}).get("reference_to_standalone_ratio"),
-                "reference_advantages": report.get("comparison", {}).get("reference_advantages", []),
+                "text_ratio": report
+                .get("comparison", {})
+                .get("text_delta", {})
+                .get("reference_to_standalone_ratio"),
+                "reference_advantages": report.get("comparison", {}).get(
+                    "reference_advantages", []
+                ),
                 "standalone_output": report.get("outputs", {}).get("standalone"),
                 "reference_output": report.get("outputs", {}).get("reference"),
             }
@@ -376,40 +426,33 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         "",
     ]
     line_delta = comparison.get("text_delta", {}).get("line_delta", {})
-    lines.extend(
-        [
-            f"- reference lines missing in standalone: {line_delta.get('reference_lines_missing_in_standalone_count')}",
-            f"- standalone lines missing in reference: {line_delta.get('standalone_lines_missing_in_reference_count')}",
-            "",
-        ]
-    )
+    lines.extend([
+        f"- reference lines missing in standalone: {line_delta.get('reference_lines_missing_in_standalone_count')}",
+        f"- standalone lines missing in reference: {line_delta.get('standalone_lines_missing_in_reference_count')}",
+        "",
+    ])
     missing_samples = line_delta.get("reference_lines_missing_in_standalone_samples") or []
     if missing_samples:
         lines.append("### Reference-only samples")
         lines.append("")
-        for sample in missing_samples[:20]:
-            lines.append(f"- `{sample}`")
+        lines.extend(f"- `{sample}`" for sample in missing_samples[:20])
         lines.append("")
-    lines.extend(
-        [
+    lines.extend([
         "## Features",
         "",
-        ]
-    )
+    ])
     for key, value in feature.items():
         lines.append(
             f"- {key}: standalone={value.get('standalone')} reference={value.get('reference')} delta={value.get('delta_reference_minus_standalone')}"
         )
-    lines.extend(
-        [
-            "",
-            "## Outputs",
-            "",
-            f"- standalone: `{report.get('outputs', {}).get('standalone')}`",
-            f"- reference: `{report.get('outputs', {}).get('reference')}`",
-            "",
-        ]
-    )
+    lines.extend([
+        "",
+        "## Outputs",
+        "",
+        f"- standalone: `{report.get('outputs', {}).get('standalone')}`",
+        f"- reference: `{report.get('outputs', {}).get('reference')}`",
+        "",
+    ])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -426,30 +469,34 @@ def write_batch_markdown(path: Path, report: dict[str, Any]) -> None:
         "",
     ]
     for item in report.get("top_gaps", []):
-        lines.extend(
-            [
-                f"### {item.get('input')}",
-                "",
-                f"- missing reference lines: {item.get('missing_reference_lines')}",
-                f"- text ratio: {item.get('text_ratio')}",
-                f"- reference advantages: {', '.join(item.get('reference_advantages') or [])}",
-                f"- standalone: `{item.get('standalone_output')}`",
-                f"- reference: `{item.get('reference_output')}`",
-                "",
-            ]
-        )
+        lines.extend([
+            f"### {item.get('input')}",
+            "",
+            f"- missing reference lines: {item.get('missing_reference_lines')}",
+            f"- text ratio: {item.get('text_ratio')}",
+            f"- reference advantages: {', '.join(item.get('reference_advantages') or [])}",
+            f"- standalone: `{item.get('standalone_output')}`",
+            f"- reference: `{item.get('reference_output')}`",
+            "",
+        ])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Compare standalone HWP conversion against a reference provider")
+    parser = argparse.ArgumentParser(
+        description="Compare standalone HWP conversion against a reference provider"
+    )
     parser.add_argument("input", type=Path)
-    parser.add_argument("--out-dir", type=Path, default=Path("tmp/hwp_conversion_reference_compare"))
+    parser.add_argument(
+        "--out-dir", type=Path, default=Path("tmp/hwp_conversion_reference_compare")
+    )
     parser.add_argument("--reference", choices=["hwpxjs"], default="hwpxjs")
     parser.add_argument("--no-decoded-style-bridge", action="store_true")
     parser.add_argument("--timeout-sec", type=int, default=120)
-    parser.add_argument("--limit", type=int, help="Maximum number of HWP files to compare when input is a directory")
+    parser.add_argument(
+        "--limit", type=int, help="Maximum number of HWP files to compare when input is a directory"
+    )
     parser.add_argument("--report-json", type=Path)
     parser.add_argument("--report-md", type=Path)
     args = parser.parse_args()
@@ -482,7 +529,13 @@ def main() -> int:
     else:
         write_markdown(report_md, report)
         status = str(report["comparison"]["status"])
-    print(json.dumps({"status": status, "report_json": str(report_json), "report_md": str(report_md)}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {"status": status, "report_json": str(report_json), "report_md": str(report_md)},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

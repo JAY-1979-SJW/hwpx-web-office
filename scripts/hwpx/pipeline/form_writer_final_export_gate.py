@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 SCHEMA_VERSION = "form_writer_final_export_gate_v1"
 
@@ -51,11 +51,11 @@ def _val_hash(value: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _expires_iso(days: int = _DEFAULT_EXPIRY_DAYS) -> str:
-    dt = datetime.now(timezone.utc) + timedelta(days=days)
+    dt = datetime.now(UTC) + timedelta(days=days)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -67,26 +67,20 @@ def _export_id(output_file_id: str, ts: str) -> str:
 # Export eligibility check
 # ---------------------------------------------------------------------------
 
-def _check_export_eligible(
-    download_review_payload: dict,
-    decision_result: dict,
-    source_template_hash: str = "",
-) -> tuple[bool, str]:
-    """
-    final export 허용 여부와 차단 사유 반환.
-    Returns (enabled: bool, blocked_reason: str)
-    """
+
+def _check_review_decision(decision_result: dict) -> tuple[bool, str] | None:
     review_status = decision_result.get("decisionResult", "")
     source_mutated_decision = decision_result.get("sourceMutated", False)
-
-    # review decision 검사
     if review_status != "ACCEPTED_BY_USER":
         return False, _DECISION_TO_BLOCKED.get(review_status, BLOCKED_NOT_ACCEPTED)
-
     if source_mutated_decision:
         return False, BLOCKED_SOURCE_MUTATED
+    return None
 
-    # download review payload 검사
+
+def _check_download_payload(
+    download_review_payload: dict, source_template_hash: str
+) -> tuple[bool, str] | None:
     dl = download_review_payload
     writer_status = dl.get("writerStatus", "")
     summary = dl.get("summary", {})
@@ -115,11 +109,28 @@ def _check_export_eligible(
     if not output_hash:
         return False, BLOCKED_HASH_MISSING
 
-    # output == source 검사
     src_hash = source_template_hash or download_info.get("sourceTemplateHash", "")
     if src_hash and output_file_id == src_hash:
         return False, BLOCKED_OUTPUT_EQUALS_SOURCE
 
+    return None
+
+
+def _check_export_eligible(
+    download_review_payload: dict,
+    decision_result: dict,
+    source_template_hash: str = "",
+) -> tuple[bool, str]:
+    """
+    final export 허용 여부와 차단 사유 반환.
+    Returns (enabled: bool, blocked_reason: str)
+    """
+    blocked = _check_review_decision(decision_result)
+    if blocked is not None:
+        return blocked
+    blocked = _check_download_payload(download_review_payload, source_template_hash)
+    if blocked is not None:
+        return blocked
     return True, ""
 
 
@@ -127,7 +138,8 @@ def _check_export_eligible(
 # Build final export payload
 # ---------------------------------------------------------------------------
 
-def build_final_export_payload(
+
+def build_final_export_payload(  # ruff: ignore[too-many-arguments] (여러 파일에서 호출 — 시그니처 변경 보류)
     download_review_payload: dict,
     decision_result: dict,
     form_id: str = "",

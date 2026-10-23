@@ -5,17 +5,21 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성/타입애노테이션(ET.Element)은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고
+# 파싱 함수만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 STRUCTURE_TERMS = [
     "<hm:",
     "<hp:masterPage",
-    "masterPageCnt=\"1\"",
-    "masterPageCnt=\"2\"",
+    'masterPageCnt="1"',
+    'masterPageCnt="2"',
     "headerIDRef",
     "footerIDRef",
     "<hp:header",
@@ -80,23 +84,21 @@ def _xpath_for(elem: ET.Element, parents: dict[ET.Element, ET.Element]) -> str:
 def _xml_structure_hits(entry: str, text: str) -> list[dict[str, Any]]:
     hits: list[dict[str, Any]] = []
     try:
-        root = ET.fromstring(text.encode("utf-8"))
-    except Exception:
+        root = _dx_fromstring(text.encode("utf-8"))
+    except Exception:  # ruff: ignore[blind-except] — 파싱 실패 시 빈 결과(탐색 계속)
         return hits
     parents = _parent_map(root)
     for elem in root.iter():
         name = _local_name(elem.tag)
         if name not in STRUCTURE_LOCAL_NAMES:
             continue
-        hits.append(
-            {
-                "entry": entry,
-                "local_name": name,
-                "path": _xpath_for(elem, parents),
-                "attributes": dict(elem.attrib),
-                "text": _element_text(elem),
-            }
-        )
+        hits.append({
+            "entry": entry,
+            "local_name": name,
+            "path": _xpath_for(elem, parents),
+            "attributes": dict(elem.attrib),
+            "text": _element_text(elem),
+        })
     return hits
 
 
@@ -131,18 +133,16 @@ def inspect_hwpx(path: Path) -> dict[str, Any]:
                 text = _decode(zf.read(name))
                 for term in STRUCTURE_TERMS:
                     if term in text:
-                        row["term_hits"].append(
-                            {
-                                "entry": name,
-                                "term": term,
-                                "snippet": _snippet(text, term),
-                            }
-                        )
+                        row["term_hits"].append({
+                            "entry": name,
+                            "term": term,
+                            "snippet": _snippet(text, term),
+                        })
                 row["xml_structure_hits"].extend(_xml_structure_hits(name, text))
     except BadZipFile:
         row["status"] = "BAD_ZIP"
         return row
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         row["status"] = "ERROR"
         row["error"] = str(exc)
         return row
@@ -194,18 +194,16 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
         for row in rows:
-            writer.writerow(
-                {
-                    "file": row.get("file"),
-                    "size": row.get("size"),
-                    "zip_ok": row.get("zip_ok"),
-                    "entry_count": row.get("entry_count"),
-                    "status": row.get("status"),
-                    "term_hit_count": len(row.get("term_hits", [])),
-                    "xml_hit_count": len(row.get("xml_structure_hits", [])),
-                    "header_footer_entries": ";".join(row.get("header_footer_entries", [])),
-                }
-            )
+            writer.writerow({
+                "file": row.get("file"),
+                "size": row.get("size"),
+                "zip_ok": row.get("zip_ok"),
+                "entry_count": row.get("entry_count"),
+                "status": row.get("status"),
+                "term_hit_count": len(row.get("term_hits", [])),
+                "xml_hit_count": len(row.get("xml_structure_hits", [])),
+                "header_footer_entries": ";".join(row.get("header_footer_entries", [])),
+            })
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -224,7 +222,13 @@ def main(argv: list[str] | None = None) -> int:
     write_json(Path(args.out_json), report)
     if args.out_csv:
         write_csv(Path(args.out_csv), report["rows"])
-    print(json.dumps({k: report[k] for k in ("status", "file_count", "found_count")}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {k: report[k] for k in ("status", "file_count", "found_count")},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0 if report["status"] == "PASS" else 2
 
 

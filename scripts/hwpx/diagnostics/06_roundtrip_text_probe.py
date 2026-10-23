@@ -9,9 +9,12 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-from hwp_diag_common import exit_code, print_report, status_from_errors, utc_now, write_report
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 from extract_hwp_body_fields import extract_hwp_text
 
+from hwp_diag_common import exit_code, print_report, status_from_errors, utc_now, write_report
 
 SECTION_RE = re.compile(r"^contents/section\d+\.xml$", re.IGNORECASE)
 
@@ -38,7 +41,7 @@ def read_hwpx_section_text(hwpx_path: Path) -> dict:
             entries.append(name)
             payload = zf.read(name)
             try:
-                root = ET.fromstring(payload)
+                root = _dx_fromstring(payload)
             except ET.ParseError as exc:
                 xml_errors.append({"entry": name, "error": str(exc)})
                 continue

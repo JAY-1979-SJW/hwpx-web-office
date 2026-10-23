@@ -57,14 +57,12 @@ def parser_to_master_slot_detect(path: Path):
 
     def _fn(rec: dict) -> list[dict]:
         result = parse_hwpx_v2(path)
-        slots: list[dict] = []
-        for s in result.inputSlotCandidates:
-            slots.append({
+        slots: list[dict] = [{
                 "label": getattr(s, "labelText", "") or "",
                 "type": getattr(s, "slotType", "unknown"),
                 "cellKey": getattr(s, "cellKey", None),
                 "paragraphKey": getattr(s, "paragraphKey", None),
-            })
+            } for s in result.inputSlotCandidates]
         return slots
     return _fn
 
@@ -72,10 +70,6 @@ def parser_to_master_slot_detect(path: Path):
 def run_batch(limit: int = 100) -> dict:
     from scripts.hwpx.master_orchestration import auto_fill_master as mo
     from scripts.hwpx.orchestration import fill_review_log_recorder as orc
-    from scripts.hwpx.recognition_corpus import (
-        corpus_schema as cs,
-        audit_learning_log_contract as al,
-    )
 
     # 1. corpus에서 100건 sampling
     corpus_path = PROJECT_ROOT / "data/recognition_corpus/corpus.sqlite3"

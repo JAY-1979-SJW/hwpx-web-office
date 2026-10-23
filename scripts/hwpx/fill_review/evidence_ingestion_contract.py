@@ -13,6 +13,7 @@ EvidenceSource[] 로 변환하는 deterministic 계약.
 - confidence가 높아도 자동 승인하지 않는다 (UI/검수 게이트 통과 필수).
 - 충돌 값은 warnings에 남기고 자동 선택하지 않는다.
 """
+
 from __future__ import annotations
 
 import re
@@ -24,16 +25,32 @@ ENGINE_VERSION = "0.1.0"
 
 # 입력 hint에 허용되는 sourceType (출력에도 동일 집합 사용)
 ALLOWED_SOURCE_TYPES: frozenset[str] = frozenset({
-    "CONTRACT_XLSX", "ESTIMATE_XLSX", "BUSINESS_LICENSE", "SEAL_IMAGE",
-    "OCR_RESULT", "MANUAL_ENTRY", "USER_INPUT", "UPLOADED_DOCUMENT", "UNKNOWN",
+    "CONTRACT_XLSX",
+    "ESTIMATE_XLSX",
+    "BUSINESS_LICENSE",
+    "SEAL_IMAGE",
+    "OCR_RESULT",
+    "MANUAL_ENTRY",
+    "USER_INPUT",
+    "UPLOADED_DOCUMENT",
+    "UNKNOWN",
 })
 
 # 표준 extracted field 이름
 STANDARD_FIELD_NAMES: frozenset[str] = frozenset({
-    "projectName", "contractAmount", "startDate", "endDate",
-    "companyName", "businessRegistrationNumber", "representativeName",
-    "siteManagerName", "address", "phone",
-    "sealImageRef", "attachmentDocumentRef", "freeText",
+    "projectName",
+    "contractAmount",
+    "startDate",
+    "endDate",
+    "companyName",
+    "businessRegistrationNumber",
+    "representativeName",
+    "siteManagerName",
+    "address",
+    "phone",
+    "sealImageRef",
+    "attachmentDocumentRef",
+    "freeText",
 })
 
 # 한국어 → 표준 field 매핑
@@ -94,6 +111,7 @@ _EXT_HINT: dict[str, str] = {
 
 # ── dataclasses ──────────────────────────────────────────────────────────────
 
+
 @dataclass
 class RejectedInput:
     inputId: str
@@ -119,8 +137,10 @@ class IngestionWarning:
 
     def to_dict(self) -> dict:
         return {
-            "code": self.code, "detail": self.detail,
-            "inputId": self.inputId, "fieldName": self.fieldName,
+            "code": self.code,
+            "detail": self.detail,
+            "inputId": self.inputId,
+            "fieldName": self.fieldName,
         }
 
 
@@ -151,6 +171,7 @@ class EvidenceIngestionResult:
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _detect_source_type(inp: dict) -> tuple[str, list[str]]:
     """(sourceType, warning_codes) 반환. 입력 hint > 파일명 > 확장자."""
@@ -293,10 +314,12 @@ def _extract_from_tables(tables) -> dict:
     return out
 
 
-def _merge_fields_with_conflict_check(target: dict[str, str],
-                                          additions: dict[str, str],
-                                          warnings: list[IngestionWarning],
-                                          input_id: str) -> dict:
+def _merge_fields_with_conflict_check(
+    target: dict[str, str],
+    additions: dict[str, str],
+    warnings: list[IngestionWarning],
+    input_id: str,
+) -> dict:
     """target에 additions를 merge. 같은 key에 다른 value면 FIELD_CONFLICT warning."""
     conflicts: dict[str, list[str]] = {}
     for k, v in additions.items():
@@ -306,16 +329,20 @@ def _merge_fields_with_conflict_check(target: dict[str, str],
             continue
         target[k] = v
     for k, vals in conflicts.items():
-        warnings.append(IngestionWarning(
-            code="FIELD_CONFLICT",
-            detail=f"field={k!r} values={vals}",
-            inputId=input_id, fieldName=k,
-        ))
+        warnings.append(
+            IngestionWarning(
+                code="FIELD_CONFLICT",
+                detail=f"field={k!r} values={vals}",
+                inputId=input_id,
+                fieldName=k,
+            )
+        )
     return target
 
 
-def _confidence_for_source(source_type: str, num_fields: int,
-                                has_text: bool, has_tables: bool) -> float:
+def _confidence_for_source(
+    source_type: str, num_fields: int, has_text: bool, has_tables: bool
+) -> float:
     """간단 휴리스틱 confidence (자동 승인의 근거가 아님 — 표시 전용)."""
     base = {
         "CONTRACT_XLSX": 0.7,
@@ -335,147 +362,216 @@ def _confidence_for_source(source_type: str, num_fields: int,
     return round(base, 3)
 
 
+def _reject_reason(inp: dict) -> tuple[str, str] | None:
+    """입력 거부 사유 (reason, warningCode) — 없으면 None(유효한 입력)."""
+    if not (inp.get("sourceHash") or "").strip():
+        return "sourceHash is required", "SOURCE_HASH_REQUIRED"
+    is_empty = (
+        not (inp.get("extractedFields") or {})
+        and not (inp.get("extractedText") or "").strip()
+        and not (inp.get("extractedTables") or [])
+        and not (inp.get("metadata") or {})
+    )
+    if is_empty:
+        return (
+            "no extractedFields / extractedText / extractedTables / metadata",
+            "EMPTY_INPUT",
+        )
+    return None
+
+
+def _normalize_extracted_fields(
+    raw_fields_in: dict, input_id: str
+) -> tuple[dict[str, str], dict[str, dict], list[IngestionWarning]]:
+    """1) 직접 주어진 extractedFields (한국어 키도 영어 표준 키로 정규화)."""
+    normalized: dict[str, str] = {}
+    normalized_details: dict[str, dict] = {}
+    per_source_warnings: list[IngestionWarning] = []
+    for raw_key, raw_value in raw_fields_in.items():
+        std_key = _alias_to_standard(raw_key)
+        if std_key not in STANDARD_FIELD_NAMES:
+            # 비표준 키는 freeText로 모은다 (충돌 가능성 → conflict check)
+            if raw_value:
+                existing = normalized.get("freeText", "")
+                new_text = f"{raw_key}: {raw_value}"
+                merged = (existing + "\n" + new_text) if existing else new_text
+                normalized["freeText"] = merged
+            continue
+        display, details, warn_code = _normalize_field_value(std_key, raw_value)
+        if not display:
+            continue
+        if std_key in normalized and normalized[std_key] != display:
+            per_source_warnings.append(
+                IngestionWarning(
+                    code="FIELD_CONFLICT",
+                    detail=f"field={std_key!r} values=[{normalized[std_key]!r}, {display!r}]",
+                    inputId=input_id,
+                    fieldName=std_key,
+                )
+            )
+            continue
+        normalized[std_key] = display
+        if details:
+            normalized_details[std_key] = details
+        if warn_code:
+            per_source_warnings.append(
+                IngestionWarning(
+                    code=warn_code,
+                    detail=f"field={std_key!r} value={raw_value!r}",
+                    inputId=input_id,
+                    fieldName=std_key,
+                )
+            )
+    return normalized, normalized_details, per_source_warnings
+
+
+def _merge_text_and_table_fields(
+    inp: dict,
+    normalized: dict[str, str],
+    normalized_details: dict[str, dict],
+    per_source_warnings: list[IngestionWarning],
+    input_id: str,
+) -> dict[str, str]:
+    """2) extractedText / 3) extractedTables 에서 key-value 보강 후 merge."""
+    text_extracted = _extract_from_text(inp.get("extractedText") or "")
+    tables_extracted = _extract_from_tables(inp.get("extractedTables") or [])
+
+    for source_dict in (text_extracted, tables_extracted):
+        normalized_again: dict[str, str] = {}
+        for k, v in source_dict.items():
+            display, details, warn_code = _normalize_field_value(k, v)
+            if not display:
+                continue
+            normalized_again[k] = display
+            if details and k not in normalized_details:
+                normalized_details[k] = details
+            if warn_code:
+                per_source_warnings.append(
+                    IngestionWarning(
+                        code=warn_code,
+                        detail=f"field={k!r} value={v!r}",
+                        inputId=input_id,
+                        fieldName=k,
+                    )
+                )
+        normalized = _merge_fields_with_conflict_check(
+            normalized,
+            normalized_again,
+            per_source_warnings,
+            input_id,
+        )
+    return normalized
+
+
+def _build_evidence_source_record(
+    inp: dict,
+    input_id: str,
+    source_name: str,
+    source_type: str,
+    normalized_fields: tuple[dict[str, str], dict[str, dict]],
+    per_source_warnings: list[IngestionWarning],
+) -> dict:
+    """4) 결과 evidence 레코드 — confidence 계산 + 부족 경고 부가."""
+    normalized, normalized_details = normalized_fields
+    ev_id = inp.get("evidenceId") or f"ev_{uuid.uuid4().hex[:8]}"
+    confidence = _confidence_for_source(
+        source_type,
+        num_fields=len(normalized),
+        has_text=bool(inp.get("extractedText")),
+        has_tables=bool(inp.get("extractedTables")),
+    )
+
+    if not normalized:
+        per_source_warnings.append(
+            IngestionWarning(
+                code="MISSING_EXTRACTED_FIELDS",
+                detail=f"no normalized field extracted from {source_name!r}",
+                inputId=input_id,
+            )
+        )
+
+    if confidence < 0.4:
+        per_source_warnings.append(
+            IngestionWarning(
+                code="LOW_CONFIDENCE_EXTRACTION",
+                detail=f"confidence={confidence}",
+                inputId=input_id,
+            )
+        )
+
+    return {
+        "evidenceId": ev_id,
+        "sourceType": source_type,
+        "sourceName": source_name,
+        "sourceHash": inp["sourceHash"],
+        "extractedFields": normalized,
+        "extractedFieldDetails": normalized_details,
+        "confidence": confidence,
+        "warnings": [w.to_dict() for w in per_source_warnings],
+    }
+
+
 # ── public API ──────────────────────────────────────────────────────────────
+
 
 def build_evidence_sources(inputs: list[dict]) -> EvidenceIngestionResult:
     """업로드된 자료 입력 목록 → EvidenceIngestionResult."""
     result = EvidenceIngestionResult(requestId=str(uuid.uuid4()))
     result.sourceCount = len(inputs or [])
 
-    for inp in (inputs or []):
+    for inp in inputs or []:
         if not isinstance(inp, dict):
-            result.rejectedInputs.append(RejectedInput(
-                inputId="", sourceName="",
-                reason="input is not a dict",
-                warningCode="EMPTY_INPUT",
-            ))
+            result.rejectedInputs.append(
+                RejectedInput(
+                    inputId="",
+                    sourceName="",
+                    reason="input is not a dict",
+                    warningCode="EMPTY_INPUT",
+                )
+            )
             continue
 
         input_id = inp.get("inputId") or str(uuid.uuid4())
         source_name = inp.get("sourceName") or ""
 
-        # sourceHash 필수
-        if not (inp.get("sourceHash") or "").strip():
-            result.rejectedInputs.append(RejectedInput(
-                inputId=input_id, sourceName=source_name,
-                reason="sourceHash is required",
-                warningCode="SOURCE_HASH_REQUIRED",
-            ))
-            continue
-
-        # 비어 있는 입력 (모든 추출 입력이 없음)
-        is_empty = (
-            not (inp.get("extractedFields") or {})
-            and not (inp.get("extractedText") or "").strip()
-            and not (inp.get("extractedTables") or [])
-            and not (inp.get("metadata") or {})
-        )
-        if is_empty:
-            result.rejectedInputs.append(RejectedInput(
-                inputId=input_id, sourceName=source_name,
-                reason="no extractedFields / extractedText / extractedTables / metadata",
-                warningCode="EMPTY_INPUT",
-            ))
+        rejection = _reject_reason(inp)
+        if rejection is not None:
+            reason, warning_code = rejection
+            result.rejectedInputs.append(
+                RejectedInput(
+                    inputId=input_id,
+                    sourceName=source_name,
+                    reason=reason,
+                    warningCode=warning_code,
+                )
+            )
             continue
 
         source_type, type_warnings = _detect_source_type(inp)
         for code in type_warnings:
-            result.warnings.append(IngestionWarning(
-                code=code, detail=f"sourceName={source_name!r}", inputId=input_id,
-            ))
-
-        # 1) 직접 주어진 extractedFields (한국어 키도 영어 표준 키로 정규화)
-        normalized: dict[str, str] = {}
-        normalized_details: dict[str, dict] = {}
-        per_source_warnings: list[IngestionWarning] = []
-
-        raw_fields_in = inp.get("extractedFields") or {}
-        for raw_key, raw_value in raw_fields_in.items():
-            std_key = _alias_to_standard(raw_key)
-            if std_key not in STANDARD_FIELD_NAMES:
-                # 비표준 키는 freeText로 모은다 (충돌 가능성 → conflict check)
-                if raw_value:
-                    existing = normalized.get("freeText", "")
-                    new_text = f"{raw_key}: {raw_value}"
-                    merged = (existing + "\n" + new_text) if existing else new_text
-                    normalized["freeText"] = merged
-                continue
-            display, details, warn_code = _normalize_field_value(std_key, raw_value)
-            if not display:
-                continue
-            if std_key in normalized and normalized[std_key] != display:
-                per_source_warnings.append(IngestionWarning(
-                    code="FIELD_CONFLICT",
-                    detail=f"field={std_key!r} values=[{normalized[std_key]!r}, {display!r}]",
-                    inputId=input_id, fieldName=std_key,
-                ))
-                continue
-            normalized[std_key] = display
-            if details:
-                normalized_details[std_key] = details
-            if warn_code:
-                per_source_warnings.append(IngestionWarning(
-                    code=warn_code,
-                    detail=f"field={std_key!r} value={raw_value!r}",
-                    inputId=input_id, fieldName=std_key,
-                ))
-
-        # 2) extractedText에서 key-value 보강
-        text_extracted = _extract_from_text(inp.get("extractedText") or "")
-        # 3) extractedTables에서 label-value 보강
-        tables_extracted = _extract_from_tables(inp.get("extractedTables") or [])
-
-        # 보강 결과는 conflict check 후 merge
-        for source_dict in (text_extracted, tables_extracted):
-            normalized_again: dict[str, str] = {}
-            for k, v in source_dict.items():
-                display, details, warn_code = _normalize_field_value(k, v)
-                if not display:
-                    continue
-                normalized_again[k] = display
-                if details and k not in normalized_details:
-                    normalized_details[k] = details
-                if warn_code:
-                    per_source_warnings.append(IngestionWarning(
-                        code=warn_code, detail=f"field={k!r} value={v!r}",
-                        inputId=input_id, fieldName=k,
-                    ))
-            normalized = _merge_fields_with_conflict_check(
-                normalized, normalized_again, per_source_warnings, input_id,
+            result.warnings.append(
+                IngestionWarning(
+                    code=code,
+                    detail=f"sourceName={source_name!r}",
+                    inputId=input_id,
+                )
             )
 
-        # 결과 evidence
-        ev_id = inp.get("evidenceId") or f"ev_{uuid.uuid4().hex[:8]}"
-        confidence = _confidence_for_source(
-            source_type,
-            num_fields=len(normalized),
-            has_text=bool(inp.get("extractedText")),
-            has_tables=bool(inp.get("extractedTables")),
+        normalized, normalized_details, per_source_warnings = _normalize_extracted_fields(
+            inp.get("extractedFields") or {}, input_id
+        )
+        normalized = _merge_text_and_table_fields(
+            inp, normalized, normalized_details, per_source_warnings, input_id
         )
 
-        if not normalized:
-            per_source_warnings.append(IngestionWarning(
-                code="MISSING_EXTRACTED_FIELDS",
-                detail=f"no normalized field extracted from {source_name!r}",
-                inputId=input_id,
-            ))
-
-        if confidence < 0.4:
-            per_source_warnings.append(IngestionWarning(
-                code="LOW_CONFIDENCE_EXTRACTION",
-                detail=f"confidence={confidence}", inputId=input_id,
-            ))
-
-        evidence_source = {
-            "evidenceId": ev_id,
-            "sourceType": source_type,
-            "sourceName": source_name,
-            "sourceHash": inp["sourceHash"],
-            "extractedFields": normalized,
-            "extractedFieldDetails": normalized_details,
-            "confidence": confidence,
-            "warnings": [w.to_dict() for w in per_source_warnings],
-        }
+        evidence_source = _build_evidence_source_record(
+            inp,
+            input_id,
+            source_name,
+            source_type,
+            (normalized, normalized_details),
+            per_source_warnings,
+        )
         result.evidenceSources.append(evidence_source)
         result.warnings.extend(per_source_warnings)
 

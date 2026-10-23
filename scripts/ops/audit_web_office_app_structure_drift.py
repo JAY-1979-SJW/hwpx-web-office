@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -82,6 +81,8 @@ REQUIRED_ENDPOINTS = [
     "POST /api/web-office/catalog-match",
     "POST /api/web-office/catalog-by-category",
     "POST /api/web-office/catalog-ai-search",
+    # WEB-OFFICE-CATALOG-FILL-01: 참조 hwpx 값 -> 카탈로그 매칭 대상 서식 칸 채움 제안(규칙 기반, AI 미사용).
+    "POST /api/web-office/catalog-fill",
     # WEB-OFFICE-CONVERT-01: 온디맨드 서식 준비(HWP→한컴 COM 변환) + 산출물 다운로드.
     "POST /api/web-office/prepare-form",
     "GET /api/web-office/download/{filename}",
@@ -149,8 +150,7 @@ def audit() -> dict[str, Any]:
         _check(findings, "ENDPOINT_NOT_IMPLEMENTED", endpoint in routes, endpoint)
 
     unexpected_routes = sorted(route for route in routes if route not in REQUIRED_ENDPOINTS)
-    for route in unexpected_routes:
-        findings.append({"code": "UNEXPECTED_ENDPOINT_IMPLEMENTED", "detail": route})
+    findings.extend({"code": "UNEXPECTED_ENDPOINT_IMPLEMENTED", "detail": route} for route in unexpected_routes)
 
     _check(findings, "STATIC_MOUNT_MISSING", 'app.mount(' in api_source and '"/web-office"' in api_source, "app.mount /web-office")
     _check(findings, "MODE_NOT_SANDBOX_ONLY", 'MODE = "SANDBOX_ONLY"' in api_source, _rel(API_ROUTE))

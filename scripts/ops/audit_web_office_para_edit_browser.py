@@ -6,7 +6,6 @@ JS 브라우저 상태기계 + runtime + React 컴포넌트의 정적 잠금 +
 from __future__ import annotations
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 PR = Path(__file__).resolve().parents[2]
@@ -38,11 +37,9 @@ def _check_static() -> list[dict]:
                                       "detail": str(p.relative_to(PR))})
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_JS:
-            if tok in src:
-                findings.append({"code": "FORBIDDEN_JS_TOKEN",
+        findings.extend({"code": "FORBIDDEN_JS_TOKEN",
                                           "level": "FAIL",
-                                          "detail": f"{p.name}: {tok}"})
+                                          "detail": f"{p.name}: {tok}"} for tok in FORBIDDEN_JS if tok in src)
     return findings
 
 
@@ -74,10 +71,9 @@ def audit() -> dict:
     # 본 공정 디렉토리 .hwpx 0건
     for d in [VIEWER_DIR, PR / "scripts/hwpx/web_office"]:
         if d.is_dir():
-            for f in d.glob("*.hwpx"):
-                findings.append({"code": "UNEXPECTED_HWPX",
+            findings.extend({"code": "UNEXPECTED_HWPX",
                                           "level": "FAIL",
-                                          "detail": str(f.relative_to(PR))})
+                                          "detail": str(f.relative_to(PR))} for f in d.glob("*.hwpx"))
 
     return {
         "task": "WEB-OFFICE-PARA-EDIT-BROWSER-01",

@@ -296,7 +296,7 @@ def test_T29_final_export_tests_pass():
     r = subprocess.run(
         [sys.executable, "-m", "pytest",
          "tests/test_hwpx_form_writer_final_export_gate.py", "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -318,7 +318,7 @@ def test_T30_upstream_tests_pass():
          "tests/test_hwpx_review_panel.py",
          "tests/test_hwpx_form_field_mapping.py",
          "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr

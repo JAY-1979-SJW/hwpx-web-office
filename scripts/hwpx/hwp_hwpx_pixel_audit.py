@@ -54,7 +54,7 @@ def run_render(input_path: Path, output_path: Path, page: int, resolution: int) 
         "-Resolution",
         str(resolution),
     ]
-    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, timeout=180)
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=180)
     if completed.returncode != 0:
         return {
             "ok": False,

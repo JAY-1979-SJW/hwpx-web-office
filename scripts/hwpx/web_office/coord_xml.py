@@ -67,9 +67,7 @@ def direct_linesegs(p):
     out = []
     for arr in p:
         if ln(arr.tag) == "linesegarray":
-            for s in arr:
-                if ln(s.tag) == "lineseg":
-                    out.append(s.attrib)
+            out.extend(s.attrib for s in arr if ln(s.tag) == "lineseg")
     return out
 
 

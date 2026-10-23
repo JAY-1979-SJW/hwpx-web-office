@@ -6,7 +6,6 @@ closeout 문서 + RISK-LEDGER 별책이 시방서의 필수 섹션 / 토큰을 �
 from __future__ import annotations
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 PR = Path(__file__).resolve().parents[2]
@@ -79,10 +78,9 @@ def _no_new_hwpx_outputs() -> list[dict]:
     for p in scan:
         if not p.is_dir():
             continue
-        for f in p.glob("**/*.hwpx"):
-            findings.append({"code": "UNEXPECTED_HWPX_OUTPUT",
+        findings.extend({"code": "UNEXPECTED_HWPX_OUTPUT",
                                       "level": "FAIL",
-                                      "detail": str(f.relative_to(PR))})
+                                      "detail": str(f.relative_to(PR))} for f in p.glob("**/*.hwpx"))
     return findings
 
 
@@ -90,7 +88,7 @@ def _commit_is_reachable(sha: str) -> bool:
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--verify", sha + "^{commit}"],
-            capture_output=True, text=True, timeout=10, cwd=str(PR))
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=str(PR))
         return r.returncode == 0
     except Exception:
         return False
@@ -110,20 +108,14 @@ def audit() -> dict:
                                   "level": "FAIL",
                                   "detail": str(RISK_DOC.relative_to(PR))})
 
-    for sec in REQUIRED_CLOSEOUT_SECTIONS:
-        if sec not in co:
-            findings.append({"code": "CLOSEOUT_SECTION_MISSING",
-                                      "level": "FAIL", "detail": sec})
+    findings.extend({"code": "CLOSEOUT_SECTION_MISSING",
+                                      "level": "FAIL", "detail": sec} for sec in REQUIRED_CLOSEOUT_SECTIONS if sec not in co)
 
-    for tok in REQUIRED_CLOSEOUT_TOKENS:
-        if tok not in co:
-            findings.append({"code": "CLOSEOUT_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "CLOSEOUT_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_CLOSEOUT_TOKENS if tok not in co)
 
-    for tok in REQUIRED_RISK_TOKENS:
-        if tok not in rl:
-            findings.append({"code": "RISK_TOKEN_MISSING",
-                                      "level": "FAIL", "detail": tok})
+    findings.extend({"code": "RISK_TOKEN_MISSING",
+                                      "level": "FAIL", "detail": tok} for tok in REQUIRED_RISK_TOKENS if tok not in rl)
 
     # commit anchor 가 실제 reachable 인지 확인
     if not _commit_is_reachable(MVP_A_COMMIT):

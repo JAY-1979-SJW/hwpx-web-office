@@ -3,15 +3,19 @@
 section XML에서 표/행/셀을 파싱하여 TableInfo 목록을 반환한다.
 기존 corpus profiler의 table parsing 로직을 wrapper 수준으로 재구성.
 """
+
 from __future__ import annotations
 
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
-from .parser_contract import TableInfo, CellInfo
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
+
 from .errors import WarnCode
+from .parser_contract import CellInfo, TableInfo
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 _TAG_TBL = f"{{{NS_HP}}}tbl"
@@ -19,6 +23,8 @@ _TAG_TR = f"{{{NS_HP}}}tr"
 _TAG_TC = f"{{{NS_HP}}}tc"
 _TAG_T = f"{{{NS_HP}}}t"
 _TAG_CELLSPAN = f"{{{NS_HP}}}cellSpan"
+_TAG_CELLADDR = f"{{{NS_HP}}}cellAddr"
+_TAG_CELLSZ = f"{{{NS_HP}}}cellSz"
 _TAG_RUN = f"{{{NS_HP}}}run"
 _TAG_P = f"{{{NS_HP}}}p"
 _TAG_SUBLIST = f"{{{NS_HP}}}subList"
@@ -85,32 +91,60 @@ def _iter_cell_content(elem: ET.Element, _root: bool = True):
 
 
 def _cell_raw_text(tc: ET.Element) -> str:
-    return "".join(_inline_text(e) for e in _iter_cell_content(tc)
-                   if e.tag == _TAG_T)
+    return "".join(_inline_text(e) for e in _iter_cell_content(tc) if e.tag == _TAG_T)
 
 
 def _cell_span(tc: ET.Element) -> tuple[int, int]:
     for child in tc:
         if child.tag == _TAG_CELLSPAN:
             try:
-                return (int(child.attrib.get("colSpan", "1")),
-                        int(child.attrib.get("rowSpan", "1")))
+                return (
+                    int(child.attrib.get("colSpan", "1")),
+                    int(child.attrib.get("rowSpan", "1")),
+                )
             except ValueError:
                 return 1, 1
     return 1, 1
 
 
+def _cell_height(tc: ET.Element) -> int:
+    sz = tc.find(_TAG_CELLSZ)
+    try:
+        return int(sz.get("height", "0")) if sz is not None else 0
+    except ValueError:
+        return 0
+
+
+def _cell_addr(tc: ET.Element, default_row: int, default_col: int) -> tuple[int, int]:
+    """hp:cellAddr 의 (rowAddr, colAddr). 편집기(hwpx_table_ops)가 쓰는 격자 주소와 같다.
+
+    row/col 은 행 안 순번(웹 오피스·적재 스키마 키가 의존)이라 그대로 두고, 격자 주소는
+    visualRow/visualCol 에 싣는다. 병합 칸이 있는 행에서는 둘이 달라, 순번으로 쓰면
+    값이 엉뚱한 칸에 들어간다. cellAddr 가 없으면 순번을 그대로 쓴다.
+    """
+    for child in tc:
+        if child.tag == _TAG_CELLADDR:
+            try:
+                return (
+                    int(child.attrib.get("rowAddr", default_row)),
+                    int(child.attrib.get("colAddr", default_col)),
+                )
+            except ValueError:
+                break
+    return default_row, default_col
+
+
 def _extract_cell_style(tc: ET.Element, style_defs: dict) -> dict:
     """tc 요소에서 스타일 ID 참조와 결정값을 추출."""
     border_fill_id = tc.get("borderFillIDRef", "")
-    char_pr_ids = list(dict.fromkeys(
-        el.get("charPrIDRef", "") for el in tc.iter(_TAG_RUN)
-        if el.get("charPrIDRef")
-    ))
-    para_pr_ids = list(dict.fromkeys(
-        el.get("paraPrIDRef", "") for el in tc.iter(_TAG_P)
-        if el.get("paraPrIDRef")
-    ))
+    char_pr_ids = list(
+        dict.fromkeys(
+            el.get("charPrIDRef", "") for el in tc.iter(_TAG_RUN) if el.get("charPrIDRef")
+        )
+    )
+    para_pr_ids = list(
+        dict.fromkeys(el.get("paraPrIDRef", "") for el in tc.iter(_TAG_P) if el.get("paraPrIDRef"))
+    )
 
     fill_color: str | None = None
     font_height: int | None = None
@@ -164,7 +198,9 @@ def _extract_cell_style(tc: ET.Element, style_defs: dict) -> dict:
     if not h_align and para_align:
         h_align = para_align
     sl = tc.find(_TAG_SUBLIST)
-    v_align = sl.get("vertAlign", "") if sl is not None else tc.get("vAlign", tc.get("verticalAlign", ""))
+    v_align = (
+        sl.get("vertAlign", "") if sl is not None else tc.get("vAlign", tc.get("verticalAlign", ""))
+    )
 
     return {
         "borderFillIDRef": border_fill_id or None,
@@ -202,17 +238,19 @@ def _cell_paragraphs(tc: ET.Element) -> list[str]:
     return paras
 
 
-def _parse_table_element(tbl: ET.Element, section_index: int,
-                          table_index: int, block_index: int,
-                          style_defs: dict | None = None) -> TableInfo:
+def _parse_table_element(
+    tbl: ET.Element,
+    section_index: int,
+    table_index: int,
+    block_index: int,
+    style_defs: dict | None = None,
+) -> TableInfo:
     _style_defs = style_defs or {}
     table_id = f"t_s{section_index}_{table_index:03d}"
     rows_raw = [c for c in tbl if c.tag == _TAG_TR]
 
     cells: list[CellInfo] = []
-    raw_rows: list[list[ET.Element]] = []
-    for tr in rows_raw:
-        raw_rows.append([c for c in tr if c.tag == _TAG_TC])
+    raw_rows: list[list[ET.Element]] = [[c for c in tr if c.tag == _TAG_TC] for tr in rows_raw]
 
     row_count = len(raw_rows)
     col_count = max((len(r) for r in raw_rows), default=0)
@@ -223,6 +261,7 @@ def _parse_table_element(tbl: ET.Element, section_index: int,
     for ri, row in enumerate(raw_rows):
         for ci, tc in enumerate(row):
             col_span, row_span = _cell_span(tc)
+            addr_row, addr_col = _cell_addr(tc, ri, ci)
             if col_span > 1 or row_span > 1:
                 has_merged = True
             nested = _has_nested_table(tc)
@@ -240,41 +279,44 @@ def _parse_table_element(tbl: ET.Element, section_index: int,
             # isLikelyInputSlot: 빈 셀 (라벨 오른쪽 첫 번째 후보)
             is_slot = not norm_text and ri > 0
 
-            cells.append(CellInfo(
-                cellId=cell_id,
-                row=ri,
-                col=ci,
-                visualRow=ri,
-                visualCol=ci,
-                rowSpan=row_span,
-                colSpan=col_span,
-                isMergedOrigin=(col_span > 1 or row_span > 1),
-                text=raw_text,
-                normalizedText=norm_text,
-                paragraphs=paras,
-                charPrIDRefs=style["charPrIDRefs"],
-                paraPrIDRefs=style["paraPrIDRefs"],
-                borderFillIDRef=style["borderFillIDRef"],
-                fillColor=style["fillColor"],
-                fontHeight=style["fontHeight"],
-                fontSizePt=style["fontSizePt"],
-                fontFace=style["fontFace"],
-                fontName=style["fontName"],
-                bold=style["bold"],
-                italic=style["italic"],
-                underline=style["underline"],
-                textColor=style["textColor"],
-                horizontalAlign=style["horizontalAlign"],
-                verticalAlign=style["verticalAlign"],
-                marginLeft=style["marginLeft"],
-                marginRight=style["marginRight"],
-                marginTop=style["marginTop"],
-                marginBottom=style["marginBottom"],
-                borderSummary=style["borderSummary"],
-                hasNestedTable=nested,
-                isLikelyLabel=is_label,
-                isLikelyInputSlot=is_slot,
-            ))
+            cells.append(
+                CellInfo(
+                    cellId=cell_id,
+                    row=ri,
+                    col=ci,
+                    visualRow=addr_row,
+                    visualCol=addr_col,
+                    rowSpan=row_span,
+                    colSpan=col_span,
+                    isMergedOrigin=(col_span > 1 or row_span > 1),
+                    text=raw_text,
+                    normalizedText=norm_text,
+                    paragraphs=paras,
+                    charPrIDRefs=style["charPrIDRefs"],
+                    paraPrIDRefs=style["paraPrIDRefs"],
+                    borderFillIDRef=style["borderFillIDRef"],
+                    fillColor=style["fillColor"],
+                    fontHeight=style["fontHeight"],
+                    fontSizePt=style["fontSizePt"],
+                    fontFace=style["fontFace"],
+                    fontName=style["fontName"],
+                    bold=style["bold"],
+                    italic=style["italic"],
+                    underline=style["underline"],
+                    textColor=style["textColor"],
+                    horizontalAlign=style["horizontalAlign"],
+                    verticalAlign=style["verticalAlign"],
+                    marginLeft=style["marginLeft"],
+                    marginRight=style["marginRight"],
+                    marginTop=style["marginTop"],
+                    marginBottom=style["marginBottom"],
+                    borderSummary=style["borderSummary"],
+                    hasNestedTable=nested,
+                    cellHeight=_cell_height(tc),
+                    isLikelyLabel=is_label,
+                    isLikelyInputSlot=is_slot,
+                )
+            )
 
     # 헤더 행 감지 (row 0 중심)
     header_row_candidates: list[int] = []
@@ -309,12 +351,15 @@ def _parse_table_element(tbl: ET.Element, section_index: int,
     )
 
 
-def parse_tables_from_section(section_xml: bytes, section_index: int,
-                               start_block_index: int = 0,
-                               style_defs: dict | None = None) -> list[TableInfo]:
+def parse_tables_from_section(
+    section_xml: bytes,
+    section_index: int,
+    start_block_index: int = 0,
+    style_defs: dict | None = None,
+) -> list[TableInfo]:
     """section XML bytes에서 모든 표를 파싱해 TableInfo 목록 반환."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return []
 

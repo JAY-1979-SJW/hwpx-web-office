@@ -40,8 +40,7 @@ def expand_rowspan_content(cells, row_h, nrow):
     for c in cells:
         if c["rowSpan"] <= 1:
             continue
-        idxs = [i for i in range(c["row"], c["row"] + c["rowSpan"])
-                if 0 <= i < nrow]
+        idxs = [i for i in range(c["row"], c["row"] + c["rowSpan"]) if 0 <= i < nrow]
         if not idxs:
             continue
         # 내용 수용 하드 불변식 — 셀은 자기 내용(본문 줄)을 반드시 담는다.
@@ -71,23 +70,20 @@ def normalize_declared(cells, col_w, row_h, tw, th, nrow):
     # 무시한다. cellSz(행별 저장 실높이)가 한컴 실배치와 일치함이 다중
     # 문서 픽셀 감사로 검증됨. stale th 로 축소하면 행이 내용 밀착까지
     # 눌려 서식이 뭉개진다. th-정규화는 근소 인플레이션(≤1.5x)만 보정.
-    if th > 0 and sh > 0 and sh <= th * 1.5:
-        if sh > th * 1.02:
-            # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
-            # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
-            # 근사가 행을 부풀려 페이지가 배로 늘던 결함의 근본 보정.
-            min_need = [0.0] * nrow
-            for c in cells:
-                if c["rowSpan"] == 1:
-                    need = min(c["hContent"] + c["mt"] * 2, c["hEff"])
-                    if need > min_need[c["row"]]:
-                        min_need[c["row"]] = need
-            slack = [max(0.0, row_h[i] - min_need[i])
-                     for i in range(nrow)]
-            tslack = sum(slack)
-            if tslack > 1e-6:
-                k = min(1.0, (sh - th) / tslack)
-                row_h = [row_h[i] - slack[i] * k for i in range(nrow)]
+    if th > 0 and sh > 0 and sh <= th * 1.5 and sh > th * 1.02:
+        # 과대(인플레이션) — 각 행의 "내용 최소높이"는 보장하고
+        # 여유분만 비례 축소해 선언 표높이(th)로 수렴. rowSpan 분배
+        # 근사가 행을 부풀려 페이지가 배로 늘던 결함의 근본 보정.
+        min_need = [0.0] * nrow
+        for c in cells:
+            if c["rowSpan"] == 1:
+                need = min(c["hContent"] + c["mt"] * 2, c["hEff"])
+                min_need[c["row"]] = max(min_need[c["row"]], need)
+        slack = [max(0.0, row_h[i] - min_need[i]) for i in range(nrow)]
+        tslack = sum(slack)
+        if tslack > 1e-6:
+            k = min(1.0, (sh - th) / tslack)
+            row_h = [row_h[i] - slack[i] * k for i in range(nrow)]
     return col_w, row_h
 
 
@@ -106,6 +102,55 @@ def sim_bottom(row_h, base_y, geo):
     return cur
 
 
+def _compute_compact_row_heights(cells, row_h, nrow):
+    """행별 컴팩트 하한(comp) — 단일-span 셀의 '글리프 합 + 여백 절반'."""
+    comp = [0.0] * nrow
+    for c in cells:
+        if c["rowSpan"] == 1:
+            v = c["hCompact"] + c["mt"]  # 여백 2mt → mt(절반)
+            comp[c["row"]] = max(comp[c["row"]], v)
+    for i in range(nrow):
+        if comp[i] <= 0 or comp[i] > row_h[i]:
+            comp[i] = row_h[i]
+    return comp
+
+
+def _page_available_height(start_pg, p_end, base_y, anchor_abs, geo):
+    """[start_pg..p_end] 페이지 구간에서 표가 실제로 쓸 수 있는 세로 공간 합."""
+    page_h = geo["page_h"]
+    m_top = geo["m_top"]
+    content_h = geo["content_h"]
+    tgt = 0.0
+    for pg in range(start_pg, p_end + 1):
+        top = base_y if pg == start_pg else pg * page_h + m_top
+        bot = anchor_abs - 2 if pg == p_end else pg * page_h + m_top + content_h
+        if bot > top:
+            tgt += bot - top
+    return tgt
+
+
+def _trim_residual_overflow(row_h, nrow, base_y, geo, anchor_abs):
+    """컴팩트 하한(α=1)으로도 수 px 초과 시, 잔여를 행당 절대 상한
+    2.5px(렌더러 clip-margin 3px 이내 = 시각 무해)로 균등 분배해 깎는다.
+    비례 축소는 대형(다줄) 행에서 더 많이 깎아 줄이 셀 밖으로 밀리므로
+    쓰지 않는다."""
+    removed = [0.0] * nrow
+    for _ in range(4):
+        excess = sim_bottom(row_h, base_y, geo) - (anchor_abs - 2)
+        if excess <= 1.0:
+            break
+        budget = [max(0.0, 2.5 - removed[i]) for i in range(nrow)]
+        tot_b = sum(budget)
+        if tot_b <= 0.5:
+            break  # 상한 소진 — 잔여는 수용(과깎기 금지)
+        kk = min(1.0, excess / tot_b)
+        for i in range(nrow):
+            cut = budget[i] * kk
+            row_h[i] -= cut
+            removed[i] += cut
+    return row_h
+
+
 def compress_to_anchor(cells, row_h, nrow, base_y, anchor_vpos, geo):
     """앵커 역산 — HWPX 는 자동흐름 페이지 나눔을 저장하지 않지만, 표 다음
     본문 문단의 vpos(페이지 상대)는 한컴이 실제 배치한 좌표다. 표가
@@ -116,75 +161,40 @@ def compress_to_anchor(cells, row_h, nrow, base_y, anchor_vpos, geo):
     않는다. 단일페이지 표는 건드리지 않는다. 반환: (row_h, alpha)."""
     page_h = geo["page_h"]
     m_top = geo["m_top"]
-    content_h = geo["content_h"]
     alpha = 0.0
     if anchor_vpos is None or page_h <= 0:
         return row_h, alpha
     sh_now = sum(row_h)
     start_pg = int(base_y // page_h)
     end_pg = int(sim_bottom(row_h, base_y, geo) // page_h)
-    if not (end_pg > start_pg and sh_now > 0):   # 페이지 넘는 표만
+    if not (end_pg > start_pg and sh_now > 0):  # 페이지 넘는 표만
         return row_h, alpha
-    comp = [0.0] * nrow                # 행별 컴팩트 하한
-    for c in cells:
-        if c["rowSpan"] == 1:
-            v = c["hCompact"] + c["mt"]   # 여백 2mt → mt(절반)
-            if v > comp[c["row"]]:
-                comp[c["row"]] = v
-    for i in range(nrow):
-        if comp[i] <= 0 or comp[i] > row_h[i]:
-            comp[i] = row_h[i]
+    comp = _compute_compact_row_heights(cells, row_h, nrow)
     sh_comp = sum(comp)
     for p_end in range(start_pg, end_pg + 1):
         anchor_abs = p_end * page_h + m_top + anchor_vpos
         if anchor_abs <= base_y + 1:
             continue
-        tgt = 0.0                  # 목표높이 = 페이지별 가용합
-        for pg in range(start_pg, p_end + 1):
-            top = base_y if pg == start_pg else pg * page_h + m_top
-            bot = (anchor_abs - 2 if pg == p_end
-                   else pg * page_h + m_top + content_h)
-            if bot > top:
-                tgt += bot - top
+        tgt = _page_available_height(start_pg, p_end, base_y, anchor_abs, geo)
         if tgt < sh_comp * 0.96:
-            continue    # 컴팩트로도 안 들어감 → 다음 페이지 후보
+            continue  # 컴팩트로도 안 들어감 → 다음 페이지 후보
         if tgt >= sh_now:
-            break       # 압축 불필요(이미 앵커 안)
+            break  # 압축 불필요(이미 앵커 안)
         denom = sh_now - sh_comp
         a = (sh_now - tgt) / denom if denom > 1e-6 else 1.0
         a = min(1.0, max(0.0, a))
         # 행이 페이지 경계를 통째로 넘으며 생기는 슬랙 보정 —
         # 재시뮬레이션으로 하단이 앵커 안에 들 때까지 α 미세 상향.
         for _ in range(4):
-            rh = [row_h[i] - a * (row_h[i] - comp[i])
-                  for i in range(nrow)]
+            rh = [row_h[i] - a * (row_h[i] - comp[i]) for i in range(nrow)]
             excess = sim_bottom(rh, base_y, geo) - (anchor_abs - 2)
             if excess <= 1.0 or a >= 1.0:
                 break
             a = min(1.0, a + excess / max(denom, 1e-6))
-        row_h = [row_h[i] - a * (row_h[i] - comp[i])
-                 for i in range(nrow)]
+        row_h = [row_h[i] - a * (row_h[i] - comp[i]) for i in range(nrow)]
         alpha = a
-        # 컴팩트 하한(α=1)로도 수 px 초과하면 잔여를 행당 절대
-        # 상한 2.5px(렌더러 clip-margin 3px 이내 = 시각 무해)로
-        # 균등 분배해 깎는다. 비례 축소는 대형(다줄) 행에서 더
-        # 많이 깎아 줄이 셀 밖으로 밀리므로 쓰지 않는다.
         if a >= 1.0:
-            removed = [0.0] * nrow
-            for _ in range(4):
-                excess = sim_bottom(row_h, base_y, geo) - (anchor_abs - 2)
-                if excess <= 1.0:
-                    break
-                budget = [max(0.0, 2.5 - removed[i])
-                          for i in range(nrow)]
-                tot_b = sum(budget)
-                if tot_b <= 0.5:
-                    break   # 상한 소진 — 잔여는 수용(과깎기 금지)
-                kk = min(1.0, excess / tot_b)
-                for i in range(nrow):
-                    cut = budget[i] * kk
-                    row_h[i] -= cut
-                    removed[i] += cut
+            row_h = _trim_residual_overflow(row_h, nrow, base_y, geo, anchor_abs)
         break
     return row_h, alpha
 
@@ -206,6 +216,7 @@ def paginate_rows(cells, row_h, nrow, base_y, geo):
     page_h = geo["page_h"]
     m_top = geo["m_top"]
     content_h = geo["content_h"]
+
     def _paginate(start_y):
         ra = [start_y] * (nrow + 1)
         cur = start_y
@@ -215,8 +226,7 @@ def paginate_rows(cells, row_h, nrow, base_y, geo):
             if page_h > 0:
                 _pg = int(cur // page_h)
                 _cbot = _pg * page_h + m_top + content_h
-                if (cur + row_h[i] > _cbot + 1.0
-                        and row_h[i] <= content_h + 1.0):
+                if cur + row_h[i] > _cbot + 1.0 and row_h[i] <= content_h + 1.0:
                     if first_jump_at is None:
                         first_jump_at = placed
                     cur = (_pg + 1) * page_h + m_top
@@ -227,9 +237,7 @@ def paginate_rows(cells, row_h, nrow, base_y, geo):
         return ra, first_jump_at
 
     row_abs, _fj = _paginate(base_y)
-    if (_fj is not None and page_h > 0
-            and _fj < content_h * 0.12
-            and _fj > 0):
+    if _fj is not None and page_h > 0 and _fj < content_h * 0.12 and _fj > 0:
         _next_top = (int(base_y // page_h) + 1) * page_h + m_top
         if _next_top > base_y:
             row_abs, _ = _paginate(_next_top)
@@ -246,5 +254,5 @@ def col_rank_map(cells):
         row_cols.setdefault(c["row"], set()).add(c["col"])
     for r, cs in row_cols.items():
         for rank, ca in enumerate(sorted(cs)):
-            col_rank[(r, ca)] = rank
+            col_rank[r, ca] = rank
     return col_rank

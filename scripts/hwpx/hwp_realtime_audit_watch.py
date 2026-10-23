@@ -6,13 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-import hwp_to_hwpx_standalone as core
 import hwp_full_fidelity_converter as full
 import hwp_hwp5proc_audit
+import hwp_to_hwpx_standalone as core
 import openhwp_rust_probe
 
 
@@ -51,8 +52,10 @@ def attach_identity_audit(result: dict[str, Any], *, require_identity: bool) -> 
         return audited
     try:
         analysis = full.analyze_hwp(Path(str(input_value)), include_records=False)
-        identity = full.build_identity_audit(Path(str(input_value)), Path(str(output_value)), analysis=analysis)
-    except Exception as exc:  # noqa: BLE001
+        identity = full.build_identity_audit(
+            Path(str(input_value)), Path(str(output_value)), analysis=analysis
+        )
+    except Exception as exc:  # ruff: ignore[blind-except]
         identity = {
             "status": "FAIL",
             "mode": "full_fidelity_identity_audit",
@@ -79,7 +82,11 @@ def attach_openhwp_audit(
     audited = dict(result)
     if not openhwp_root:
         audited["openhwp_status"] = "SKIPPED"
-        audited["openhwp_audit"] = {"enabled": False, "status": "SKIPPED", "reason": "OPENHWP_NOT_CONFIGURED"}
+        audited["openhwp_audit"] = {
+            "enabled": False,
+            "status": "SKIPPED",
+            "reason": "OPENHWP_NOT_CONFIGURED",
+        }
         return audited
     input_value = audited.get("input")
     if not input_value:
@@ -88,7 +95,7 @@ def attach_openhwp_audit(
         try:
             audit = openhwp_rust_probe.run_probe(Path(str(input_value)), openhwp_root=openhwp_root)
             audit["enabled"] = True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             audit = {
                 "enabled": True,
                 "status": "FAIL",
@@ -104,22 +111,27 @@ def attach_openhwp_audit(
     return audited
 
 
+@dataclass
+class RealtimeWatchSettings:
+    job_id: str
+    started_at: str
+    input_dir: Path
+    output_dir: Path
+    pattern: str
+    existing_policy: str
+    fidelity_policy: str
+    embed_original: bool
+    require_identity: bool
+    hwp5proc: Path | None
+    require_hwp5proc: bool
+    openhwp_root: Path | None
+    require_openhwp: bool
+    interval_sec: float
+
+
 def build_realtime_report(
+    settings: RealtimeWatchSettings,
     *,
-    job_id: str,
-    started_at: str,
-    input_dir: Path,
-    output_dir: Path,
-    pattern: str,
-    existing_policy: str,
-    fidelity_policy: str,
-    embed_original: bool,
-    require_identity: bool,
-    hwp5proc: Path | None,
-    require_hwp5proc: bool,
-    openhwp_root: Path | None,
-    require_openhwp: bool,
-    interval_sec: float,
     cycle_count: int,
     events: list[dict[str, Any]],
     results: list[dict[str, Any]],
@@ -127,54 +139,54 @@ def build_realtime_report(
 ) -> dict[str, Any]:
     counts = summarize_results(results)
     status = "PASS" if counts["fail_count"] == 0 else "FAIL"
-    report = core.attach_watch_gate(
-        {
-            "status": status,
-            "mode": "watch_text_only_rebuild",
-            "job_id": job_id,
-            "started_at": started_at,
-            "finished_at": core.iso_now() if final else "",
-            "duration_sec": round((core.utc_now() - core.datetime.fromisoformat(started_at)).total_seconds(), 6),
-            "input_dir": str(input_dir),
-            "output_dir": str(output_dir),
-            "pattern": pattern,
-            "cycle_count": cycle_count,
-            "detected_count": len(results),
-            **counts,
-            "existing_policy": existing_policy,
-            "fidelity_policy": fidelity_policy,
-            "embed_original": embed_original,
-            "identity_audit": {
-                "enabled": True,
-                "require_identity": require_identity,
-                "identity_pass_count": counts["identity_pass_count"],
-                "identity_fail_count": counts["identity_fail_count"],
-            },
-            "hwp5proc_audit": {
-                "enabled": bool(hwp5proc),
-                "hwp5proc": str(hwp5proc) if hwp5proc else "",
-                "require_hwp5proc": require_hwp5proc,
-                "hwp5proc_pass_count": counts["hwp5proc_pass_count"],
-                "hwp5proc_warn_count": counts["hwp5proc_warn_count"],
-                "hwp5proc_fail_count": counts["hwp5proc_fail_count"],
-            },
-            "openhwp_audit": {
-                "enabled": bool(openhwp_root),
-                "openhwp_root": str(openhwp_root) if openhwp_root else "",
-                "require_openhwp": require_openhwp,
-                "openhwp_pass_count": counts["openhwp_pass_count"],
-                "openhwp_fail_count": counts["openhwp_fail_count"],
-            },
-            "interval_sec": interval_sec,
-            "events": events,
-            "results": results,
-            "realtime": {
-                "active": not final,
-                "last_cycle": cycle_count,
-                "last_checked_at": events[-1]["checked_at"] if events else "",
-            },
-        }
-    )
+    report = core.attach_watch_gate({
+        "status": status,
+        "mode": "watch_text_only_rebuild",
+        "job_id": settings.job_id,
+        "started_at": settings.started_at,
+        "finished_at": core.iso_now() if final else "",
+        "duration_sec": round(
+            (core.utc_now() - core.datetime.fromisoformat(settings.started_at)).total_seconds(), 6
+        ),
+        "input_dir": str(settings.input_dir),
+        "output_dir": str(settings.output_dir),
+        "pattern": settings.pattern,
+        "cycle_count": cycle_count,
+        "detected_count": len(results),
+        **counts,
+        "existing_policy": settings.existing_policy,
+        "fidelity_policy": settings.fidelity_policy,
+        "embed_original": settings.embed_original,
+        "identity_audit": {
+            "enabled": True,
+            "require_identity": settings.require_identity,
+            "identity_pass_count": counts["identity_pass_count"],
+            "identity_fail_count": counts["identity_fail_count"],
+        },
+        "hwp5proc_audit": {
+            "enabled": bool(settings.hwp5proc),
+            "hwp5proc": str(settings.hwp5proc) if settings.hwp5proc else "",
+            "require_hwp5proc": settings.require_hwp5proc,
+            "hwp5proc_pass_count": counts["hwp5proc_pass_count"],
+            "hwp5proc_warn_count": counts["hwp5proc_warn_count"],
+            "hwp5proc_fail_count": counts["hwp5proc_fail_count"],
+        },
+        "openhwp_audit": {
+            "enabled": bool(settings.openhwp_root),
+            "openhwp_root": str(settings.openhwp_root) if settings.openhwp_root else "",
+            "require_openhwp": settings.require_openhwp,
+            "openhwp_pass_count": counts["openhwp_pass_count"],
+            "openhwp_fail_count": counts["openhwp_fail_count"],
+        },
+        "interval_sec": settings.interval_sec,
+        "events": events,
+        "results": results,
+        "realtime": {
+            "active": not final,
+            "last_cycle": cycle_count,
+            "last_checked_at": events[-1]["checked_at"] if events else "",
+        },
+    })
     return report
 
 
@@ -193,7 +205,9 @@ def write_cycle_audit(
     cycle_report["target_count"] = len(cycle_results)
     counts = summarize_results(cycle_results)
     cycle_report.update(counts)
-    core.write_audit_log(audit_log, cycle_report, event="realtime_watch_cycle", audit_level=audit_level)
+    core.write_audit_log(
+        audit_log, cycle_report, event="realtime_watch_cycle", audit_level=audit_level
+    )
     if audit_level == "forensic":
         resolved = Path(audit_log).expanduser().resolve()
         resolved.parent.mkdir(parents=True, exist_ok=True)
@@ -201,13 +215,17 @@ def write_cycle_audit(
             item = dict(result)
             item["job_id"] = report.get("job_id")
             item["mode"] = "watch_text_only_rebuild"
-            record = core.build_audit_record(item, event="realtime_conversion_item", audit_level="forensic")
+            record = core.build_audit_record(
+                item, event="realtime_conversion_item", audit_level="forensic"
+            )
             record["cycle"] = cycle
             record["item_index"] = index
-            resolved.open("a", encoding="utf-8").write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+            resolved.open("a", encoding="utf-8").write(
+                json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+            )
 
 
-def run_realtime_watch(
+def run_realtime_watch(  # ruff: ignore[too-many-arguments] (5개 호출부 - main()+테스트 4곳 - 키워드 인자라 시그니처 변경 보류)
     input_dir: Path,
     output_dir: Path,
     *,
@@ -238,6 +256,22 @@ def run_realtime_watch(
     events: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     cycle = 0
+    settings = RealtimeWatchSettings(
+        job_id=resolved_job_id,
+        started_at=started_at,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        pattern=pattern,
+        existing_policy=existing_policy,
+        fidelity_policy=fidelity_policy,
+        embed_original=embed_original,
+        require_identity=require_identity,
+        hwp5proc=hwp5proc,
+        require_hwp5proc=require_hwp5proc,
+        openhwp_root=openhwp_root,
+        require_openhwp=require_openhwp,
+        interval_sec=interval_sec,
+    )
 
     while True:
         cycle += 1
@@ -252,42 +286,32 @@ def run_realtime_watch(
             fidelity_policy=fidelity_policy,
             embed_original=embed_original,
         )
-        cycle_results = [attach_identity_audit(result, require_identity=require_identity) for result in cycle_results]
         cycle_results = [
-            hwp_hwp5proc_audit.attach_hwp5proc_audit(result, hwp5proc=hwp5proc, require_hwp5proc=require_hwp5proc)
+            attach_identity_audit(result, require_identity=require_identity)
+            for result in cycle_results
+        ]
+        cycle_results = [
+            hwp_hwp5proc_audit.attach_hwp5proc_audit(
+                result, hwp5proc=hwp5proc, require_hwp5proc=require_hwp5proc
+            )
             for result in cycle_results
         ]
         cycle_results = [
             attach_openhwp_audit(result, openhwp_root=openhwp_root, require_openhwp=require_openhwp)
             for result in cycle_results
         ]
-        events.append(
-            {
-                "cycle": cycle,
-                "checked_at": core.iso_now(),
-                "detected_count": len(detections),
-                "converted_count": len(cycle_results),
-                "result_statuses": [result.get("status") for result in cycle_results],
-                "detections": detections,
-            }
-        )
+        events.append({
+            "cycle": cycle,
+            "checked_at": core.iso_now(),
+            "detected_count": len(detections),
+            "converted_count": len(cycle_results),
+            "result_statuses": [result.get("status") for result in cycle_results],
+            "detections": detections,
+        })
         results.extend(cycle_results)
         final = max_cycles is not None and cycle >= max(1, int(max_cycles))
         report = build_realtime_report(
-            job_id=resolved_job_id,
-            started_at=started_at,
-            input_dir=input_dir,
-            output_dir=output_dir,
-            pattern=pattern,
-            existing_policy=existing_policy,
-            fidelity_policy=fidelity_policy,
-            embed_original=embed_original,
-            require_identity=require_identity,
-            hwp5proc=hwp5proc,
-            require_hwp5proc=require_hwp5proc,
-            openhwp_root=openhwp_root,
-            require_openhwp=require_openhwp,
-            interval_sec=interval_sec,
+            settings,
             cycle_count=cycle,
             events=events,
             results=results,
@@ -310,11 +334,27 @@ def main() -> int:
     parser.add_argument("--fidelity-policy", choices=core.FIDELITY_POLICIES, default="audit")
     parser.add_argument("--no-embed-original", action="store_true")
     parser.add_argument("--strict-quality", action="store_true")
-    parser.add_argument("--require-identity", action="store_true", help="Treat full-fidelity identity audit failures as conversion failures")
-    parser.add_argument("--hwp5proc", type=Path, help="Optional hwp5proc.exe path for realtime source record audits")
-    parser.add_argument("--require-hwp5proc", action="store_true", help="Treat hwp5proc audit failures as conversion failures")
-    parser.add_argument("--openhwp-root", type=Path, help="Optional OpenHWP checkout root for Rust parser audits")
-    parser.add_argument("--require-openhwp", action="store_true", help="Treat OpenHWP parser audit failures as conversion failures")
+    parser.add_argument(
+        "--require-identity",
+        action="store_true",
+        help="Treat full-fidelity identity audit failures as conversion failures",
+    )
+    parser.add_argument(
+        "--hwp5proc", type=Path, help="Optional hwp5proc.exe path for realtime source record audits"
+    )
+    parser.add_argument(
+        "--require-hwp5proc",
+        action="store_true",
+        help="Treat hwp5proc audit failures as conversion failures",
+    )
+    parser.add_argument(
+        "--openhwp-root", type=Path, help="Optional OpenHWP checkout root for Rust parser audits"
+    )
+    parser.add_argument(
+        "--require-openhwp",
+        action="store_true",
+        help="Treat OpenHWP parser audit failures as conversion failures",
+    )
     parser.add_argument("--interval-sec", type=float, default=2.0)
     parser.add_argument("--max-cycles", type=int)
     parser.add_argument("--audit-log", type=Path)

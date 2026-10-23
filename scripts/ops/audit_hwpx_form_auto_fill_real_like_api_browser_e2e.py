@@ -35,7 +35,7 @@ def _run_pytest(paths: list[str], timeout: int = 900) -> dict[str, Any]:
         [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=timeout,
     )
     text = result.stdout + "\n" + result.stderr
@@ -60,7 +60,7 @@ def _dirty_baseline() -> dict[str, Any]:
         ["git", "status", "--short"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -255,8 +255,7 @@ def _write_summary_md(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Checks",
     ]
-    for item in summary["checks"]:
-        lines.append(f"- {item['status']} {item['code']} {item['desc']}")
+    lines.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in summary["checks"])
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

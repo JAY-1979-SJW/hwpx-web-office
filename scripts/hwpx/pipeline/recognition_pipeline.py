@@ -3,6 +3,7 @@
 전체 파이프라인 흐름 조립:
 parse_before → recognize → plan → edit → parse_after → compare → hancom_verify → final_decision
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -10,13 +11,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .pipeline_contract import (
-    PipelineResult, RecognitionResult, make_request_id,
-)
-from .plan_builder import build_edit_plan, build_edit_plan_from_form, _FIELD_LABEL_MAP
 from .form_recognizer import recognize_form
-from .reparse_verifier import verify as reparse_verify
 from .hancom_safe_gate import verify as hancom_verify
+from .pipeline_contract import (
+    PipelineResult,
+    RecognitionResult,
+    make_request_id,
+)
+from .plan_builder import build_edit_plan, build_edit_plan_from_form
+from .reparse_verifier import verify as reparse_verify
 
 _SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
 _HWPX_DIR = _SCRIPTS / "hwpx"
@@ -25,6 +28,10 @@ for _p in [str(_SCRIPTS), str(_HWPX_DIR)]:
         sys.path.insert(0, _p)
 
 from hwpx.parser import parse_hwpx_v2  # type: ignore
+
+
+# 글자 맞춤·글자 모양 같은 꾸밈 후처리 단계의 실패 — 값 쓰기 자체는 성공했고, 값은 다시 읽기로 따로 검증한다.
+_COSMETIC_STEP_STATUSES = {"SUBLIST_NOT_FOUND", "CELL_CHAR_STYLE_NOT_FOUND"}
 
 
 def _recognize(parser_result) -> RecognitionResult:
@@ -58,6 +65,105 @@ def _recognize(parser_result) -> RecognitionResult:
     return rec
 
 
+def _run_parse_before_stage(input_path: Path, result: PipelineResult):
+    """1) parse_before. 성공 시 파싱 결과 반환, 실패 시 result를 FAIL로 채우고 None 반환."""
+    try:
+        before = parse_hwpx_v2(input_path)
+        result.stages["parse_before"] = "ok"
+    except Exception as exc:  # ruff: ignore[blind-except] -- 예외를 구조화된 실패 결과로 변환
+        result.errors.append(f"parse_before_failed: {exc}")
+        result.stages["parse_before"] = "error"
+        _mark_not_verified(result, "FAIL")
+        result.finalDecision = "FAIL"
+        return None
+
+    if getattr(before, "errors", []):
+        result.errors.append(
+            f"parser_errors: {[getattr(e, 'code', str(e)) for e in before.errors]}"
+        )
+        result.stages["parse_before"] = "error"
+        _mark_not_verified(result, "FAIL")
+        result.finalDecision = "FAIL"
+        return None
+    return before
+
+
+def _run_recognition_stage(before, result: PipelineResult):
+    # ── 2. recognize (form_recognizer 우선) ─────────────────────────────────
+    form_rec = None
+    try:
+        form_rec = recognize_form(before)
+        result.formType = form_rec.formType
+        result.tableRoles = form_rec.tableRoles
+        result.inputSlots = form_rec.enhancedSlots
+        result.unsafeTargets = form_rec.unsafeTableIds
+        result.stages["recognize"] = "review_required" if form_rec.reviewRequired else "ok"
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 warning 기록 후 계속
+        result.warnings.append(f"form_recognize_failed: {exc}")
+        result.stages["recognize"] = "error"
+
+    try:
+        rec = _recognize(before)
+        result.recognition = rec
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 warning 기록 후 계속
+        result.warnings.append(f"recognize_failed: {exc}")
+        rec = RecognitionResult(reviewRequired=True)
+        result.recognition = rec
+
+    return form_rec, rec
+
+
+def _run_post_edit_verification(
+    before, after, plan_result, output_path, result: PipelineResult
+) -> None:
+    # ── 6. compare (reparse verify) ─────────────────────────────────────────
+    try:
+        vr = reparse_verify(before, after, plan_result)
+        result.verification = vr
+        result.stages["compare"] = vr.decision
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 warning 기록 후 계속
+        result.warnings.append(f"reparse_verify_failed: {exc}")
+        result.stages["compare"] = "error"
+        result.verification.decision = "REVIEW_REQUIRED"
+
+    # ── 7. hancom_verify ────────────────────────────────────────────────────
+    try:
+        hv = hancom_verify(output_path)
+        result.hancomVerify = hv
+        result.stages["hancom_verify"] = hv.verdict
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 warning 기록 후 계속
+        result.warnings.append(f"hancom_verify_failed: {exc}")
+        result.stages["hancom_verify"] = "error"
+        result.hancomVerify.verdict = "error"
+
+
+def _mark_not_verified(result: PipelineResult, decision: str) -> None:
+    """검증 단계에 닿기 전에 끝난 실행은 하위 판정이 기본값 PASS 로 남지 않게 맞춘다.
+
+    호출자가 verification.decision / hancomVerify.verdict 만 읽어도 통과로 오해하지 못하게 한다.
+    """
+    result.verification.decision = decision
+    result.hancomVerify.verdict = decision
+
+
+def _determine_final_decision(result: PipelineResult) -> str:
+    # ── 8. final_decision ───────────────────────────────────────────────────
+    hv_verdict = result.hancomVerify.verdict
+    cmp_decision = result.verification.decision
+
+    if hv_verdict == "PASS" and cmp_decision == "PASS":
+        return "PASS"
+    if hv_verdict == "FAIL" or cmp_decision == "FAIL":
+        decision = "FAIL"
+    else:
+        decision = "REVIEW_REQUIRED"
+    if hv_verdict == "PASS":
+        result.warnings.append(
+            f"hancom_verify_pass_but_{cmp_decision.lower()}: 한글 호환 검사는 통과, 쓴 칸 대조는 {cmp_decision}"
+        )
+    return decision
+
+
 def run_pipeline(
     input_path: Path,
     output_path: Path,
@@ -73,42 +179,11 @@ def run_pipeline(
         outputFile=str(output_path),
     )
 
-    # ── 1. parse_before ─────────────────────────────────────────────────────
-    try:
-        before = parse_hwpx_v2(input_path)
-        result.stages["parse_before"] = "ok"
-    except Exception as exc:
-        result.errors.append(f"parse_before_failed: {exc}")
-        result.stages["parse_before"] = "error"
-        result.finalDecision = "FAIL"
+    before = _run_parse_before_stage(input_path, result)
+    if before is None:
         return result
 
-    if getattr(before, "errors", []):
-        result.errors.append(f"parser_errors: {[getattr(e,'code',str(e)) for e in before.errors]}")
-        result.stages["parse_before"] = "error"
-        result.finalDecision = "FAIL"
-        return result
-
-    # ── 2. recognize (form_recognizer 우선) ─────────────────────────────────
-    form_rec = None
-    try:
-        form_rec = recognize_form(before)
-        result.formType = form_rec.formType
-        result.tableRoles = form_rec.tableRoles
-        result.inputSlots = form_rec.enhancedSlots
-        result.unsafeTargets = form_rec.unsafeTableIds
-        result.stages["recognize"] = "review_required" if form_rec.reviewRequired else "ok"
-    except Exception as exc:
-        result.warnings.append(f"form_recognize_failed: {exc}")
-        result.stages["recognize"] = "error"
-
-    try:
-        rec = _recognize(before)
-        result.recognition = rec
-    except Exception as exc:
-        result.warnings.append(f"recognize_failed: {exc}")
-        rec = RecognitionResult(reviewRequired=True)
-        result.recognition = rec
+    form_rec, rec = _run_recognition_stage(before, result)
 
     # ── 3. plan ─────────────────────────────────────────────────────────────
     try:
@@ -121,31 +196,46 @@ def run_pipeline(
         result.skippedFields = plan_result.skippedFields
         result.reviewRequiredFields = list(plan_result.reviewRequiredReasons.keys())
         result.stages["plan"] = "ok" if plan_result.plannedFields else "partial"
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] -- 예외를 구조화된 실패 결과로 변환
         result.errors.append(f"plan_failed: {exc}")
         result.stages["plan"] = "error"
+        _mark_not_verified(result, "FAIL")
         result.finalDecision = "FAIL"
         return result
 
     if not plan_result.editPlan:
         result.warnings.append("empty_edit_plan: no fields planned")
         result.stages["edit"] = "skipped"
-        result.finalDecision = "REVIEW_REQUIRED"
+        _mark_not_verified(result, "FAIL")
+        result.finalDecision = "FAIL"
         return result
 
     # ── 4. edit ─────────────────────────────────────────────────────────────
     try:
-        from hwpx_edit_tool import apply_edit_plan  # type: ignore
-        edit_report = apply_edit_plan(input_path, output_path, plan_result.editPlan)
+        from .edit_runner import apply_plan
+
+        edit_report = apply_plan(input_path, output_path, plan_result.editPlan)
+        if edit_report.get("status") == "FAIL" and not edit_report.get("errors"):
+            # 편집기가 일부 작업 실패(예: LABEL_CELL_NOT_FOUND)를 status 로만 알리는 경우
+            failed = [
+                str(op.get("status"))
+                for op in edit_report.get("operations", [])
+                if "PASS" not in str(op.get("status", "")).upper()
+                and str(op.get("status")) not in _COSMETIC_STEP_STATUSES
+            ]
+            if failed:
+                edit_report["errors"] = [f"edit_status_fail: {failed[:5]}"]
         if edit_report.get("errors"):
             result.errors.extend(edit_report["errors"])
             result.stages["edit"] = "error"
+            _mark_not_verified(result, "FAIL")
             result.finalDecision = "FAIL"
             return result
         result.stages["edit"] = "ok"
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] -- 예외를 구조화된 실패 결과로 변환
         result.errors.append(f"edit_failed: {exc}")
         result.stages["edit"] = "error"
+        _mark_not_verified(result, "FAIL")
         result.finalDecision = "FAIL"
         return result
 
@@ -153,40 +243,13 @@ def run_pipeline(
     try:
         after = parse_hwpx_v2(output_path)
         result.stages["parse_after"] = "ok"
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] -- 예외를 구조화된 실패 결과로 변환
         result.warnings.append(f"parse_after_failed: {exc}")
         result.stages["parse_after"] = "error"
+        _mark_not_verified(result, "REVIEW_REQUIRED")
         result.finalDecision = "REVIEW_REQUIRED"
         return result
 
-    # ── 6. compare (reparse verify) ─────────────────────────────────────────
-    try:
-        vr = reparse_verify(before, after, plan_result)
-        result.verification = vr
-        result.stages["compare"] = vr.decision
-    except Exception as exc:
-        result.warnings.append(f"reparse_verify_failed: {exc}")
-        result.stages["compare"] = "error"
-
-    # ── 7. hancom_verify ────────────────────────────────────────────────────
-    try:
-        hv = hancom_verify(output_path)
-        result.hancomVerify = hv
-        result.stages["hancom_verify"] = hv.verdict
-    except Exception as exc:
-        result.warnings.append(f"hancom_verify_failed: {exc}")
-        result.stages["hancom_verify"] = "error"
-        result.hancomVerify.verdict = "error"
-
-    # ── 8. final_decision ───────────────────────────────────────────────────
-    hv_verdict = result.hancomVerify.verdict
-    cmp_decision = result.verification.decision
-
-    if hv_verdict == "PASS" and cmp_decision == "PASS":
-        result.finalDecision = "PASS"
-    elif hv_verdict == "FAIL" or cmp_decision == "FAIL":
-        result.finalDecision = "FAIL"
-    else:
-        result.finalDecision = "REVIEW_REQUIRED"
-
+    _run_post_edit_verification(before, after, plan_result, output_path, result)
+    result.finalDecision = _determine_final_decision(result)
     return result

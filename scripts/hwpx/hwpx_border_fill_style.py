@@ -138,8 +138,7 @@ def create_border_fill(root: ET.Element, name: str, spec: dict[str, Any]) -> tup
         set(spec)
         - {"background_color", "fill_color", "border_type", "border_width", "border_color", "borders"}
     )
-    for field in unsupported:
-        warnings.append({"type": "BORDER_FILL_FIELD_PENDING", "name": name, "field": field})
+    warnings.extend({"type": "BORDER_FILL_FIELD_PENDING", "name": name, "field": field} for field in unsupported)
 
     container.append(border_fill)
     _bump_item_count(container)

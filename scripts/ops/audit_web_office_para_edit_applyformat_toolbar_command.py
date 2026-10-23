@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01 준공검사.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-TOOLBAR-COMMAND-01 준공검사.
 
 applyFormatToSelection helper (JS) → APPLY_FORMAT command 발급 →
 commandLog append-only 적재 회로의 정적·동적 검증.
@@ -15,13 +15,15 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ
+
 STATE_MJS = PR / "frontend/web_office_viewer/para_edit_state.mjs"
 CMD_MJS = PR / "frontend/web_office_viewer/para_edit_command.mjs"
 PREVIEW_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatPreview.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "para_edit_apply_format_smoke.mjs")
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 REQUIRED_STATE_PATTERNS = [
     r"export\s+function\s+applyFormatToSelection\(",
@@ -95,10 +97,8 @@ def _check_required_state() -> list[dict]:
         findings.append({"code": "STATE_MJS_MISSING", "level": "FAIL"})
         return findings
     src = STATE_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_STATE_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "STATE_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "STATE_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_STATE_PATTERNS if not re.search(pat, src))
     return findings
 
 
@@ -108,10 +108,8 @@ def _check_required_command() -> list[dict]:
         findings.append({"code": "CMD_MJS_MISSING", "level": "FAIL"})
         return findings
     src = CMD_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_CMD_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "CMD_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "CMD_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_CMD_PATTERNS if not re.search(pat, src))
     # makeApplyFormatCommand 1개만 정의되어야 한다 (factory 재정의 금지)
     defs = re.findall(
         r"export\s+function\s+makeApplyFormatCommand\b", src)
@@ -129,14 +127,10 @@ def _check_required_preview() -> list[dict]:
                           "level": "FAIL"})
         return findings
     src = PREVIEW_TSX.read_text(encoding="utf-8")
-    for pat in REQUIRED_PREVIEW_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "PREVIEW_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_PREVIEW_PATTERNS:
-        if re.search(pat, src):
-            findings.append({"code": "PREVIEW_FORBIDDEN_CALL",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "PREVIEW_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_PREVIEW_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "PREVIEW_FORBIDDEN_CALL",
+                              "level": "FAIL", "detail": pat} for pat in FORBIDDEN_PREVIEW_PATTERNS if re.search(pat, src))
     return findings
 
 
@@ -152,49 +146,27 @@ def _check_no_backend_call_in_frontend() -> list[dict]:
         if not p.is_file():
             continue
         src = p.read_text(encoding="utf-8")
-        for pat in FORBIDDEN_FRONTEND_BACKEND_CALLS:
-            if re.search(pat, src):
-                findings.append({"code": "BACKEND_CALL_IN_FRONTEND",
+        findings.extend({"code": "BACKEND_CALL_IN_FRONTEND",
                                   "level": "FAIL",
-                                  "detail": f"{rel}: {pat}"})
+                                  "detail": f"{rel}: {pat}"} for pat in FORBIDDEN_FRONTEND_BACKEND_CALLS if re.search(pat, src))
     return findings
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
-            continue
-        if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
-            continue
-        if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR)
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

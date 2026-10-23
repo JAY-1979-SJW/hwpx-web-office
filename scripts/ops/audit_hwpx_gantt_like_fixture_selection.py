@@ -28,7 +28,7 @@ manifest: dict = {}
 if manifest_ok:
     try:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    except Exception as e:
+    except Exception:
         manifest_ok = False
 
 check("C01", "gantt_fixture_manifest.json 존재", manifest_ok)

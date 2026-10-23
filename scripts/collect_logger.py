@@ -14,7 +14,6 @@
 import logging
 import logging.handlers
 from pathlib import Path
-from datetime import datetime
 
 LOG_DIR = Path.home() / "app/haehan-platform/logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)

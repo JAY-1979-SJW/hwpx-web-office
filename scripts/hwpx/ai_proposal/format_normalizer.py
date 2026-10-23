@@ -10,7 +10,6 @@ CLAUDE.md §6 격리 유지 — evidence_ingestion 의존 없이 자체 규칙.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 
 def normalize_value(*, semantic_type: str | None,

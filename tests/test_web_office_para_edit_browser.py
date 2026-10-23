@@ -21,7 +21,7 @@ from scripts.ops.audit_web_office_para_edit_browser import (  # noqa: E402
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

@@ -17,10 +17,10 @@ Writer Executor live mode — **sandbox 사본 한정** 첫 실 writer 호출 �
 이 모듈은 사본 파일에 한해 writer를 호출하지만, 원본 파일에 대해서는 절대로
 호출하지 않으며 시스템 어디에도 원본을 덮어쓰지 않는다.
 """
+
 from __future__ import annotations
 
 import hashlib
-import io
 import re
 import unicodedata
 import uuid
@@ -29,6 +29,10 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 from . import generic_edit_plan_writer_adapter as adapter
 
@@ -47,17 +51,44 @@ ALLOWED_LIVE_OPERATION_TYPES: frozenset[str] = frozenset({
 
 # align 허용값 (HWPX convention — 대소문자 무관 입력 허용, 내부 표준화)
 ALLOWED_HORIZONTAL_ALIGN_VALUES: frozenset[str] = frozenset({
-    "LEFT", "CENTER", "RIGHT", "JUSTIFY",
+    "LEFT",
+    "CENTER",
+    "RIGHT",
+    "JUSTIFY",
 })
 ALLOWED_VERTICAL_ALIGN_VALUES: frozenset[str] = frozenset({
-    "TOP", "CENTER", "BOTTOM",
+    "TOP",
+    "CENTER",
+    "BOTTOM",
 })
 
 _OVERWRITE_OPS: frozenset[str] = frozenset({
-    "setCellText", "setParagraphText",
-    "setCellHorizontalAlign", "setCellVerticalAlign",
-    "setCellFillColor", "setCellTextStyle", "replaceTextRun",
+    "setCellText",
+    "setParagraphText",
+    "setCellHorizontalAlign",
+    "setCellVerticalAlign",
+    "setCellFillColor",
+    "setCellTextStyle",
+    "replaceTextRun",
 })
+
+_PARAGRAPH_OP_TYPES = {"setParagraphText", "replaceTextRun"}
+_PARAGRAPH_FAILURE_TO_VERDICT = {
+    "expected_before_mismatch": "BLOCKED_EXPECTED_BEFORE_MISMATCH",
+    "target_not_found": "BLOCKED_TARGET_NOT_FOUND",
+    "find_text_not_found": "BLOCKED_FIND_TEXT_NOT_FOUND",
+    "ambiguous_text_run": "BLOCKED_AMBIGUOUS_TEXT_RUN",
+    "run_boundary_unsupported": "BLOCKED_RUN_BOUNDARY_UNSUPPORTED",
+    "invalid_find_text": "BLOCKED_INVALID_FIND_TEXT",
+}
+_PARAGRAPH_FAILURE_TO_FINDING = {
+    "expected_before_mismatch": "EXPECTED_BEFORE_MISMATCH",
+    "target_not_found": "TARGET_NOT_FOUND",
+    "find_text_not_found": "FIND_TEXT_NOT_FOUND",
+    "ambiguous_text_run": "AMBIGUOUS_TEXT_RUN",
+    "run_boundary_unsupported": "RUN_BOUNDARY_UNSUPPORTED",
+    "invalid_find_text": "INVALID_FIND_TEXT",
+}
 
 # 네임스페이스 prefix 등록 (재직렬화 시 보존)
 ET.register_namespace("hp", NS_HP)
@@ -65,6 +96,7 @@ ET.register_namespace("hh", NS_HH)
 
 
 # ── dataclass ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class AppliedCall:
@@ -115,8 +147,7 @@ class LiveFinding:
     operationId: str | None = None
 
     def to_dict(self) -> dict:
-        return {"code": self.code, "detail": self.detail,
-                "operationId": self.operationId}
+        return {"code": self.code, "detail": self.detail, "operationId": self.operationId}
 
 
 @dataclass
@@ -139,8 +170,7 @@ class ReadbackResult:
     def to_dict(self) -> dict:
         return {
             "targetCellsVerified": self.targetCellsVerified,
-            "untouchedCellNormalizedTextPreserved":
-                self.untouchedCellNormalizedTextPreserved,
+            "untouchedCellNormalizedTextPreserved": self.untouchedCellNormalizedTextPreserved,
             "tableCountPreserved": self.tableCountPreserved,
             "cellCountPreserved": self.cellCountPreserved,
             "rowSpanSumPreserved": self.rowSpanSumPreserved,
@@ -192,6 +222,7 @@ class LiveSandboxResult:
 
 # ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 
+
 def _parser_normalize(text: str) -> str:
     """parser table_parser._normalize와 동일한 정규화 (한글 사이 공백 제거 포함)."""
     if not text:
@@ -205,7 +236,7 @@ def _parser_normalize(text: str) -> str:
 
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -223,8 +254,7 @@ def _parse_table_id(table_id: str) -> tuple[int, int] | None:
 
 
 def _section_xml_name_for_index(zip_names: list[str], section_index: int) -> str | None:
-    sec_paths = sorted(n for n in zip_names
-                          if "section" in n and n.endswith(".xml"))
+    sec_paths = sorted(n for n in zip_names if "section" in n and n.endswith(".xml"))
     if 0 <= section_index < len(sec_paths):
         return sec_paths[section_index]
     return None
@@ -285,6 +315,7 @@ def _section_root_top_level_paragraphs(root) -> list:
 def _paragraph_visible_text(p_elem) -> str:
     """문단의 visible text 추출. 중첩 tbl 내부는 제외."""
     parts: list[str] = []
+
     def walk(e):
         if e.tag == _TAG_TBL_FULL:
             return
@@ -292,6 +323,7 @@ def _paragraph_visible_text(p_elem) -> str:
             parts.append(e.text)
         for c in list(e):
             walk(c)
+
     for c in list(p_elem):
         walk(c)
     return "".join(parts)
@@ -300,6 +332,7 @@ def _paragraph_visible_text(p_elem) -> str:
 def _paragraph_text_run_elements(p_elem) -> list:
     """문단 내 (중첩 tbl 제외) <hp:t> 요소 목록."""
     ts: list = []
+
     def walk(e):
         if e.tag == _TAG_TBL_FULL:
             return
@@ -307,6 +340,7 @@ def _paragraph_text_run_elements(p_elem) -> list:
             ts.append(e)
         for c in list(e):
             walk(c)
+
     for c in list(p_elem):
         walk(c)
     return ts
@@ -315,7 +349,7 @@ def _paragraph_text_run_elements(p_elem) -> list:
 def _section_paragraph_text_map(section_xml: bytes, section_idx: int) -> dict:
     """section XML에서 {paragraphKey: visibleText} 산출."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return {}
     result: dict[str, str] = {}
@@ -324,13 +358,12 @@ def _section_paragraph_text_map(section_xml: bytes, section_idx: int) -> dict:
     return result
 
 
-def _modify_paragraph_text_in_section_xml(section_xml: bytes,
-                                                paragraph_idx: int,
-                                                new_value: str,
-                                                expected_before) -> tuple[bytes, bool, str | None]:
+def _modify_paragraph_text_in_section_xml(
+    section_xml: bytes, paragraph_idx: int, new_value: str, expected_before
+) -> tuple[bytes, bool, str | None]:
     """setParagraphText 적용. return (xml_bytes, modified, failure_reason)."""
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False, "parse_error"
     paragraphs = _section_root_top_level_paragraphs(root)
@@ -355,16 +388,23 @@ def _modify_paragraph_text_in_section_xml(section_xml: bytes,
     return new_bytes, True, None
 
 
-def _replace_text_run_in_section_xml(section_xml: bytes,
-                                            paragraph_idx: int,
-                                            find_str: str,
-                                            replace_str: str,
-                                            expected_before) -> tuple[bytes, bool, str | None]:
+def _find_single_text_run_with(ts, find_str: str) -> ET.Element | None:
+    for t in ts:
+        if t.text and (find_str in t.text):
+            if t.text.count(find_str) == 1:
+                return t
+            return None
+    return None
+
+
+def _replace_text_run_in_section_xml(
+    section_xml: bytes, paragraph_idx: int, find_str: str, replace_str: str, expected_before
+) -> tuple[bytes, bool, str | None]:
     """replaceTextRun 적용. return (xml_bytes, modified, failure_reason)."""
     if find_str is None or find_str == "":
         return section_xml, False, "invalid_find_text"
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False, "parse_error"
     paragraphs = _section_root_top_level_paragraphs(root)
@@ -382,12 +422,7 @@ def _replace_text_run_in_section_xml(section_xml: bytes,
         return section_xml, False, "ambiguous_text_run"
     # 정확히 1회 occurrence — 어느 단일 <hp:t> 안에 있는지 확인
     ts = _paragraph_text_run_elements(target_p)
-    target_t = None
-    for t in ts:
-        if t.text and (find_str in t.text):
-            if t.text.count(find_str) == 1:
-                target_t = t
-            break
+    target_t = _find_single_text_run_with(ts, find_str)
     if target_t is None:
         # find가 run 경계에 걸쳐 단일 t 내부에 없음
         return section_xml, False, "run_boundary_unsupported"
@@ -422,9 +457,9 @@ def _find_cell_element(root, table_index: int, row: int, col: int):
     return None
 
 
-def _modify_cell_halign_in_section_xml(section_xml: bytes, table_index: int,
-                                            row: int, col: int,
-                                            new_value: str) -> tuple[bytes, bool]:
+def _modify_cell_halign_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """대상 셀의 hAlign 속성을 new_value로 설정 (대문자 정규화).
 
     parser는 tc[@hAlign] 또는 tc[@horizontalAlign]을 먼저 읽으므로 tc 속성에 직접 기록한다.
@@ -433,7 +468,7 @@ def _modify_cell_halign_in_section_xml(section_xml: bytes, table_index: int,
     if normalized not in ALLOWED_HORIZONTAL_ALIGN_VALUES:
         return section_xml, False
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
     tc = _find_cell_element(root, table_index, row, col)
@@ -445,9 +480,9 @@ def _modify_cell_halign_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _modify_cell_valign_in_section_xml(section_xml: bytes, table_index: int,
-                                            row: int, col: int,
-                                            new_value: str) -> tuple[bytes, bool]:
+def _modify_cell_valign_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """대상 셀의 vertAlign을 new_value로 설정.
 
     parser 우선순위: <hp:subList vertAlign=...> 가 있으면 그 값. 그 외 tc[@vAlign] 폴백.
@@ -457,7 +492,7 @@ def _modify_cell_valign_in_section_xml(section_xml: bytes, table_index: int,
     if normalized not in ALLOWED_VERTICAL_ALIGN_VALUES:
         return section_xml, False
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
     tc = _find_cell_element(root, table_index, row, col)
@@ -472,16 +507,51 @@ def _modify_cell_valign_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _modify_cell_text_in_section_xml(section_xml: bytes, table_index: int,
-                                          row: int, col: int,
-                                          new_value: str) -> tuple[bytes, bool]:
+def _find_target_cell(tbl: ET.Element, row: int, col: int) -> ET.Element | None:
+    tr_idx = 0
+    for tr in list(tbl):
+        if tr.tag != f"{{{NS_HP}}}tr":
+            continue
+        if tr_idx == row:
+            tc_idx = 0
+            for tc in list(tr):
+                if tc.tag != f"{{{NS_HP}}}tc":
+                    continue
+                if tc_idx == col:
+                    return tc
+                tc_idx += 1
+            return None
+        tr_idx += 1
+    return None
+
+
+def _apply_cell_text(tc: ET.Element, new_value: str) -> bool:
+    t_elements = list(tc.iter(f"{{{NS_HP}}}t"))
+    if t_elements:
+        t_elements[0].text = new_value
+        for t in t_elements[1:]:
+            t.text = ""
+        return True
+    # <hp:t>가 없으면 첫 p>run에 신규 t 삽입
+    for p in tc.iter(f"{{{NS_HP}}}p"):
+        run = p.find(f"{{{NS_HP}}}run")
+        target_parent = run if run is not None else p
+        new_t = ET.SubElement(target_parent, f"{{{NS_HP}}}t")
+        new_t.text = new_value
+        return True
+    return False
+
+
+def _modify_cell_text_in_section_xml(
+    section_xml: bytes, table_index: int, row: int, col: int, new_value: str
+) -> tuple[bytes, bool]:
     """section XML에서 (table_index, row, col) 셀의 텍스트만 수정.
 
     구조(charPr/borderFill/run/p) 보존, 첫 번째 <hp:t>에 new_value 기록, 나머지 <hp:t>은 비움.
     return (new_xml_bytes, modified)
     """
     try:
-        root = ET.fromstring(section_xml)
+        root = _dx_fromstring(section_xml)
     except ET.ParseError:
         return section_xml, False
 
@@ -492,35 +562,9 @@ def _modify_cell_text_in_section_xml(section_xml: bytes, table_index: int,
             tbl_count += 1
             continue
         # 일치 테이블
-        tr_idx = 0
-        for tr in list(tbl):
-            if tr.tag != f"{{{NS_HP}}}tr":
-                continue
-            if tr_idx == row:
-                tc_idx = 0
-                for tc in list(tr):
-                    if tc.tag != f"{{{NS_HP}}}tc":
-                        continue
-                    if tc_idx == col:
-                        t_elements = list(tc.iter(f"{{{NS_HP}}}t"))
-                        if t_elements:
-                            t_elements[0].text = new_value
-                            for t in t_elements[1:]:
-                                t.text = ""
-                            modified = True
-                        else:
-                            # <hp:t>가 없으면 첫 p>run에 신규 t 삽입
-                            for p in tc.iter(f"{{{NS_HP}}}p"):
-                                run = p.find(f"{{{NS_HP}}}run")
-                                target_parent = run if run is not None else p
-                                new_t = ET.SubElement(target_parent, f"{{{NS_HP}}}t")
-                                new_t.text = new_value
-                                modified = True
-                                break
-                        break
-                    tc_idx += 1
-                break
-            tr_idx += 1
+        tc = _find_target_cell(tbl, row, col)
+        if tc is not None:
+            modified = _apply_cell_text(tc, new_value)
         break
 
     if not modified:
@@ -529,12 +573,12 @@ def _modify_cell_text_in_section_xml(section_xml: bytes, table_index: int,
     return new_bytes, True
 
 
-def _write_sandbox_zip(source_path: Path, output_path: Path,
-                          section_modifications: dict[str, bytes]) -> None:
+def _write_sandbox_zip(
+    source_path: Path, output_path: Path, section_modifications: dict[str, bytes]
+) -> None:
     """원본 zip을 사본으로 복사하되 section_modifications에 있는 항목은 새 바이트로 교체."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(source_path, "r") as zin, \
-         zipfile.ZipFile(output_path, "w") as zout:
+    with zipfile.ZipFile(source_path, "r") as zin, zipfile.ZipFile(output_path, "w") as zout:
         infos = zin.infolist()
         ordered = sorted(infos, key=lambda i: 0 if i.filename == "mimetype" else 1)
         for info in ordered:
@@ -542,8 +586,7 @@ def _write_sandbox_zip(source_path: Path, output_path: Path,
                 data = section_modifications[info.filename]
             else:
                 data = zin.read(info.filename)
-            new_info = zipfile.ZipInfo(filename=info.filename,
-                                          date_time=info.date_time)
+            new_info = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
             new_info.compress_type = info.compress_type
             new_info.external_attr = info.external_attr
             zout.writestr(new_info, data)
@@ -573,92 +616,31 @@ def _snapshot(parser_result, hwpx_path: Path | None = None) -> dict:
         try:
             with zipfile.ZipFile(hwpx_path) as zf:
                 sec_names = sorted(
-                    n for n in zf.namelist()
-                    if "section" in n and n.endswith(".xml")
+                    n for n in zf.namelist() if "section" in n and n.endswith(".xml")
                 )
                 for sec_idx, name in enumerate(sec_names):
                     snap["paragraphText"].update(
                         _section_paragraph_text_map(zf.read(name), sec_idx)
                     )
-        except Exception:
+        except (KeyError, zipfile.BadZipFile, OSError, ET.ParseError):
             pass
     return snap
 
 
-# ── 메인 함수 ────────────────────────────────────────────────────────────────
+@dataclass
+class _CallValidationOutcome:
+    accepted_calls: list[dict]
+    skipped: list[SkippedCall]
+    findings: list[LiveFinding]
+    fatal_verdict: str | None
 
-def execute_writer_call_plan_live_sandbox(writer_call_plan,
-                                                source_path: Path,
-                                                sandbox_output_path: Path) -> LiveSandboxResult:
-    """sandbox 사본에 한해 writerCallPlan을 실제 적용한다.
 
-    원본 파일은 절대 수정되지 않는다 (sha256/mtime 검증).
-    setCellText 외 operation은 이번 공정에서 차단된다.
-    """
-    wcp = writer_call_plan.to_dict() if hasattr(writer_call_plan, "to_dict") \
-            else dict(writer_call_plan or {})
-    source_path = Path(source_path)
-    sandbox_output_path = Path(sandbox_output_path)
-    plan_id = wcp.get("planId", "")
-
-    result = LiveSandboxResult(
-        executorId=str(uuid.uuid4()),
-        planId=plan_id,
-        outputPath=str(sandbox_output_path).replace("\\", "/"),
-    )
-
-    # 1) 원본 sha256 기록 (변경 검증용)
-    if not source_path.exists():
-        result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "SOURCE_NOT_FOUND", f"source={source_path}",
-        ))
-        return result
-    source_sha_before = _sha256(source_path)
-    source_mtime_before = source_path.stat().st_mtime
-    result.sourceSha256Before = source_sha_before
-
-    # 2) sandbox path가 원본을 덮어쓰면 즉시 차단
-    try:
-        same_path = source_path.resolve() == sandbox_output_path.resolve()
-    except Exception:
-        same_path = str(source_path) == str(sandbox_output_path)
-    if same_path:
-        result.verdict = "BLOCKED_UNSAFE_OUTPUT_PATH"
-        result.safetyFindings.append(LiveFinding(
-            "OUTPUT_OVERWRITES_SOURCE",
-            f"sandbox output path equals source path={source_path}",
-        ))
-        result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
-        return result
-
-    # 3) adapter readiness
-    if not wcp.get("readyForWriter") or wcp.get("verdict") != "READY_FOR_WRITER":
-        result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "ADAPTER_NOT_READY",
-            f"writer adapter verdict={wcp.get('verdict')!r} "
-            f"readyForWriter={wcp.get('readyForWriter')}",
-        ))
-        result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
-        return result
-
-    calls = wcp.get("writerCalls", []) or []
-    if not calls:
-        result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
-        result.safetyFindings.append(LiveFinding(
-            "NO_WRITER_CALLS", "writerCalls is empty",
-        ))
-        result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
-        return result
-
-    # 4) 각 call 검증 + setCellText만 적용 후보로 분리
-    valid_methods = set(adapter.OPERATION_TO_WRITER_METHOD.values())
+def _validate_and_filter_calls(calls: list, valid_methods: set[str]) -> _CallValidationOutcome:
+    """writer call 목록을 검증해 적용 후보만 남긴다 (execute_writer_call_plan_live_sandbox 4단계)."""
     fatal_verdict: str | None = None
     accepted_calls: list[dict] = []
+    skipped: list[SkippedCall] = []
+    findings: list[LiveFinding] = []
 
     for raw in calls:
         c = raw if isinstance(raw, dict) else (raw.to_dict() if hasattr(raw, "to_dict") else {})
@@ -668,390 +650,402 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
         op_type = c.get("operationType", "")
 
         if method not in valid_methods:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "writer_method_not_whitelisted",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "WRITER_METHOD_NOT_WHITELISTED",
-                f"writerMethod={method!r}", op_id,
-            ))
+            skipped.append(SkippedCall(cmd_id, op_id, method, "writer_method_not_whitelisted"))
+            findings.append(
+                LiveFinding("WRITER_METHOD_NOT_WHITELISTED", f"writerMethod={method!r}", op_id)
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_UNSAFE_WRITER_METHOD"
             continue
 
         if op_type in _OVERWRITE_OPS and "expectedBefore" not in c:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "expected_before_missing",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "EXPECTED_BEFORE_MISSING", "", op_id,
-            ))
+            skipped.append(SkippedCall(cmd_id, op_id, method, "expected_before_missing"))
+            findings.append(LiveFinding("EXPECTED_BEFORE_MISSING", "", op_id))
             fatal_verdict = fatal_verdict or "BLOCKED_EXPECTED_BEFORE_MISSING"
             continue
 
         if not c.get("sourceDocumentHash"):
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "source_document_hash_missing",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "SOURCE_HASH_MISSING", "", op_id,
-            ))
+            skipped.append(SkippedCall(cmd_id, op_id, method, "source_document_hash_missing"))
+            findings.append(LiveFinding("SOURCE_HASH_MISSING", "", op_id))
             fatal_verdict = fatal_verdict or "BLOCKED_SOURCE_HASH_MISSING"
             continue
 
         if op_type not in ALLOWED_LIVE_OPERATION_TYPES:
-            result.skippedCalls.append(SkippedCall(
-                cmd_id, op_id, method, "unsupported_live_operation",
-            ))
-            result.safetyFindings.append(LiveFinding(
-                "UNSUPPORTED_LIVE_OPERATION",
-                f"operationType={op_type!r} not in {sorted(ALLOWED_LIVE_OPERATION_TYPES)}",
-                op_id,
-            ))
+            skipped.append(SkippedCall(cmd_id, op_id, method, "unsupported_live_operation"))
+            findings.append(
+                LiveFinding(
+                    "UNSUPPORTED_LIVE_OPERATION",
+                    f"operationType={op_type!r} not in {sorted(ALLOWED_LIVE_OPERATION_TYPES)}",
+                    op_id,
+                )
+            )
             fatal_verdict = fatal_verdict or "BLOCKED_UNSUPPORTED_LIVE_OPERATION"
             continue
 
         accepted_calls.append(c)
 
-    if fatal_verdict and not accepted_calls:
-        result.verdict = fatal_verdict
-        result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
-        return result
+    return _CallValidationOutcome(accepted_calls, skipped, findings, fatal_verdict)
 
-    # 5) 사본 작성: section 단위 수정 누적
-    # source zip의 entry 목록과 section 매핑 파악
-    with zipfile.ZipFile(source_path) as zf:
-        zip_names = zf.namelist()
-        section_xml_bytes_by_name: dict[str, bytes] = {}
-        for name in zip_names:
-            if "section" in name and name.endswith(".xml"):
-                section_xml_bytes_by_name[name] = zf.read(name)
 
-    section_modifications: dict[str, bytes] = {}
-    applied_with_target_info: list[tuple[dict, str]] = []   # (call, section_name)
+@dataclass
+class _CallApplyOutcome:
+    section_name: str | None = None
+    new_xml: bytes | None = None
+    skip_reason: str | None = None
+    finding: LiveFinding | None = None
+    fatal_verdict: str | None = None
 
-    _PARAGRAPH_OP_TYPES = {"setParagraphText", "replaceTextRun"}
-    _PARAGRAPH_FAILURE_TO_VERDICT = {
-        "expected_before_mismatch": "BLOCKED_EXPECTED_BEFORE_MISMATCH",
-        "target_not_found": "BLOCKED_TARGET_NOT_FOUND",
-        "find_text_not_found": "BLOCKED_FIND_TEXT_NOT_FOUND",
-        "ambiguous_text_run": "BLOCKED_AMBIGUOUS_TEXT_RUN",
-        "run_boundary_unsupported": "BLOCKED_RUN_BOUNDARY_UNSUPPORTED",
-        "invalid_find_text": "BLOCKED_INVALID_FIND_TEXT",
-    }
-    _PARAGRAPH_FAILURE_TO_FINDING = {
-        "expected_before_mismatch": "EXPECTED_BEFORE_MISMATCH",
-        "target_not_found": "TARGET_NOT_FOUND",
-        "find_text_not_found": "FIND_TEXT_NOT_FOUND",
-        "ambiguous_text_run": "AMBIGUOUS_TEXT_RUN",
-        "run_boundary_unsupported": "RUN_BOUNDARY_UNSUPPORTED",
-        "invalid_find_text": "INVALID_FIND_TEXT",
-    }
 
-    for c in accepted_calls:
-        target = c.get("target") or {}
-        new_value = c.get("value")
-        op_type = c.get("operationType", "")
+def _apply_paragraph_call(
+    c: dict,
+    zip_names: list[str],
+    section_modifications: dict[str, bytes],
+    section_xml_bytes_by_name: dict[str, bytes],
+) -> _CallApplyOutcome:
+    """paragraph 계열(setParagraphText/replaceTextRun) writer call을 사본 section XML에 적용한다."""
+    target = c.get("target") or {}
+    new_value = c.get("value")
+    op_type = c.get("operationType", "")
+    op_id = c.get("operationId", "")
 
-        # ── paragraph ops 분기 ────────────────────────────────────────────────
-        if op_type in _PARAGRAPH_OP_TYPES:
-            resolved = _resolve_paragraph_target(target)
-            if resolved is None:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "paragraph_target_unparseable",
-                ))
-                result.safetyFindings.append(LiveFinding(
-                    "TARGET_NOT_FOUND",
-                    "paragraph target lacks paragraphKey or (sectionIndex+paragraphIndex)",
-                    c.get("operationId", ""),
-                ))
-                fatal_verdict = fatal_verdict or "BLOCKED_TARGET_NOT_FOUND"
-                continue
-            section_idx, paragraph_idx = resolved
-            section_name = _section_xml_name_for_index(zip_names, section_idx)
-            if section_name is None:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "section_not_found",
-                ))
-                fatal_verdict = fatal_verdict or "BLOCKED_TARGET_NOT_FOUND"
-                continue
-            current_xml = section_modifications.get(section_name) \
-                            or section_xml_bytes_by_name.get(section_name, b"")
-            if op_type == "setParagraphText":
-                new_xml, modified, failure = _modify_paragraph_text_in_section_xml(
-                    current_xml, paragraph_idx,
-                    str(new_value) if new_value is not None else "",
-                    c.get("expectedBefore"),
-                )
-            else:   # replaceTextRun
-                # find/replace는 op 상단 또는 op.value(dict)에서 추출
-                val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
-                find_str = c.get("find")
-                if find_str is None:
-                    find_str = val_dict.get("find") if isinstance(val_dict, dict) else None
-                replace_str = c.get("replace")
-                if replace_str is None:
-                    replace_str = val_dict.get("replace") if isinstance(val_dict, dict) else None
-                new_xml, modified, failure = _replace_text_run_in_section_xml(
-                    current_xml, paragraph_idx, find_str, replace_str,
-                    c.get("expectedBefore"),
-                )
-            if failure:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), failure,
-                ))
-                result.safetyFindings.append(LiveFinding(
-                    _PARAGRAPH_FAILURE_TO_FINDING.get(failure, failure.upper()),
-                    f"operationType={op_type!r} reason={failure}",
-                    c.get("operationId", ""),
-                ))
-                fatal_verdict = (fatal_verdict
-                                  or _PARAGRAPH_FAILURE_TO_VERDICT.get(failure,
-                                                                            "BLOCKED_NOT_READY_FOR_WRITER"))
-                continue
-            if not modified:
-                result.skippedCalls.append(SkippedCall(
-                    c.get("commandId", ""), c.get("operationId", ""),
-                    c.get("writerMethod", ""), "paragraph_not_modified",
-                ))
-                continue
-            section_modifications[section_name] = new_xml
-            applied_with_target_info.append((c, section_name))
-            continue
+    resolved = _resolve_paragraph_target(target)
+    if resolved is None:
+        return _CallApplyOutcome(
+            skip_reason="paragraph_target_unparseable",
+            finding=LiveFinding(
+                "TARGET_NOT_FOUND",
+                "paragraph target lacks paragraphKey or (sectionIndex+paragraphIndex)",
+                op_id,
+            ),
+            fatal_verdict="BLOCKED_TARGET_NOT_FOUND",
+        )
+    section_idx, paragraph_idx = resolved
+    section_name = _section_xml_name_for_index(zip_names, section_idx)
+    if section_name is None:
+        return _CallApplyOutcome(
+            skip_reason="section_not_found", fatal_verdict="BLOCKED_TARGET_NOT_FOUND"
+        )
 
-        # ── cell ops 분기 (기존 로직) ────────────────────────────────────────
-        table_id = target.get("tableId", "")
-        row = target.get("row")
-        col = target.get("col")
-        parsed = _parse_table_id(table_id)
-        if parsed is None or row is None or col is None:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "target_unparseable",
-            ))
-            continue
-        section_idx, table_idx = parsed
-        section_name = _section_xml_name_for_index(zip_names, section_idx)
-        if section_name is None:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "section_not_found",
-            ))
-            continue
+    current_xml = section_modifications.get(section_name) or section_xml_bytes_by_name.get(
+        section_name, b""
+    )
+    if op_type == "setParagraphText":
+        new_xml, modified, failure = _modify_paragraph_text_in_section_xml(
+            current_xml,
+            paragraph_idx,
+            str(new_value) if new_value is not None else "",
+            c.get("expectedBefore"),
+        )
+    else:  # replaceTextRun
+        # find/replace는 op 상단 또는 op.value(dict)에서 추출
+        val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
+        find_str = c.get("find")
+        if find_str is None:
+            find_str = val_dict.get("find") if isinstance(val_dict, dict) else None
+        replace_str = c.get("replace")
+        if replace_str is None:
+            replace_str = val_dict.get("replace") if isinstance(val_dict, dict) else None
+        new_xml, modified, failure = _replace_text_run_in_section_xml(
+            current_xml,
+            paragraph_idx,
+            find_str,
+            replace_str,
+            c.get("expectedBefore"),
+        )
+    if failure:
+        return _CallApplyOutcome(
+            skip_reason=failure,
+            finding=LiveFinding(
+                _PARAGRAPH_FAILURE_TO_FINDING.get(failure, failure.upper()),
+                f"operationType={op_type!r} reason={failure}",
+                op_id,
+            ),
+            fatal_verdict=_PARAGRAPH_FAILURE_TO_VERDICT.get(
+                failure, "BLOCKED_NOT_READY_FOR_WRITER"
+            ),
+        )
+    if not modified:
+        return _CallApplyOutcome(skip_reason="paragraph_not_modified")
+    return _CallApplyOutcome(section_name=section_name, new_xml=new_xml)
 
-        current_xml = section_modifications.get(section_name) \
-                        or section_xml_bytes_by_name.get(section_name, b"")
-        if op_type == "setCellText":
-            new_xml, modified = _modify_cell_text_in_section_xml(
-                current_xml, table_idx, row, col, str(new_value or ""),
-            )
-            invalid_align = False
-        elif op_type == "setCellHorizontalAlign":
-            normalized = (str(new_value or "").strip().upper())
-            invalid_align = normalized not in ALLOWED_HORIZONTAL_ALIGN_VALUES
-            if invalid_align:
-                modified = False
-                new_xml = current_xml
-            else:
-                new_xml, modified = _modify_cell_halign_in_section_xml(
-                    current_xml, table_idx, row, col, normalized,
-                )
-        elif op_type == "setCellVerticalAlign":
-            normalized = (str(new_value or "").strip().upper())
-            invalid_align = normalized not in ALLOWED_VERTICAL_ALIGN_VALUES
-            if invalid_align:
-                modified = False
-                new_xml = current_xml
-            else:
-                new_xml, modified = _modify_cell_valign_in_section_xml(
-                    current_xml, table_idx, row, col, normalized,
-                )
-        else:
-            # 방어선 (ALLOWED_LIVE_OPERATION_TYPES 외 — 위에서 이미 차단되지만 한번 더)
+
+def _apply_cell_call(
+    c: dict,
+    zip_names: list[str],
+    section_modifications: dict[str, bytes],
+    section_xml_bytes_by_name: dict[str, bytes],
+) -> _CallApplyOutcome:
+    """cell 계열(setCellText/setCellHorizontalAlign/setCellVerticalAlign) writer call을 사본 section XML에 적용한다."""
+    target = c.get("target") or {}
+    new_value = c.get("value")
+    op_type = c.get("operationType", "")
+
+    table_id = target.get("tableId", "")
+    row = target.get("row")
+    col = target.get("col")
+    parsed = _parse_table_id(table_id)
+    if parsed is None or row is None or col is None:
+        return _CallApplyOutcome(skip_reason="target_unparseable")
+    section_idx, table_idx = parsed
+    section_name = _section_xml_name_for_index(zip_names, section_idx)
+    if section_name is None:
+        return _CallApplyOutcome(skip_reason="section_not_found")
+
+    current_xml = section_modifications.get(section_name) or section_xml_bytes_by_name.get(
+        section_name, b""
+    )
+    if op_type == "setCellText":
+        new_xml, modified = _modify_cell_text_in_section_xml(
+            current_xml, table_idx, row, col, str(new_value or "")
+        )
+        invalid_align = False
+    elif op_type == "setCellHorizontalAlign":
+        normalized = str(new_value or "").strip().upper()
+        invalid_align = normalized not in ALLOWED_HORIZONTAL_ALIGN_VALUES
+        if invalid_align:
             modified = False
             new_xml = current_xml
-            invalid_align = False
-
+        else:
+            new_xml, modified = _modify_cell_halign_in_section_xml(
+                current_xml, table_idx, row, col, normalized
+            )
+    elif op_type == "setCellVerticalAlign":
+        normalized = str(new_value or "").strip().upper()
+        invalid_align = normalized not in ALLOWED_VERTICAL_ALIGN_VALUES
         if invalid_align:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "invalid_align_value",
-            ))
-            result.safetyFindings.append(LiveFinding(
+            modified = False
+            new_xml = current_xml
+        else:
+            new_xml, modified = _modify_cell_valign_in_section_xml(
+                current_xml, table_idx, row, col, normalized
+            )
+    else:
+        # 방어선 (ALLOWED_LIVE_OPERATION_TYPES 외 — 위에서 이미 차단되지만 한번 더)
+        modified = False
+        new_xml = current_xml
+        invalid_align = False
+
+    if invalid_align:
+        return _CallApplyOutcome(
+            skip_reason="invalid_align_value",
+            finding=LiveFinding(
                 "INVALID_ALIGN_VALUE",
                 f"operationType={op_type!r} value={new_value!r}",
                 c.get("operationId", ""),
-            ))
-            fatal_verdict = fatal_verdict or "BLOCKED_INVALID_ALIGN_VALUE"
-            continue
+            ),
+            fatal_verdict="BLOCKED_INVALID_ALIGN_VALUE",
+        )
+    if not modified:
+        return _CallApplyOutcome(skip_reason="target_cell_not_found_in_section")
+    return _CallApplyOutcome(section_name=section_name, new_xml=new_xml)
 
-        if not modified:
-            result.skippedCalls.append(SkippedCall(
-                c.get("commandId", ""), c.get("operationId", ""),
-                c.get("writerMethod", ""), "target_cell_not_found_in_section",
-            ))
-            continue
-        section_modifications[section_name] = new_xml
-        applied_with_target_info.append((c, section_name))
 
-    if not section_modifications:
-        # invalid align이 우선 사유면 그것을 verdict로 보고
-        result.verdict = fatal_verdict or "BLOCKED_NOT_READY_FOR_WRITER"
-        if result.verdict != "BLOCKED_INVALID_ALIGN_VALUE":
-            result.safetyFindings.append(LiveFinding(
-                "NO_APPLICABLE_CALLS",
-                "no accepted call resulted in a section modification",
-            ))
-        result.sourceSha256After = _sha256(source_path)
-        result.originalUnmodified = (result.sourceSha256After == source_sha_before)
-        return result
+def _apply_all_accepted_calls(
+    accepted_calls: list[dict],
+    zip_names: list[str],
+    section_xml_bytes_by_name: dict[str, bytes],
+) -> tuple[
+    dict[str, bytes], list[tuple[dict, str]], list[SkippedCall], list[LiveFinding], str | None
+]:
+    """4단계를 통과한 call들을 순서대로 사본 section XML에 적용한다 (execute_writer_call_plan_live_sandbox 5단계)."""
+    section_modifications: dict[str, bytes] = {}
+    applied_with_target_info: list[tuple[dict, str]] = []
+    skipped: list[SkippedCall] = []
+    findings: list[LiveFinding] = []
+    fatal_verdict: str | None = None
 
-    # 6) 사본 작성 (이 시점이 유일한 writer 호출 — 사본 경로에 한해)
-    _write_sandbox_zip(source_path, sandbox_output_path, section_modifications)
-    result.writerCalled = True
-    result.outputCreated = sandbox_output_path.exists()
-
-    # 7) 원본 무수정 검증 (즉시)
-    source_sha_after = _sha256(source_path)
-    source_mtime_after = source_path.stat().st_mtime
-    result.sourceSha256After = source_sha_after
-    result.originalUnmodified = (
-        source_sha_after == source_sha_before
-        and source_mtime_after == source_mtime_before
-    )
-    if not result.originalUnmodified:
-        result.verdict = "FAIL_ORIGINAL_MUTATED"
-        result.safetyFindings.append(LiveFinding(
-            "ORIGINAL_MUTATED",
-            f"sha_before={source_sha_before} sha_after={source_sha_after}",
-        ))
-        return result
-
-    # 8) readback: 원본 + 사본 모두 파싱하여 비교
-    from ..parser.parser_engine import parse_hwpx_v2
-    before = parse_hwpx_v2(source_path)
-    after = parse_hwpx_v2(sandbox_output_path)
-    snap_before = _snapshot(before, source_path)
-    snap_after = _snapshot(after, sandbox_output_path)
-
-    rb = result.readback
-
-    # 8-1) 대상 셀/문단 검증: op_type별로 어떤 속성이 바뀌어야 하는지 분기
-    target_cell_ids: set[str] = set()
-    target_paragraph_keys: set[str] = set()
-    # cell_id → set of "text"/"halign"/"valign" — 그 cell에서 변경이 허용된 속성
-    touched_attrs_by_cell: dict[str, set[str]] = {}
-    for c, _section_name in applied_with_target_info:
-        target = c.get("target") or {}
+    for c in accepted_calls:
         op_type = c.get("operationType", "")
+        if op_type in _PARAGRAPH_OP_TYPES:
+            outcome = _apply_paragraph_call(
+                c, zip_names, section_modifications, section_xml_bytes_by_name
+            )
+        else:
+            outcome = _apply_cell_call(
+                c, zip_names, section_modifications, section_xml_bytes_by_name
+            )
 
-        # paragraph ops 처리
-        if op_type in {"setParagraphText", "replaceTextRun"}:
-            resolved = _resolve_paragraph_target(target)
-            if resolved is None:
-                continue
-            section_idx, paragraph_idx = resolved
-            paragraph_key = _format_paragraph_key(section_idx, paragraph_idx)
-            target_paragraph_keys.add(paragraph_key)
-            actual_after = snap_after["paragraphText"].get(paragraph_key, "")
-            if op_type == "setParagraphText":
-                new_value = str(c.get("value") or "")
-                ok = (actual_after == new_value)
-                value_written = new_value
-            else:   # replaceTextRun
-                val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
-                find_str = c.get("find") if c.get("find") is not None else (
-                    val_dict.get("find") if isinstance(val_dict, dict) else None
+        if outcome.skip_reason:
+            skipped.append(
+                SkippedCall(
+                    c.get("commandId", ""),
+                    c.get("operationId", ""),
+                    c.get("writerMethod", ""),
+                    outcome.skip_reason,
                 )
-                replace_str = c.get("replace") if c.get("replace") is not None else (
-                    val_dict.get("replace") if isinstance(val_dict, dict) else ""
-                )
-                before_raw = snap_before["paragraphText"].get(paragraph_key, "")
-                expected_text = before_raw.replace(find_str or "",
-                                                       replace_str if replace_str is not None else "",
-                                                       1)
-                ok = (actual_after == expected_text)
-                value_written = {"find": find_str, "replace": replace_str}
-            if ok:
-                rb.targetCellsVerified += 1
-            else:
-                rb.divergences.append(
-                    f"target_{op_type}_not_applied {paragraph_key}: actual={actual_after!r}"
-                )
-            result.appliedCalls.append(AppliedCall(
-                commandId=c.get("commandId", ""),
-                operationId=c.get("operationId", ""),
-                operationType=op_type,
-                writerMethod=c.get("writerMethod", ""),
-                target=dict(target),
-                valueWritten=value_written,
-                expectedBefore=c.get("expectedBefore"),
-                actualAfter=actual_after,
-                note="sandbox_paragraph_applied",
-            ))
+            )
+            if outcome.finding:
+                findings.append(outcome.finding)
+            fatal_verdict = fatal_verdict or outcome.fatal_verdict
             continue
 
-        # cell ops
-        tid = target.get("tableId")
-        row = target.get("row")
-        col = target.get("col")
-        cell_id = f"{tid}:r{row}:c{col}"
-        target_cell_ids.add(cell_id)
-        attr_bucket = touched_attrs_by_cell.setdefault(cell_id, set())
+        section_modifications[outcome.section_name] = outcome.new_xml
+        applied_with_target_info.append((c, outcome.section_name))
 
-        if op_type == "setCellText":
-            actual_after = snap_after["cellNormText"].get(cell_id, "")
-            normalized_expected = _parser_normalize(str(c.get("value") or ""))
-            ok = (actual_after == normalized_expected
-                  or (normalized_expected and normalized_expected in actual_after))
-            attr_bucket.add("text")
-        elif op_type == "setCellHorizontalAlign":
-            normalized_expected = str(c.get("value") or "").strip().upper()
-            actual_after = snap_after["cellHAlign"].get(cell_id, "")
-            ok = (actual_after.upper() == normalized_expected)
-            attr_bucket.add("halign")
-        elif op_type == "setCellVerticalAlign":
-            normalized_expected = str(c.get("value") or "").strip().upper()
-            actual_after = snap_after["cellVAlign"].get(cell_id, "")
-            ok = (actual_after.upper() == normalized_expected)
-            attr_bucket.add("valign")
-        else:
-            actual_after = ""
-            ok = False
+    return section_modifications, applied_with_target_info, skipped, findings, fatal_verdict
 
-        if ok:
-            rb.targetCellsVerified += 1
-        else:
-            rb.divergences.append(
-                f"target_{op_type}_not_applied {cell_id}: "
-                f"expected~{c.get('value')!r}, actual={actual_after!r}"
+
+@dataclass
+class _VerifyOutcome:
+    applied_call: AppliedCall
+    ok: bool
+    divergence: str | None = None
+    paragraph_key: str | None = None
+    cell_id: str | None = None
+    cell_attr: str | None = None
+
+
+def _verify_applied_call(c: dict, snap_before: dict, snap_after: dict) -> _VerifyOutcome | None:
+    """readback 8-1: 적용된 call 하나가 실제로 반영됐는지 snapshot으로 검증한다.
+
+    paragraph target을 다시 resolve하지 못하면(방어선) None을 반환해 호출부가
+    아무 기록도 남기지 않고 건너뛰게 한다 — 기존 인라인 루프의 `continue`와 동일.
+    """
+    target = c.get("target") or {}
+    op_type = c.get("operationType", "")
+
+    if op_type in {"setParagraphText", "replaceTextRun"}:
+        resolved = _resolve_paragraph_target(target)
+        if resolved is None:
+            return None
+        section_idx, paragraph_idx = resolved
+        paragraph_key = _format_paragraph_key(section_idx, paragraph_idx)
+        actual_after = snap_after["paragraphText"].get(paragraph_key, "")
+        if op_type == "setParagraphText":
+            new_value = str(c.get("value") or "")
+            ok = actual_after == new_value
+            value_written = new_value
+        else:  # replaceTextRun
+            val_dict = c.get("value") if isinstance(c.get("value"), dict) else {}
+            find_str = (
+                c.get("find")
+                if c.get("find") is not None
+                else (val_dict.get("find") if isinstance(val_dict, dict) else None)
             )
-        result.appliedCalls.append(AppliedCall(
+            replace_str = (
+                c.get("replace")
+                if c.get("replace") is not None
+                else (val_dict.get("replace") if isinstance(val_dict, dict) else "")
+            )
+            before_raw = snap_before["paragraphText"].get(paragraph_key, "")
+            expected_text = before_raw.replace(
+                find_str or "", replace_str if replace_str is not None else "", 1
+            )
+            ok = actual_after == expected_text
+            value_written = {"find": find_str, "replace": replace_str}
+        divergence = (
+            None if ok else f"target_{op_type}_not_applied {paragraph_key}: actual={actual_after!r}"
+        )
+        applied_call = AppliedCall(
             commandId=c.get("commandId", ""),
             operationId=c.get("operationId", ""),
             operationType=op_type,
             writerMethod=c.get("writerMethod", ""),
-            target=dict(c.get("target") or {}),
-            valueWritten=c.get("value"),
+            target=dict(target),
+            valueWritten=value_written,
             expectedBefore=c.get("expectedBefore"),
             actualAfter=actual_after,
-            note="sandbox_applied",
-        ))
+            note="sandbox_paragraph_applied",
+        )
+        return _VerifyOutcome(applied_call, ok, divergence, paragraph_key=paragraph_key)
 
+    # cell ops
+    tid = target.get("tableId")
+    row = target.get("row")
+    col = target.get("col")
+    cell_id = f"{tid}:r{row}:c{col}"
+    cell_attr: str | None = None
+
+    if op_type == "setCellText":
+        actual_after = snap_after["cellNormText"].get(cell_id, "")
+        normalized_expected = _parser_normalize(str(c.get("value") or ""))
+        ok = actual_after == normalized_expected or (
+            normalized_expected and normalized_expected in actual_after
+        )
+        cell_attr = "text"
+    elif op_type == "setCellHorizontalAlign":
+        normalized_expected = str(c.get("value") or "").strip().upper()
+        actual_after = snap_after["cellHAlign"].get(cell_id, "")
+        ok = actual_after.upper() == normalized_expected
+        cell_attr = "halign"
+    elif op_type == "setCellVerticalAlign":
+        normalized_expected = str(c.get("value") or "").strip().upper()
+        actual_after = snap_after["cellVAlign"].get(cell_id, "")
+        ok = actual_after.upper() == normalized_expected
+        cell_attr = "valign"
+    else:
+        actual_after = ""
+        ok = False
+
+    divergence = (
+        None
+        if ok
+        else (
+            f"target_{op_type}_not_applied {cell_id}: "
+            f"expected~{c.get('value')!r}, actual={actual_after!r}"
+        )
+    )
+    applied_call = AppliedCall(
+        commandId=c.get("commandId", ""),
+        operationId=c.get("operationId", ""),
+        operationType=op_type,
+        writerMethod=c.get("writerMethod", ""),
+        target=dict(c.get("target") or {}),
+        valueWritten=c.get("value"),
+        expectedBefore=c.get("expectedBefore"),
+        actualAfter=actual_after,
+        note="sandbox_applied",
+    )
+    return _VerifyOutcome(applied_call, ok, divergence, cell_id=cell_id, cell_attr=cell_attr)
+
+
+def _run_readback_call_verification(
+    applied_with_target_info: list[tuple[dict, str]],
+    snap_before: dict,
+    snap_after: dict,
+    rb: ReadbackResult,
+) -> tuple[list[AppliedCall], dict[str, set[str]], set[str]]:
+    """readback 8-1 루프: 적용된 call들을 전부 검증해 rb.targetCellsVerified/divergences를 채운다."""
+    applied_calls: list[AppliedCall] = []
+    touched_attrs_by_cell: dict[str, set[str]] = {}
+    target_paragraph_keys: set[str] = set()
+
+    for c, _section_name in applied_with_target_info:
+        outcome = _verify_applied_call(c, snap_before, snap_after)
+        if outcome is None:
+            continue
+        if outcome.ok:
+            rb.targetCellsVerified += 1
+        else:
+            rb.divergences.append(outcome.divergence)
+        applied_calls.append(outcome.applied_call)
+        if outcome.paragraph_key is not None:
+            target_paragraph_keys.add(outcome.paragraph_key)
+        if outcome.cell_id is not None:
+            bucket = touched_attrs_by_cell.setdefault(outcome.cell_id, set())
+            if outcome.cell_attr is not None:
+                bucket.add(outcome.cell_attr)
+
+    return applied_calls, touched_attrs_by_cell, target_paragraph_keys
+
+
+def _check_non_target_preservation(
+    snap_before: dict,
+    snap_after: dict,
+    touched_attrs_by_cell: dict[str, set[str]],
+    target_paragraph_keys: set[str],
+    rb: ReadbackResult,
+) -> None:
+    """readback 8-2/8-2b: 비대상 셀·문단이 그대로 보존됐는지 검사해 rb에 기록한다."""
     # 8-2) 비대상 셀: 3개 속성 (text/halign/valign) 모두 보존
     #      대상 셀: 변경되지 않은 속성은 보존되어야 함
     for cid, text_before in snap_before["cellNormText"].items():
         touched = touched_attrs_by_cell.get(cid, set())
-        if "text" not in touched:
-            if snap_after["cellNormText"].get(cid) != text_before:
-                rb.untouchedCellNormalizedTextPreserved = False
-                rb.divergences.append(
-                    f"non_target_text_changed {cid}: "
-                    f"before={text_before!r}, after={snap_after['cellNormText'].get(cid)!r}"
-                )
+        if "text" not in touched and snap_after["cellNormText"].get(cid) != text_before:
+            rb.untouchedCellNormalizedTextPreserved = False
+            rb.divergences.append(
+                f"non_target_text_changed {cid}: "
+                f"before={text_before!r}, after={snap_after['cellNormText'].get(cid)!r}"
+            )
         if "halign" not in touched:
             if snap_after["cellHAlign"].get(cid, "") != snap_before["cellHAlign"].get(cid, ""):
                 rb.divergences.append(
@@ -1078,28 +1072,261 @@ def execute_writer_call_plan_live_sandbox(writer_call_plan,
                 f"after={(snap_after.get('paragraphText') or {}).get(pkey)!r}"
             )
 
-    # 8-3) 구조 / 서식 카운터 보존
-    def _eq(key: str) -> bool:
-        return snap_before[key] == snap_after[key]
 
-    rb.tableCountPreserved = _eq("tableCount")
-    rb.cellCountPreserved = _eq("cellCount")
-    rb.rowSpanSumPreserved = _eq("rowSpanSum")
-    rb.colSpanSumPreserved = _eq("colSpanSum")
-    rb.objectCountPreserved = _eq("objectCount")
-    rb.binDataCountPreserved = _eq("binDataCount")
-    rb.horizontalAlignCountPreserved = _eq("cells_with_horizontalAlign")
-    rb.verticalAlignCountPreserved = _eq("cells_with_verticalAlign")
-    rb.fontNameCountPreserved = _eq("cells_with_fontName")
-    rb.fontSizeCountPreserved = _eq("cells_with_fontSizePt")
-    rb.textColorCountPreserved = _eq("cells_with_textColor")
-    for k in ("tableCount", "cellCount", "rowSpanSum", "colSpanSum",
-                "objectCount", "binDataCount",
-                "cells_with_horizontalAlign", "cells_with_verticalAlign",
-                "cells_with_fontName", "cells_with_fontSizePt",
-                "cells_with_textColor"):
+def _check_structural_counters(snap_before: dict, snap_after: dict, rb: ReadbackResult) -> None:
+    """readback 8-3: 구조/서식 카운터가 그대로 보존됐는지 검사해 rb에 기록한다."""
+    counter_keys = (
+        "tableCount",
+        "cellCount",
+        "rowSpanSum",
+        "colSpanSum",
+        "objectCount",
+        "binDataCount",
+        "cells_with_horizontalAlign",
+        "cells_with_verticalAlign",
+        "cells_with_fontName",
+        "cells_with_fontSizePt",
+        "cells_with_textColor",
+    )
+    rb.tableCountPreserved = snap_before["tableCount"] == snap_after["tableCount"]
+    rb.cellCountPreserved = snap_before["cellCount"] == snap_after["cellCount"]
+    rb.rowSpanSumPreserved = snap_before["rowSpanSum"] == snap_after["rowSpanSum"]
+    rb.colSpanSumPreserved = snap_before["colSpanSum"] == snap_after["colSpanSum"]
+    rb.objectCountPreserved = snap_before["objectCount"] == snap_after["objectCount"]
+    rb.binDataCountPreserved = snap_before["binDataCount"] == snap_after["binDataCount"]
+    rb.horizontalAlignCountPreserved = (
+        snap_before["cells_with_horizontalAlign"] == snap_after["cells_with_horizontalAlign"]
+    )
+    rb.verticalAlignCountPreserved = (
+        snap_before["cells_with_verticalAlign"] == snap_after["cells_with_verticalAlign"]
+    )
+    rb.fontNameCountPreserved = (
+        snap_before["cells_with_fontName"] == snap_after["cells_with_fontName"]
+    )
+    rb.fontSizeCountPreserved = (
+        snap_before["cells_with_fontSizePt"] == snap_after["cells_with_fontSizePt"]
+    )
+    rb.textColorCountPreserved = (
+        snap_before["cells_with_textColor"] == snap_after["cells_with_textColor"]
+    )
+    for k in counter_keys:
         if snap_before[k] != snap_after[k]:
             rb.divergences.append(f"{k} before={snap_before[k]} after={snap_after[k]}")
+
+
+def _finalize_blocked(
+    result: LiveSandboxResult, source_path: Path, source_sha_before: str, verdict: str
+) -> LiveSandboxResult:
+    """차단 verdict로 result를 마무리한다 (원본 sha256 재확인 포함)."""
+    result.verdict = verdict
+    result.sourceSha256After = _sha256(source_path)
+    result.originalUnmodified = result.sourceSha256After == source_sha_before
+    return result
+
+
+@dataclass
+class _PreflightOutcome:
+    blocked_result: LiveSandboxResult | None = None
+    source_sha_before: str = ""
+    source_mtime_before: float = 0.0
+
+
+def _preflight_source_and_path(
+    result: LiveSandboxResult, source_path: Path, sandbox_output_path: Path
+) -> _PreflightOutcome:
+    """1~2단계: 원본 존재 확인 + sandbox 경로가 원본을 덮어쓰지 않는지 확인한다."""
+    if not source_path.exists():
+        result.verdict = "BLOCKED_NOT_READY_FOR_WRITER"
+        result.safetyFindings.append(LiveFinding("SOURCE_NOT_FOUND", f"source={source_path}"))
+        return _PreflightOutcome(blocked_result=result)
+
+    source_sha_before = _sha256(source_path)
+    source_mtime_before = source_path.stat().st_mtime
+    result.sourceSha256Before = source_sha_before
+
+    try:
+        same_path = source_path.resolve() == sandbox_output_path.resolve()
+    except OSError:
+        same_path = str(source_path) == str(sandbox_output_path)
+    if same_path:
+        result.safetyFindings.append(
+            LiveFinding(
+                "OUTPUT_OVERWRITES_SOURCE",
+                f"sandbox output path equals source path={source_path}",
+            )
+        )
+        blocked = _finalize_blocked(
+            result, source_path, source_sha_before, "BLOCKED_UNSAFE_OUTPUT_PATH"
+        )
+        return _PreflightOutcome(blocked_result=blocked)
+
+    return _PreflightOutcome(
+        source_sha_before=source_sha_before, source_mtime_before=source_mtime_before
+    )
+
+
+def _check_adapter_ready(
+    wcp: dict, result: LiveSandboxResult, source_path: Path, source_sha_before: str
+) -> tuple[LiveSandboxResult | None, list]:
+    """3단계: adapter readiness 와 writerCalls 존재를 확인한다."""
+    if not wcp.get("readyForWriter") or wcp.get("verdict") != "READY_FOR_WRITER":
+        result.safetyFindings.append(
+            LiveFinding(
+                "ADAPTER_NOT_READY",
+                f"writer adapter verdict={wcp.get('verdict')!r} "
+                f"readyForWriter={wcp.get('readyForWriter')}",
+            )
+        )
+        blocked = _finalize_blocked(
+            result, source_path, source_sha_before, "BLOCKED_NOT_READY_FOR_WRITER"
+        )
+        return blocked, []
+
+    calls = wcp.get("writerCalls", []) or []
+    if not calls:
+        result.safetyFindings.append(LiveFinding("NO_WRITER_CALLS", "writerCalls is empty"))
+        blocked = _finalize_blocked(
+            result, source_path, source_sha_before, "BLOCKED_NOT_READY_FOR_WRITER"
+        )
+        return blocked, []
+
+    return None, calls
+
+
+def _load_section_xml_bytes(source_path: Path) -> tuple[list[str], dict[str, bytes]]:
+    """source zip에서 entry 목록과 section XML 원본 바이트를 읽는다 (5단계 앞부분)."""
+    with zipfile.ZipFile(source_path) as zf:
+        zip_names = zf.namelist()
+        section_xml_bytes_by_name = {
+            name: zf.read(name) for name in zip_names if "section" in name and name.endswith(".xml")
+        }
+    return zip_names, section_xml_bytes_by_name
+
+
+def _verify_original_unmodified(
+    result: LiveSandboxResult,
+    source_path: Path,
+    source_sha_before: str,
+    source_mtime_before: float,
+) -> bool:
+    """7단계: 원본이 그대로인지 즉시 검증하고 result에 기록한다. 변형됐으면 False를 반환한다."""
+    source_sha_after = _sha256(source_path)
+    source_mtime_after = source_path.stat().st_mtime
+    result.sourceSha256After = source_sha_after
+    result.originalUnmodified = (
+        source_sha_after == source_sha_before and source_mtime_after == source_mtime_before
+    )
+    if not result.originalUnmodified:
+        result.verdict = "FAIL_ORIGINAL_MUTATED"
+        result.safetyFindings.append(
+            LiveFinding(
+                "ORIGINAL_MUTATED",
+                f"sha_before={source_sha_before} sha_after={source_sha_after}",
+            )
+        )
+    return result.originalUnmodified
+
+
+# ── 메인 함수 ────────────────────────────────────────────────────────────────
+
+
+def execute_writer_call_plan_live_sandbox(
+    writer_call_plan, source_path: Path, sandbox_output_path: Path
+) -> LiveSandboxResult:
+    """sandbox 사본에 한해 writerCallPlan을 실제 적용한다.
+
+    원본 파일은 절대 수정되지 않는다 (sha256/mtime 검증).
+    setCellText 외 operation은 이번 공정에서 차단된다.
+    """
+    wcp = (
+        writer_call_plan.to_dict()
+        if hasattr(writer_call_plan, "to_dict")
+        else dict(writer_call_plan or {})
+    )
+    source_path = Path(source_path)
+    sandbox_output_path = Path(sandbox_output_path)
+    plan_id = wcp.get("planId", "")
+
+    result = LiveSandboxResult(
+        executorId=str(uuid.uuid4()),
+        planId=plan_id,
+        outputPath=str(sandbox_output_path).replace("\\", "/"),
+    )
+
+    # 1~2) 원본 존재 확인 + sandbox 경로 안전성 확인
+    preflight = _preflight_source_and_path(result, source_path, sandbox_output_path)
+    if preflight.blocked_result is not None:
+        return preflight.blocked_result
+    source_sha_before = preflight.source_sha_before
+    source_mtime_before = preflight.source_mtime_before
+
+    # 3) adapter readiness
+    blocked, calls = _check_adapter_ready(wcp, result, source_path, source_sha_before)
+    if blocked is not None:
+        return blocked
+
+    # 4) 각 call 검증 + setCellText만 적용 후보로 분리
+    valid_methods = set(adapter.OPERATION_TO_WRITER_METHOD.values())
+    validation = _validate_and_filter_calls(calls, valid_methods)
+    accepted_calls = validation.accepted_calls
+    result.skippedCalls.extend(validation.skipped)
+    result.safetyFindings.extend(validation.findings)
+    fatal_verdict = validation.fatal_verdict
+
+    if fatal_verdict and not accepted_calls:
+        return _finalize_blocked(result, source_path, source_sha_before, fatal_verdict)
+
+    # 5) 사본 작성: section 단위 수정 누적
+    zip_names, section_xml_bytes_by_name = _load_section_xml_bytes(source_path)
+
+    section_modifications, applied_with_target_info, apply_skipped, apply_findings, apply_fatal = (
+        _apply_all_accepted_calls(accepted_calls, zip_names, section_xml_bytes_by_name)
+    )
+    result.skippedCalls.extend(apply_skipped)
+    result.safetyFindings.extend(apply_findings)
+    fatal_verdict = fatal_verdict or apply_fatal
+
+    if not section_modifications:
+        # invalid align이 우선 사유면 그것을 verdict로 보고
+        no_calls_verdict = fatal_verdict or "BLOCKED_NOT_READY_FOR_WRITER"
+        if no_calls_verdict != "BLOCKED_INVALID_ALIGN_VALUE":
+            result.safetyFindings.append(
+                LiveFinding(
+                    "NO_APPLICABLE_CALLS",
+                    "no accepted call resulted in a section modification",
+                )
+            )
+        return _finalize_blocked(result, source_path, source_sha_before, no_calls_verdict)
+
+    # 6) 사본 작성 (이 시점이 유일한 writer 호출 — 사본 경로에 한해)
+    _write_sandbox_zip(source_path, sandbox_output_path, section_modifications)
+    result.writerCalled = True
+    result.outputCreated = sandbox_output_path.exists()
+
+    # 7) 원본 무수정 검증 (즉시)
+    if not _verify_original_unmodified(result, source_path, source_sha_before, source_mtime_before):
+        return result
+
+    # 8) readback: 원본 + 사본 모두 파싱하여 비교
+    from ..parser.parser_engine import parse_hwpx_v2
+
+    before = parse_hwpx_v2(source_path)
+    after = parse_hwpx_v2(sandbox_output_path)
+    snap_before = _snapshot(before, source_path)
+    snap_after = _snapshot(after, sandbox_output_path)
+
+    rb = result.readback
+
+    # 8-1) 대상 셀/문단 검증: op_type별로 어떤 속성이 바뀌어야 하는지 분기
+    applied_calls, touched_attrs_by_cell, target_paragraph_keys = _run_readback_call_verification(
+        applied_with_target_info, snap_before, snap_after, rb
+    )
+    result.appliedCalls.extend(applied_calls)
+
+    _check_non_target_preservation(
+        snap_before, snap_after, touched_attrs_by_cell, target_paragraph_keys, rb
+    )
+    _check_structural_counters(snap_before, snap_after, rb)
 
     # 8-4) 최종 verdict
     if rb.divergences:

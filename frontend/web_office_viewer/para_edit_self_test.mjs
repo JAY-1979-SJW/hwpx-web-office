@@ -8,7 +8,7 @@ import {
   validateExpectedBefore, validateCharPrPreserved,
   validateParPrPreserved,
   REASON_MERGE_CHARPR_MISMATCH, REASON_REQUIRES_REVIEW,
-  POLICY_REQUIRES_REVIEW, POLICY_FOCUS_CHARPR,
+  POLICY_REQUIRES_REVIEW,
 } from "./para_edit_command.mjs";
 import {
   makeParagraphEditorState, selectParagraph, setCaret,

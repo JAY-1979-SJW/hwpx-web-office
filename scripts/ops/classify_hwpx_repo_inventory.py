@@ -82,6 +82,8 @@ def _run_git_ls_files() -> list[str]:
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
         check=True,
     )
@@ -118,10 +120,7 @@ def _read_text_sample(path: str, max_bytes: int = 512_000) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def classify_path(path: str) -> tuple[str, str, str]:
-    lower = path.lower()
-    name = Path(path).name.lower()
-
+def _classify_infra_and_docs_paths(lower: str, path: str, name: str) -> tuple[str, str, str] | None:
     if lower.startswith(".githooks/"):
         return "CONFIG_BUILD", "unassigned", "keep_git_hooks"
     # .claude/ 는 프로젝트 도구 설정(훅 등록 등)이다 — .githooks 와 같은 성격.
@@ -139,6 +138,13 @@ def classify_path(path: str) -> tuple[str, str, str]:
         "package-lock.json",
         "pyproject.toml",
         "requirements.txt",
+        "locked_files.toml",
+        # 2026-09-29: FE-01/FE-03 품질검사 도구(eslint/html-validate) 도입 시 신설.
+        # package.json 과 같은 성격(루트 빌드/린트 설정)인데 허용목록이 없어
+        # 새 파일 분류 게이트가 UNKNOWN_REVIEW_REQUIRED 로 막았다.
+        "eslint.config.mjs",
+        ".htmlvalidate.json",
+        ".htmlvalidateignore",
     }:
         return "CONFIG_BUILD", "unassigned", "keep_root_config"
     if lower.startswith("data/reports/"):
@@ -149,66 +155,92 @@ def classify_path(path: str) -> tuple[str, str, str]:
         return "TEST_FIXTURE", "test_support", "keep_test_fixture"
     if lower.startswith("tests/"):
         return "TEST_ONLY", _infer_zone(path), "keep_test"
-    if lower.startswith("frontend/"):
-        if "form_autofill" in lower:
-            return "ACTIVE_AUTOFILL", "batch_api_browser", "keep_active_autofill_frontend"
-        return "FRONTEND_VIEWER", "browser_ui", "keep_frontend_viewer"
-    if lower.startswith("scripts/ops/"):
-        # scripts/ops/hooks/ 는 게이트를 자동 집행하는 감리 기반시설이다
-        # (편집 시점에 게이트를 돌려 규칙 위반을 즉시 잡는다) — 이름이
-        # `gate_` 로 시작하지 않아도 성격은 AUDIT_GATE 다.
-        # `build_` 도 같은 성격이다 - 기존 build_hwpx_repo_separation_owner_review.py·
-        # build_hwpx_repo_separation_execution_plan_draft.py·
-        # build_hwpx_repo_manifest_promotion_candidates.py 전부 이 규칙으로 새 파일이었다면
-        # 똑같이 막혔을 선례(감사 산출물을 read-only로 만드는 스크립트) - 토큰 목록 공백이었다.
-        if any(
-            token in lower
-            for token in (
-                "audit_",
-                "gate_",
-                "verify_",
-                "install_",
-                "classify_",
-                "build_",
-                "dashboard",
-                "history",
-                "candidate_scan",
-                "candidate_upload",
-                "upload_hwpx_candidates",
-                "/hooks/",
-            )
-        ):
-            return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
-        if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
-            return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"
-        return "LEGACY_EXPERIMENT", "unassigned", "review_legacy_ops"
-    if lower.startswith("scripts/hwpx/pipeline/"):
-        if any(
-            token in lower
-            for token in (
-                "form_auto_fill",
-                "form_field_mapper",
-                "review_panel",
-                "approval_gate",
-                "download_review",
-                "final_export",
-                "readback",
-                "upload_document_parser",
-            )
-        ):
-            return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_pipeline"
-        return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_pipeline_core"
-    if lower.startswith("scripts/hwpx/"):
-        if "/test_" in lower or name.startswith("test_"):
-            return "TEST_ONLY", "test_support", "keep_script_test"
-        if any(
-            part in lower
-            for part in ("/parser/", "/recognition_corpus/", "/source_extractor/", "/web_office/")
-        ):
-            return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_core"
-        if any(token in lower for token in ("hancom", "hwp_to_hwpx", "converter", "native_com")):
-            return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
+    return None
+
+
+def _classify_frontend_path(lower: str) -> tuple[str, str, str] | None:
+    if not lower.startswith("frontend/"):
+        return None
+    if "form_autofill" in lower:
+        return "ACTIVE_AUTOFILL", "batch_api_browser", "keep_active_autofill_frontend"
+    return "FRONTEND_VIEWER", "browser_ui", "keep_frontend_viewer"
+
+
+def _classify_scripts_ops_path(lower: str, path: str) -> tuple[str, str, str] | None:
+    if not lower.startswith("scripts/ops/"):
+        return None
+    # 2026-10-16: 감사들이 가져다 쓰는 공용 검사 모듈. 파일 이름이 audit_/gate_ 로 시작하지 않으므로
+    # 토큰 규칙에 걸리지 않는다 - 정확한 경로 1건만 감사 지원 모듈로 지정한다(와일드카드 금지).
+    if lower == "scripts/ops/ops_common_checks.py":
+        return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
+    # scripts/ops/hooks/ 는 게이트를 자동 집행하는 감리 기반시설이다
+    # (편집 시점에 게이트를 돌려 규칙 위반을 즉시 잡는다) — 이름이
+    # `gate_` 로 시작하지 않아도 성격은 AUDIT_GATE 다.
+    # `build_` 도 같은 성격이다 - 기존 build_hwpx_repo_separation_owner_review.py·
+    # build_hwpx_repo_separation_execution_plan_draft.py·
+    # build_hwpx_repo_manifest_promotion_candidates.py 전부 이 규칙으로 새 파일이었다면
+    # 똑같이 막혔을 선례(감사 산출물을 read-only로 만드는 스크립트) - 토큰 목록 공백이었다.
+    if any(
+        token in lower
+        for token in (
+            "audit_",
+            "gate_",
+            "verify_",
+            "install_",
+            "classify_",
+            "build_",
+            "inspect_",
+            "diagnose_",
+            "dashboard",
+            "history",
+            "candidate_scan",
+            "candidate_upload",
+            "upload_hwpx_candidates",
+            "/hooks/",
+        )
+    ):
+        return "AUDIT_GATE", "closeout_security", "keep_gate_audit"
+    if "hwpx_form_autofill" in lower or "form_auto_fill" in lower:
+        return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_ops"
+    return "LEGACY_EXPERIMENT", "unassigned", "review_legacy_ops"
+
+
+def _classify_scripts_hwpx_pipeline_path(lower: str, path: str) -> tuple[str, str, str] | None:
+    if not lower.startswith("scripts/hwpx/pipeline/"):
+        return None
+    if any(
+        token in lower
+        for token in (
+            "form_auto_fill",
+            "form_field_mapper",
+            "review_panel",
+            "approval_gate",
+            "download_review",
+            "final_export",
+            "readback",
+            "upload_document_parser",
+        )
+    ):
+        return "ACTIVE_AUTOFILL", _infer_zone(path), "keep_active_autofill_pipeline"
+    return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_pipeline_core"
+
+
+def _classify_scripts_hwpx_path(lower: str, name: str) -> tuple[str, str, str] | None:
+    if not lower.startswith("scripts/hwpx/"):
+        return None
+    if "/test_" in lower or name.startswith("test_"):
+        return "TEST_ONLY", "test_support", "keep_script_test"
+    if any(
+        part in lower
+        for part in ("/parser/", "/recognition_corpus/", "/source_extractor/", "/web_office/")
+    ):
         return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_core"
+    if any(token in lower for token in ("hancom", "hwp_to_hwpx", "converter", "native_com")):
+        return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
+    return "ACTIVE_HWPX_CORE", "hwpx_core", "keep_hwpx_core"
+
+
+def _classify_remaining_script_paths(lower: str) -> tuple[str, str, str]:
     if lower.startswith("scripts/hwp-worker/"):
         # 한컴 COM 변환 워커(HWP→HWPX) — 부모 저장소서 복원한 컨버터 라인.
         return "LEGACY_EXPERIMENT", "hwpx_core", "review_hancom_or_converter_line"
@@ -219,80 +251,98 @@ def classify_path(path: str) -> tuple[str, str, str]:
     return "UNKNOWN_REVIEW_REQUIRED", "unassigned", "manual_review_required"
 
 
-def _infer_zone(path: str) -> str:
+def classify_path(path: str) -> tuple[str, str, str]:
     lower = path.lower()
-    if "web_office" in lower:
-        return "test_support"
-    if any(
-        token in lower
-        for token in (
+    name = Path(path).name.lower()
+
+    result = _classify_infra_and_docs_paths(lower, path, name)
+    if result is not None:
+        return result
+    result = _classify_frontend_path(lower)
+    if result is not None:
+        return result
+    result = _classify_scripts_ops_path(lower, path)
+    if result is not None:
+        return result
+    result = _classify_scripts_hwpx_pipeline_path(lower, path)
+    if result is not None:
+        return result
+    result = _classify_scripts_hwpx_path(lower, name)
+    if result is not None:
+        return result
+    return _classify_remaining_script_paths(lower)
+
+
+_ZONE_TOKEN_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("test_support", ("web_office",)),
+    (
+        "closeout_security",
+        (
             "repo_separation",
             "repo_inventory",
             "detailed_separation",
             "new_file_classification",
             "app_structure_drift",
             "monitor_structure_drift",
-        )
-    ):
-        return "closeout_security"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    (
+        "closeout_security",
+        (
             "existing_file_classification",
             "module_log_contract",
             "module_audits",
             "persistent_gates",
             "fail_fast",
             "zone_gates",
-        )
-    ):
-        return "closeout_security"
-    if any(
-        token in lower
-        for token in (
+            # 2026-10-16: 감사들이 가져다 쓰는 공용 검사 모듈(ops_common_checks.py). 넓은 'ops_common'
+            # 가 아니라 정확한 이름만 넣어, 이후 생기는 ops_common_* 파일이 자동 편입되지 않게 한다.
+            "ops_common_checks",
+        ),
+    ),
+    (
+        "batch_api_browser",
+        (
             "api_route",
             "frontend_contract",
             "browser_smoke",
             "browser_batch",
             "ui_connect",
             "module_communication",
-        )
-    ):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")
-    ):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")
-    ):
-        return "input_parse"
-    if any(
-        token in lower
-        for token in (
+        ),
+    ),
+    ("batch_api_browser", ("e2e_smoke", "real_like_sandbox_batch", "api_browser", "api_batch")),
+    ("input_parse", ("field_mapping", "field_mapper", "parser", "preflight", "upload_document")),
+    (
+        "input_parse",
+        (
             "field_catalog",
             "index_and_recommend",
             "type_classification",
             "construction_work_design",
-        )
-    ):
-        return "input_parse"
-    if any(token in lower for token in ("review_panel", "approval_gate", "human_approval")):
-        return "review_approval"
-    if any(
-        token in lower
-        for token in ("writer_sandbox", "readback", "write_sandbox", "rwedit", "backend_rwedit")
-    ):
-        return "writer_readback"
-    if any(token in lower for token in ("download_review", "final_export")):
-        return "download_export"
-    if any(token in lower for token in ("api_batch", "browser_batch", "api_browser", "real_like")):
-        return "batch_api_browser"
-    if any(
-        token in lower
-        for token in (
+            # 2026-09-29: recognition_corpus 신규 테스트(예: results_analysis)가
+            # 이 토큰 없이 "unassigned" 로 빠져 새 파일 분류 게이트가 막았다.
+            # 이미 tracked 인 test_hwpx_recognition_corpus_db_build.py 등도
+            # 같은 공백이었으나 grandfather 돼 안 걸렸을 뿐이다.
+            "recognition_corpus",
+        ),
+    ),
+    ("review_approval", ("review_panel", "approval_gate", "human_approval")),
+    (
+        "writer_readback",
+        (
+            "writer_sandbox",
+            "readback",
+            "write_sandbox",
+            "rwedit",
+            "backend_rwedit",
+        ),
+    ),
+    ("download_export", ("download_review", "final_export")),
+    ("batch_api_browser", ("api_batch", "browser_batch", "api_browser", "real_like")),
+    (
+        "closeout_security",
+        (
             "closeout",
             "security",
             "audit",
@@ -301,9 +351,16 @@ def _infer_zone(path: str) -> str:
             "history",
             "deploy_verifier",
             "server_deploy",
-        )
-    ):
-        return "closeout_security"
+        ),
+    ),
+]
+
+
+def _infer_zone(path: str) -> str:
+    lower = path.lower()
+    for zone, tokens in _ZONE_TOKEN_RULES:
+        if any(token in lower for token in tokens):
+            return zone
     return "unassigned"
 
 
@@ -427,6 +484,8 @@ def _git_head() -> str:
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
         check=True,
     )
@@ -461,8 +520,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
     for name, count in payload["summary"]["zones"].items():
         lines.append(f"- {name}: {count}")
     lines.extend(["", "## Next Separation"])
-    for value in payload["separationRecommendations"].values():
-        lines.append(f"- {value}")
+    lines.extend(f"- {value}" for value in payload["separationRecommendations"].values())
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe inventory markdown")

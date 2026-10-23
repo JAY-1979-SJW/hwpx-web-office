@@ -334,11 +334,9 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
         "",
         "## Commands",
     ]
-    for command in payload["installation"]["commands"]:
-        lines.append(f"- {command}")
+    lines.extend(f"- {command}" for command in payload["installation"]["commands"])
     lines.extend(["", "## Checks"])
-    for item in payload["checks"]:
-        lines.append(f"- {item['status']} {item['code']} {item['desc']}")
+    lines.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in payload["checks"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")

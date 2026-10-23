@@ -35,12 +35,9 @@ def _find(code: str, level: str, detail: str) -> dict[str, Any]:
 
 
 def audit() -> dict[str, Any]:
-    findings: list[dict] = []
 
     # 1. 필수 파일 존재
-    for rel in REQUIRED_PY + REQUIRED_JS + REQUIRED_TESTS:
-        if not (PR / rel).is_file():
-            findings.append(_find("REQUIRED_FILE_MISSING", "FAIL", rel))
+    findings: list[dict] = [_find("REQUIRED_FILE_MISSING", "FAIL", rel) for rel in REQUIRED_PY + REQUIRED_JS + REQUIRED_TESTS if not (PR / rel).is_file()]
 
     # 2. CT_PARA_INSERT 선언 확인
     model_src = (PR / "scripts/hwpx/web_office/para_edit_model.py"
@@ -64,7 +61,7 @@ def audit() -> dict[str, Any]:
     # 4. JS smoke PASS
     r = subprocess.run(
         ["node", str(JS_SMOKE)],
-        capture_output=True, text=True, timeout=30)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     if r.returncode != 0 or not r.stdout.strip():
         findings.append(_find("JS_SMOKE_ERROR", "FAIL", r.stderr[:200]))
     else:
@@ -80,7 +77,7 @@ def audit() -> dict[str, Any]:
         [sys.executable, "-m", "pytest",
          "tests/test_web_office_para_edit_structure_para_insert.py",
          "-q", "--tb=short"],
-        capture_output=True, text=True, timeout=60, cwd=str(PR))
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, cwd=str(PR))
     if r2.returncode != 0:
         findings.append(_find("PY_TEST_FAIL", "FAIL",
                               r2.stdout[-400:]))

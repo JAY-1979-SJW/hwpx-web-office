@@ -7,6 +7,7 @@ apply_edit_plan / write_package / repair_for_server / fill_schedule_bars 호출 
 원본 fixture 수정 없음.
 reports 산출물은 커밋 제외.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,7 +17,6 @@ from .parser_contract import (
     BarRangeInfo,
     DateColumnInfo,
     ProgressColumnInfo,
-    ScheduleAxisMappingResult,
     ScheduleBarPlanCandidate,
     ScheduleBarRangeRequest,
     ScheduleDateRange,
@@ -42,7 +42,7 @@ _TASK_HEADERS = {"공종", "작업명", "세부공정", "내용", "항목", "공
 # 기간 열 후보 헤더
 _PERIOD_HEADERS = {"기간", "일정", "공사기간", "기간(일)", "period"}
 
-_BAR_SYMBOLS = {"■", "□", "▪", "▫", "●", "○", "▶", "◀", "▲", "▽", "━", "─", "─", "·", "◾"}
+_BAR_SYMBOLS = {"■", "□", "▪", "▫", "●", "○", "▶", "◀", "▲", "▽", "━", "─", "·", "◾"}
 
 
 def normalize_axis_label(text: str) -> str:
@@ -66,7 +66,9 @@ def infer_axis_unit(headers: list[str]) -> str:
     month_cnt = sum(1 for h in headers if _RE_MONTH_KR.match(h.strip()))
     week_cnt = sum(1 for h in headers if _RE_WEEK_KR.match(h.strip()))
     day_cnt = sum(1 for h in headers if _RE_DAY_NUM.match(h.strip()))
-    date_cnt = sum(1 for h in headers if _RE_DATE_SLASH.match(h.strip()) or _RE_DATE_DOT.match(h.strip()))
+    date_cnt = sum(
+        1 for h in headers if _RE_DATE_SLASH.match(h.strip()) or _RE_DATE_DOT.match(h.strip())
+    )
 
     if month_cnt >= 2:
         return "month"
@@ -89,6 +91,55 @@ def _cells_by_row_col(table) -> dict[tuple[int, int], Any]:
 
 # ── STEP 2: 날짜축 탐지 ───────────────────────────────────────────────────────
 
+
+_DATE_LABEL_CONFIDENCE = {
+    "month:": 0.95,
+    "week:": 0.90,
+    "day:": 0.80,
+    "date:": 0.85,
+}
+
+
+def _row_date_columns(
+    cells: dict[tuple[int, int], Any], row_i: int, cols: int
+) -> list[DateColumnInfo]:
+    date_cols: list[DateColumnInfo] = []
+    for col_i in range(cols):
+        cell = cells.get((row_i, col_i))
+        if not cell:
+            continue
+        text = (getattr(cell, "normalizedText", "") or "").strip()
+        if not text:
+            continue
+        norm = normalize_axis_label(text)
+        conf = next(
+            (c for prefix, c in _DATE_LABEL_CONFIDENCE.items() if norm.startswith(prefix)), 0.0
+        )
+        if conf > 0:
+            date_cols.append(
+                DateColumnInfo(col=col_i, label=text, normalized=norm, confidence=conf)
+            )
+    return date_cols
+
+
+def _classify_header_rows(
+    date_cols: list[DateColumnInfo], header_row: int
+) -> tuple[list[int], list[int], list[int]]:
+    month_header_rows: list[int] = []
+    week_header_rows: list[int] = []
+    day_header_rows: list[int] = []
+    for d in date_cols:
+        if d.normalized.startswith("month:"):
+            if header_row not in month_header_rows:
+                month_header_rows.append(header_row)
+        elif d.normalized.startswith("week:"):
+            if header_row not in week_header_rows:
+                week_header_rows.append(header_row)
+        elif d.normalized.startswith("day:") and header_row not in day_header_rows:
+            day_header_rows.append(header_row)
+    return month_header_rows, week_header_rows, day_header_rows
+
+
 def detect_time_axis(table) -> TimeAxisInfo:
     cells = _cells_by_row_col(table)
     rows = getattr(table, "rowCount", 0)
@@ -98,32 +149,9 @@ def detect_time_axis(table) -> TimeAxisInfo:
     best_date_cols: list[DateColumnInfo] = []
     best_score: float = 0.0
     evidence: list[str] = []
-    month_header_rows: list[int] = []
-    week_header_rows: list[int] = []
-    day_header_rows: list[int] = []
 
     for row_i in range(min(rows, 4)):
-        date_cols: list[DateColumnInfo] = []
-        for col_i in range(cols):
-            cell = cells.get((row_i, col_i))
-            if not cell:
-                continue
-            text = (getattr(cell, "normalizedText", "") or "").strip()
-            if not text:
-                continue
-            norm = normalize_axis_label(text)
-            conf = 0.0
-            if norm.startswith("month:"):
-                conf = 0.95
-            elif norm.startswith("week:"):
-                conf = 0.90
-            elif norm.startswith("day:"):
-                conf = 0.80
-            elif norm.startswith("date:"):
-                conf = 0.85
-            if conf > 0:
-                date_cols.append(DateColumnInfo(col=col_i, label=text, normalized=norm, confidence=conf))
-
+        date_cols = _row_date_columns(cells, row_i, cols)
         if len(date_cols) >= 2:
             score = len(date_cols) * sum(d.confidence for d in date_cols) / len(date_cols)
             if score > best_score:
@@ -143,17 +171,9 @@ def detect_time_axis(table) -> TimeAxisInfo:
     evidence.append(f"date_cols={[d.col for d in best_date_cols]}")
     evidence.append(f"unit={unit}")
 
-    # 월/주/일 헤더 행 분류
-    for d in best_date_cols:
-        if d.normalized.startswith("month:"):
-            if best_header_row not in month_header_rows:
-                month_header_rows.append(best_header_row)
-        elif d.normalized.startswith("week:"):
-            if best_header_row not in week_header_rows:
-                week_header_rows.append(best_header_row)
-        elif d.normalized.startswith("day:"):
-            if best_header_row not in day_header_rows:
-                day_header_rows.append(best_header_row)
+    month_header_rows, week_header_rows, day_header_rows = _classify_header_rows(
+        best_date_cols, best_header_row
+    )
 
     axis_conf = min(0.99, best_score / (len(best_date_cols) + 1))
     return TimeAxisInfo(
@@ -170,6 +190,31 @@ def detect_time_axis(table) -> TimeAxisInfo:
 
 
 # ── STEP 3: 작업행 탐지 ───────────────────────────────────────────────────────
+
+
+def _axis_texts_for_row(cells: dict, row_i: int, date_col_set: set[int]) -> list[str]:
+    axis_texts = []
+    for col_i in date_col_set:
+        c = cells.get((row_i, col_i))
+        t = (getattr(c, "normalizedText", "") or "").strip() if c else ""
+        if t:
+            axis_texts.append(t)
+    return axis_texts
+
+
+def _left_texts_for_row(
+    cells: dict, cols: int, row_i: int, text0: str, date_col_set: set[int]
+) -> list[str]:
+    left_texts = [text0]
+    for col_i in range(1, min(2, cols)):
+        if col_i in date_col_set:
+            break
+        c = cells.get((row_i, col_i))
+        t = (getattr(c, "normalizedText", "") or "").strip() if c else ""
+        if t:
+            left_texts.append(t)
+    return left_texts
+
 
 def detect_task_rows(table, axis: TimeAxisInfo) -> list[TaskRowInfo]:
     cells = _cells_by_row_col(table)
@@ -192,21 +237,8 @@ def detect_task_rows(table, axis: TimeAxisInfo) -> list[TaskRowInfo]:
             continue
 
         # 날짜축 영역 셀 확인 — 바 기호 또는 내용 있으면 작업행
-        axis_texts = []
-        for col_i in date_col_set:
-            c = cells.get((row_i, col_i))
-            t = (getattr(c, "normalizedText", "") or "").strip() if c else ""
-            if t:
-                axis_texts.append(t)
-
-        left_texts = [text0]
-        for col_i in range(1, min(2, cols)):
-            if col_i in date_col_set:
-                break
-            c = cells.get((row_i, col_i))
-            t = (getattr(c, "normalizedText", "") or "").strip() if c else ""
-            if t:
-                left_texts.append(t)
+        axis_texts = _axis_texts_for_row(cells, row_i, date_col_set)
+        left_texts = _left_texts_for_row(cells, cols, row_i, text0, date_col_set)
 
         conf = 0.80
         if axis_texts:
@@ -215,19 +247,22 @@ def detect_task_rows(table, axis: TimeAxisInfo) -> list[TaskRowInfo]:
         if axis_texts:
             evidence.append(f"axis_sample={axis_texts[:2]}")
 
-        task_rows.append(TaskRowInfo(
-            row=row_i,
-            taskName=text0,
-            trade="",
-            leftText=left_texts,
-            confidence=conf,
-            evidence=evidence,
-        ))
+        task_rows.append(
+            TaskRowInfo(
+                row=row_i,
+                taskName=text0,
+                trade="",
+                leftText=left_texts,
+                confidence=conf,
+                evidence=evidence,
+            )
+        )
 
     return task_rows
 
 
 # ── STEP 4: 막대 구간 탐지 ────────────────────────────────────────────────────
+
 
 def classify_bar_type(table, row: int, date_col_set: set[int]) -> tuple[str, list[str]]:
     cells = _cells_by_row_col(table)
@@ -242,7 +277,6 @@ def classify_bar_type(table, row: int, date_col_set: set[int]) -> tuple[str, lis
             continue
         text = (getattr(c, "normalizedText", "") or "").strip()
         color = getattr(c, "fillColor", "") or ""
-        merged = getattr(c, "isMergedOrigin", False)
 
         if color and color.lower() not in ("", "ffffff", "none", "auto"):
             fill_colors.append(color)
@@ -267,7 +301,92 @@ def classify_bar_type(table, row: int, date_col_set: set[int]) -> tuple[str, lis
     return "empty_template", ["no_bar_content"]
 
 
-def detect_bar_ranges(table, axis: TimeAxisInfo, task_rows: list[TaskRowInfo]) -> list[BarRangeInfo]:
+def _scan_bar_segments(
+    cells, row_i: int, bar_type: str, evidence, sorted_date_cols: list[int]
+) -> list[BarRangeInfo]:
+    row_ranges: list[BarRangeInfo] = []
+
+    # 연속 구간 탐지
+    start_col: int | None = None
+    end_col: int | None = None
+    seg_texts: list[str] = []
+    seg_colors: list[str] = []
+
+    def flush(sc, ec, texts, colors):
+        if sc is None:
+            return None
+        bt = bar_type
+        fc = colors[0] if colors else ""
+        txt = " ".join(texts) if texts else ""
+        conf = (
+            0.85 if bt in ("text_full", "color_bar") else (0.75 if bt == "text_partial" else 0.60)
+        )
+        return BarRangeInfo(
+            row=row_i,
+            colStart=sc,
+            colEnd=ec,
+            barType=bt,
+            text=txt[:40],
+            fillColor=fc,
+            confidence=conf,
+            evidence=evidence,
+        )
+
+    for col_i in sorted_date_cols:
+        c = cells.get((row_i, col_i))
+        text = (getattr(c, "normalizedText", "") or "").strip() if c else ""
+        color = (getattr(c, "fillColor", "") or "") if c else ""
+        is_marked_color = bool(color and color.lower() not in ("ffffff", "none", ""))
+        has_content = bool(text) or is_marked_color
+
+        if has_content:
+            if start_col is None:
+                start_col = col_i
+            end_col = col_i
+            if text:
+                seg_texts.append(text)
+            if is_marked_color:
+                seg_colors.append(color)
+        else:
+            r = flush(start_col, end_col, seg_texts, seg_colors)
+            if r:
+                row_ranges.append(r)
+            start_col = None
+            end_col = None
+            seg_texts = []
+            seg_colors = []
+
+    r = flush(start_col, end_col, seg_texts, seg_colors)
+    if r:
+        row_ranges.append(r)
+    return row_ranges
+
+
+def _detect_bar_ranges_for_row(
+    cells, row_i: int, bar_type: str, evidence, sorted_date_cols: list[int]
+) -> list[BarRangeInfo]:
+    row_ranges = _scan_bar_segments(cells, row_i, bar_type, evidence, sorted_date_cols)
+
+    # empty_template은 명시적으로 1개의 범위로 기록
+    if bar_type == "empty_template" and not any(br.row == row_i for br in row_ranges):
+        row_ranges.append(
+            BarRangeInfo(
+                row=row_i,
+                colStart=sorted_date_cols[0],
+                colEnd=sorted_date_cols[-1],
+                barType="empty_template",
+                text="",
+                fillColor="",
+                confidence=0.60,
+                evidence=evidence,
+            )
+        )
+    return row_ranges
+
+
+def detect_bar_ranges(
+    table, axis: TimeAxisInfo, task_rows: list[TaskRowInfo]
+) -> list[BarRangeInfo]:
     cells = _cells_by_row_col(table)
     date_col_set = {d.col for d in axis.dateColumns}
     if not date_col_set:
@@ -279,72 +398,15 @@ def detect_bar_ranges(table, axis: TimeAxisInfo, task_rows: list[TaskRowInfo]) -
     for tr in task_rows:
         row_i = tr.row
         bar_type, evidence = classify_bar_type(table, row_i, date_col_set)
-
-        # 연속 구간 탐지
-        start_col: int | None = None
-        end_col: int | None = None
-        seg_texts: list[str] = []
-        seg_colors: list[str] = []
-
-        def flush(sc, ec, texts, colors):
-            if sc is None:
-                return None
-            bt = bar_type
-            fc = colors[0] if colors else ""
-            txt = " ".join(texts) if texts else ""
-            conf = 0.85 if bt in ("text_full", "color_bar") else (
-                0.75 if bt == "text_partial" else 0.60
-            )
-            return BarRangeInfo(
-                row=row_i, colStart=sc, colEnd=ec,
-                barType=bt, text=txt[:40], fillColor=fc,
-                confidence=conf, evidence=evidence,
-            )
-
-        for col_i in sorted_date_cols:
-            c = cells.get((row_i, col_i))
-            text = (getattr(c, "normalizedText", "") or "").strip() if c else ""
-            color = (getattr(c, "fillColor", "") or "") if c else ""
-            has_content = bool(text) or bool(color and color.lower() not in ("ffffff", "none", ""))
-
-            if has_content:
-                if start_col is None:
-                    start_col = col_i
-                end_col = col_i
-                if text:
-                    seg_texts.append(text)
-                if color and color.lower() not in ("ffffff", "none", ""):
-                    seg_colors.append(color)
-            else:
-                r = flush(start_col, end_col, seg_texts, seg_colors)
-                if r:
-                    ranges.append(r)
-                start_col = None
-                end_col = None
-                seg_texts = []
-                seg_colors = []
-
-        r = flush(start_col, end_col, seg_texts, seg_colors)
-        if r:
-            ranges.append(r)
-
-        # empty_template은 명시적으로 1개의 범위로 기록
-        if bar_type == "empty_template" and not any(br.row == row_i for br in ranges):
-            ranges.append(BarRangeInfo(
-                row=row_i,
-                colStart=sorted_date_cols[0],
-                colEnd=sorted_date_cols[-1],
-                barType="empty_template",
-                text="",
-                fillColor="",
-                confidence=0.60,
-                evidence=evidence,
-            ))
+        ranges.extend(
+            _detect_bar_ranges_for_row(cells, row_i, bar_type, evidence, sorted_date_cols)
+        )
 
     return ranges
 
 
 # ── STEP 5: 진행률 열 탐지 ───────────────────────────────────────────────────
+
 
 def detect_progress_column(table) -> ProgressColumnInfo | None:
     cells = _cells_by_row_col(table)
@@ -365,6 +427,7 @@ def detect_progress_column(table) -> ProgressColumnInfo | None:
 
 
 # ── STEP 1: 공정표 구조 전체 탐지 ─────────────────────────────────────────────
+
 
 def detect_schedule_structure(parser_result) -> list[ScheduleInfo]:
     """ParserV2Result에서 공정표 구조를 탐지해 ScheduleInfo 목록으로 반환."""
@@ -399,17 +462,19 @@ def detect_schedule_structure(parser_result) -> list[ScheduleInfo]:
         if not task_rows:
             warnings.append("task_rows_empty")
 
-        results.append(ScheduleInfo(
-            tableId=getattr(table, "tableId", ""),
-            scheduleType="gantt_bar_schedule",
-            confidence=conf,
-            timeAxis=axis,
-            taskRows=task_rows,
-            barRanges=bar_ranges,
-            progressColumn=progress_col,
-            warnings=warnings,
-            evidence=evidence,
-        ))
+        results.append(
+            ScheduleInfo(
+                tableId=getattr(table, "tableId", ""),
+                scheduleType="gantt_bar_schedule",
+                confidence=conf,
+                timeAxis=axis,
+                taskRows=task_rows,
+                barRanges=bar_ranges,
+                progressColumn=progress_col,
+                warnings=warnings,
+                evidence=evidence,
+            )
+        )
 
     return results
 
@@ -425,6 +490,7 @@ _RE_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})$")
 
 
 # ── STEP 2: normalize 함수 ────────────────────────────────────────────────────
+
 
 def normalize_month_label(label: str) -> str:
     """월 레이블을 'month:N' 형태로 반환."""
@@ -523,6 +589,38 @@ def extract_day_from_date(value: str) -> int | None:
 
 # ── STEP 3: date range → col range 변환 ──────────────────────────────────────
 
+
+def _resolve_column_for_date(
+    normalized_date: str,
+    col_map: dict[str, int],
+    sorted_cols: list,
+    *,
+    reverse: bool,
+    label: str,
+) -> tuple[int, str | None]:
+    col = col_map.get(normalized_date, -1)
+    if col != -1:
+        return col, None
+    search_order = reversed(sorted_cols) if reverse else sorted_cols
+    for d in search_order:
+        if d.normalized == normalized_date:
+            return d.col, None
+    return -1, f"{label}_not_in_axis: {normalized_date}"
+
+
+def _clamp_partial_range(
+    col_start: int, col_end: int, sorted_cols: list
+) -> tuple[int, int, list[str]]:
+    clamp_warnings: list[str] = []
+    if col_start == -1 and col_end != -1:
+        col_start = sorted_cols[0].col
+        clamp_warnings.append("start_out_of_range_clamped_to_first_col")
+    if col_end == -1 and col_start != -1:
+        col_end = sorted_cols[-1].col
+        clamp_warnings.append("end_out_of_range_clamped_to_last_col")
+    return col_start, col_end, clamp_warnings
+
+
 def map_date_range_to_columns(
     time_axis: TimeAxisInfo,
     start_date: str,
@@ -553,33 +651,21 @@ def map_date_range_to_columns(
     col_map: dict[str, int] = {d.normalized: d.col for d in time_axis.dateColumns}
     sorted_cols = sorted(time_axis.dateColumns, key=lambda d: d.col)
 
-    col_start = col_map.get(norm_start, -1)
-    col_end = col_map.get(norm_end, -1)
-
     # 범위 시작/끝이 직접 매핑 안 되면 인접 탐색 (같은 unit prefix)
-    if col_start == -1:
-        for d in sorted_cols:
-            if d.normalized == norm_start:
-                col_start = d.col
-                break
-        if col_start == -1:
-            warnings.append(f"start_not_in_axis: {norm_start}")
-
-    if col_end == -1:
-        for d in reversed(sorted_cols):
-            if d.normalized == norm_end:
-                col_end = d.col
-                break
-        if col_end == -1:
-            warnings.append(f"end_not_in_axis: {norm_end}")
+    col_start, start_warning = _resolve_column_for_date(
+        norm_start, col_map, sorted_cols, reverse=False, label="start"
+    )
+    if start_warning:
+        warnings.append(start_warning)
+    col_end, end_warning = _resolve_column_for_date(
+        norm_end, col_map, sorted_cols, reverse=True, label="end"
+    )
+    if end_warning:
+        warnings.append(end_warning)
 
     # 부분 매핑 처리
-    if col_start == -1 and col_end != -1:
-        col_start = sorted_cols[0].col
-        warnings.append("start_out_of_range_clamped_to_first_col")
-    if col_end == -1 and col_start != -1:
-        col_end = sorted_cols[-1].col
-        warnings.append("end_out_of_range_clamped_to_last_col")
+    col_start, col_end, clamp_warnings = _clamp_partial_range(col_start, col_end, sorted_cols)
+    warnings.extend(clamp_warnings)
     if col_start == -1 and col_end == -1:
         warnings.append("no_range_match")
         date_range.warnings = warnings
@@ -602,6 +688,34 @@ def map_date_range_to_columns(
 
 
 # ── STEP 4: task row 매칭 ─────────────────────────────────────────────────────
+
+
+def _find_task_row_by_contains(
+    task_rows: list[TaskRowInfo], task_name: str
+) -> tuple[TaskRowInfo, float, list[str], str | None] | None:
+    candidates = [tr for tr in task_rows if task_name in tr.taskName or tr.taskName in task_name]
+    if len(candidates) == 1:
+        return candidates[0], 0.80, [f"contains_match={task_name!r}"], None
+    if len(candidates) > 1:
+        # 가장 짧은 것 (가장 구체적)
+        best = min(candidates, key=lambda t: len(t.taskName))
+        return (
+            best,
+            0.65,
+            [f"multi_contains_match={task_name!r}", f"selected={best.taskName!r}"],
+            f"multiple matches for {task_name!r}",
+        )
+    return None
+
+
+def _find_task_row_by_trade(
+    task_rows: list[TaskRowInfo], trade: str
+) -> tuple[TaskRowInfo, float, list[str], str | None] | None:
+    for tr in task_rows:
+        if trade in (tr.trade or "") or trade in " ".join(tr.leftText or []):
+            return tr, 0.60, [f"trade_match={trade!r}"], "matched via trade only"
+    return None
+
 
 def find_task_row(
     task_rows: list[TaskRowInfo],
@@ -627,25 +741,21 @@ def find_task_row(
             return tr, 0.95, [f"exact_match={task_name!r}"], None
 
     # 우선순위 3: contains match
-    candidates = [tr for tr in task_rows if task_name in tr.taskName or tr.taskName in task_name]
-    if len(candidates) == 1:
-        return candidates[0], 0.80, [f"contains_match={task_name!r}"], None
-    if len(candidates) > 1:
-        # 가장 짧은 것 (가장 구체적)
-        best = min(candidates, key=lambda t: len(t.taskName))
-        return best, 0.65, [f"multi_contains_match={task_name!r}", f"selected={best.taskName!r}"], \
-               f"multiple matches for {task_name!r}"
+    contains_result = _find_task_row_by_contains(task_rows, task_name)
+    if contains_result is not None:
+        return contains_result
 
     # 우선순위 4: trade + taskName
     if trade:
-        for tr in task_rows:
-            if trade in (tr.trade or "") or trade in " ".join(tr.leftText or []):
-                return tr, 0.60, [f"trade_match={trade!r}"], f"matched via trade only"
+        trade_result = _find_task_row_by_trade(task_rows, trade)
+        if trade_result is not None:
+            return trade_result
 
     return None, 0.0, [f"no_match_for={task_name!r}"], f"task not found: {task_name!r}"
 
 
 # ── STEP 5: bar plan candidate 생성 ──────────────────────────────────────────
+
 
 def build_schedule_bar_plan_candidate(
     schedule_info: ScheduleInfo,
@@ -685,8 +795,13 @@ def build_schedule_bar_plan_candidate(
 
     # confidence 계산
     conf = round(tr_conf * 0.5 + (0.50 if col_start != -1 else 0.0), 3)
-    review_required = (col_start == -1 or col_end == -1 or col_start > col_end
-                       or matched_tr is None or bool(warnings))
+    review_required = (
+        col_start == -1
+        or col_end == -1
+        or col_start > col_end
+        or matched_tr is None
+        or bool(warnings)
+    )
     review_reason: str | None = "; ".join(warnings) if warnings else None
 
     # 기존 barRange 탐색
@@ -699,7 +814,8 @@ def build_schedule_bar_plan_candidate(
     # 충돌 검사
     conflict = detect_bar_conflict(
         [br for br in schedule_info.barRanges if br.row == row],
-        col_start, col_end,
+        col_start,
+        col_end,
     )
 
     return ScheduleBarPlanCandidate(
@@ -726,6 +842,7 @@ def build_schedule_bar_plan_candidate(
 
 
 # ── STEP 6: 충돌 검사 ────────────────────────────────────────────────────────
+
 
 def detect_bar_conflict(
     existing_ranges: list[BarRangeInfo],
@@ -762,6 +879,7 @@ def detect_bar_conflict(
 
 
 # ── STEP 7: empty_template 후보 자동 생성 ────────────────────────────────────
+
 
 def generate_empty_template_bar_candidates(
     schedule_info: ScheduleInfo,
@@ -806,32 +924,39 @@ def generate_empty_template_bar_candidates(
 
         conflict = detect_bar_conflict(
             [br for br in schedule_info.barRanges if br.row == tr.row],
-            req_col_start, req_col_end,
+            req_col_start,
+            req_col_end,
         )
         source = "empty_template_candidate"
         conf = 0.70 if not req_warnings else 0.55
 
-        candidates.append(ScheduleBarPlanCandidate(
-            tableId=schedule_info.tableId,
-            row=tr.row,
-            taskName=tr.taskName,
-            colStart=req_col_start,
-            colEnd=req_col_end,
-            axisUnit=axis.unit,
-            startLabel=req_start_label,
-            endLabel=req_end_label,
-            color="",
-            text="",
-            textAt="center",
-            confidence=conf,
-            source=source,
-            existingBarType=existing_bar_type,
-            conflict=conflict,
-            reviewRequired=bool(req_warnings),
-            reviewRequiredReason="; ".join(req_warnings) if req_warnings else None,
-            evidence=[f"row={tr.row}", f"taskName={tr.taskName!r}",
-                      f"colStart={req_col_start}", f"colEnd={req_col_end}"],
-            warnings=list(req_warnings),
-        ))
+        candidates.append(
+            ScheduleBarPlanCandidate(
+                tableId=schedule_info.tableId,
+                row=tr.row,
+                taskName=tr.taskName,
+                colStart=req_col_start,
+                colEnd=req_col_end,
+                axisUnit=axis.unit,
+                startLabel=req_start_label,
+                endLabel=req_end_label,
+                color="",
+                text="",
+                textAt="center",
+                confidence=conf,
+                source=source,
+                existingBarType=existing_bar_type,
+                conflict=conflict,
+                reviewRequired=bool(req_warnings),
+                reviewRequiredReason="; ".join(req_warnings) if req_warnings else None,
+                evidence=[
+                    f"row={tr.row}",
+                    f"taskName={tr.taskName!r}",
+                    f"colStart={req_col_start}",
+                    f"colEnd={req_col_end}",
+                ],
+                warnings=list(req_warnings),
+            )
+        )
 
     return candidates

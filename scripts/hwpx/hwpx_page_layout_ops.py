@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from hwpx_package import HwpxPackage, local_name
-
 
 HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 HS_NS = "http://www.hancom.co.kr/hwpml/2011/section"
@@ -103,6 +102,24 @@ def _find_or_create_margin(page_pr: ET.Element) -> tuple[ET.Element, bool]:
     return margin, created
 
 
+def _resolve_margins(layout: dict[str, Any], errors: list[dict[str, Any]]) -> dict[str, int]:
+    raw_margins = layout.get("margins", {})
+    if raw_margins is None:
+        raw_margins = {}
+    if not isinstance(raw_margins, dict):
+        errors.append({"type": "PAGE_MARGINS_NOT_OBJECT", "value": raw_margins})
+        raw_margins = {}
+
+    margins: dict[str, int] = {}
+    for field, default in DEFAULT_MARGINS.items():
+        value = raw_margins.get(field, default)
+        if not isinstance(value, int) or value < 0:
+            errors.append({"type": "PAGE_MARGIN_INVALID", "field": field, "value": value})
+            value = default
+        margins[field] = value
+    return margins
+
+
 def normalize_page_layout(layout: dict[str, Any] | None) -> dict[str, Any]:
     layout = layout or {}
     warnings: list[dict[str, Any]] = []
@@ -134,20 +151,7 @@ def normalize_page_layout(layout: dict[str, Any] | None) -> dict[str, Any]:
         width, height = height, width
         warnings.append({"type": "PAGE_DIMENSIONS_SWAPPED_FOR_PORTRAIT"})
 
-    raw_margins = layout.get("margins", {})
-    if raw_margins is None:
-        raw_margins = {}
-    if not isinstance(raw_margins, dict):
-        errors.append({"type": "PAGE_MARGINS_NOT_OBJECT", "value": raw_margins})
-        raw_margins = {}
-
-    margins: dict[str, int] = {}
-    for field, default in DEFAULT_MARGINS.items():
-        value = raw_margins.get(field, default)
-        if not isinstance(value, int) or value < 0:
-            errors.append({"type": "PAGE_MARGIN_INVALID", "field": field, "value": value})
-            value = default
-        margins[field] = value
+    margins = _resolve_margins(layout, errors)
 
     gutter_type = str(layout.get("gutter_type", DEFAULT_PAGE["gutter_type"]))
     return {
@@ -166,7 +170,11 @@ def normalize_page_layout(layout: dict[str, Any] | None) -> dict[str, Any]:
 def inspect_page_layout(package: HwpxPackage, section_index: int = 0) -> dict[str, Any]:
     sections = package.section_entries()
     if section_index < 0 or section_index >= len(sections):
-        return {"status": "SECTION_NOT_FOUND", "section_index": section_index, "section_count": len(sections)}
+        return {
+            "status": "SECTION_NOT_FOUND",
+            "section_index": section_index,
+            "section_count": len(sections),
+        }
     entry = sections[section_index]
     root = package.read_xml(entry)
     page_pr = _find_first(root, "pagePr")
@@ -183,7 +191,11 @@ def inspect_page_layout(package: HwpxPackage, section_index: int = 0) -> dict[st
 def set_page_layout(package: HwpxPackage, layout: dict[str, Any] | None) -> dict[str, Any]:
     normalized = normalize_page_layout(layout)
     if normalized["errors"]:
-        return {"status": "PAGE_LAYOUT_INVALID", "normalized": normalized, "warnings": normalized["warnings"]}
+        return {
+            "status": "PAGE_LAYOUT_INVALID",
+            "normalized": normalized,
+            "warnings": normalized["warnings"],
+        }
 
     sections = package.section_entries()
     section_index = normalized["section_index"]

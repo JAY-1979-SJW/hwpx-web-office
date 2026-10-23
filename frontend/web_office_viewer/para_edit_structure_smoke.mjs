@@ -4,12 +4,10 @@ import {
   makeParagraphEditorState, setCaret, splitParagraphAtCaret,
   mergeParagraphWithPrevious,
   undo, redo, typeTextAtCaret, setRange, deleteBackward,
-  SEL_CARET, SEL_TEXT_RANGE,
 } from "./para_edit_state.mjs";
 import { onKeyDown } from "./para_edit_runtime.mjs";
 import {
-  allocateNewParagraphId, applyParaInsertToParagraphs,
-  applyParaDeleteToParagraphs, makeParaInsertCommand,
+  allocateNewParagraphId,
   makeParaDeleteCommand, applyParaDeleteForwardToParagraphs,
   validateRunCharPrIntegrity, splitRun,
   REASON_CHARPR_MISSING_ON_RUN, REASON_CHARPR_SPLIT_SOURCE_MISSING,

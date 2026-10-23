@@ -11,6 +11,7 @@
 - 외부 모델 / OCR / writer / output HWPX / secret 미참조
 - raw 개인정보 저장 금지 (해시만)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -22,18 +23,30 @@ CONTRACT_VERSION = "v1"
 
 # AI proposal envelope 필수 필드
 REQUIRED_PROPOSAL_FIELDS: tuple[str, ...] = (
-    "proposalId", "label", "value", "confidence",
+    "proposalId",
+    "label",
+    "value",
+    "confidence",
 )
 OPTIONAL_PROPOSAL_FIELDS: tuple[str, ...] = (
-    "semanticType", "targetHint", "evidence",
-    "rationale", "modelId",
+    "semanticType",
+    "targetHint",
+    "evidence",
+    "rationale",
+    "modelId",
 )
 
 # 외부 손님이 보내면 안 되는 필드 (방화구획)
 FORBIDDEN_PROPOSAL_FIELDS: tuple[str, ...] = (
-    "filesystemPath", "outputPath", "absolutePath",
-    "credential", "token", "password", "secret",
-    "apiKey", "sessionCookie",
+    "filesystemPath",
+    "outputPath",
+    "absolutePath",
+    "credential",
+    "token",
+    "password",
+    "secret",
+    "apiKey",
+    "sessionCookie",
 )
 
 # 개인정보 가능 패턴 — raw value 저장 거부
@@ -48,28 +61,36 @@ class ProposalRejection(ValueError):
 
 # ── proposal envelope validation ───────────────────────────────────────────
 
-def validate_proposal_envelope(p: dict) -> list[str]:
+
+def _validate_confidence_field(p: dict) -> list[str]:
     errs: list[str] = []
-    if not isinstance(p, dict):
-        return ["PROPOSAL_NOT_OBJECT"]
-    for k in REQUIRED_PROPOSAL_FIELDS:
-        if k not in p:
-            errs.append(f"MISSING_FIELD:{k}")
     conf = p.get("confidence")
     if conf is not None:
         if not isinstance(conf, (int, float)):
             errs.append("CONFIDENCE_NOT_NUMBER")
         elif not (0.0 <= float(conf) <= 1.0):
             errs.append("CONFIDENCE_OUT_OF_RANGE")
+    return errs
+
+
+def _validate_string_fields(p: dict) -> list[str]:
+    errs: list[str] = []
     label = p.get("label")
     if label is not None and not isinstance(label, str):
         errs.append("LABEL_NOT_STRING")
     val = p.get("value")
     if val is not None and not isinstance(val, str):
         errs.append("VALUE_NOT_STRING")
-    for forbidden in FORBIDDEN_PROPOSAL_FIELDS:
-        if forbidden in p:
-            errs.append(f"FORBIDDEN_FIELD:{forbidden}")
+    return errs
+
+
+def validate_proposal_envelope(p: dict) -> list[str]:
+    if not isinstance(p, dict):
+        return ["PROPOSAL_NOT_OBJECT"]
+    errs: list[str] = [f"MISSING_FIELD:{k}" for k in REQUIRED_PROPOSAL_FIELDS if k not in p]
+    errs.extend(_validate_confidence_field(p))
+    errs.extend(_validate_string_fields(p))
+    errs.extend(f"FORBIDDEN_FIELD:{forbidden}" for forbidden in FORBIDDEN_PROPOSAL_FIELDS if forbidden in p)
     return errs
 
 
@@ -85,18 +106,22 @@ def validate_proposal_batch(proposals: list) -> dict:
             errs.append("DUPLICATE_PROPOSAL_ID")
         if errs:
             rejected.append({
-                "proposalId": pid, "errors": errs,
+                "proposalId": pid,
+                "errors": errs,
             })
         else:
             seen_ids.add(pid)
             accepted.append(p)
     return {
-        "accepted": accepted, "rejected": rejected,
-        "acceptedCount": len(accepted), "rejectedCount": len(rejected),
+        "accepted": accepted,
+        "rejected": rejected,
+        "acceptedCount": len(accepted),
+        "rejectedCount": len(rejected),
     }
 
 
 # ── value redaction (개인정보 보호) ─────────────────────────────────────────
+
 
 def hash_value(v: str | None) -> str | None:
     if v is None:
@@ -110,20 +135,20 @@ def redact_proposal_value(value: str | None) -> dict:
     사업자번호/전화번호/주민번호 패턴은 preview에서도 마스킹.
     """
     if value is None:
-        return {"valueHash": None, "redactedPreview": None,
-                  "containsSensitive": False}
-    sensitive = bool(_BIZNO_RE.search(value)
-                          or _PHONE_RE.search(value)
-                          or _RRN_RE.search(value))
+        return {"valueHash": None, "redactedPreview": None, "containsSensitive": False}
+    sensitive = bool(_BIZNO_RE.search(value) or _PHONE_RE.search(value) or _RRN_RE.search(value))
     preview = value[:20]
     if sensitive:
         preview = "[REDACTED]"
-    return {"valueHash": hash_value(value),
-              "redactedPreview": preview,
-              "containsSensitive": sensitive}
+    return {
+        "valueHash": hash_value(value),
+        "redactedPreview": preview,
+        "containsSensitive": sensitive,
+    }
 
 
 # ── snapshot ───────────────────────────────────────────────────────────────
+
 
 def dump_contract_snapshot() -> dict:
     return {
@@ -160,11 +185,8 @@ def audit_ai_proposal_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_AI_PROPOSAL_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
-    return {"violations": violations, "ok": not violations,
-              "filesChecked": checked}
+                } for needle in FORBIDDEN_AI_PROPOSAL_IMPORTS if needle in text)
+    return {"violations": violations, "ok": not violations, "filesChecked": checked}

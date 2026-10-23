@@ -1,20 +1,25 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Post-commit devlog writer.
 
-Default behavior writes change history and devlog files only. It never creates
-an additional commit unless ALLOW_POST_COMMIT_AUTO_COMMIT=1 is explicitly set.
+Default behavior writes the local change history only. The devlog (which sends the
+commit message and diff to the external `claude` CLI) is generated only when
+HWPX_DEVLOG_GENERATE=1 is explicitly set. It never creates an additional commit
+unless ALLOW_POST_COMMIT_AUTO_COMMIT=1 is explicitly set.
 """
+
 import json
 import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 KST = timezone(timedelta(hours=9))
 DIFF_MAX_CHARS = 8000
 AUTO_COMMIT_ENV = "ALLOW_POST_COMMIT_AUTO_COMMIT"
+DEVLOG_GENERATE_ENV = "HWPX_DEVLOG_GENERATE"
 KNOWN_SECRET_PREFIXES = ("s" + "k-", "gh" + "p_", "AI" + "za")
 SECRET_LITERAL_RE = re.compile(
     r'"(?:' + "|".join(re.escape(prefix) for prefix in KNOWN_SECRET_PREFIXES) + r')[^"\r\n]*"'
@@ -34,7 +39,14 @@ def auto_commit_enabled(env: dict[str, str] | None = None) -> bool:
     return values.get(AUTO_COMMIT_ENV) == "1"
 
 
-def commit_generated_devlog(repo: Path, devlog_path: Path, jsonl_path: Path, commit_hash: str) -> bool:
+def devlog_generation_enabled(env: dict[str, str] | None = None) -> bool:
+    values = os.environ if env is None else env
+    return values.get(DEVLOG_GENERATE_ENV) == "1"
+
+
+def commit_generated_devlog(
+    repo: Path, devlog_path: Path, jsonl_path: Path, commit_hash: str
+) -> bool:
     if not auto_commit_enabled():
         print(f"[post-commit] auto commit disabled; set {AUTO_COMMIT_ENV}=1 to opt in")
         return False
@@ -45,15 +57,20 @@ def commit_generated_devlog(repo: Path, devlog_path: Path, jsonl_path: Path, com
     return True
 
 
+@dataclass
+class CommitMeta:
+    date_str: str
+    author: str
+    branch: str
+    commit_hash: str
+
+
 def generate_devlog_claude(
     commit_msg: str,
     commit_body: str,
     changed_files: list[str],
     diff_text: str,
-    date_str: str,
-    author: str,
-    branch: str,
-    commit_hash: str,
+    meta: CommitMeta,
 ) -> str:
     files_md = "\n".join(f"- `{f}`" for f in changed_files)
     prompt = f"""git diff and the commit message are provided below.
@@ -70,10 +87,10 @@ Diff:
 
 # {commit_msg}
 
-- 작업일시: {date_str}
-- 작업자: {author}
-- 관련 브랜치: {branch}
-- 관련 커밋: {commit_hash}
+- 작업일시: {meta.date_str}
+- 작업자: {meta.author}
+- 관련 브랜치: {meta.branch}
+- 관련 커밋: {meta.commit_hash}
 
 ## 목표
 
@@ -144,7 +161,7 @@ def claude_available() -> bool:
     try:
         subprocess.run(["claude", "--version"], capture_output=True, timeout=5)
         return True
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
         return False
 
 
@@ -157,7 +174,7 @@ def main():
 
     commit_hash = run(["git", "rev-parse", "--short", "HEAD"])
     commit_body = run(["git", "log", "-1", "--pretty=%b"])
-    author = run(["git", "config", "user.name"])
+    author = "dev"  # 로컬 계정명 노출 방지: git 설정 값을 쓰지 않는다
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     raw_files = run(["git", "diff-tree", "--no-commit-id", "-r", "--name-only", "HEAD"])
     changed_files = [f for f in raw_files.splitlines() if f]
@@ -170,7 +187,9 @@ def main():
         "timestamp": timestamp,
         "task_name": mask_secret_literals(commit_msg),
         "changed_files": changed_files,
-        "summary": mask_secret_literals(commit_body.replace("\n", " ").strip() if commit_body else commit_msg),
+        "summary": mask_secret_literals(
+            commit_body.replace("\n", " ").strip() if commit_body else commit_msg
+        ),
         "result": "ok",
         "commit_hash": commit_hash,
         "notes": "",
@@ -179,11 +198,14 @@ def main():
     jsonl_path = repo / "logs" / "change_history.jsonl"
     jsonl_path.parent.mkdir(parents=True, exist_ok=True)
     existing = jsonl_path.read_text(encoding="utf-8") if jsonl_path.exists() else ""
-    with open(jsonl_path, "w", encoding="utf-8", newline="\n") as f:
+    with Path(jsonl_path).open("w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         if existing:
             f.write(existing)
     print(f"[post-commit] change_history.jsonl <- {commit_hash}  {commit_msg}")
+
+    if not devlog_generation_enabled():
+        return
 
     devlog_dir = repo / "docs" / "devlog"
     devlog_dir.mkdir(parents=True, exist_ok=True)
@@ -201,17 +223,23 @@ def main():
                 mask_secret_literals(commit_body),
                 changed_files,
                 diff_text,
+                CommitMeta(date_str, author, branch, commit_hash),
+            )
+        except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
+            print(f"[post-commit] Claude failed ({exc}); writing stub", file=sys.stderr)
+            content = make_stub(
+                mask_secret_literals(commit_msg),
+                changed_files,
                 date_str,
                 author,
                 branch,
                 commit_hash,
             )
-        except Exception as exc:
-            print(f"[post-commit] Claude failed ({exc}); writing stub", file=sys.stderr)
-            content = make_stub(mask_secret_literals(commit_msg), changed_files, date_str, author, branch, commit_hash)
     else:
         print("[post-commit] claude CLI unavailable; writing stub", file=sys.stderr)
-        content = make_stub(mask_secret_literals(commit_msg), changed_files, date_str, author, branch, commit_hash)
+        content = make_stub(
+            mask_secret_literals(commit_msg), changed_files, date_str, author, branch, commit_hash
+        )
 
     content = mask_secret_literals(content)
     devlog_path.write_text(content, encoding="utf-8", newline="\n")
@@ -222,6 +250,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] -- 이 단계만 기록 후 계속
         print(f"[post-commit] warning: {exc}", file=sys.stderr)
         sys.exit(0)

@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
 from scripts.ops import gate_hwpx_form_auto_fill_zones as zone_gate  # noqa: E402
+from scripts.ops import ops_common_checks as occ
 
 DESIGN = ROOT / "docs" / "reports" / "HWPX_FORM_AUTO_FILL_CONSTRUCTION_WORK_MASTER_DESIGN.md"
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_construction_work_design"
@@ -58,7 +59,7 @@ def _run_pytest(paths: list[str], timeout: int = 300) -> dict[str, Any]:
         [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=timeout,
     )
     lines = [_safe_text(line.strip()) for line in (result.stdout + "\n" + result.stderr).splitlines() if line.strip()]
@@ -78,7 +79,7 @@ def _safe_text(text: str) -> str:
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict[str, Any]:
@@ -95,7 +96,7 @@ def _dirty_baseline() -> dict[str, Any]:
         ["git", "status", "--short"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -226,8 +227,7 @@ def _write_reports(summary: dict[str, Any]) -> None:
         "",
         "## Checks",
     ]
-    for item in summary["checks"]:
-        lines.append(f"- {item['status']} {item['code']} {item['desc']}")
+    lines.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in summary["checks"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")
@@ -235,10 +235,7 @@ def _write_reports(summary: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe report payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe report payload")
 
 
 def main() -> int:

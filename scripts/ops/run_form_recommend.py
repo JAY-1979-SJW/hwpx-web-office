@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from hwpx.recognition_corpus.form_index import FormIndex, DEFAULT_JSONL, recommend
+from hwpx.recognition_corpus.form_index import FormIndex, DEFAULT_JSONL
 
 STATIC_INDEX_PATH = (
     PROJECT_ROOT / "data" / "reports"

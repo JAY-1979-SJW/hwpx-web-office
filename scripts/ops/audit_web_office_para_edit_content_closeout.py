@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-CONTENT-CLOSEOUT-01 준공검사.
+"""WEB-OFFICE-PARA-EDIT-CONTENT-CLOSEOUT-01 준공검사.
 
 PARA-EDIT 내용 편집 3종 (TYPE_TEXT / REPLACE_TEXT_RANGE /
 DELETE_TEXT_RANGE) × (cell / body) × (single-run / multi-run) 전 범위
@@ -10,7 +10,6 @@ DELETE_TEXT_RANGE) × (cell / body) × (single-run / multi-run) 전 범위
 from __future__ import annotations
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,13 +18,15 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ
+
 CLOSEOUT_DOC = (PR / "docs/architecture/"
                    "web_office_para_edit_content_closeout.md")
 # 좌표조회 수리 준공 후 갱신 (334d665 → b9782a5) — ro_view_importer._find_cell_elem
 # 이 셀 문단을 격자주소가 아닌 셀 순번으로 찾도록 교정.
 # 셀 텍스트 손실·중첩 표 중복 수리 준공 후 재갱신 (b9782a5 → 3f94c2a) —
 # hp:t 인라인 tail 유실 + 중첩 표 내용 중복 제거. 정당 변경 확인 후 재고정.
-BASELINE_COMMIT = "5b33ccd"  # hp:ctrl 텍스트유출 수리 준공 후 갱신 (cbe8cce → 5b33ccd)
+BASELINE_COMMIT = "84f6345"  # hp:ctrl 텍스트유출 수리 준공 후 갱신 (5b33ccd → 84f6345)
 
 # 회귀 자재 (테스트 파일) — 모두 존재해야 한다.
 REQUIRED_TESTS = [
@@ -131,14 +132,10 @@ def _check_required_doc() -> list[dict]:
                           "detail": str(CLOSEOUT_DOC.relative_to(PR))})
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in DOC_REQUIRED_PHRASES_IN_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_PHRASES_OUT_OF_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
+    findings.extend({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in DOC_REQUIRED_PHRASES_IN_SCOPE if phrase not in src)
+    findings.extend({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
+                              "level": "FAIL", "detail": phrase} for phrase in DOC_REQUIRED_PHRASES_OUT_OF_SCOPE if phrase not in src)
     if BASELINE_COMMIT not in src:
         findings.append({"code": "DOC_BASELINE_MISSING",
                           "level": "FAIL",
@@ -163,24 +160,7 @@ def _check_required_files() -> list[dict]:
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
-            continue
-        if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
-            continue
-        if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR)
 
 
 def _check_forbidden_features() -> list[dict]:
@@ -199,12 +179,9 @@ def _check_forbidden_features() -> list[dict]:
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -247,11 +224,9 @@ def _check_coverage_probes() -> list[dict]:
                               "level": "FAIL", "detail": rel})
             continue
         src = p.read_text(encoding="utf-8")
-        for pat in patterns:
-            if not re.search(pat, src):
-                findings.append({"code": "COVERAGE_PROBE_MISSING",
+        findings.extend({"code": "COVERAGE_PROBE_MISSING",
                                   "level": "FAIL",
-                                  "detail": f"{rel}: {pat}"})
+                                  "detail": f"{rel}: {pat}"} for pat in patterns if not re.search(pat, src))
     return findings
 
 

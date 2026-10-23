@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any, NamedTuple
 
 from hwpx_package import HwpxPackage, local_name
 from hwpx_table_cell_layout_style import (
@@ -19,7 +19,7 @@ def _table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Elem
     for entry in package.section_entries():
         try:
             root = package.read_xml(entry)
-        except Exception:
+        except (KeyError, ET.ParseError, OSError):
             continue
         for elem in root.iter():
             name = local_name(elem.tag).lower()
@@ -28,7 +28,9 @@ def _table_elements(package: HwpxPackage) -> list[tuple[str, ET.Element, ET.Elem
     return tables
 
 
-def _find_table(package: HwpxPackage, table_index: int) -> tuple[str, ET.Element, ET.Element] | None:
+def _find_table(
+    package: HwpxPackage, table_index: int
+) -> tuple[str, ET.Element, ET.Element] | None:
     tables = _table_elements(package)
     if table_index < 0 or table_index >= len(tables):
         return None
@@ -36,11 +38,21 @@ def _find_table(package: HwpxPackage, table_index: int) -> tuple[str, ET.Element
 
 
 def _rows(table: ET.Element) -> list[ET.Element]:
-    return [elem for elem in table.iter() if local_name(elem.tag).lower() in {"tr", "row"} or local_name(elem.tag).lower().endswith("tr")]
+    return [
+        elem
+        for elem in table.iter()
+        if local_name(elem.tag).lower() in {"tr", "row"}
+        or local_name(elem.tag).lower().endswith("tr")
+    ]
 
 
 def _cells(row: ET.Element) -> list[ET.Element]:
-    return [elem for elem in list(row) if local_name(elem.tag).lower() in {"tc", "cell"} or local_name(elem.tag).lower().endswith("tc")]
+    return [
+        elem
+        for elem in list(row)
+        if local_name(elem.tag).lower() in {"tc", "cell"}
+        or local_name(elem.tag).lower().endswith("tc")
+    ]
 
 
 def _child(elem: ET.Element, name: str) -> ET.Element | None:
@@ -59,7 +71,9 @@ def _cell_by_addr(rows: list[ET.Element], row_index: int, col_index: int) -> ET.
         if addr is None:
             continue
         saw_addr = True
-        if addr.attrib.get("rowAddr") == str(row_index) and addr.attrib.get("colAddr") == str(col_index):
+        if addr.attrib.get("rowAddr") == str(row_index) and addr.attrib.get("colAddr") == str(
+            col_index
+        ):
             return cell
     if saw_addr:
         return None
@@ -93,6 +107,33 @@ def _margin(value: Any) -> dict[str, str] | None:
     return result or None
 
 
+class _SublistEnumField(NamedTuple):
+    keys: tuple[str, ...]
+    enum_values: Any
+    attrib_name: str
+    warn_type: str
+
+
+def _apply_sublist_enum_field(
+    sublist: ET.Element,
+    layout: dict[str, Any],
+    field: _SublistEnumField,
+    applied: dict[str, Any],
+    warnings: list[dict[str, Any]],
+) -> None:
+    raw = None
+    for key in field.keys:
+        if key in layout:
+            raw = layout[key]
+            break
+    value = _enum(raw, field.enum_values)
+    if value:
+        sublist.attrib[field.attrib_name] = value
+        applied[field.attrib_name] = value
+    elif any(key in layout for key in field.keys):
+        warnings.append({"type": field.warn_type, "value": layout})
+
+
 def set_cell_layout(
     package: HwpxPackage,
     table_index: int,
@@ -107,34 +148,60 @@ def set_cell_layout(
     rows = _rows(table)
     cell = _cell_by_addr(rows, row_index, col_index)
     if cell is None:
-        return {"status": "CELL_NOT_FOUND", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "CELL_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
     sublist = _child(cell, "subList")
     margin = _child(cell, "cellMargin")
     if sublist is None:
-        return {"status": "CELL_SUBLIST_NOT_FOUND", "table_index": table_index, "row_index": row_index, "col_index": col_index}
+        return {
+            "status": "CELL_SUBLIST_NOT_FOUND",
+            "table_index": table_index,
+            "row_index": row_index,
+            "col_index": col_index,
+        }
 
     applied: dict[str, Any] = {}
     warnings: list[dict[str, Any]] = []
-    vert_align = _enum(layout.get("cell_vertical_align", layout.get("vertical_align", layout.get("vert_align"))), VERT_ALIGN_VALUES)
-    if vert_align:
-        sublist.attrib["vertAlign"] = vert_align
-        applied["vertAlign"] = vert_align
-    elif any(key in layout for key in ("cell_vertical_align", "vertical_align", "vert_align")):
-        warnings.append({"type": "VERT_ALIGN_INVALID", "value": layout})
-
-    text_direction = _enum(layout.get("cell_text_direction", layout.get("text_direction")), TEXT_DIRECTION_VALUES)
-    if text_direction:
-        sublist.attrib["textDirection"] = text_direction
-        applied["textDirection"] = text_direction
-    elif any(key in layout for key in ("cell_text_direction", "text_direction")):
-        warnings.append({"type": "TEXT_DIRECTION_INVALID", "value": layout})
-
-    line_wrap = _enum(layout.get("cell_line_wrap", layout.get("line_wrap")), LINE_WRAP_VALUES)
-    if line_wrap:
-        sublist.attrib["lineWrap"] = line_wrap
-        applied["lineWrap"] = line_wrap
-    elif any(key in layout for key in ("cell_line_wrap", "line_wrap")):
-        warnings.append({"type": "LINE_WRAP_INVALID", "value": layout})
+    _apply_sublist_enum_field(
+        sublist,
+        layout,
+        _SublistEnumField(
+            ("cell_vertical_align", "vertical_align", "vert_align"),
+            VERT_ALIGN_VALUES,
+            "vertAlign",
+            "VERT_ALIGN_INVALID",
+        ),
+        applied,
+        warnings,
+    )
+    _apply_sublist_enum_field(
+        sublist,
+        layout,
+        _SublistEnumField(
+            ("cell_text_direction", "text_direction"),
+            TEXT_DIRECTION_VALUES,
+            "textDirection",
+            "TEXT_DIRECTION_INVALID",
+        ),
+        applied,
+        warnings,
+    )
+    _apply_sublist_enum_field(
+        sublist,
+        layout,
+        _SublistEnumField(
+            ("cell_line_wrap", "line_wrap"),
+            LINE_WRAP_VALUES,
+            "lineWrap",
+            "LINE_WRAP_INVALID",
+        ),
+        applied,
+        warnings,
+    )
 
     cell_margin = _margin(layout.get("cell_margin"))
     if cell_margin and margin is not None:

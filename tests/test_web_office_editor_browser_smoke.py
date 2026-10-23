@@ -95,7 +95,7 @@ def _start_editor_server(
         env=env,
         stdout=log_handle,
         stderr=subprocess.STDOUT,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
     )
     _wait_health(base_url, proc)
     return proc, log_handle, base_url

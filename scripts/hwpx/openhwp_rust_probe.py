@@ -12,18 +12,17 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_TOOLCHAIN = "stable-x86_64-pc-windows-gnu"
-DEFAULT_TARGET_DIR = Path("C:/tmp/openhwp_probe_target")
+DEFAULT_TARGET_DIR = Path("tmp/openhwp_probe_target")
 DEFAULT_WORK_DIR = Path("tmp/openhwp_rust_probe")
 DEFAULT_OPENHWP_ROOT = Path("tmp/oss_openhwp")
 
 
-PROBE_MAIN_RS = r'''
+PROBE_MAIN_RS = (
+    r"""
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -118,7 +117,9 @@ fn main() {
         }
     }
 }
-'''.strip() + "\n"
+""".strip()
+    + "\n"
+)
 
 
 def cargo_toml(openhwp_root: Path) -> str:
@@ -152,7 +153,7 @@ def ensure_probe_project(work_dir: Path, openhwp_root: Path) -> Path:
     return work_dir / "Cargo.toml"
 
 
-def run_probe(
+def run_probe(  # ruff: ignore[too-many-arguments] (여러 파일에서 키워드 인자로 호출 — 시그니처 변경 보류)
     input_path: Path,
     *,
     openhwp_root: Path = DEFAULT_OPENHWP_ROOT,

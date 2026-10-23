@@ -15,7 +15,8 @@ import os
 import shutil
 import socket
 import time
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,7 @@ DEFAULT_LOCK_FILE = DEFAULT_WORK_ROOT / "hwp_native_com_batch.lock"
 
 
 def iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def output_path_for(source: Path, input_root: Path, output_root: Path) -> Path:
@@ -78,7 +79,11 @@ def write_csv_report(path: Path, results: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for item in results:
             conversion = item.get("conversion") if isinstance(item.get("conversion"), dict) else {}
-            audit = item.get("native_identity_audit") if isinstance(item.get("native_identity_audit"), dict) else {}
+            audit = (
+                item.get("native_identity_audit")
+                if isinstance(item.get("native_identity_audit"), dict)
+                else {}
+            )
             writer.writerow({
                 "index": item.get("index", ""),
                 "status": item.get("status", ""),
@@ -87,7 +92,9 @@ def write_csv_report(path: Path, results: list[dict[str, Any]]) -> None:
                 "output": item.get("output", ""),
                 "copied": item.get("copied", ""),
                 "skipped": item.get("skipped", ""),
-                "error_code": item.get("error_code") or item.get("skip_reason") or conversion.get("error_code", ""),
+                "error_code": item.get("error_code")
+                or item.get("skip_reason")
+                or conversion.get("error_code", ""),
                 "error_message": item.get("error_message") or conversion.get("error_message", ""),
                 "audit_status": audit.get("status", ""),
             })
@@ -109,7 +116,7 @@ class BatchLock:
         self.path = path
         self._fd: int | None = None
 
-    def __enter__(self) -> "BatchLock":
+    def __enter__(self) -> BatchLock:
         if self.path is None:
             return self
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +127,9 @@ class BatchLock:
         }
         try:
             self._fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(self._fd, json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+            os.write(
+                self._fd, json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            )
         except FileExistsError as exc:
             raise RuntimeError(f"BATCH_LOCK_EXISTS: {self.path}") from exc
         return self
@@ -149,12 +158,20 @@ def native_identity_audit(
     visual_ack: bool = False,
 ) -> dict[str, Any]:
     validation = HwpxValidator.validate_hwpx(output)
-    visual_gate = build_gate_report(output, None, visual_ack, "automated-native-com-batch") if output.exists() else {
-        "status": "FAIL",
-        "machine_ok": False,
-        "reason": "OUTPUT_NOT_FOUND",
-    }
-    converter_json = conversion.get("converter_json") if isinstance(conversion.get("converter_json"), dict) else {}
+    visual_gate = (
+        build_gate_report(output, None, visual_ack, "automated-native-com-batch")
+        if output.exists()
+        else {
+            "status": "FAIL",
+            "machine_ok": False,
+            "reason": "OUTPUT_NOT_FOUND",
+        }
+    )
+    converter_json = (
+        conversion.get("converter_json")
+        if isinstance(conversion.get("converter_json"), dict)
+        else {}
+    )
     blockers: list[str] = []
     warnings: list[str] = []
     if conversion.get("provider") != HWP_CONVERSION_PROVIDER:
@@ -203,7 +220,7 @@ def native_identity_audit(
     }
 
 
-def convert_one_native(
+def convert_one_native(  # ruff: ignore[too-many-arguments] - 다른 파일(convert_local_hwp_inventory_to_hwpx.py)에서도 호출, 시그니처 변경 보류
     source: Path,
     *,
     input_root: Path,
@@ -307,75 +324,128 @@ def planned_result(
     }
 
 
-def run_batch(
-    input_dir: Path,
-    output_dir: Path,
-    *,
-    staging_dir: Path,
-    diag_dir: Path,
-    report_json: Path,
-    audit_jsonl: Path | None,
-    pattern: str,
-    limit: int,
-    timeout_sec: int,
-    save_strategy: str,
-    existing_policy: str = "overwrite",
-    report_csv: Path | None = None,
-    lock_file: Path | None = None,
-    fail_fast: bool = False,
-    dry_run: bool = False,
-) -> dict[str, Any]:
-    if existing_policy not in {"skip", "overwrite", "fail"}:
-        raise ValueError(f"unsupported existing_policy: {existing_policy}")
+@dataclass
+class BatchConfig:
+    """Bundled args for `run_batch` (was 15 positional/keyword params)."""
+
+    input_dir: Path
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+    report_json: Path
+    audit_jsonl: Path | None
+    pattern: str
+    limit: int
+    timeout_sec: int
+    save_strategy: str
+    existing_policy: str = "overwrite"
+    report_csv: Path | None = None
+    lock_file: Path | None = None
+    fail_fast: bool = False
+    dry_run: bool = False
+
+
+@dataclass
+class _ResolvedBatchPaths:
+    """Resolved, ready-to-use subset of `BatchConfig` needed per source file."""
+
+    input_dir: Path
+    output_dir: Path
+    staging_dir: Path
+    diag_dir: Path
+    timeout_sec: int
+    save_strategy: str
+    existing_policy: str
+    dry_run: bool
+
+
+def _result_for_source(source: Path, paths: _ResolvedBatchPaths, index: int) -> dict[str, Any]:
+    target_output = output_path_for(source, paths.input_dir, paths.output_dir)
+    if paths.dry_run:
+        return planned_result(
+            source, input_root=paths.input_dir, output_root=paths.output_dir, index=index
+        )
+    if target_output.exists() and paths.existing_policy == "skip":
+        return skipped_existing_result(
+            source, input_root=paths.input_dir, output_root=paths.output_dir, index=index
+        )
+    if target_output.exists() and paths.existing_policy == "fail":
+        return {
+            "status": "FAIL",
+            "index": index,
+            "input": str(source),
+            "relative": str(source.relative_to(paths.input_dir)),
+            "output": str(target_output),
+            "copied": False,
+            "skipped": False,
+            "error_code": "OUTPUT_EXISTS",
+            "error_message": "Output already exists and existing_policy=fail",
+            "output_info": file_snapshot(target_output),
+        }
+    return convert_one_native(
+        source,
+        input_root=paths.input_dir,
+        output_root=paths.output_dir,
+        staging_root=paths.staging_dir,
+        diag_dir=paths.diag_dir,
+        timeout_sec=paths.timeout_sec,
+        save_strategy=paths.save_strategy,
+        index=index,
+    )
+
+
+def run_batch(config: BatchConfig) -> dict[str, Any]:
+    if config.existing_policy not in {"skip", "overwrite", "fail"}:
+        raise ValueError(f"unsupported existing_policy: {config.existing_policy}")
     started = iso_now()
-    input_dir = Path(input_dir).expanduser().resolve()
-    output_dir = Path(output_dir).expanduser().resolve()
-    staging_dir = Path(staging_dir).expanduser().resolve()
-    diag_dir = Path(diag_dir).expanduser().resolve()
-    report_json = Path(report_json).expanduser().resolve()
-    audit_jsonl = Path(audit_jsonl).expanduser().resolve() if audit_jsonl else None
-    report_csv = Path(report_csv).expanduser().resolve() if report_csv else None
-    lock_file = Path(lock_file).expanduser().resolve() if lock_file else None
+    input_dir = Path(config.input_dir).expanduser().resolve()
+    output_dir = Path(config.output_dir).expanduser().resolve()
+    staging_dir = Path(config.staging_dir).expanduser().resolve()
+    diag_dir = Path(config.diag_dir).expanduser().resolve()
+    report_json = Path(config.report_json).expanduser().resolve()
+    audit_jsonl = Path(config.audit_jsonl).expanduser().resolve() if config.audit_jsonl else None
+    report_csv = Path(config.report_csv).expanduser().resolve() if config.report_csv else None
+    lock_file = Path(config.lock_file).expanduser().resolve() if config.lock_file else None
+    pattern = config.pattern
+    limit = config.limit
+    timeout_sec = config.timeout_sec
+    save_strategy = config.save_strategy
+    existing_policy = config.existing_policy
+    fail_fast = config.fail_fast
+    dry_run = config.dry_run
+    resolved_paths = _ResolvedBatchPaths(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        staging_dir=staging_dir,
+        diag_dir=diag_dir,
+        timeout_sec=timeout_sec,
+        save_strategy=save_strategy,
+        existing_policy=existing_policy,
+        dry_run=dry_run,
+    )
     with BatchLock(lock_file):
         targets = sorted(path for path in input_dir.rglob(pattern) if path.is_file())
         if limit > 0:
             targets = targets[:limit]
         results: list[dict[str, Any]] = []
         for index, source in enumerate(targets, 1):
-            target_output = output_path_for(source, input_dir, output_dir)
-            if dry_run:
-                result = planned_result(source, input_root=input_dir, output_root=output_dir, index=index)
-            elif target_output.exists() and existing_policy == "skip":
-                result = skipped_existing_result(source, input_root=input_dir, output_root=output_dir, index=index)
-            elif target_output.exists() and existing_policy == "fail":
-                result = {
-                    "status": "FAIL",
-                    "index": index,
-                    "input": str(source),
-                    "relative": str(source.relative_to(input_dir)),
-                    "output": str(target_output),
-                    "copied": False,
-                    "skipped": False,
-                    "error_code": "OUTPUT_EXISTS",
-                    "error_message": "Output already exists and existing_policy=fail",
-                    "output_info": file_snapshot(target_output),
-                }
-            else:
-                result = convert_one_native(
-                    source,
-                    input_root=input_dir,
-                    output_root=output_dir,
-                    staging_root=staging_dir,
-                    diag_dir=diag_dir,
-                    timeout_sec=timeout_sec,
-                    save_strategy=save_strategy,
-                    index=index,
-                )
+            result = _result_for_source(source, resolved_paths, index)
             results.append(result)
             if audit_jsonl:
                 audit_jsonl.parent.mkdir(parents=True, exist_ok=True)
                 with audit_jsonl.open("a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"event": "native_hancom_com_conversion_item", "logged_at": iso_now(), "result": result}, ensure_ascii=False, sort_keys=True) + "\n")
+                    fh.write(
+                        json.dumps(
+                            {
+                                "event": "native_hancom_com_conversion_item",
+                                "logged_at": iso_now(),
+                                "result": result,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
             if fail_fast and result.get("status") == "FAIL":
                 break
     ok_count = sum(1 for item in results if item.get("status") == "PASS")
@@ -424,12 +494,16 @@ def main() -> int:
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--staging-dir", type=Path, default=DEFAULT_WORK_ROOT / "staging")
     parser.add_argument("--diag-dir", type=Path, default=DEFAULT_WORK_ROOT / "diag")
-    parser.add_argument("--report-json", type=Path, default=Path("tmp/hwp_native_com_batch_report.json"))
+    parser.add_argument(
+        "--report-json", type=Path, default=Path("tmp/hwp_native_com_batch_report.json")
+    )
     parser.add_argument("--audit-jsonl", type=Path)
     parser.add_argument("--report-csv", type=Path)
     parser.add_argument("--lock-file", type=Path, default=DEFAULT_LOCK_FILE)
     parser.add_argument("--pattern", default="*.hwp")
-    parser.add_argument("--limit", type=int, default=1, help="Maximum files to convert; 0 means all")
+    parser.add_argument(
+        "--limit", type=int, default=1, help="Maximum files to convert; 0 means all"
+    )
     parser.add_argument("--timeout-sec", type=int, default=90)
     parser.add_argument("--save-strategy", choices=["direct", "haction", "auto"], default="direct")
     parser.add_argument("--existing-policy", choices=["skip", "overwrite", "fail"], default="skip")
@@ -437,23 +511,45 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     report = run_batch(
-        args.input_dir,
-        args.output_dir,
-        staging_dir=args.staging_dir,
-        diag_dir=args.diag_dir,
-        report_json=args.report_json,
-        audit_jsonl=args.audit_jsonl,
-        pattern=str(args.pattern),
-        limit=int(args.limit),
-        timeout_sec=int(args.timeout_sec),
-        save_strategy=str(args.save_strategy),
-        existing_policy=str(args.existing_policy),
-        report_csv=args.report_csv,
-        lock_file=args.lock_file,
-        fail_fast=bool(args.fail_fast),
-        dry_run=bool(args.dry_run),
+        BatchConfig(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            staging_dir=args.staging_dir,
+            diag_dir=args.diag_dir,
+            report_json=args.report_json,
+            audit_jsonl=args.audit_jsonl,
+            pattern=str(args.pattern),
+            limit=int(args.limit),
+            timeout_sec=int(args.timeout_sec),
+            save_strategy=str(args.save_strategy),
+            existing_policy=str(args.existing_policy),
+            report_csv=args.report_csv,
+            lock_file=args.lock_file,
+            fail_fast=bool(args.fail_fast),
+            dry_run=bool(args.dry_run),
+        )
     )
-    print(json.dumps({key: report[key] for key in ["status", "mode", "target_count", "ok_count", "skip_count", "plan_count", "fail_count", "report_json", "report_csv"] if key in report}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                key: report[key]
+                for key in [
+                    "status",
+                    "mode",
+                    "target_count",
+                    "ok_count",
+                    "skip_count",
+                    "plan_count",
+                    "fail_count",
+                    "report_json",
+                    "report_csv",
+                ]
+                if key in report
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0 if report.get("status") == "PASS" else 1
 
 

@@ -9,6 +9,7 @@
 실제로 초기안은 ①에서 100% 였지만 ③에서 68.3% 였다. 임계값은 현재
 측정치보다 약간 낮게 잡아 우연한 변동은 통과시키되 실질 퇴행은 잡는다.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,14 +21,18 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # noqa: E402
-from scripts.hwpx.web_office.form_field_roles import _self_test as roles_self_test  # noqa: E402
-from scripts.hwpx.web_office.form_input_schema import (  # noqa: E402
+from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_field_roles import _self_test as roles_self_test  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.form_input_schema import (  # ruff: ignore[module-import-not-at-top-of-file]
     _self_test as schema_self_test,
+)
+from scripts.hwpx.web_office.form_input_schema import (
     build_input_schema,
 )
-from scripts.hwpx.web_office.form_taxonomy import (  # noqa: E402
+from scripts.hwpx.web_office.form_taxonomy import (  # ruff: ignore[module-import-not-at-top-of-file]
     _self_test as taxonomy_self_test,
+)
+from scripts.hwpx.web_office.form_taxonomy import (
     classify_document,
 )
 
@@ -51,33 +56,52 @@ def _load(fixture: str) -> list[dict]:
     return json.loads((FIXTURES / f"{fixture}.json").read_text(encoding="utf-8"))
 
 
+def _skip_if_sources_missing(fixture: str) -> None:
+    """sourcePath 들은 data/drafts/(.gitignore 대상, 실제 로컬 수집본)를 가리킨다."""
+    forms = _load(fixture)
+    missing = [f["sourcePath"] for f in forms if not (PROJECT_ROOT / f["sourcePath"]).is_file()]
+    if missing:
+        pytest.skip(
+            f"실제 로컬 코퍼스 없음(data/drafts/는 .gitignore 대상): "
+            f"{fixture} 중 {len(missing)}/{len(forms)}건 소스 파일 없음 (예: {missing[0]})"
+        )
+
+
 def _measure(fixture: str) -> tuple[int, int]:
     """(맞은 칸, 전체 칸)"""
     hit = total = 0
     for form in _load(fixture):
         res = load_hwpx_for_editor(
             {"operation": "HWPX_EDITOR_LOAD", "sourcePath": form["sourcePath"]},
-            project_root=PROJECT_ROOT)
+            project_root=PROJECT_ROOT,
+        )
         assert res.get("verdict") == "PASS", form["sourcePath"]
-        schema = build_input_schema(res["documentModel"], res["renderPayload"],
-                                    name=form["name"],
-                                    field_count=len(form["fields"]))
+        schema = build_input_schema(
+            res["documentModel"],
+            res["renderPayload"],
+            name=form["name"],
+            field_count=len(form["fields"]),
+        )
         pred = {i["label"]: i["role"] for i in schema["inputs"]}
         for f in form["fields"]:
             role = pred.get(f["label"]) or next(
-                (v for k, v in pred.items() if k.endswith(" " + f["label"])), None)
+                (v for k, v in pred.items() if k.endswith(" " + f["label"])), None
+            )
             if role is None:
-                role = "noise"          # 스키마에 없으면 잡음으로 걸러진 것
+                role = "noise"  # 스키마에 없으면 잡음으로 걸러진 것
             total += 1
-            hit += (role == f["role"])
+            hit += role == f["role"]
     return hit, total
 
 
-@pytest.mark.parametrize("module_test", [
-    pytest.param(taxonomy_self_test, id="form_taxonomy"),
-    pytest.param(roles_self_test, id="form_field_roles"),
-    pytest.param(schema_self_test, id="form_input_schema"),
-])
+@pytest.mark.parametrize(
+    "module_test",
+    [
+        pytest.param(taxonomy_self_test, id="form_taxonomy"),
+        pytest.param(roles_self_test, id="form_field_roles"),
+        pytest.param(schema_self_test, id="form_input_schema"),
+    ],
+)
 def test_module_self_tests_pass(module_test):
     failures = [line for line in module_test() if line.startswith("FAIL")]
     assert not failures, "\n".join(failures)
@@ -85,11 +109,13 @@ def test_module_self_tests_pass(module_test):
 
 @pytest.mark.parametrize("fixture,floor", ACCURACY_FLOOR)
 def test_role_accuracy_floor(fixture, floor):
+    _skip_if_sources_missing(fixture)
     hit, total = _measure(fixture)
     assert total > 0, f"{fixture}: 측정 대상 없음"
     acc = hit / total
     assert acc >= floor, (
-        f"{fixture} 역할 정확도 {acc:.1%} ({hit}/{total}) < 하한 {floor:.0%} — 퇴행")
+        f"{fixture} 역할 정확도 {acc:.1%} ({hit}/{total}) < 하한 {floor:.0%} — 퇴행"
+    )
 
 
 def test_noise_never_swallows_real_inputs():
@@ -99,35 +125,52 @@ def test_noise_never_swallows_real_inputs():
     """
     kept = dropped = 0
     for fixture, _ in ACCURACY_FLOOR:
+        _skip_if_sources_missing(fixture)
         for form in _load(fixture):
             res = load_hwpx_for_editor(
                 {"operation": "HWPX_EDITOR_LOAD", "sourcePath": form["sourcePath"]},
-                project_root=PROJECT_ROOT)
-            schema = build_input_schema(res["documentModel"], res["renderPayload"],
-                                        name=form["name"],
-                                        field_count=len(form["fields"]))
+                project_root=PROJECT_ROOT,
+            )
+            schema = build_input_schema(
+                res["documentModel"],
+                res["renderPayload"],
+                name=form["name"],
+                field_count=len(form["fields"]),
+            )
             labels = {i["label"] for i in schema["inputs"]}
             for f in form["fields"]:
                 if f["role"] == "noise":
                     continue
-                present = f["label"] in labels or any(
-                    l.endswith(" " + f["label"]) for l in labels)
+                present = f["label"] in labels or any(l.endswith(" " + f["label"]) for l in labels)
                 kept += present
                 dropped += not present
     total = kept + dropped
     assert total > 0
     assert kept / total >= 0.85, (
-        f"실입력칸 보존율 {kept/total:.1%} ({kept}/{total}) — 잡음 규칙이 과하다")
+        f"실입력칸 보존율 {kept / total:.1%} ({kept}/{total}) — 잡음 규칙이 과하다"
+    )
 
 
 def test_sensitive_fields_are_flagged():
     """주민등록번호 같은 민감칸은 반드시 표시된다(값은 다루지 않는다)."""
-    rp = {"tables": [{"cells": [
-        {"row": 0, "col": 0, "text": "주민등록번호"},
-        {"row": 0, "col": 1, "text": ""},
-    ]}]}
-    dm = {"paragraphs": [{"containerScope": {
-        "kind": "cell", "tableIndex": 0, "rowIndex": 0, "colIndex": 1}, "runs": []}]}
+    rp = {
+        "tables": [
+            {
+                "cells": [
+                    {"row": 0, "col": 0, "text": "주민등록번호"},
+                    {"row": 0, "col": 1, "text": ""},
+                ]
+            }
+        ]
+    }
+    dm = {
+        "paragraphs": [
+            {
+                "containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": 0, "colIndex": 1},
+                "runs": [],
+            }
+        ]
+    }
     schema = build_input_schema(dm, rp, name="어떤 신청서.hwpx", field_count=1)
     assert schema["sensitiveCount"] == 1
     assert schema["inputs"][0]["semantic"] == "residentNo"
@@ -135,15 +178,24 @@ def test_sensitive_fields_are_flagged():
 
 def test_ledger_keeps_fields_but_marks_office():
     """대장·내부문서도 입력칸을 지우지 않고 역할만 관공서로 단다."""
-    rp = {"tables": [{"cells": [
-        {"row": 0, "col": 0, "text": "일련번호"}, {"row": 0, "col": 1, "text": ""},
-        {"row": 1, "col": 0, "text": "성명"}, {"row": 1, "col": 1, "text": ""},
-    ]}]}
-    cell = lambda r: {"containerScope": {"kind": "cell", "tableIndex": 0,
-                                         "rowIndex": r, "colIndex": 1}, "runs": []}
+    rp = {
+        "tables": [
+            {
+                "cells": [
+                    {"row": 0, "col": 0, "text": "일련번호"},
+                    {"row": 0, "col": 1, "text": ""},
+                    {"row": 1, "col": 0, "text": "성명"},
+                    {"row": 1, "col": 1, "text": ""},
+                ]
+            }
+        ]
+    }
+    cell = lambda r: {
+        "containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": r, "colIndex": 1},
+        "runs": [],
+    }
     dm = {"paragraphs": [cell(0), cell(1)]}
-    schema = build_input_schema(dm, rp, name="채혈금지대상자 관리대장.hwpx",
-                                field_count=2)
+    schema = build_input_schema(dm, rp, name="채혈금지대상자 관리대장.hwpx", field_count=2)
     assert schema["docType"] == "대장기록"
     assert schema["inputCount"] == 2, "대장이라고 칸을 지우면 안 된다"
     assert schema["applicantCount"] == 0

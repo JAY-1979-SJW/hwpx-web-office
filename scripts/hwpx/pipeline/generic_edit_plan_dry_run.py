@@ -10,6 +10,7 @@ output HWPX를 생성하지도 않는다. plan과 parser_result만 받아서:
   - autoExecutable / review / blocked 재분류
 하는 모의시공만 수행한다.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,8 +19,8 @@ from typing import Any
 
 from . import generic_edit_plan_contract as contract
 
-
 # ── 결과 dataclass ────────────────────────────────────────────────────────────
+
 
 @dataclass
 class ExpectedChange:
@@ -48,8 +49,7 @@ class SafetyFinding:
     operationId: str | None = None
 
     def to_dict(self) -> dict:
-        return {"code": self.code, "detail": self.detail,
-                "operationId": self.operationId}
+        return {"code": self.code, "detail": self.detail, "operationId": self.operationId}
 
 
 @dataclass
@@ -90,6 +90,7 @@ class DryRunResult:
 
 # ── target lookup ─────────────────────────────────────────────────────────────
 
+
 def _find_cell(parser_result, table_id: str, row: int, col: int):
     """parser_result.tables[*].cells에서 (tableId,row,col) 셀 검색."""
     if parser_result is None:
@@ -112,8 +113,10 @@ def _current_value_for(op_type: str, cell) -> Any:
         "setCellVerticalAlign": cell.verticalAlign,
         "setCellFillColor": cell.fillColor,
         "setCellTextStyle": {
-            "bold": cell.bold, "italic": cell.italic,
-            "underline": cell.underline, "textColor": cell.textColor,
+            "bold": cell.bold,
+            "italic": cell.italic,
+            "underline": cell.underline,
+            "textColor": cell.textColor,
         },
         "setParagraphText": (cell.paragraphs[0] if cell.paragraphs else ""),
         "replaceTextRun": cell.normalizedText or cell.text,
@@ -123,8 +126,120 @@ def _current_value_for(op_type: str, cell) -> Any:
 
 # ── dry-run 본체 ──────────────────────────────────────────────────────────────
 
-def dry_run_edit_plan(plan: dict, parser_result=None,
-                       source_document_hash: str | None = None) -> DryRunResult:
+
+def _lookup_cell_for_op(
+    op_type: str, target: dict, op_id: str, parser_result, result: DryRunResult
+) -> tuple[Any, bool]:
+    """(cell, blocked) 반환. blocked=True면 TARGET_CELL_NOT_FOUND로 강등돼야 함."""
+    _cell_lookup_ops = {
+        "setCellText",
+        "setCellHorizontalAlign",
+        "setCellVerticalAlign",
+        "setCellFillColor",
+        "setCellTextStyle",
+    }
+    if op_type == "replaceTextRun" and target.get("tableId"):
+        _cell_lookup_ops = _cell_lookup_ops | {"replaceTextRun"}
+    if op_type not in _cell_lookup_ops:
+        return None, False
+    cell = _find_cell(parser_result, target.get("tableId"), target.get("row"), target.get("col"))
+    if parser_result is not None and cell is None:
+        result.safetyFindings.append(
+            SafetyFinding(
+                "TARGET_CELL_NOT_FOUND",
+                f"tableId={target.get('tableId')!r} row={target.get('row')} col={target.get('col')}",
+                op_id,
+            )
+        )
+        return None, True
+    return cell, False
+
+
+def _check_expected_before(
+    op: dict, op_id: str, op_type: str, cell, parser_result, result: DryRunResult
+) -> bool:
+    """expectedBefore 불일치 시 True(auto→review 강등 필요)를 반환."""
+    if parser_result is None or cell is None:
+        return False
+    current = _current_value_for(op_type, cell)
+    expected_before = op.get("expectedBefore")
+    if expected_before is not None and current != expected_before:
+        result.safetyFindings.append(
+            SafetyFinding(
+                "EXPECTED_BEFORE_MISMATCH",
+                f"expected={expected_before!r} actual={current!r}",
+                op_id,
+            )
+        )
+        return True
+    return False
+
+
+def _process_one_operation(
+    op: dict,
+    parser_result,
+    auto_ops: set[str],
+    review_ops: set[str],
+    blocked_ops: set[str],
+    result: DryRunResult,
+) -> None:
+    op_id = op.get("operationId", "")
+    op_type = op.get("operationType", "")
+    target = op.get("target", {}) or {}
+
+    if op_id in blocked_ops:
+        return  # contract 단계에서 이미 blocked
+
+    cell, target_blocked = _lookup_cell_for_op(op_type, target, op_id, parser_result, result)
+    if target_blocked:
+        # auto/review 어디였든 BLOCKED로 강등
+        if op_id in auto_ops:
+            auto_ops.discard(op_id)
+            blocked_ops.add(op_id)
+        elif op_id in review_ops:
+            review_ops.discard(op_id)
+            blocked_ops.add(op_id)
+        return
+
+    if (
+        _check_expected_before(op, op_id, op_type, cell, parser_result, result)
+        and op_id in auto_ops
+    ):
+        auto_ops.discard(op_id)
+        review_ops.add(op_id)
+
+    # 예상 변경 산출 (auto / review 모두 포함, blocked는 제외)
+    if op_id in blocked_ops:
+        return
+    before = _current_value_for(op_type, cell) if cell is not None else op.get("expectedBefore")
+    after = op.get("value")
+    note = "review_required" if op_id in review_ops else ""
+    result.expectedChanges.append(
+        ExpectedChange(
+            operationId=op_id,
+            operationType=op_type,
+            target=target,
+            before=before,
+            after=after,
+            note=note,
+        )
+    )
+
+
+def _determine_dry_run_verdict(result: DryRunResult) -> str:
+    if result.blockedOps and not result.autoAllowedOps and not result.reviewRequiredOps:
+        return "BLOCKED_UNSAFE"
+    if result.blockedOps:
+        # 일부 blocked + 일부 살아남음 → 안전 보수적으로 review로 보고
+        return "REVIEW_REQUIRED"
+    if result.reviewRequiredOps:
+        return "REVIEW_REQUIRED"
+    return "PASS_AUTO_ALLOWED"
+
+
+def dry_run_edit_plan(
+    plan: dict, parser_result=None, source_document_hash: str | None = None
+) -> DryRunResult:
     """plan을 dry-run으로 실행. writer 미호출, output 미생성, 원본 무수정.
 
     parser_result: ParserV2Result (None이면 target lookup 검증 생략)
@@ -141,9 +256,13 @@ def dry_run_edit_plan(plan: dict, parser_result=None,
     result.reviewRequiredOps = list(val.reviewRequiredOps)
     result.blockedOps = list(val.blockedOps)
     for issue in val.issues:
-        result.safetyFindings.append(SafetyFinding(
-            code=issue.code, detail=issue.detail, operationId=issue.operationId,
-        ))
+        result.safetyFindings.append(
+            SafetyFinding(
+                code=issue.code,
+                detail=issue.detail,
+                operationId=issue.operationId,
+            )
+        )
 
     if val.verdict == "BLOCKED_INVALID_PLAN":
         result.verdict = "BLOCKED_INVALID_PLAN"
@@ -152,101 +271,30 @@ def dry_run_edit_plan(plan: dict, parser_result=None,
 
     # 2) sourceDocumentHash 매칭 (caller가 넘긴 경우만)
     if source_document_hash is not None:
-        result.sourceDocumentHashMatched = (
-            plan.get("sourceDocumentHash") == source_document_hash
-        )
+        result.sourceDocumentHashMatched = plan.get("sourceDocumentHash") == source_document_hash
         if not result.sourceDocumentHashMatched:
-            result.safetyFindings.append(SafetyFinding(
-                "SOURCE_HASH_MISMATCH",
-                f"plan.sourceDocumentHash={plan.get('sourceDocumentHash')!r} "
-                f"!= actual={source_document_hash!r}",
-            ))
+            result.safetyFindings.append(
+                SafetyFinding(
+                    "SOURCE_HASH_MISMATCH",
+                    f"plan.sourceDocumentHash={plan.get('sourceDocumentHash')!r} "
+                    f"!= actual={source_document_hash!r}",
+                )
+            )
 
     # 3) operation별 모의시공
     auto_ops = set(val.autoAllowedOps)
     review_ops = set(val.reviewRequiredOps)
     blocked_ops = set(val.blockedOps)
-    demoted_to_review: list[str] = []
-    demoted_to_blocked: list[str] = []
 
     for op in plan.get("operations", []):
-        op_id = op.get("operationId", "")
-        op_type = op.get("operationType", "")
-        target = op.get("target", {}) or {}
-
-        if op_id in blocked_ops:
-            continue   # contract 단계에서 이미 blocked
-
-        # target lookup (셀 ops만 검증)
-        cell = None
-        # replaceTextRun은 셀 좌표(tableId+row+col)일 수도, paragraph 좌표일 수도 있다.
-        # tableId가 있으면 셀 ops로 다루고, paragraphKey/paragraphIndex만 있으면 paragraph 좌표로 본다.
-        _cell_lookup_ops = {"setCellText", "setCellHorizontalAlign",
-                              "setCellVerticalAlign", "setCellFillColor",
-                              "setCellTextStyle"}
-        if op_type == "replaceTextRun" and target.get("tableId"):
-            _cell_lookup_ops = _cell_lookup_ops | {"replaceTextRun"}
-        if op_type in _cell_lookup_ops:
-            cell = _find_cell(parser_result, target.get("tableId"),
-                                target.get("row"), target.get("col"))
-            if parser_result is not None and cell is None:
-                result.safetyFindings.append(SafetyFinding(
-                    "TARGET_CELL_NOT_FOUND",
-                    f"tableId={target.get('tableId')!r} "
-                    f"row={target.get('row')} col={target.get('col')}",
-                    op_id,
-                ))
-                # auto/review 어디였든 BLOCKED로 강등
-                if op_id in auto_ops:
-                    auto_ops.discard(op_id); blocked_ops.add(op_id)
-                    demoted_to_blocked.append(op_id)
-                elif op_id in review_ops:
-                    review_ops.discard(op_id); blocked_ops.add(op_id)
-                    demoted_to_blocked.append(op_id)
-                continue
-
-        # expectedBefore 일치성 검증
-        if parser_result is not None and cell is not None:
-            current = _current_value_for(op_type, cell)
-            expected_before = op.get("expectedBefore")
-            if expected_before is not None and current != expected_before:
-                result.safetyFindings.append(SafetyFinding(
-                    "EXPECTED_BEFORE_MISMATCH",
-                    f"expected={expected_before!r} actual={current!r}",
-                    op_id,
-                ))
-                # auto였으면 review로 강등
-                if op_id in auto_ops:
-                    auto_ops.discard(op_id); review_ops.add(op_id)
-                    demoted_to_review.append(op_id)
-
-        # 예상 변경 산출 (auto / review 모두 포함, blocked는 제외)
-        if op_id in blocked_ops:
-            continue
-        before = _current_value_for(op_type, cell) if cell is not None else op.get("expectedBefore")
-        after = op.get("value")
-        note = ""
-        if op_id in review_ops:
-            note = "review_required"
-        result.expectedChanges.append(ExpectedChange(
-            operationId=op_id, operationType=op_type,
-            target=target, before=before, after=after, note=note,
-        ))
+        _process_one_operation(op, parser_result, auto_ops, review_ops, blocked_ops, result)
 
     # 4) 최종 분류
     result.autoAllowedOps = sorted(auto_ops)
     result.reviewRequiredOps = sorted(review_ops)
     result.blockedOps = sorted(blocked_ops)
 
-    if result.blockedOps and not result.autoAllowedOps and not result.reviewRequiredOps:
-        result.verdict = "BLOCKED_UNSAFE"
-    elif result.blockedOps:
-        # 일부 blocked + 일부 살아남음 → 안전 보수적으로 review로 보고
-        result.verdict = "REVIEW_REQUIRED"
-    elif result.reviewRequiredOps:
-        result.verdict = "REVIEW_REQUIRED"
-    else:
-        result.verdict = "PASS_AUTO_ALLOWED"
+    result.verdict = _determine_dry_run_verdict(result)
 
     result.autoExecutable = (
         result.verdict == "PASS_AUTO_ALLOWED"

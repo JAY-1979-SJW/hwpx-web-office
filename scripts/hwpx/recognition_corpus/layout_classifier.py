@@ -14,6 +14,7 @@ layout_classifier.py — 표 메타데이터 기반 레이아웃 분류 모듈.
     TABLE_LIST_ONLY          데이터 목록형 (입력셀 없음)
     UNKNOWN                  미분류
 """
+
 from __future__ import annotations
 
 import re
@@ -21,21 +22,39 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # ── 레이아웃 타입 상수 ────────────────────────────────────────────────────────
-LT_HEADER_COL      = "HEADER_COLUMN_FORM"
-LT_LABEL_ADJ       = "LABEL_ADJACENT_FORM"
-LT_FORM_INLINE     = "FORM_FIELD_INLINE"
-LT_APPROVAL        = "PUBLIC_DOC_APPROVAL_FORM"
-LT_BACK_SIDE       = "BACK_SIDE_FORM"
-LT_GANTT           = "GANTT_LIKE_SCHEDULE"
-LT_H_SCHEDULE      = "HORIZONTAL_SCHEDULE"
-LT_LIST_ONLY       = "TABLE_LIST_ONLY"
-LT_UNKNOWN         = "UNKNOWN"
+LT_HEADER_COL = "HEADER_COLUMN_FORM"
+LT_LABEL_ADJ = "LABEL_ADJACENT_FORM"
+LT_FORM_INLINE = "FORM_FIELD_INLINE"
+LT_APPROVAL = "PUBLIC_DOC_APPROVAL_FORM"
+LT_BACK_SIDE = "BACK_SIDE_FORM"
+LT_GANTT = "GANTT_LIKE_SCHEDULE"
+LT_H_SCHEDULE = "HORIZONTAL_SCHEDULE"
+LT_LIST_ONLY = "TABLE_LIST_ONLY"
+LT_UNKNOWN = "UNKNOWN"
 
 # ── 공문서 승인 영역 키워드 ──────────────────────────────────────────────────
 _APPROVAL_KEYWORDS = frozenset({
-    "접수", "직인", "결재", "담당", "검토", "승인", "기안",
-    "전결", "대결", "서명", "서명란", "인", "날인", "확인인",
-    "계장", "과장", "부장", "팀장", "국장", "처장", "차장",
+    "접수",
+    "직인",
+    "결재",
+    "담당",
+    "검토",
+    "승인",
+    "기안",
+    "전결",
+    "대결",
+    "서명",
+    "서명란",
+    "인",
+    "날인",
+    "확인인",
+    "계장",
+    "과장",
+    "부장",
+    "팀장",
+    "국장",
+    "처장",
+    "차장",
 })
 # ── 뒤쪽 마커 ────────────────────────────────────────────────────────────────
 _BACK_PATTERN = re.compile(
@@ -56,9 +75,21 @@ _DATE_PATTERN = re.compile(
 )
 # ── 공정 키워드 ──────────────────────────────────────────────────────────────
 _SCHEDULE_KEYWORDS = frozenset({
-    "공종", "작업명", "시작일", "착수일", "종료일", "완료일",
-    "기간", "공기", "진행률", "공정명", "task", "start", "end",
-    "duration", "공정표",
+    "공종",
+    "작업명",
+    "시작일",
+    "착수일",
+    "종료일",
+    "완료일",
+    "기간",
+    "공기",
+    "진행률",
+    "공정명",
+    "task",
+    "start",
+    "end",
+    "duration",
+    "공정표",
 })
 
 
@@ -76,11 +107,25 @@ class LayoutClassification:
         }
 
 
+def _check_horizontal_schedule(
+    date_cols: int, sched_hits: int, row_count: int, col_count: int, evidence: list[str]
+) -> LayoutClassification | None:
+    if date_cols >= 1 and sched_hits >= 2:
+        evidence.append(f"date_cols={date_cols}, schedule_keywords={sched_hits}")
+        return LayoutClassification(LT_H_SCHEDULE, 0.80, evidence)
+    if sched_hits >= 3 and row_count >= 3:
+        layout_t = LT_H_SCHEDULE if col_count > row_count else "VERTICAL_SCHEDULE"
+        evidence.append(f"schedule_keywords={sched_hits}, rows={row_count}, cols={col_count}")
+        return LayoutClassification(layout_t, 0.75, evidence)
+    return None
+
+
 # ── 분류 함수 ─────────────────────────────────────────────────────────────────
 
-def classify_layout(
+
+def classify_layout(  # ruff: ignore[too-many-arguments] (여러 파일에서 호출 — 시그니처 변경 보류)
     header_texts: list[str],
-    input_cell_types: dict[str, int],   # {"header_column": N, "label_adjacent": M, ...}
+    input_cell_types: dict[str, int],  # {"header_column": N, "label_adjacent": M, ...}
     total_cells: int,
     empty_cells: int,
     row_count: int,
@@ -102,7 +147,7 @@ def classify_layout(
     evidence: list[str] = []
     n_hdr_col = input_cell_types.get("header_column", 0)
     n_lbl_adj = input_cell_types.get("label_adjacent", 0)
-    n_form    = input_cell_types.get("form_field", 0)
+    n_form = input_cell_types.get("form_field", 0)
 
     # ── 1. 뒤쪽/앞쪽 형식 ────────────────────────────────────────────────────
     back_hits = sum(1 for h in header_texts if _BACK_PATTERN.search(h))
@@ -114,7 +159,9 @@ def classify_layout(
     approval_hits = sum(1 for h in header_texts if h in _APPROVAL_KEYWORDS)
     if approval_hits >= 2 or (approval_hits >= 1 and total_cells <= 20):
         conf = min(0.70 + approval_hits * 0.05, 0.95)
-        evidence.append(f"approval/stamp keywords ({approval_hits}): {[h for h in header_texts if h in _APPROVAL_KEYWORDS][:5]}")
+        evidence.append(
+            f"approval/stamp keywords ({approval_hits}): {[h for h in header_texts if h in _APPROVAL_KEYWORDS][:5]}"
+        )
         return LayoutClassification(LT_APPROVAL, conf, evidence)
 
     # ── 3. Gantt 공정표 ───────────────────────────────────────────────────────
@@ -126,13 +173,9 @@ def classify_layout(
 
     # ── 4. 수평 일정표 ────────────────────────────────────────────────────────
     sched_hits = sum(1 for h in header_texts if h.lower() in _SCHEDULE_KEYWORDS)
-    if date_cols >= 1 and sched_hits >= 2:
-        evidence.append(f"date_cols={date_cols}, schedule_keywords={sched_hits}")
-        return LayoutClassification(LT_H_SCHEDULE, 0.80, evidence)
-    if sched_hits >= 3 and row_count >= 3:
-        layout_t = LT_H_SCHEDULE if col_count > row_count else "VERTICAL_SCHEDULE"
-        evidence.append(f"schedule_keywords={sched_hits}, rows={row_count}, cols={col_count}")
-        return LayoutClassification(layout_t, 0.75, evidence)
+    result = _check_horizontal_schedule(date_cols, sched_hits, row_count, col_count, evidence)
+    if result is not None:
+        return result
 
     # ── 5. label_adjacent form ────────────────────────────────────────────────
     if n_lbl_adj > 0 and col_count == 2:
@@ -163,12 +206,13 @@ def classify_layout(
     evidence.append(
         f"no rule matched: hdr_col={n_hdr_col} lbl_adj={n_lbl_adj} "
         f"rows={row_count} cols={col_count} empty_ratio="
-        f"{(empty_cells/total_cells if total_cells else 0):.2f}"
+        f"{(empty_cells / total_cells if total_cells else 0):.2f}"
     )
     return LayoutClassification(LT_UNKNOWN, 0.0, evidence)
 
 
 # ── 파일 수준 레이아웃 요약 분류 ────────────────────────────────────────────
+
 
 def classify_file_layout(
     header_texts_all: list[str],
@@ -181,7 +225,7 @@ def classify_file_layout(
     evidence: list[str] = []
     n_hdr_col = input_type_dist.get("header_column", 0)
     n_lbl_adj = input_type_dist.get("label_adjacent", 0)
-    n_form    = input_type_dist.get("form_field", 0)
+    n_form = input_type_dist.get("form_field", 0)
     total_input = n_hdr_col + n_lbl_adj + n_form
 
     # 뒤쪽 마커
@@ -215,6 +259,7 @@ def classify_file_layout(
 
 
 # ── 배치 분류: survey per-file 결과를 받아 레이아웃 재분류 ────────────────────
+
 
 def reclassify_from_survey(
     per_file_records: list[dict],

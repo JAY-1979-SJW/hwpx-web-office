@@ -1,4 +1,4 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-EXISTING-CHARPR-01.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-EXISTING-CHARPR-01.
 
 fontSize axis matching + Format Toolbar dropdown 의 정적·동적 검증.
 """
@@ -15,13 +15,15 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
+from scripts.ops import ops_common_checks as occ
+
 MATCHER_MJS = (PR / "frontend/web_office_viewer/"
                       "format_charpr_matcher.mjs")
 TOOLBAR_TSX = (PR / "frontend/web_office_viewer/components/"
                       "WebOfficeFormatToolbar.tsx")
 SMOKE_JS = (PR / "frontend/web_office_viewer/"
                   "format_charpr_matcher_smoke.mjs")
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 REQUIRED_MATCHER_PATTERNS = [
     r"export\s+function\s+matchAxisChange\(",
@@ -95,14 +97,10 @@ def _check_matcher_static() -> list[dict]:
         findings.append({"code": "MATCHER_MISSING", "level": "FAIL"})
         return findings
     src = MATCHER_MJS.read_text(encoding="utf-8")
-    for pat in REQUIRED_MATCHER_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "MATCHER_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_MATCHER_PATTERNS:
-        if re.search(pat, src, re.IGNORECASE):
-            findings.append({"code": "MATCHER_FORBIDDEN",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "MATCHER_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_MATCHER_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "MATCHER_FORBIDDEN",
+                              "level": "FAIL", "detail": pat} for pat in FORBIDDEN_MATCHER_PATTERNS if re.search(pat, src, re.IGNORECASE))
     # axis enum 에 fontSizePt 가 반드시 포함. fontName 은 미허용.
     # (textColor 는 COLOR-MATCHING 공정에서 추가됨 — 본 audit 는 허용.)
     m = re.search(
@@ -123,52 +121,28 @@ def _check_toolbar_static() -> list[dict]:
         findings.append({"code": "TOOLBAR_MISSING", "level": "FAIL"})
         return findings
     src = TOOLBAR_TSX.read_text(encoding="utf-8")
-    for pat in REQUIRED_TOOLBAR_PATTERNS:
-        if not re.search(pat, src):
-            findings.append({"code": "TOOLBAR_PATTERN_MISSING",
-                              "level": "FAIL", "detail": pat})
-    for pat in FORBIDDEN_TOOLBAR_PATTERNS:
-        if re.search(pat, src):
-            findings.append({"code": "TOOLBAR_FORBIDDEN",
-                              "level": "FAIL", "detail": pat})
+    findings.extend({"code": "TOOLBAR_PATTERN_MISSING",
+                              "level": "FAIL", "detail": pat} for pat in REQUIRED_TOOLBAR_PATTERNS if not re.search(pat, src))
+    findings.extend({"code": "TOOLBAR_FORBIDDEN",
+                              "level": "FAIL", "detail": pat} for pat in FORBIDDEN_TOOLBAR_PATTERNS if re.search(pat, src))
     return findings
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
-            continue
-        if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
-            continue
-        if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR)
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL",
+                              "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -205,10 +179,8 @@ def _check_smoke(out: dict) -> list[dict]:
                                   "fontSizeMatchingFailure",
                                   "extractAxisValuesSorted",
                                   "axisChangeDimensionsExact")
-    for k in required_keys:
-        if k not in (out.get("checks") or {}):
-            findings.append({"code": "SMOKE_CHECK_MISSING",
-                              "level": "FAIL", "detail": k})
+    findings.extend({"code": "SMOKE_CHECK_MISSING",
+                              "level": "FAIL", "detail": k} for k in required_keys if k not in (out.get("checks") or {}))
     return findings
 
 
@@ -243,7 +215,7 @@ def _run_fixture_stats() -> dict[str, Any]:
             continue
         total += 1
         grp: dict = {}
-        for cid, d in defs.items():
+        for d in defs.values():
             key = (d.get("fontName"), d.get("textColor"),
                           d.get("bold"), d.get("italic"),
                           d.get("underline"))

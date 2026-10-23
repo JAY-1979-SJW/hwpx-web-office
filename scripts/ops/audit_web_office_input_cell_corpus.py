@@ -9,6 +9,7 @@
 
 read-only — 원본 무수정. 한컴 미호출(캐시만 사용). 보고는 stdout(JSON).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +35,7 @@ _CHAR_PX = 13.0
 _HU2PX = 96.0 / 7200.0
 
 
-_LINE_PX = 22.0   # 12pt 기준 근사 줄높이(px) — 줄바꿈 가능 줄 수 계산용
+_LINE_PX = 22.0  # 12pt 기준 근사 줄높이(px) — 줄바꿈 가능 줄 수 계산용
 
 
 def _text_px(text: str) -> float:
@@ -46,15 +47,14 @@ def _text_px(text: str) -> float:
 
 
 def audit_one(path: Path, project_root: Path) -> dict:
-    rel = (str(path.relative_to(project_root))
-           if path.is_relative_to(project_root) else str(path))
+    rel = str(path.relative_to(project_root)) if path.is_relative_to(project_root) else str(path)
     rec: dict = {"path": rel, "verdict": "OK", "warnings": []}
     try:
-        from scripts.hwpx.web_office.editor_file_bridge import (
-            load_hwpx_for_editor)
+        from scripts.hwpx.web_office.editor_file_bridge import load_hwpx_for_editor
+
         r = load_hwpx_for_editor(
-            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel},
-            project_root=project_root)
+            {"operation": "HWPX_EDITOR_LOAD", "sourcePath": rel}, project_root=project_root
+        )
         if r.get("verdict") != "PASS":
             rec["verdict"] = "ERROR"
             rec["error"] = f"LOAD:{r.get('reason')}"
@@ -67,55 +67,58 @@ def audit_one(path: Path, project_root: Path) -> dict:
         rec["inputCells"] = len(inp)
 
         # 1) 분류 무결성 — 입력칸은 빈 텍스트 또는 마커
-        bad_cls = [c["cellId"] for c in inp
-                   if (c.get("text") or "").strip()
-                   and not _MARKER.search(c.get("text") or "")]
+        bad_cls = [
+            c["cellId"]
+            for c in inp
+            if (c.get("text") or "").strip() and not _MARKER.search(c.get("text") or "")
+        ]
         if bad_cls:
             rec["warnings"].append(f"CLASSIFY:{len(bad_cls)}")
             rec["badClassify"] = bad_cls[:5]
 
         # 2) 마커 해부 — 셀 마커 전부 라벨 부여됐는가
         marked = [c for c in origin if _MARKER.search(c.get("text") or "")]
-        unlabeled = [c["cellId"] for c in marked
-                     if not (c.get("isInputCell") and c.get("inputLabel"))]
+        unlabeled = [
+            c["cellId"] for c in marked if not (c.get("isInputCell") and c.get("inputLabel"))
+        ]
         rec["markerCells"] = len(marked)
         if unlabeled:
             rec["warnings"].append(f"MARKER_UNLABELED:{len(unlabeled)}")
 
         # 3) 원본 결함 — 셀 폭 초과 텍스트(주입 결함: 한컴도 겹쳐 그림)
         overflow = []
-        z = zipfile.ZipFile(path)
-        for sec in [n for n in z.namelist()
-                    if re.search(r"section\d+\.xml$", n.lower())]:
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(z.read(sec))
+        # B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+        from defusedxml.ElementTree import fromstring as _dx_fromstring
 
-            def _ln(t):
-                return t.rsplit("}", 1)[-1] if "}" in t else t
-            for tc in root.iter():
-                if _ln(tc.tag) != "tc":
-                    continue
-                sz = next((e for e in tc.iter() if _ln(e.tag) == "cellSz"),
-                          None)
-                if sz is None:
-                    continue
-                w_px = float(sz.attrib.get("width", 0)) * _HU2PX
-                h_px = float(sz.attrib.get("height", 0)) * _HU2PX
-                if w_px <= 0:
-                    continue
-                # 셀 높이만큼 줄바꿈 가능(HWPX 표 셀은 자동 줄바꿈이 기본) —
-                # 폭 초과만으로는 결함이 아니다. 줄바꿈해도 셀 안에 못 들어갈
-                # 때만(필요 줄 수 > 보유 줄 수) 진짜 원본 결함으로 본다.
-                lines_avail = max(1, int(h_px / _LINE_PX))
-                for p in (e for e in tc.iter() if _ln(e.tag) == "p"):
-                    txt = "".join(t.text or "" for t in p.iter()
-                                  if _ln(t.tag) == "t")
-                    if not txt.strip():
+        with zipfile.ZipFile(path) as z:
+            for sec in [n for n in z.namelist() if re.search(r"section\d+\.xml$", n.lower())]:
+                root = _dx_fromstring(z.read(sec))
+
+                def _ln(t):
+                    return t.rsplit("}", 1)[-1] if "}" in t else t
+
+                for tc in root.iter():
+                    if _ln(tc.tag) != "tc":
                         continue
-                    lines_needed = _text_px(txt) / max(1.0, w_px)
-                    if lines_needed > lines_avail * 1.25 + 0.5:
-                        overflow.append(txt.strip()[:16])
-                        break
+                    sz = next((e for e in tc.iter() if _ln(e.tag) == "cellSz"), None)
+                    if sz is None:
+                        continue
+                    w_px = float(sz.attrib.get("width", 0)) * _HU2PX
+                    h_px = float(sz.attrib.get("height", 0)) * _HU2PX
+                    if w_px <= 0:
+                        continue
+                    # 셀 높이만큼 줄바꿈 가능(HWPX 표 셀은 자동 줄바꿈이 기본) —
+                    # 폭 초과만으로는 결함이 아니다. 줄바꿈해도 셀 안에 못 들어갈
+                    # 때만(필요 줄 수 > 보유 줄 수) 진짜 원본 결함으로 본다.
+                    lines_avail = max(1, int(h_px / _LINE_PX))
+                    for p in (e for e in tc.iter() if _ln(e.tag) == "p"):
+                        txt = "".join(t.text or "" for t in p.iter() if _ln(t.tag) == "t")
+                        if not txt.strip():
+                            continue
+                        lines_needed = _text_px(txt) / max(1.0, w_px)
+                        if lines_needed > lines_avail * 1.25 + 0.5:
+                            overflow.append(txt.strip()[:16])
+                            break
         rec["textOverflowCells"] = len(overflow)
         if overflow:
             rec["warnings"].append(f"SOURCE_TEXT_OVERFLOW:{len(overflow)}")
@@ -123,9 +126,10 @@ def audit_one(path: Path, project_root: Path) -> dict:
 
         # 4)+5) 레이아웃 — 연결률·입력칸 줄 포함·품질 (캐시만, 한컴 미호출)
         from scripts.hwpx.web_office.coordinate_layout import build_layout
+
         lay = build_layout(
-            {"operation": "HWPX_COORD_LAYOUT", "sourcePath": rel},
-            project_root=project_root)
+            {"operation": "HWPX_COORD_LAYOUT", "sourcePath": rel}, project_root=project_root
+        )
         if lay.get("verdict") == "PASS":
             model_ids = {c["cellId"] for c in origin}
             box_ids = set()
@@ -139,15 +143,13 @@ def audit_one(path: Path, project_root: Path) -> dict:
                 for ln in pd.get("lines") or []:
                     cid = ln.get("cellId")
                     if cid and cid in boxes:
-                        ok = any(b["y"] - 2 <= ln["y"] <= b["y"] + b["h"] + 2
-                                 for b in boxes[cid])
+                        ok = any(b["y"] - 2 <= ln["y"] <= b["y"] + b["h"] + 2 for b in boxes[cid])
                         if not ok:
                             mis_line += 1
-            link = (len(model_ids & box_ids) / len(model_ids)
-                    if model_ids else 1.0)
+            link = len(model_ids & box_ids) / len(model_ids) if model_ids else 1.0
             rec["cellLinkRate"] = round(link, 3)
             if link < 0.999:
-                rec["warnings"].append(f"CELL_LINK:{round(link*100, 1)}%")
+                rec["warnings"].append(f"CELL_LINK:{round(link * 100, 1)}%")
             if mis_line:
                 rec["warnings"].append(f"LINE_OUT_OF_BOX:{mis_line}")
             q = lay.get("quality") or {}
@@ -155,10 +157,11 @@ def audit_one(path: Path, project_root: Path) -> dict:
                 rec["warnings"].append(
                     f"QUALITY:{q.get('cellOverflow')}"
                     f"/{q.get('cellOverflowMaxPx')}px"
-                    f"/ovl{q.get('bodyOverlap')}")
+                    f"/ovl{q.get('bodyOverlap')}"
+                )
         else:
             rec["warnings"].append(f"LAYOUT:{lay.get('reason')}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # ruff: ignore[blind-except]
         rec["verdict"] = "ERROR"
         rec["error"] = f"{type(e).__name__}: {e}"[:160]
         return rec
@@ -169,14 +172,17 @@ def audit_one(path: Path, project_root: Path) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--root", action="append", default=None,
-                    help="HWPX 폴더/파일(반복). 기본: samples, uploads, fixtures")
+    ap.add_argument(
+        "--root",
+        action="append",
+        default=None,
+        help="HWPX 폴더/파일(반복). 기본: samples, uploads, fixtures",
+    )
     ap.add_argument("--limit", type=int, default=0, help="상한(0=전수)")
     ap.add_argument("--json", default=None, help="상세 결과 저장 경로")
     args = ap.parse_args()
 
-    roots = args.root or [
-        "samples", "tmp/web_office_uploads", "tests/fixtures/hwpx"]
+    roots = args.root or ["samples", "tmp/web_office_uploads", "tests/fixtures/hwpx"]
     files: list[Path] = []
     for r in roots:
         base = Path(r) if Path(r).is_absolute() else ROOT / r
@@ -201,22 +207,28 @@ def main() -> int:
         "schemaVersion": "web_office_input_cell_corpus_v1",
         "verdict": PASS_VERDICT if err == 0 else FAIL_VERDICT,
         "scanned": len(results),
-        "ok": ok, "warn": warn, "error": err,
+        "ok": ok,
+        "warn": warn,
+        "error": err,
         "warningKinds": kinds,
         "markerDocs": sum(1 for r in results if r.get("markerCells")),
-        "sourceOverflowDocs": sum(
-            1 for r in results if r.get("textOverflowCells")),
+        "sourceOverflowDocs": sum(1 for r in results if r.get("textOverflowCells")),
         "worst": [
-            {"path": r["path"], "verdict": r["verdict"],
-             "warnings": r.get("warnings", [])[:4],
-             "error": r.get("error")}
-            for r in results if r["verdict"] != "OK"
+            {
+                "path": r["path"],
+                "verdict": r["verdict"],
+                "warnings": r.get("warnings", [])[:4],
+                "error": r.get("error"),
+            }
+            for r in results
+            if r["verdict"] != "OK"
         ][:20],
     }
     if args.json:
         Path(args.json).write_text(
-            json.dumps({"summary": summary, "results": results},
-                       ensure_ascii=False, indent=1), encoding="utf-8")
+            json.dumps({"summary": summary, "results": results}, ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
     print(json.dumps(summary, ensure_ascii=False, indent=1))
     return 0 if summary["verdict"] == PASS_VERDICT else 1
 

@@ -6,8 +6,14 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = Path("data") / "reports" / "hwpx_form_auto_fill_upload_gate"
 
@@ -35,16 +41,39 @@ SUPPORTED_PACKAGE_KINDS = {"HWPX_PACKAGE", "SANITIZED_REAL_LIKE_PACKAGE", "SYNTH
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def _safe_id(seed: str) -> str:
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
 
 
+def _first_block_reason(
+    request: dict[str, Any], source_hint: str, output_hint: str, package_kind: str, scan_text: str
+) -> str | None:
+    """업로드 요청을 순서대로 검사해 첫 번째로 걸리는 차단 사유를 반환한다."""
+    if request.get("mode") != "SANDBOX_ONLY":
+        return BLOCKED_NON_SANDBOX_MODE
+    if request.get("sourceMutationAllowed") is not False:
+        return BLOCKED_SOURCE_MUTATION_ALLOWED
+    if request.get("realUserFile") is True:
+        return BLOCKED_REAL_USER_FILE
+    if request.get("declaredSanitized") is not True:
+        return BLOCKED_UNSANITIZED_SAMPLE
+    if package_kind not in SUPPORTED_PACKAGE_KINDS:
+        return BLOCKED_UNSUPPORTED_FILE_TYPE
+    if source_hint and output_hint and source_hint == output_hint:
+        return BLOCKED_OUTPUT_EQUALS_SOURCE
+    if ABS_PATH_RE.search(scan_text):
+        return BLOCKED_RAW_PATH_RISK
+    if RAW_FILENAME_RE.search(scan_text):
+        return BLOCKED_RAW_FILENAME_RISK
+    if PII_RE.search(scan_text):
+        return BLOCKED_PII_RISK
+    return None
+
+
 def evaluate_upload_request(request: dict[str, Any]) -> dict[str, Any]:
-    mode = request.get("mode")
-    source_mutation_allowed = request.get("sourceMutationAllowed")
     display_name = str(request.get("displayName", "sanitized-sample"))
     package_kind = str(request.get("packageKind", ""))
     source_hint = str(request.get("sourcePathHint", ""))
@@ -52,25 +81,7 @@ def evaluate_upload_request(request: dict[str, Any]) -> dict[str, Any]:
     content_preview = str(request.get("contentPreview", ""))
     scan_text = "\n".join([display_name, source_hint, output_hint, content_preview])
 
-    blocked_reason: str | None = None
-    if mode != "SANDBOX_ONLY":
-        blocked_reason = BLOCKED_NON_SANDBOX_MODE
-    elif source_mutation_allowed is not False:
-        blocked_reason = BLOCKED_SOURCE_MUTATION_ALLOWED
-    elif request.get("realUserFile") is True:
-        blocked_reason = BLOCKED_REAL_USER_FILE
-    elif request.get("declaredSanitized") is not True:
-        blocked_reason = BLOCKED_UNSANITIZED_SAMPLE
-    elif package_kind not in SUPPORTED_PACKAGE_KINDS:
-        blocked_reason = BLOCKED_UNSUPPORTED_FILE_TYPE
-    elif source_hint and output_hint and source_hint == output_hint:
-        blocked_reason = BLOCKED_OUTPUT_EQUALS_SOURCE
-    elif ABS_PATH_RE.search(scan_text):
-        blocked_reason = BLOCKED_RAW_PATH_RISK
-    elif RAW_FILENAME_RE.search(scan_text):
-        blocked_reason = BLOCKED_RAW_FILENAME_RISK
-    elif PII_RE.search(scan_text):
-        blocked_reason = BLOCKED_PII_RISK
+    blocked_reason = _first_block_reason(request, source_hint, output_hint, package_kind, scan_text)
 
     accepted = blocked_reason is None
     response = {
@@ -198,10 +209,7 @@ def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"unsafe upload gate payload: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, "unsafe upload gate payload")
 
 
 def main() -> int:
@@ -215,4 +223,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

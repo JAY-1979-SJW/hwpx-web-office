@@ -9,7 +9,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -297,7 +296,7 @@ def test_T20_e2e_smoke_tests_pass():
     r = subprocess.run(
         [sys.executable, "-m", "pytest",
          "tests/test_hwpx_form_auto_fill_e2e_smoke.py", "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -317,7 +316,7 @@ def test_T21_upstream_tests_pass():
          "tests/test_hwpx_form_writer_readback_hardening.py",
          "tests/test_hwpx_form_auto_fill_writer_sandbox.py",
          "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr

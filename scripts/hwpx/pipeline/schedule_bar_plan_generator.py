@@ -13,7 +13,6 @@ from __future__ import annotations
 from ..parser.parser_contract import (
     ScheduleBarEditPlan,
     ScheduleBarEditPlanItem,
-    ScheduleBarPlanBuildResult,
     ScheduleBarPlanCandidate,
     ScheduleBarPlanDecision,
 )

@@ -4,7 +4,7 @@
  */
 import {
   makeSetCellTextCommand, applyForward, applyInverse,
-  validateAgainstCurrent, STATUS_VALIDATED, STATUS_REJECTED,
+  validateAgainstCurrent, STATUS_VALIDATED,
 } from "./edit_command.mjs";
 
 export const MODE_READ_ONLY = "READ_ONLY";

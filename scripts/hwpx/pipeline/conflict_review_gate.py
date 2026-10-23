@@ -12,7 +12,6 @@ REVIEW_REQUIRED 공정표 막대 후보를 검토 목록으로 변환하고,
 """
 from __future__ import annotations
 
-import uuid
 
 from ..parser.parser_contract import (
     ScheduleBarEditPlan,

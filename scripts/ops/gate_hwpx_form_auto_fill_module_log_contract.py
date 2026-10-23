@@ -13,11 +13,14 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # noqa: E402
-from scripts.ops import hwpx_form_auto_fill_module_audit_history as history  # noqa: E402
+from scripts.ops import audit_hwpx_form_auto_fill_modules as module_audit  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.ops import hwpx_form_auto_fill_module_audit_history as history  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_module_log_contract"
-DEFAULT_MODULE_AUDIT_REPORT = ROOT / "data" / "reports" / "hwpx_form_auto_fill_module_audits" / "module_audit_summary.json"
+DEFAULT_MODULE_AUDIT_REPORT = (
+    ROOT / "data" / "reports" / "hwpx_form_auto_fill_module_audits" / "module_audit_summary.json"
+)
 PASS_VERDICT = "PASS_HWPX_FORM_AUTO_FILL_MODULE_LOG_CONTRACT"
 FAIL_VERDICT = "FAIL_HWPX_FORM_AUTO_FILL_MODULE_LOG_CONTRACT"
 
@@ -67,11 +70,14 @@ def _expected_modules(module_payload: dict[str, Any] | None) -> set[str]:
     return {item["id"] for item in manifest.get("modules", [])}
 
 
-def _validate_entry(entry: dict[str, Any], zone_by_module: dict[str, str]) -> list[str]:
+def _check_required_top_fields(entry: dict[str, Any]) -> list[str]:
+    return [
+        f"{FAIL_MISSING_REQUIRED_FIELD}:{field}" for field in REQUIRED_FIELDS if field not in entry
+    ]
+
+
+def _check_zone_and_status(entry: dict[str, Any], zone_by_module: dict[str, str]) -> list[str]:
     failures: list[str] = []
-    for field in REQUIRED_FIELDS:
-        if field not in entry:
-            failures.append(f"{FAIL_MISSING_REQUIRED_FIELD}:{field}")
     module_id = entry.get("moduleId")
     if zone_by_module.get(module_id) != entry.get("zone"):
         failures.append(FAIL_INVALID_MODULE_ZONE)
@@ -81,29 +87,44 @@ def _validate_entry(entry: dict[str, Any], zone_by_module: dict[str, str]) -> li
         failures.append(FAIL_FAILED_MODULE_LOGGED_PASS)
     if not TIMESTAMP_RE.match(str(entry.get("timestampUtc", ""))):
         failures.append("FAIL_INVALID_TIMESTAMP")
+    return failures
 
+
+def _check_checks_field(entry: dict[str, Any]) -> list[str]:
     checks = entry.get("checks", {})
     if not isinstance(checks, dict):
-        failures.append(f"{FAIL_MISSING_REQUIRED_FIELD}:checks")
-    else:
-        for field in REQUIRED_CHECK_FIELDS:
-            if field not in checks:
-                failures.append(f"{FAIL_MISSING_REQUIRED_FIELD}:checks.{field}")
+        return [f"{FAIL_MISSING_REQUIRED_FIELD}:checks"]
+    return [
+        f"{FAIL_MISSING_REQUIRED_FIELD}:checks.{field}"
+        for field in REQUIRED_CHECK_FIELDS
+        if field not in checks
+    ]
 
+
+def _check_security_field(entry: dict[str, Any]) -> list[str]:
     security = entry.get("security", {})
     if not isinstance(security, dict):
-        failures.append(FAIL_INVALID_SECURITY_FIELDS)
-    else:
-        for field in REQUIRED_SECURITY_FIELDS:
-            if field not in security:
-                failures.append(f"{FAIL_MISSING_REQUIRED_FIELD}:security.{field}")
-            elif int(security[field]) != 0:
-                failures.append(FAIL_SECURITY_LEAK_IN_LOG)
+        return [FAIL_INVALID_SECURITY_FIELDS]
+    failures: list[str] = []
+    for field in REQUIRED_SECURITY_FIELDS:
+        if field not in security:
+            failures.append(f"{FAIL_MISSING_REQUIRED_FIELD}:security.{field}")
+        elif int(security[field]) != 0:
+            failures.append(FAIL_SECURITY_LEAK_IN_LOG)
+    return failures
+
+
+def _validate_entry(entry: dict[str, Any], zone_by_module: dict[str, str]) -> list[str]:
+    failures: list[str] = []
+    failures.extend(_check_required_top_fields(entry))
+    failures.extend(_check_zone_and_status(entry, zone_by_module))
+    failures.extend(_check_checks_field(entry))
+    failures.extend(_check_security_field(entry))
     return failures
 
 
 def _no_leak(text: str) -> bool:
-    return not (ABS_PATH_RE.search(text) or RAW_FILENAME_RE.search(text) or PII_RE.search(text))
+    return occ.no_leak(text, ABS_PATH_RE, RAW_FILENAME_RE, PII_RE)
 
 
 def validate_module_log_contract(
@@ -121,21 +142,21 @@ def validate_module_log_contract(
         text = json.dumps(entry, ensure_ascii=False)
         if not _no_leak(text):
             entry_failures.append(FAIL_SECURITY_LEAK_IN_LOG)
-        entry_results.append(
-            {
-                "moduleId": entry.get("moduleId"),
-                "zone": entry.get("zone"),
-                "status": "PASS" if not entry_failures else "FAIL",
-                "failures": sorted(set(entry_failures)),
-            }
-        )
+        entry_results.append({
+            "moduleId": entry.get("moduleId"),
+            "zone": entry.get("zone"),
+            "status": "PASS" if not entry_failures else "FAIL",
+            "failures": sorted(set(entry_failures)),
+        })
         failures.extend(entry_failures)
 
     failures = sorted(set(failures))
     return {
         "schemaVersion": "hwpx_form_auto_fill_module_log_contract_v1",
         "verdict": PASS_VERDICT if not failures else FAIL_VERDICT,
-        "runId": entries[0].get("runId") if entries else datetime.now(UTC).strftime("run_%Y%m%dT%H%M%SZ"),
+        "runId": entries[0].get("runId")
+        if entries
+        else datetime.now(UTC).strftime("run_%Y%m%dT%H%M%SZ"),
         "summary": {
             "expectedModules": len(expected),
             "loggedModules": len(module_ids),
@@ -183,10 +204,7 @@ def run_module_log_contract_gate(
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"{FAIL_UNSAFE_REPORT}: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, FAIL_UNSAFE_REPORT)
 
 
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:
@@ -229,7 +247,9 @@ def main() -> int:
     parser.add_argument("--report-dir", default=str(REPORT_DIR))
     parser.add_argument("--entries-json")
     args = parser.parse_args()
-    payload = run_module_log_contract_gate(report_dir=Path(args.report_dir), entries=_load_entries(args.entries_json))
+    payload = run_module_log_contract_gate(
+        report_dir=Path(args.report_dir), entries=_load_entries(args.entries_json)
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["verdict"] == PASS_VERDICT else 1
 

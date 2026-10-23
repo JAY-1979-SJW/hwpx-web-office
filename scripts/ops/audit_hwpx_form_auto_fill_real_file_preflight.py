@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 import tempfile
@@ -33,7 +32,7 @@ def _run_pytest(paths: list[str], timeout: int = 900) -> dict[str, Any]:
         [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=timeout,
     )
     text = result.stdout + "\n" + result.stderr
@@ -58,7 +57,7 @@ def _dirty_baseline() -> dict[str, Any]:
         ["git", "status", "--short"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -354,8 +353,7 @@ def audit() -> dict[str, Any]:
         "",
         "## Checks",
     ]
-    for item in checks:
-        md.append(f"- {item['status']} {item['code']} {item['desc']}")
+    md.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in checks)
     (REPORT_DIR / "real_file_preflight_summary.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
     return summary

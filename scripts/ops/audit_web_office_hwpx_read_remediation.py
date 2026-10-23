@@ -8,19 +8,24 @@ fixture corpus is inventoried, that unsupported XML/package surface is reported
 deterministically, and that the Web Office read model still loads without
 mutating source files.
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# ET.Element 타입애노테이션은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고
+# 파싱 함수만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -28,9 +33,8 @@ if str(PROJECT_ROOT) not in sys.path:
 if str(PROJECT_ROOT / "scripts" / "hwpx") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "hwpx"))
 
-from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # noqa: E402
-from scripts.hwpx.web_office.render_payload import build_render_payload  # noqa: E402
-
+from scripts.hwpx.web_office.render_payload import build_render_payload  # ruff: ignore[module-import-not-at-top-of-file]
+from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 SCHEMA_VERSION = "web_office_hwpx_read_remediation_audit_v1"
 PASS_VERDICT = "PASS_WEB_OFFICE_HWPX_READ_REMEDIATION_CURRENT_SCOPE"
@@ -38,9 +42,7 @@ FAIL_VERDICT = "FAIL_WEB_OFFICE_HWPX_READ_REMEDIATION"
 STATUS_VALUE = "BASIC_READ_VERIFIED_FULL_READ_NOT_CLAIMED"
 
 DEFAULT_CORPUS_DIR = PROJECT_ROOT / "tests" / "fixtures" / "hwpx" / "corpus"
-DEFAULT_REPORT_DIR = (
-    PROJECT_ROOT / "data" / "reports" / "web_office_hwpx_read_remediation"
-)
+DEFAULT_REPORT_DIR = PROJECT_ROOT / "data" / "reports" / "web_office_hwpx_read_remediation"
 
 SUPPORTED_CURRENT_XML_LOCALS = {
     "HCFVersion",
@@ -324,34 +326,49 @@ def _classify_xml_local_with_context(
     contexts: Counter[str] | None = None,
 ) -> str:
     context_keys = set(contexts or {})
-    if local in {"case", "default"} and context_keys and all(
-        key.endswith("header.xml:switch") for key in context_keys
+    if (
+        local in {"case", "default"}
+        and context_keys
+        and all(key.endswith("header.xml:switch") for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local == "style" and context_keys and all(
-        key.endswith("header.xml:styles") for key in context_keys
+    if (
+        local == "style"
+        and context_keys
+        and all(key.endswith("header.xml:styles") for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local == "switch" and context_keys and all(
-        key.endswith(("header.xml:paraPr", "header.xml:tabPr"))
-        for key in context_keys
+    if (
+        local == "switch"
+        and context_keys
+        and all(key.endswith(("header.xml:paraPr", "header.xml:tabPr")) for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local in {"grid", "lineNumberShape", "pageBorderFill", "pagePr"} and context_keys and all(
-        key.endswith("section0.xml:secPr") for key in context_keys
+    if (
+        local in {"grid", "lineNumberShape", "pageBorderFill", "pagePr"}
+        and context_keys
+        and all(key.endswith("section0.xml:secPr") for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local == "secPr" and context_keys and all(
-        key.endswith("section0.xml:run") for key in context_keys
+    if (
+        local == "secPr"
+        and context_keys
+        and all(key.endswith("section0.xml:run") for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local == "sz" and context_keys and all(
-        key.endswith("section0.xml:tbl") for key in context_keys
+    if (
+        local == "sz"
+        and context_keys
+        and all(key.endswith("section0.xml:tbl") for key in context_keys)
     ):
         return "parsed_for_current_model"
-    if local == "offset" and context_keys and all(
-        key.endswith(("header.xml:charPr", "section0.xml:pageBorderFill"))
-        for key in context_keys
+    if (
+        local == "offset"
+        and context_keys
+        and all(
+            key.endswith(("header.xml:charPr", "section0.xml:pageBorderFill"))
+            for key in context_keys
+        )
     ):
         return "parsed_for_current_model"
     return _classify_xml_local(local)
@@ -364,19 +381,14 @@ def _unsupported_category(
     context_keys = set(contexts or {})
     if local in {"case", "default", "switch"}:
         return "style_compatibility"
-    if local == "language" and any(
-        key.endswith("content.hpf:metadata") for key in context_keys
-    ):
+    if local == "language" and any(key.endswith("content.hpf:metadata") for key in context_keys):
         return "package_metadata"
     if local == "offset":
         if any(key.endswith("section0.xml:pageBorderFill") for key in context_keys):
             return "page_layout"
-        if context_keys and all(key.endswith("header.xml:charPr")
-                                for key in context_keys):
+        if context_keys and all(key.endswith("header.xml:charPr") for key in context_keys):
             return "text_style"
-    if local == "colPr" and any(
-        key.endswith("section0.xml:ctrl") for key in context_keys
-    ):
+    if local == "colPr" and any(key.endswith("section0.xml:ctrl") for key in context_keys):
         return "embedded_control"
     return UNSUPPORTED_CATEGORY_BY_LOCAL.get(local, "unknown_review_required")
 
@@ -388,16 +400,22 @@ def _build_unsupported_category_summary(
     categories: dict[str, dict[str, Any]] = {}
     for local in sorted(unsupported_locals):
         category = (category_by_local or {}).get(local) or _unsupported_category(local)
-        meta = UNSUPPORTED_CATEGORY_META.get(category, {
-            "claimImpact": "Unsupported element category requires manual review.",
-            "nextAction": "Classify this element family before upgrading the read claim.",
-        })
-        bucket = categories.setdefault(category, {
-            "elementFamilies": [],
-            "count": 0,
-            "claimImpact": meta["claimImpact"],
-            "nextAction": meta["nextAction"],
-        })
+        meta = UNSUPPORTED_CATEGORY_META.get(
+            category,
+            {
+                "claimImpact": "Unsupported element category requires manual review.",
+                "nextAction": "Classify this element family before upgrading the read claim.",
+            },
+        )
+        bucket = categories.setdefault(
+            category,
+            {
+                "elementFamilies": [],
+                "count": 0,
+                "claimImpact": meta["claimImpact"],
+                "nextAction": meta["nextAction"],
+            },
+        )
         bucket["elementFamilies"].append(local)
         bucket["count"] += 1
     return {
@@ -421,8 +439,8 @@ def _inspect_package(path: Path) -> dict[str, Any]:
             if name.endswith((".xml", ".hpf")):
                 xml_entries.append(name)
                 try:
-                    root = ET.fromstring(zf.read(name))
-                except Exception as exc:  # pragma: no cover - covered by payload
+                    root = _dx_fromstring(zf.read(name))
+                except Exception as exc:  # ruff: ignore[blind-except] — pragma: no cover - covered by payload
                     package_findings.append({
                         "code": "XML_PARSE_FAILED",
                         "entry": name,
@@ -431,7 +449,9 @@ def _inspect_package(path: Path) -> dict[str, Any]:
                     continue
                 stack: list[ET.Element] = []
 
-                def walk(elem: ET.Element) -> None:
+                def walk(
+                    elem: ET.Element, *, stack: list[ET.Element] = stack, name: str = name
+                ) -> None:
                     local = _local_name(elem.tag)
                     parent = _local_name(stack[-1].tag) if stack else "<root>"
                     element_counter[local] += 1
@@ -439,7 +459,7 @@ def _inspect_package(path: Path) -> dict[str, Any]:
                     element_contexts.setdefault(local, Counter())[context_key] += 1
                     stack.append(elem)
                     for child in list(elem):
-                        walk(child)
+                        walk(child, stack=stack, name=name)
                     stack.pop()
 
                 walk(root)
@@ -501,7 +521,7 @@ def _audit_fixture(path: Path, manifest_by_name: dict[str, dict[str, Any]]) -> d
 
     try:
         package = _inspect_package(path)
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] — 감사 도구: 실패도 finding 으로 기록하고 계속
         package = {}
         findings.append({"code": "PACKAGE_INSPECTION_FAILED", "message": str(exc)})
 
@@ -521,7 +541,7 @@ def _audit_fixture(path: Path, manifest_by_name: dict[str, dict[str, Any]]) -> d
             findings.append({"code": "TABLES_WITHOUT_CELLS"})
         if payload.get("editable") is not False:
             findings.append({"code": "PAYLOAD_EDITABLE_NOT_FALSE"})
-    except Exception as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] — 감사 도구: 실패도 finding 으로 기록하고 계속
         model_counts = {}
         findings.append({"code": "WEB_OFFICE_IMPORT_FAILED", "message": str(exc)})
 
@@ -560,9 +580,7 @@ def run_audit(
     manifest = _load_manifest(corpus_dir)
     manifest_entries = manifest.get("fixtures") or []
     manifest_by_name = {
-        str(item.get("fileName")): item
-        for item in manifest_entries
-        if item.get("fileName")
+        str(item.get("fileName")): item for item in manifest_entries if item.get("fileName")
     }
     files = sorted(p for p in corpus_dir.glob("*.hwpx") if p.is_file())
 
@@ -588,8 +606,7 @@ def run_audit(
         )
 
     missing_manifest_files = sorted(
-        name for name in manifest_by_name
-        if not (corpus_dir / name).is_file()
+        name for name in manifest_by_name if not (corpus_dir / name).is_file()
     )
     failures = [
         {
@@ -604,16 +621,18 @@ def run_audit(
     if missing_manifest_files:
         failures.append({
             "path": _safe_rel(corpus_dir / "fixture_manifest.json"),
-            "findings": [{
-                "code": "MANIFEST_REFERENCES_MISSING_FILES",
-                "files": missing_manifest_files,
-            }],
+            "findings": [
+                {
+                    "code": "MANIFEST_REFERENCES_MISSING_FILES",
+                    "files": missing_manifest_files,
+                }
+            ],
         })
 
     payload = {
         "schemaVersion": SCHEMA_VERSION,
         "task": "WEB-OFFICE-HWPX-READ-REMEDIATION-AUDIT-20260525",
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "statusValue": STATUS_VALUE,
         "fullCompatibilityClaimed": False,
         "serverFinalReferenceRequired": True,

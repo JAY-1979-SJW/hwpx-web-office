@@ -7,12 +7,12 @@ GUI automation, or external converter programs.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import hwp_to_hwpx_standalone as core
-
 
 Extractor = Callable[[Path], dict[str, Any]]
 ResultCallback = Callable[[dict[str, Any]], None]
@@ -39,7 +39,7 @@ class HwpToHwpxOptions:
     job_id: str | None = None
 
     @classmethod
-    def from_values(
+    def from_values(  # ruff: ignore[too-many-arguments] -- 공개 SDK 팩토리, 각 인자가 dataclass 필드와 1:1 대응
         cls,
         *,
         expected_texts: list[str] | tuple[str, ...] | None = None,
@@ -55,7 +55,7 @@ class HwpToHwpxOptions:
         audit_log_path: str | Path | None = None,
         audit_level: str = "standard",
         job_id: str | None = None,
-    ) -> "HwpToHwpxOptions":
+    ) -> HwpToHwpxOptions:
         return cls(
             expected_texts=tuple(expected_texts or ()),
             strict_quality=bool(strict_quality),
@@ -101,7 +101,7 @@ class HwpToHwpxConverter:
         if self.options.log_path:
             core.configure_logging(Path(self.options.log_path), level=self.options.log_level)
 
-    def with_options(self, options: HwpToHwpxOptions) -> "HwpToHwpxConverter":
+    def with_options(self, options: HwpToHwpxOptions) -> HwpToHwpxConverter:
         return HwpToHwpxConverter(options)
 
     def convert_file(
@@ -127,7 +127,12 @@ class HwpToHwpxConverter:
         result = core.convert_hwp_to_hwpx(Path(input_path), Path(output_path), **kwargs)
         core.log_result("sdk_file_complete", result)
         if resolved.audit_log_path:
-            core.write_audit_log(Path(resolved.audit_log_path), result, event="sdk_file_conversion", audit_level=resolved.audit_level)
+            core.write_audit_log(
+                Path(resolved.audit_log_path),
+                result,
+                event="sdk_file_conversion",
+                audit_level=resolved.audit_level,
+            )
         return result
 
     def convert_directory(
@@ -160,7 +165,9 @@ class HwpToHwpxConverter:
                     on_result(result)
         if resolved.audit_log_path:
             audit_path = Path(resolved.audit_log_path)
-            core.write_audit_log(audit_path, report, event="sdk_batch_conversion", audit_level=resolved.audit_level)
+            core.write_audit_log(
+                audit_path, report, event="sdk_batch_conversion", audit_level=resolved.audit_level
+            )
             core.write_forensic_item_audit(audit_path, report, audit_level=resolved.audit_level)
         return report
 
@@ -179,7 +186,12 @@ class HwpToHwpxConverter:
             existing_policy=resolved.existing_policy,
         )
         if resolved.audit_log_path:
-            core.write_audit_log(Path(resolved.audit_log_path), report, event="sdk_batch_plan", audit_level=resolved.audit_level)
+            core.write_audit_log(
+                Path(resolved.audit_log_path),
+                report,
+                event="sdk_batch_plan",
+                audit_level=resolved.audit_level,
+            )
         return report
 
     def convert_auto(
@@ -203,7 +215,12 @@ class HwpToHwpxConverter:
     ) -> None:
         core.write_report(Path(json_path) if json_path else None, report)
         core.write_report_csv(Path(csv_path) if csv_path else None, report)
-        core.LOGGER.info("sdk_reports_written json_path=%s csv_path=%s status=%s", json_path, csv_path, report.get("status"))
+        core.LOGGER.info(
+            "sdk_reports_written json_path=%s csv_path=%s status=%s",
+            json_path,
+            csv_path,
+            report.get("status"),
+        )
 
 
 def convert_file(

@@ -4,11 +4,11 @@
 별도 공정 (CELL-SAVE-HWPX-VERIFY7-01) 에서만 가능.
 """
 from __future__ import annotations
-from typing import Any, Iterable
+from typing import Any
 
 from .edit_command_model import (
     EditCommand, COMMAND_TYPE_SET_CELL_TEXT,
-    STATUS_REJECTED, STATUS_VALIDATED, validate_against_current,
+    validate_against_current,
 )
 
 

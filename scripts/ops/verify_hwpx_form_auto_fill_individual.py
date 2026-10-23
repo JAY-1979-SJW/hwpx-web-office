@@ -69,7 +69,7 @@ def _dirty_baseline() -> dict[str, Any]:
         ["git", "status", "--short"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -145,7 +145,7 @@ def _run_process(
             command,
             cwd=str(ROOT),
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=timeout,
         )
         output = result.stdout + "\n" + result.stderr
@@ -212,13 +212,11 @@ def _write_md(path: Path, payload: dict[str, Any]) -> None:
         "",
         "## Results",
     ]
-    for item in payload["results"]:
-        lines.append(f"- {item['status']} {item['label']} - attempts={item['attempts']} - {item['summary']}")
+    lines.extend(f"- {item['status']} {item['label']} - attempts={item['attempts']} - {item['summary']}" for item in payload["results"])
     lines.append("")
     lines.append("## Audits")
     if payload["auditRuns"]:
-        for item in payload["auditRuns"]:
-            lines.append(f"- {item['status']} {item['label']} - attempts={item['attempts']} - {item['summary']}")
+        lines.extend(f"- {item['status']} {item['label']} - attempts={item['attempts']} - {item['summary']}" for item in payload["auditRuns"])
     else:
         lines.append("- SKIP audit auto-run disabled")
     text = "\n".join(lines) + "\n"

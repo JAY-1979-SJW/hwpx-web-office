@@ -8,19 +8,24 @@ import csv
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONVERTER = REPO_ROOT / "scripts" / "hwpx" / "convert_local_hwp_inventory_to_hwpx.py"
-DEFAULT_INVENTORY = REPO_ROOT / "reports" / "runtime" / "local_hwp_hwpx_inventory_default" / "local_hwp_hwpx_inventory.csv"
+DEFAULT_INVENTORY = (
+    REPO_ROOT
+    / "reports"
+    / "runtime"
+    / "local_hwp_hwpx_inventory_default"
+    / "local_hwp_hwpx_inventory.csv"
+)
 DEFAULT_RUN_DIR = REPO_ROOT / "reports" / "runtime" / "local_hwp_inventory_to_hwpx_full_run"
 
 
 def iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def count_hwp_rows(inventory_csv: Path, root_contains: str) -> int:
@@ -119,18 +124,16 @@ def run_chunk(
     }
 
 
-def run_all(
-    *,
-    inventory_csv: Path,
-    run_dir: Path,
-    chunk_size: int,
-    start_offset: int,
-    stop_offset: int,
-    timeout_sec: int,
-    root_contains: str,
-    continue_on_fail: bool,
-    ignore_state: bool,
-) -> dict[str, Any]:
+def run_all(args: argparse.Namespace) -> dict[str, Any]:
+    inventory_csv: Path = args.inventory_csv.resolve()
+    run_dir: Path = args.run_dir.resolve()
+    chunk_size = int(args.chunk_size)
+    start_offset = int(args.start_offset)
+    stop_offset = int(args.stop_offset)
+    timeout_sec = int(args.timeout_sec)
+    root_contains = str(args.root_contains)
+    continue_on_fail = bool(args.continue_on_fail)
+    ignore_state = bool(args.ignore_state)
     run_dir.mkdir(parents=True, exist_ok=True)
     state_path = run_dir / "full_run_state.json"
     summary_path = run_dir / "full_run_summary.json"
@@ -214,23 +217,15 @@ def main() -> int:
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN_DIR)
     parser.add_argument("--chunk-size", type=int, default=200)
     parser.add_argument("--start-offset", type=int, default=0)
-    parser.add_argument("--stop-offset", type=int, default=0, help="Exclusive stop offset; 0 means all HWP rows.")
+    parser.add_argument(
+        "--stop-offset", type=int, default=0, help="Exclusive stop offset; 0 means all HWP rows."
+    )
     parser.add_argument("--timeout-sec", type=int, default=150)
     parser.add_argument("--root-contains", default="")
     parser.add_argument("--continue-on-fail", action="store_true")
     parser.add_argument("--ignore-state", action="store_true")
     args = parser.parse_args()
-    summary = run_all(
-        inventory_csv=args.inventory_csv.resolve(),
-        run_dir=args.run_dir.resolve(),
-        chunk_size=int(args.chunk_size),
-        start_offset=int(args.start_offset),
-        stop_offset=int(args.stop_offset),
-        timeout_sec=int(args.timeout_sec),
-        root_contains=str(args.root_contains),
-        continue_on_fail=bool(args.continue_on_fail),
-        ignore_state=bool(args.ignore_state),
-    )
+    summary = run_all(args)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0 if summary.get("status") == "PASS" else 1
 

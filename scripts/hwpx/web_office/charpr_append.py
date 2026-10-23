@@ -13,11 +13,16 @@ CLAUDE.md §4.1 "서식 편집 (조건부 허용)" 조건 하에서만 쓴다:
 를 그대로 쓴다 — 이 모듈이 새 id 를 header.xml 에 먼저 심어두면, 그
 경로가 "이미 header 에 있는 id" 로 인식해 정상 진행된다.
 """
+
 from __future__ import annotations
 
 import copy
 import xml.etree.ElementTree as ET
 from typing import Any
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 _HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
 ET.register_namespace("hh", _HH_NS)
@@ -25,18 +30,21 @@ ET.register_namespace("hh", _HH_NS)
 # overrides 에서 허용하는 키(그 외 키는 무시 — 알 수 없는 속성을 조용히
 # 반영하다 예상 못 한 변형이 생기는 것 방지).
 _SUPPORTED_OVERRIDE_KEYS = {
-    "fontSizePt", "textColor", "bold", "italic", "underline", "fontFaceId",
+    "fontSizePt",
+    "textColor",
+    "bold",
+    "italic",
+    "underline",
+    "fontFaceId",
 }
-_FONT_REF_SLOTS = ("hangul", "latin", "hanja", "japanese", "other",
-                   "symbol", "user")
+_FONT_REF_SLOTS = ("hangul", "latin", "hanja", "japanese", "other", "symbol", "user")
 
 
 def _ln(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
-def _find_char_pr_container(root: ET.Element) -> tuple[
-        list[ET.Element], ET.Element | None]:
+def _find_char_pr_container(root: ET.Element) -> tuple[list[ET.Element], ET.Element | None]:
     char_pr_elems: list[ET.Element] = []
     container: ET.Element | None = None
     for parent in root.iter():
@@ -48,8 +56,9 @@ def _find_char_pr_container(root: ET.Element) -> tuple[
     return char_pr_elems, container
 
 
-def _set_bool_child(elem: ET.Element, tag: str, present: bool,
-                    default_attrib: dict[str, str] | None = None) -> None:
+def _set_bool_child(
+    elem: ET.Element, tag: str, present: bool, default_attrib: dict[str, str] | None = None
+) -> None:
     """tag 자식 요소의 존재 여부로 on/off 를 표현하는 속성(bold/italic)
     을 append-only 복제본 위에서만 조정한다(원본 charPr 은 절대 안 건드림
     — 이 함수는 항상 copy.deepcopy 된 new_elem 에만 호출된다)."""
@@ -61,6 +70,32 @@ def _set_bool_child(elem: ET.Element, tag: str, present: bool,
                 new_child.set(k, v)
     elif not present and existing is not None:
         elem.remove(existing)
+
+
+def _apply_char_pr_overrides(new_elem: ET.Element, overrides: dict[str, Any]) -> None:
+    if "fontSizePt" in overrides:
+        # height 는 HWPUNIT 1/100pt 단위(예: 18.0pt → "1800")
+        new_elem.set("height", str(int(round(float(overrides["fontSizePt"]) * 100))))
+    if "textColor" in overrides:
+        new_elem.set("textColor", str(overrides["textColor"]))
+    if "bold" in overrides:
+        _set_bool_child(new_elem, "bold", bool(overrides["bold"]))
+    if "italic" in overrides:
+        _set_bool_child(new_elem, "italic", bool(overrides["italic"]))
+    if "underline" in overrides:
+        _set_bool_child(
+            new_elem,
+            "underline",
+            bool(overrides["underline"]),
+            default_attrib={"type": "SOLID", "shape": "SOLID", "color": "#000000"},
+        )
+    if "fontFaceId" in overrides:
+        face_id = str(overrides["fontFaceId"])
+        fr = new_elem.find(f"{{{_HH_NS}}}fontRef")
+        if fr is None:
+            fr = ET.SubElement(new_elem, f"{{{_HH_NS}}}fontRef")
+        for slot in _FONT_REF_SLOTS:
+            fr.set(slot, face_id)
 
 
 def append_char_pr_with_overrides(
@@ -86,46 +121,22 @@ def append_char_pr_with_overrides(
     if unknown:
         raise ValueError(f"지원하지 않는 override 키: {sorted(unknown)}")
 
-    root = ET.fromstring(header_bytes)
+    root = _dx_fromstring(header_bytes)
     char_pr_elems, char_pr_container = _find_char_pr_container(root)
 
     if char_pr_container is None:
         raise ValueError("header.xml 에 charProperties 컨테이너가 없습니다")
 
-    source_elem = next(
-        (e for e in char_pr_elems if e.get("id") == str(source_char_pr_id)),
-        None)
+    source_elem = next((e for e in char_pr_elems if e.get("id") == str(source_char_pr_id)), None)
     if source_elem is None:
-        raise ValueError(
-            f"source_char_pr_id={source_char_pr_id!r} 가 header.xml 에 없습니다")
+        raise ValueError(f"source_char_pr_id={source_char_pr_id!r} 가 header.xml 에 없습니다")
 
-    existing_ids = [int(e.get("id", "0")) for e in char_pr_elems
-                    if (e.get("id") or "").isdigit()]
+    existing_ids = [int(e.get("id", "0")) for e in char_pr_elems if (e.get("id") or "").isdigit()]
     new_id = str(max(existing_ids, default=0) + 1)
 
     new_elem = copy.deepcopy(source_elem)
     new_elem.set("id", new_id)
-
-    if "fontSizePt" in overrides:
-        # height 는 HWPUNIT 1/100pt 단위(예: 18.0pt → "1800")
-        new_elem.set("height", str(int(round(float(overrides["fontSizePt"]) * 100))))
-    if "textColor" in overrides:
-        new_elem.set("textColor", str(overrides["textColor"]))
-    if "bold" in overrides:
-        _set_bool_child(new_elem, "bold", bool(overrides["bold"]))
-    if "italic" in overrides:
-        _set_bool_child(new_elem, "italic", bool(overrides["italic"]))
-    if "underline" in overrides:
-        _set_bool_child(new_elem, "underline", bool(overrides["underline"]),
-                        default_attrib={"type": "SOLID", "shape": "SOLID",
-                                        "color": "#000000"})
-    if "fontFaceId" in overrides:
-        face_id = str(overrides["fontFaceId"])
-        fr = new_elem.find(f"{{{_HH_NS}}}fontRef")
-        if fr is None:
-            fr = ET.SubElement(new_elem, f"{{{_HH_NS}}}fontRef")
-        for slot in _FONT_REF_SLOTS:
-            fr.set(slot, face_id)
+    _apply_char_pr_overrides(new_elem, overrides)
 
     char_pr_container.append(new_elem)
     # itemCnt 보정 — <hh:charProperties itemCnt="N"> 은 charPr 개수를
@@ -149,7 +160,44 @@ def append_char_pr_for_size(
     """하위호환 — 크기만 바꾸는 좁은 진입점. 신규 코드는
     append_char_pr_with_overrides 를 직접 쓸 것."""
     return append_char_pr_with_overrides(
-        header_bytes, source_char_pr_id, {"fontSizePt": new_size_pt})
+        header_bytes, source_char_pr_id, {"fontSizePt": new_size_pt}
+    )
+
+
+def _wanted_value(source: dict[str, Any], overrides: dict[str, Any], key: str) -> Any:
+    if key == "fontSizePt":
+        return overrides.get("fontSizePt", source.get("fontSizePt"))
+    if key == "textColor":
+        return overrides.get("textColor", source.get("textColor"))
+    if key == "bold":
+        return overrides.get("bold", source.get("bold"))
+    if key == "italic":
+        return overrides.get("italic", source.get("italic"))
+    if key == "underline":
+        return overrides.get("underline", source.get("underline"))
+    return None
+
+
+def _font_ref_matches(d: dict[str, Any], source: dict[str, Any], overrides: dict[str, Any]) -> bool:
+    if "fontFaceId" in overrides:
+        # fontRef 전체(모든 언어 슬롯)가 요청한 face id 로 통일돼
+        # 있어야 매칭(append 함수가 그렇게 만들기 때문).
+        fr = d.get("fontRef") or {}
+        if not fr or any(
+            fr.get(slot) != str(overrides["fontFaceId"]) for slot in _FONT_REF_SLOTS if slot in fr
+        ):
+            return False
+        return True
+    return d.get("fontRef") == source.get("fontRef")
+
+
+def _char_pr_attrs_match(
+    d: dict[str, Any], source: dict[str, Any], overrides: dict[str, Any]
+) -> bool:
+    for key in ("fontSizePt", "textColor", "bold", "italic", "underline"):
+        if d.get(key) != _wanted_value(source, overrides, key):
+            return False
+    return True
 
 
 def find_matching_char_pr(
@@ -173,41 +221,12 @@ def find_matching_char_pr(
     if source is None:
         return None
 
-    def _wanted(d: dict[str, Any], key: str) -> Any:
-        if key == "fontSizePt":
-            return overrides.get("fontSizePt", source.get("fontSizePt"))
-        if key == "textColor":
-            return overrides.get("textColor", source.get("textColor"))
-        if key == "bold":
-            return overrides.get("bold", source.get("bold"))
-        if key == "italic":
-            return overrides.get("italic", source.get("italic"))
-        if key == "underline":
-            return overrides.get("underline", source.get("underline"))
-        return None
-
     for cid, d in char_pr_defs.items():
         if cid == str(source_char_pr_id):
             continue
-        if "fontFaceId" in overrides:
-            # fontRef 전체(모든 언어 슬롯)가 요청한 face id 로 통일돼
-            # 있어야 매칭(append 함수가 그렇게 만들기 때문).
-            fr = d.get("fontRef") or {}
-            if not fr or any(
-                    fr.get(slot) != str(overrides["fontFaceId"])
-                    for slot in _FONT_REF_SLOTS if slot in fr):
-                continue
-        elif d.get("fontRef") != source.get("fontRef"):
+        if not _font_ref_matches(d, source, overrides):
             continue
-        if d.get("fontSizePt") != _wanted(d, "fontSizePt"):
-            continue
-        if d.get("textColor") != _wanted(d, "textColor"):
-            continue
-        if d.get("bold") != _wanted(d, "bold"):
-            continue
-        if d.get("italic") != _wanted(d, "italic"):
-            continue
-        if d.get("underline") != _wanted(d, "underline"):
+        if not _char_pr_attrs_match(d, source, overrides):
             continue
         return cid
     return None

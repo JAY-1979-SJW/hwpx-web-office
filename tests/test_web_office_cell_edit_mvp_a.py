@@ -5,7 +5,6 @@ Python EditCommand 모델 + dry-run plan 게이트 + JS 자체 테스트 결과�
 호출은 절대 발생하지 않는다.
 """
 from __future__ import annotations
-import hashlib
 import json
 import subprocess
 import sys
@@ -17,12 +16,11 @@ sys.path.insert(0, str(PR))
 
 from scripts.hwpx.web_office.edit_command_model import (  # noqa: E402
     make_set_cell_text_command, apply_forward, apply_inverse,
-    validate_against_current, COMMAND_TYPE_SET_CELL_TEXT,
+    COMMAND_TYPE_SET_CELL_TEXT,
     STATUS_PENDING,
 )
 from scripts.hwpx.web_office.cell_edit_plan import (  # noqa: E402
-    build_dry_run_edit_plan, validate_command_log,
-    SAVE_DRY_RUN_NOOP, SAVE_DRY_RUN_READY, SAVE_DRY_RUN_REJECTED,
+    build_dry_run_edit_plan, SAVE_DRY_RUN_NOOP, SAVE_DRY_RUN_READY, SAVE_DRY_RUN_REJECTED,
 )
 from scripts.ops.audit_web_office_cell_edit_mvp_a import (  # noqa: E402
     audit, VIEWER_DIR, SELF_TEST_JS, PY_FILES, JS_FILES,
@@ -180,7 +178,7 @@ def test_python_cell_edit_plan_does_not_import_hwpx_edit_tool():
 def _node_ok() -> bool:
     try:
         r = subprocess.run(["node", "--version"], capture_output=True,
-                                          text=True, timeout=10)
+                                          text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

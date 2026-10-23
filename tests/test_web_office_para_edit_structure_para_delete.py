@@ -5,7 +5,6 @@ baseline: 66f5870
 """
 import subprocess, json
 from pathlib import Path
-import pytest
 
 PR = Path(__file__).parents[1]
 
@@ -135,7 +134,7 @@ def test_structure_smoke_pass():
     smoke = PR / "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
     assert smoke.exists(), "smoke file missing"
     r = subprocess.run(["node", str(smoke)], capture_output=True,
-                       text=True, timeout=30)
+                       text=True, encoding="utf-8", errors="replace", timeout=30)
     out = json.loads(r.stdout.strip().split("\n")[-1])
     assert out.get("verdict") == "PASS", out
 
@@ -167,7 +166,6 @@ def test_no_table_structure_edit():
 
 
 def test_no_new_charpr_in_writer():
-    import re
     src = (PR / "scripts/hwpx/web_office/paragraph_writer_adapter.py"
            ).read_text(encoding="utf-8")
     assert "def create_char_pr" not in src

@@ -15,7 +15,7 @@ PR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PR))
 
 CLOSEOUT_DOC = PR / "docs/architecture/web_office_para_edit_applyformat_toolbar_command_closeout.md"
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 
 # ── 1. 시방서 존재 + baseline 표기 ─────────────────────────────
@@ -161,7 +161,7 @@ def test_locked_files_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )

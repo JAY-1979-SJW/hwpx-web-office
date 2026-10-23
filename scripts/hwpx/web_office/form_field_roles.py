@@ -23,21 +23,26 @@
 정확도는 tests/fixtures/web_office/field_role_ground_truth.json 정답셋으로
 측정한다(tests/test_web_office_field_roles.py).
 """
+
 from __future__ import annotations
 
 import re
 from typing import Any
 
 # ── 서식 종류 ──────────────────────────────────────────────────────────
-KIND_APPLICATION = "민원신청"   # 신청인이 작성해 제출
-KIND_CERTIFICATE = "발급증서"   # 관공서가 발급 (허가증·증명서)
-KIND_INTERNAL = "행정내부"      # 대장·일지·의결서 등 내부문서
+KIND_APPLICATION = "민원신청"  # 신청인이 작성해 제출
+KIND_CERTIFICATE = "발급증서"  # 관공서가 발급 (허가증·증명서)
+KIND_INTERNAL = "행정내부"  # 대장·일지·의결서 등 내부문서
 
-_K_CERT = re.compile(r"(허가증|등록증|증명서|수료증|자격증|면허증|인정서|확인서|"
-                     r"지정서|합격증|증서)\s*$")
-_K_INTERNAL = re.compile(r"(대장|일지|의결서|송달서|조서|명령서|통보서|처분서|"
-                         r"내역서|결과보고|심의서|회의록|관리부|점검표|기록부|"
-                         r"건의|지휘|기안|시행문|명부|현황표|카드)")
+_K_CERT = re.compile(
+    r"(허가증|등록증|증명서|수료증|자격증|면허증|인정서|확인서|"
+    r"지정서|합격증|증서)\s*$"
+)
+_K_INTERNAL = re.compile(
+    r"(대장|일지|의결서|송달서|조서|명령서|통보서|처분서|"
+    r"내역서|결과보고|심의서|회의록|관리부|점검표|기록부|"
+    r"건의|지휘|기안|시행문|명부|현황표|카드)"
+)
 _K_APPLY = re.compile(r"(신청서|청구서|신고서|제출서|접수증|동의서|신청)")
 
 # ── 관공서 기재란 (닫힌 집합) ─────────────────────────────────────────
@@ -45,12 +50,15 @@ _OFFICE = re.compile(
     r"^(접수\s*(번호|일자?|자)|처리\s*(일자?|기간|기관)|담당\s*공무원|"
     r"담당공무원확인사항|결재|협조자|시행일|발급\s*(번호|일자?)|"
     r"허가\s*번호|등록\s*번호\s*$|정리\s*번호|관리\s*번호|문서\s*번호|"
-    r"수신자?|처리\s*결과|검토자|확인자?)\s*$")
+    r"수신자?|처리\s*결과|검토자|확인자?)\s*$"
+)
 
 # ── 잡음 ──────────────────────────────────────────────────────────────
-_N_LAYOUT = re.compile(r"^(\(\s*(뒤|앞)\s*쪽\s*\)|\(\s*제?\s*\d+\s*쪽\s*\)|"
-                       r"[▼▶◀▲△▽◁▷→←↓↑]+|[-–—ㆍ·]+|[（()）\[\]]+|"
-                       r"계|합계|소계|총계|\d+|[（(]\s*[）)]|)$")
+_N_LAYOUT = re.compile(
+    r"^(\(\s*(뒤|앞)\s*쪽\s*\)|\(\s*제?\s*\d+\s*쪽\s*\)|"
+    r"[▼▶◀▲△▽◁▷→←↓↑]+|[-–—ㆍ·]+|[（()）\[\]]+|"
+    r"계|합계|소계|총계|\d+|[（(]\s*[）)]|)$"
+)
 # 문서 끝 표기 — '붙임 … 끝.발신명의직인'
 _N_TAIL = re.compile(r"끝\s*\.\s*발신명의|발신명의\s*직인|^붙임\b.*끝\s*\.")
 # 주의: '비고 · 참고사항 · 처리기간' 은 넣지 않는다 — 실측 결과 실제 기입칸이다
@@ -58,14 +66,16 @@ _N_TAIL = re.compile(r"끝\s*\.\s*발신명의|발신명의\s*직인|^붙임\b.*
 _N_SECTION = re.compile(
     r"^(첨부|구비|제출)\s*서류|^수수료|^처리\s*절차|"
     r"^유의\s*사항|^작성\s*(방법|요령)|^준수\s*사항|^안내\s*사항|"
-    r"^기재\s*(방법|요령)|^행정정보\s*공동이용|^본인정보")
+    r"^기재\s*(방법|요령)|^행정정보\s*공동이용|^본인정보"
+)
 # 서식번호 표기 — '[별지 제7호서식] <개정 2017. 9. 22.>'
 _N_FORMNO = re.compile(r"^\s*[\[(（]?\s*별지\s*제?\s*\d|^\s*[\[(（]\s*별지")
 # 수신처 표기 — '○○부장관', '△△청장 귀하'
 _N_ADDRESSEE = re.compile(
     r"(장관|처장|청장|위원장|위원회|시장|군수|구청장|원장|사장|이사장|서장|"
     r"교육감|도지사|관리청|지청장|공단|공사|[)）]\s*장)\s*(귀하|귀중)?\s*$"
-    r"|(귀하|귀중)\s*$")
+    r"|(귀하|귀중)\s*$"
+)
 
 # ── 의미 타입 (신청인 칸에만 부여) ────────────────────────────────────
 _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
@@ -75,12 +85,24 @@ _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
     # 같은 라벨이 전화로 잡혀 전화번호가 주소칸에 들어간다(실측 오채움).
     ("phone", "tel", re.compile(r"전화|연락처|휴대폰|팩스")),
     ("address", "address", re.compile(r"주소|소재지|주소지|사업장\s*소재")),
-    ("name", "text", re.compile(r"^성명|성\s*명|이름|신청인|신고인|청구인|제출인|"
-                                r"대표자|성명\s*\(")),
+    (
+        "name",
+        "text",
+        re.compile(
+            r"^성명|성\s*명|이름|신청인|신고인|청구인|제출인|"
+            r"대표자|성명\s*\("
+        ),
+    ),
     # 건물·장소 이름은 신청인의 상호가 아니다. 실측에서 '아파트명' 칸에
     # 프로필 법인명이 들어가는 오채움이 확인돼 분리했다.
-    ("buildingName", "text", re.compile(r"아파트\s*명|건물\s*명|공동주택\s*명|"
-                                        r"단지\s*명|시설\s*명|점포\s*명")),
+    (
+        "buildingName",
+        "text",
+        re.compile(
+            r"아파트\s*명|건물\s*명|공동주택\s*명|"
+            r"단지\s*명|시설\s*명|점포\s*명"
+        ),
+    ),
     ("orgName", "text", re.compile(r"상호|법인명|기관명|업체명|^명칭|단체명")),
     # email 은 date 보다 앞에 둔다 — date 의 '^.{0,6}일$' 이
     # '이메일' 을 날짜로 오인한다(실측).
@@ -107,7 +129,8 @@ _SEMANTIC: list[tuple[str, str, re.Pattern]] = [
 # 쓰이는 복합어만 남긴다. 홑단어 단계는 처리절차 띠 규칙이 이미 걸러낸다.
 _FLOW_STEP = re.compile(
     r"^(신청서\s*작성|신고서\s*작성|청구서\s*작성|서류\s*작성|신청서\s*제출|"
-    r"신고서\s*제출|업무\s*처리\s*절차|결과\s*통보|서류\s*검토)$")
+    r"신고서\s*제출|업무\s*처리\s*절차|결과\s*통보|서류\s*검토)$"
+)
 
 
 def _norm(s: str) -> str:
@@ -120,15 +143,17 @@ def _depunct(s: str) -> str:
 
 
 def _grid(table: dict) -> dict[tuple[int, int], dict]:
-    return {(c["row"], c["col"]): c for c in table.get("cells", [])
-            if not c.get("isCoveredByMerge")}
+    return {
+        (c["row"], c["col"]): c for c in table.get("cells", []) if not c.get("isCoveredByMerge")
+    }
 
 
 # 민원서식이 반드시 갖는 접수·처리 장치. 내부문서에는 없다.
 _APP_MARKER = re.compile(
     r"접수\s*번호|처리\s*절차|처리\s*기간|담당\s*공무원\s*확인|"
     r"귀하|귀중|신청합니다|신고합니다|청구합니다|제출합니다|"
-    r"(첨부|구비|제출)\s*서류|수수료")
+    r"(첨부|구비|제출)\s*서류|수수료"
+)
 
 
 def has_application_markers(doc_model: dict, render_payload: dict) -> bool:
@@ -148,8 +173,9 @@ def has_application_markers(doc_model: dict, render_payload: dict) -> bool:
     return False
 
 
-def classify_form_kind(name: str, doc_model: dict | None = None,
-                       render_payload: dict | None = None) -> str:
+def classify_form_kind(
+    name: str, doc_model: dict | None = None, render_payload: dict | None = None
+) -> str:
     """서식 종류 — 구조(접수장치) 우선, 이름 어휘는 보조."""
     if doc_model is not None and render_payload is not None:
         if has_application_markers(doc_model, render_payload):
@@ -173,6 +199,33 @@ def classify_form_kind(name: str, doc_model: dict | None = None,
     return KIND_INTERNAL
 
 
+def _find_adjacent_label(grid: dict, r: int, c: int) -> tuple[str, int, int]:
+    """왼쪽 → 위쪽 순서로 인접 라벨 탐색. 반환: (label, label_row, label_col)."""
+    for cc in range(c - 1, -1, -1):
+        lcell = grid.get((r, cc))
+        if lcell and _norm(lcell.get("text")):
+            return _norm(lcell["text"]), r, cc
+    for rr in range(r - 1, -1, -1):
+        ucell = grid.get((rr, c))
+        if ucell and _norm(ucell.get("text")):
+            return _norm(ucell["text"]), rr, c
+    return "", r, c
+
+
+def _inherit_bare_header(grid: dict, label: str, lr: int, lc: int) -> str:
+    """'1' '12' '계' 처럼 그 자체로는 뜻이 없는 라벨은 같은 열 위쪽의
+    머리글을 물고 올라온다. 이걸 안 하면 월별 금액칸 같은 실제 입력칸이
+    전부 잡음으로 죽는다(검증셋 최대 오류 원인)."""
+    if not _BARE.match(label.replace(" ", "")):
+        return label
+    for rr in range(lr - 1, -1, -1):
+        ucell = grid.get((rr, lc))
+        head = _norm(ucell.get("text")) if ucell else ""
+        if head and not _BARE.match(head.replace(" ", "")):
+            return f"{head} {label}"
+    return label
+
+
 def extract_field_cells(doc_model: dict, render_payload: dict) -> list[dict]:
     """빈 셀의 라벨을 위치와 함께 뽑는다 (구조 판정에 표 소속이 필요하다)."""
     # 좌표 대신 paragraphId 를 함께 들고 나간다. 채움은 좌표가 아니라 문단
@@ -194,32 +247,17 @@ def extract_field_cells(doc_model: dict, render_payload: dict) -> list[dict]:
         for (r, c), _cell in sorted(grid.items()):
             if (ti, r, c) not in empty:
                 continue
-            label, lr, lc_ = "", r, c
-            for cc in range(c - 1, -1, -1):
-                lcell = grid.get((r, cc))
-                if lcell and _norm(lcell.get("text")):
-                    label, lr, lc_ = _norm(lcell["text"]), r, cc
-                    break
-            if not label:
-                for rr in range(r - 1, -1, -1):
-                    ucell = grid.get((rr, c))
-                    if ucell and _norm(ucell.get("text")):
-                        label, lr, lc_ = _norm(ucell["text"]), rr, c
-                        break
-            # '1' '12' '계' 처럼 그 자체로는 뜻이 없는 라벨은 같은 열 위쪽의
-            # 머리글을 물고 올라온다. 이걸 안 하면 월별 금액칸 같은 실제
-            # 입력칸이 전부 잡음으로 죽는다(검증셋 최대 오류 원인).
-            if _BARE.match(label.replace(" ", "")):
-                for rr in range(lr - 1, -1, -1):
-                    ucell = grid.get((rr, lc_))
-                    head = _norm(ucell.get("text")) if ucell else ""
-                    if head and not _BARE.match(head.replace(" ", "")):
-                        label = f"{head} {label}"
-                        break
+            label, lr, lc_ = _find_adjacent_label(grid, r, c)
+            label = _inherit_bare_header(grid, label, lr, lc_)
             if label and label not in seen and len(label) < 40:
                 seen.add(label)
-                out.append({"label": label, "tableIndex": ti, "row": r, "col": c,
-                            "paragraphId": empty.get((ti, r, c), "")})
+                out.append({
+                    "label": label,
+                    "tableIndex": ti,
+                    "row": r,
+                    "col": c,
+                    "paragraphId": empty.get((ti, r, c), ""),
+                })
     return out
 
 
@@ -250,7 +288,8 @@ _THIRD_PARTY = re.compile(
     r"법정\s*대리인|대리인|임대|임차|피신청|피청구|피고|상대방|거래처|"
     r"수급인|도급인|발주자|양도인|양수인|배우자|보호자|채무자|채권자|"
     r"공급자|수급자|상속인|피상속인|대상자|위임자|수임자|보증인|"
-    r"동거인|세대주(?!\s*본인)|가입자(?!\s*본인)")
+    r"동거인|세대주(?!\s*본인)|가입자(?!\s*본인)"
+)
 
 
 def _subject_of(label: str) -> str:
@@ -265,8 +304,9 @@ def _semantic_of(label: str) -> tuple[str, str]:
     return "", "text"
 
 
-def classify_fields(doc_model: dict, render_payload: dict, *,
-                    name: str = "", force_kind: str | None = None) -> dict[str, Any]:
+def classify_fields(
+    doc_model: dict, render_payload: dict, *, name: str = "", force_kind: str | None = None
+) -> dict[str, Any]:
     """서식 1건의 칸 역할을 판정한다.
 
     force_kind 를 주면 서식종류 판정을 건너뛰고 그 값을 쓴다 —
@@ -276,8 +316,7 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
     proc = _procedure_bands(render_payload)
     # 제목 대조는 구두점을 털고 한다 — 라벨은 '농약·농약활용기자재의…' 처럼
     # 가운뎃점이 들어가고 파일명은 '농약 농약활용기자재의…' 라 그냥은 안 맞는다
-    title = _depunct(re.sub(r"\.hwpx?$", "",
-                            re.sub(r"^\d+[_\s]*", "", name or ""), flags=re.I))
+    title = _depunct(re.sub(r"\.hwpx?$", "", re.sub(r"^\d+[_\s]*", "", name or ""), flags=re.I))
 
     fields: list[dict] = []
     for f in extract_field_cells(doc_model, render_payload):
@@ -290,8 +329,7 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
             role, why = "noise", "LAYOUT_OR_FORMNO"
         elif _FLOW_STEP.match(lab):
             role, why = "noise", "FLOW_STEP"
-        elif title and (lambda d: d and (d == title or (len(d) > 8 and d in title)))(
-                _depunct(lab)):
+        elif title and (lambda d: d and (d == title or (len(d) > 8 and d in title)))(_depunct(lab)):
             role, why = "noise", "FORM_TITLE"
         elif _OFFICE.match(lab):
             role, why = "office", "OFFICE_FIELD"
@@ -312,8 +350,14 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
         _known = role != "noise"
         sem, typ = _semantic_of(lab) if _known else ("", "")
         subj = _subject_of(lab) if _known else ""
-        fields.append({**f, "role": role, "reason": why,
-                       "semantic": sem, "inputType": typ, "subject": subj})
+        fields.append({
+            **f,
+            "role": role,
+            "reason": why,
+            "semantic": sem,
+            "inputType": typ,
+            "subject": subj,
+        })
 
     ap = [f for f in fields if f["role"] == "applicant"]
     return {
@@ -328,35 +372,52 @@ def classify_fields(doc_model: dict, render_payload: dict, *,
 
 def _self_test() -> list[str]:
     out: list[str] = []
+
     def eq(n, a, b):
         out.append(f"{'PASS' if a == b else 'FAIL'} {n} ({a!r})")
-    eq("종류-신청서", classify_form_kind("13638955_도로연결 허가신청서.hwpx"),
-       KIND_APPLICATION)
-    eq("종류-대장", classify_form_kind("18195161_소방공무원기장_수여대장.hwpx"),
-       KIND_INTERNAL)
-    eq("종류-증서", classify_form_kind("12227797_법인_설립허가증.hwpx"),
-       KIND_CERTIFICATE)
+
+    eq("종류-신청서", classify_form_kind("13638955_도로연결 허가신청서.hwpx"), KIND_APPLICATION)
+    eq("종류-대장", classify_form_kind("18195161_소방공무원기장_수여대장.hwpx"), KIND_INTERNAL)
+    eq("종류-증서", classify_form_kind("12227797_법인_설립허가증.hwpx"), KIND_CERTIFICATE)
     eq("의미-주민번호", _semantic_of("주민등록번호"), ("residentNo", "secret"))
     eq("의미-주소", _semantic_of("사업장 소재지"), ("address", "address"))
     eq("의미-전화", _semantic_of("연락처"), ("phone", "tel"))
 
-    rp = {"tables": [
-        {"cells": [{"row": 0, "col": 0, "text": "접수번호"},
-                   {"row": 0, "col": 1, "text": ""},
-                   {"row": 1, "col": 0, "text": "성명"},
-                   {"row": 1, "col": 1, "text": ""}]},
-        {"cells": [{"row": 0, "col": 0, "text": "처리절차"},
-                   {"row": 1, "col": 0, "text": "청구인"},
-                   {"row": 1, "col": 1, "text": ""}]},
-    ]}
-    dm = {"paragraphs": [
-        {"containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": 0,
-                            "colIndex": 1}, "runs": []},
-        {"containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": 1,
-                            "colIndex": 1}, "runs": []},
-        {"containerScope": {"kind": "cell", "tableIndex": 1, "rowIndex": 1,
-                            "colIndex": 1}, "runs": []},
-    ]}
+    rp = {
+        "tables": [
+            {
+                "cells": [
+                    {"row": 0, "col": 0, "text": "접수번호"},
+                    {"row": 0, "col": 1, "text": ""},
+                    {"row": 1, "col": 0, "text": "성명"},
+                    {"row": 1, "col": 1, "text": ""},
+                ]
+            },
+            {
+                "cells": [
+                    {"row": 0, "col": 0, "text": "처리절차"},
+                    {"row": 1, "col": 0, "text": "청구인"},
+                    {"row": 1, "col": 1, "text": ""},
+                ]
+            },
+        ]
+    }
+    dm = {
+        "paragraphs": [
+            {
+                "containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": 0, "colIndex": 1},
+                "runs": [],
+            },
+            {
+                "containerScope": {"kind": "cell", "tableIndex": 0, "rowIndex": 1, "colIndex": 1},
+                "runs": [],
+            },
+            {
+                "containerScope": {"kind": "cell", "tableIndex": 1, "rowIndex": 1, "colIndex": 1},
+                "runs": [],
+            },
+        ]
+    }
     r = classify_fields(dm, rp, name="연금 청구서.hwpx")
     by = {f["label"]: f["role"] for f in r["fields"]}
     eq("접수번호→관공서", by.get("접수번호"), "office")

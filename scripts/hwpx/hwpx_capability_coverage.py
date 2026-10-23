@@ -453,17 +453,14 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         "| capability | priority | status | category | blocker | next_action |",
         "|---|---:|---|---|---|---|",
     ]
-    for row in report["capabilities"]:
-        lines.append(
-            "| {capability} | {priority} | {status} | {category} | {blocker} | {next_action} |".format(
+    lines.extend("| {capability} | {priority} | {status} | {category} | {blocker} | {next_action} |".format(
                 capability=row["capability"],
                 priority=row["priority"],
                 status=row["effective_status"],
                 category=row["category"],
                 blocker=str(row.get("blocker", "")).replace("|", "/"),
                 next_action=str(row.get("next_action", "")).replace("|", "/"),
-            )
-        )
+            ) for row in report["capabilities"])
     lines.extend(
         [
             "",
@@ -471,8 +468,7 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
             "",
         ]
     )
-    for row in report["next_priorities"]:
-        lines.append(f"- {row['priority']} {row['capability']}: {row.get('next_action') or row.get('blocker')}")
+    lines.extend(f"- {row['priority']} {row['capability']}: {row.get('next_action') or row.get('blocker')}" for row in report["next_priorities"])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

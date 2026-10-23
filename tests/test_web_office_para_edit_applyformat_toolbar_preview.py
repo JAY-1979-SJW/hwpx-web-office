@@ -24,7 +24,7 @@ from scripts.hwpx.web_office.render_payload import build_render_payload  # ruff:
 from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view  # ruff: ignore[module-import-not-at-top-of-file]
 
 PREVIEW_TSX = PR / "frontend/web_office_viewer/components/WebOfficeFormatPreview.tsx"
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 
 def _sha(p: Path) -> str:
@@ -220,7 +220,7 @@ def test_locked_files_unchanged_vs_baseline():
         r = subprocess.run(
             ["git", "diff", BASELINE_COMMIT, "--", rel],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(PR),
             timeout=20,
         )

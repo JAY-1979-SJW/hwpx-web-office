@@ -11,6 +11,7 @@
       HWPX 산출물명은 `{원본stem}.hwpx` 또는 `{stem}_{크기}.hwpx` 형태이므로
       원본 파일 stem 으로 매칭한다.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -69,15 +70,17 @@ def kgs_name_map() -> dict[str, str]:
     """가스안전공사 특례: 수집 시 Content-Disposition 이 없어 이름이 'kgs_N' 으로
     저장됐다. 정적 경로(/asset/file/{한글명}.hwp)에 원본명이 있으므로 목록
     페이지에서 순서대로 되살린다(수집기와 동일한 추출 순서)."""
+    import urllib.error
     import urllib.parse
     import urllib.request
+
     try:
         req = urllib.request.Request(
-            "https://www.kgs.or.kr/kgs/aceb/tab.do",
-            headers={"User-Agent": "Mozilla/5.0"})
+            "https://www.kgs.or.kr/kgs/aceb/tab.do", headers={"User-Agent": "Mozilla/5.0"}
+        )
         with urllib.request.urlopen(req, timeout=30) as r:
             txt = r.read().decode("utf-8", "replace")
-    except Exception:
+    except (urllib.error.URLError, TimeoutError, OSError):
         return {}
     seen, names = set(), []
     for path in re.findall(r"/asset/file/\S+?\.hwpx?", txt):
@@ -95,40 +98,65 @@ def hug_name_map(max_pages: int = 10) -> dict[str, str]:
     snm(base64 경로)의 파일명과 짝지어 되살린다.
     주의: 페이지는 EUC-KR, onm 은 CP949 퍼센트인코딩이다."""
     import base64
+    import binascii
+    import urllib.error
     import urllib.parse
     import urllib.request
+
     base = "https://www.khug.or.kr/hug/web/cs/cl/cscl000003.jsp"
     out: dict[str, str] = {}
     for pg in range(1, max_pages + 1):
         try:
-            req = urllib.request.Request(f"{base}?gotoPage={pg}",
-                                         headers={"User-Agent": "Mozilla/5.0"})
+            req = urllib.request.Request(
+                f"{base}?gotoPage={pg}", headers={"User-Agent": "Mozilla/5.0"}
+            )
             with urllib.request.urlopen(req, timeout=30) as r:
                 txt = r.read().decode("euc-kr", "replace")
-        except Exception:
+        except (urllib.error.URLError, TimeoutError, OSError):
             break
         links = re.findall(r"downLoad\.jsp\?[^\"'>]*", txt)
         if not links:
             break
         before = len(out)
         for l in links:
-            q = urllib.parse.parse_qs(
-                urllib.parse.urlparse("?" + l.split("?", 1)[1]).query)
+            q = urllib.parse.parse_qs(urllib.parse.urlparse("?" + l.split("?", 1)[1]).query)
             onm, snm = q.get("onm", [""])[0], q.get("snm", [""])[0]
             if not onm or not snm:
                 continue
             try:
-                path = urllib.parse.unquote(
-                    base64.b64decode(snm).decode("utf-8", "replace"))
+                path = urllib.parse.unquote(base64.b64decode(snm).decode("utf-8", "replace"))
                 name = urllib.parse.unquote(onm, encoding="cp949", errors="strict")
-            except Exception:
+            except (binascii.Error, UnicodeDecodeError, UnicodeEncodeError, ValueError):
                 continue
-            key = Path(path).stem            # 예: 35045_attachfile2_1
+            key = Path(path).stem  # 예: 35045_attachfile2_1
             if key and KO.search(name):
                 out[key] = Path(name).stem
         if len(out) == before:
             break
     return out
+
+
+def _repair_one_row(r, nmap: dict, con: sqlite3.Connection, dry_run: bool) -> bool:
+    cur = r["name"] or ""
+    if KO.search(cur):
+        return False  # 이미 정상
+    stem = re.sub(r"\.hwpx?$", "", cur, flags=re.I)
+    # 전체 stem 우선 조회. 없을 때만 변환기 중복 접미(_크기)를 떼고 재시도
+    # (먼저 떼면 '10_kgs_10' 같은 정상 stem 이 '10_kgs' 로 망가진다)
+    # 조회 후보: 전체 stem → 순번접두 제거 → 변환기 중복접미 제거
+    # (먼저 접미를 떼면 '10_kgs_10' 같은 정상 stem 이 망가진다)
+    cands = [
+        stem,
+        re.sub(r"^\d+_", "", stem),
+        re.sub(r"_\d+$", "", stem),
+        re.sub(r"_\d+$", "", re.sub(r"^\d+_", "", stem)),
+    ]
+    new = next((nmap[c] for c in cands if c in nmap), None)
+    if not new:
+        return False
+    if not dry_run:
+        con.execute("UPDATE forms SET name=? WHERE form_id=?", (new + ".hwpx", r["form_id"]))
+    return True
 
 
 def repair(inst_codes: list[str], *, dry_run: bool = False) -> dict:
@@ -148,42 +176,24 @@ def repair(inst_codes: list[str], *, dry_run: bool = False) -> dict:
             "SELECT form_id, name, source_path FROM forms WHERE source_path LIKE ?",
             (f"%/{code}_hwpx/%",),
         ).fetchall()
-        fixed = 0
-        for r in rows:
-            cur = r["name"] or ""
-            if KO.search(cur):
-                continue                      # 이미 정상
-            stem = re.sub(r"\.hwpx?$", "", cur, flags=re.I)
-            # 전체 stem 우선 조회. 없을 때만 변환기 중복 접미(_크기)를 떼고 재시도
-            # (먼저 떼면 '10_kgs_10' 같은 정상 stem 이 '10_kgs' 로 망가진다)
-            # 조회 후보: 전체 stem → 순번접두 제거 → 변환기 중복접미 제거
-            # (먼저 접미를 떼면 '10_kgs_10' 같은 정상 stem 이 망가진다)
-            cands = [stem,
-                     re.sub(r"^\d+_", "", stem),
-                     re.sub(r"_\d+$", "", stem),
-                     re.sub(r"_\d+$", "", re.sub(r"^\d+_", "", stem))]
-            new = next((nmap[c] for c in cands if c in nmap), None)
-            if not new:
-                continue
-            if not dry_run:
-                con.execute("UPDATE forms SET name=? WHERE form_id=?",
-                            (new + ".hwpx", r["form_id"]))
-            fixed += 1
+        fixed = sum(1 for r in rows if _repair_one_row(r, nmap, con, dry_run))
         if fixed:
             per_inst[code] = fixed
             total_fixed += fixed
     if not dry_run:
         con.commit()
     con.close()
-    return {"totalFixed": total_fixed, "perInstitution": per_inst,
-            "dryRun": dry_run}
+    return {"totalFixed": total_fixed, "perInstitution": per_inst, "dryRun": dry_run}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--institutions", default="nhis,nps,comwel,lh,kogas,kodit,"
-                    "kosaf,hira,kibo,cak,cu,kgs,kalis,koelsa,keco,kotsa,kinfa,"
-                    "hug,hf,kamco,ccrs,ksure,kepco")
+    ap.add_argument(
+        "--institutions",
+        default="nhis,nps,comwel,lh,kogas,kodit,"
+        "kosaf,hira,kibo,cak,cu,kgs,kalis,koelsa,keco,kotsa,kinfa,"
+        "hug,hf,kamco,ccrs,ksure,kepco",
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     codes = [c.strip() for c in args.institutions.split(",") if c.strip()]

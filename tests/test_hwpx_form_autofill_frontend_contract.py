@@ -10,7 +10,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -204,7 +203,7 @@ def test_T19_api_route_tests_pass():
     r = subprocess.run(
         [sys.executable, "-m", "pytest",
          "tests/test_hwpx_form_autofill_api_route.py", "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -222,7 +221,7 @@ def test_T20_e2e_chain_tests_pass():
          "tests/test_hwpx_form_writer_final_export_gate.py",
          "tests/test_hwpx_form_writer_download_review.py",
          "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -240,7 +239,7 @@ def test_T21_upstream_tests_pass():
          "tests/test_hwpx_review_panel.py",
          "tests/test_hwpx_form_field_mapping.py",
          "-q", "--tb=no"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(Path(__file__).parent.parent),
     )
     assert r.returncode == 0, r.stdout + r.stderr

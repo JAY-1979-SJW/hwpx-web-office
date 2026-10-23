@@ -19,11 +19,15 @@ def _gradlew_path() -> Path:
 
 def _roundtrip_env() -> dict[str, str]:
     env = os.environ.copy()
-    env.setdefault("GRADLE_USER_HOME", str(Path(tempfile.gettempdir()) / "office-analysis-gradle-home"))
+    env.setdefault(
+        "GRADLE_USER_HOME", str(Path(tempfile.gettempdir()) / "office-analysis-gradle-home")
+    )
     return env
 
 
-def _expected_found(response: dict[str, Any], expected_values: list[str]) -> tuple[list[str], list[str]]:
+def _expected_found(
+    response: dict[str, Any], expected_values: list[str]
+) -> tuple[list[str], list[str]]:
     full_text = str(response.get("fullText", ""))
     found = [value for value in expected_values if value in full_text]
     missing = [value for value in expected_values if value not in full_text]
@@ -38,7 +42,7 @@ def _list_strings(values: Any) -> list[str]:
     return [str(value) for value in values if str(value)]
 
 
-def run_java_roundtrip(
+def run_java_roundtrip(  # ruff: ignore[too-many-arguments] -- 테스트 커버리지 없어 시그니처 재구성 보류, 전부 keyword-only 라 가독성 문제는 적음
     hwpx_path: Path,
     *,
     expected_values: list[str] | None = None,
@@ -50,7 +54,9 @@ def run_java_roundtrip(
 ) -> dict[str, Any]:
     """Run the Java parser CLI for one HWPX file and summarize the result."""
     expected = _list_strings(expected_values)
-    parser_text_expected = _list_strings(parser_text_expected_values if parser_text_expected_values is not None else expected)
+    parser_text_expected = _list_strings(
+        parser_text_expected_values if parser_text_expected_values is not None else expected
+    )
     package_expected = _list_strings(package_expected_values)
     metadata_expected = _list_strings(metadata_expected_values)
     output_json = out_json or hwpx_path.with_suffix(".java_roundtrip.json")
@@ -59,8 +65,8 @@ def run_java_roundtrip(
         str(gradlew),
         "parseHwpxCli",
         "-PskipGitHooks=true",
-        f"-Pinput={str(hwpx_path)}",
-        f"-Poutput={str(output_json)}",
+        f"-Pinput={hwpx_path!s}",
+        f"-Poutput={output_json!s}",
     ]
     report: dict[str, Any] = {
         "status": "FAIL",
@@ -88,15 +94,13 @@ def run_java_roundtrip(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        report.update(
-            {
-                "status": "FAIL",
-                "error": "JAVA_ROUNDTRIP_TIMEOUT",
-                "timeout_sec": timeout_sec,
-                "stdout": exc.stdout or "",
-                "stderr": exc.stderr or "",
-            }
-        )
+        report.update({
+            "status": "FAIL",
+            "error": "JAVA_ROUNDTRIP_TIMEOUT",
+            "timeout_sec": timeout_sec,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        })
         return report
 
     report["returncode"] = proc.returncode
@@ -110,25 +114,23 @@ def run_java_roundtrip(
     found, missing = _expected_found(response, parser_text_expected)
     diagnostics = response.get("diagnostics") or {}
     ok = bool(response.get("ok")) and proc.returncode == 0
-    report.update(
-        {
-            "status": "PASS" if ok and not missing else "WARN" if ok else "FAIL",
-            "parse_ok": bool(response.get("ok")),
-            "paragraph_count": len(response.get("paragraphs") or []),
-            "table_count": len(response.get("tables") or []),
-            "semantic_sections_count": len(response.get("semanticSections") or []),
-            "extracted_fields_count": len(response.get("extractedFields") or []),
-            "diagnostics_exists": bool(diagnostics),
-            "quality_score": diagnostics.get("qualityScore") if isinstance(diagnostics, dict) else None,
-            "expected_values_found": found,
-            "missing_expected_values": missing,
-            "parser_text_expected_count": len(parser_text_expected),
-            "package_expected_count": len(package_expected),
-            "metadata_expected_count": len(metadata_expected),
-            "error_count": response.get("errorCount"),
-            "warning_count": response.get("warningCount"),
-        }
-    )
+    report.update({
+        "status": "PASS" if ok and not missing else "WARN" if ok else "FAIL",
+        "parse_ok": bool(response.get("ok")),
+        "paragraph_count": len(response.get("paragraphs") or []),
+        "table_count": len(response.get("tables") or []),
+        "semantic_sections_count": len(response.get("semanticSections") or []),
+        "extracted_fields_count": len(response.get("extractedFields") or []),
+        "diagnostics_exists": bool(diagnostics),
+        "quality_score": diagnostics.get("qualityScore") if isinstance(diagnostics, dict) else None,
+        "expected_values_found": found,
+        "missing_expected_values": missing,
+        "parser_text_expected_count": len(parser_text_expected),
+        "package_expected_count": len(package_expected),
+        "metadata_expected_count": len(metadata_expected),
+        "error_count": response.get("errorCount"),
+        "warning_count": response.get("warningCount"),
+    })
     return report
 
 
@@ -205,7 +207,9 @@ def csv_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Java HwpxParser roundtrip for generated HWPX files")
+    parser = argparse.ArgumentParser(
+        description="Run Java HwpxParser roundtrip for generated HWPX files"
+    )
     parser.add_argument("--items-json", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--report-json")
@@ -213,7 +217,9 @@ def main() -> int:
     parser.add_argument("--timeout-sec", type=int, default=120)
     args = parser.parse_args()
 
-    report = run_many_java_roundtrips(_items_from_json(Path(args.items_json)), Path(args.out_dir), timeout_sec=args.timeout_sec)
+    report = run_many_java_roundtrips(
+        _items_from_json(Path(args.items_json)), Path(args.out_dir), timeout_sec=args.timeout_sec
+    )
     if args.report_json:
         write_json(Path(args.report_json), report)
     if args.report_csv:

@@ -15,7 +15,7 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-BASELINE_COMMIT = "334d665"
+BASELINE_COMMIT = "84f6345"  # 웹뷰어 JS/HTML 품질수정(ESLint/html-validate) 준공 후 갱신 (334d665 → 84f6345)
 
 SCOPE_REASON_VALUES = [
     "HEADER_SCOPE_NOT_SUPPORTED",
@@ -67,10 +67,8 @@ def _check_model_constants() -> list[dict]:
                          "detail": str(path.relative_to(PR))})
         return findings
     src = path.read_text(encoding="utf-8")
-    for val in SCOPE_REASON_VALUES:
-        if val not in src:
-            findings.append({"code": "REASON_CONSTANT_MISSING",
-                             "level": "FAIL", "detail": val})
+    findings.extend({"code": "REASON_CONSTANT_MISSING",
+                             "level": "FAIL", "detail": val} for val in SCOPE_REASON_VALUES if val not in src)
     return findings
 
 
@@ -81,10 +79,8 @@ def _check_js_helper() -> list[dict]:
     if "_scopeBoundaryRejectReason" not in src:
         findings.append({"code": "SCOPE_HELPER_MISSING", "level": "FAIL",
                          "detail": "_scopeBoundaryRejectReason"})
-    for val in SCOPE_REASON_VALUES:
-        if val not in src:
-            findings.append({"code": "JS_REASON_MISSING",
-                             "level": "FAIL", "detail": val})
+    findings.extend({"code": "JS_REASON_MISSING",
+                             "level": "FAIL", "detail": val} for val in SCOPE_REASON_VALUES if val not in src)
     return findings
 
 
@@ -144,10 +140,8 @@ def _check_js_smoke() -> list[dict]:
             findings.append({"code": "JS_SMOKE_FAIL", "level": "FAIL",
                              "detail": out})
         checks = out.get("checks", {})
-        for name in REQUIRED_SMOKE_CHECKS:
-            if not checks.get(name, {}).get("ok"):
-                findings.append({"code": "SMOKE_CHECK_FAIL",
-                                 "level": "FAIL", "detail": name})
+        findings.extend({"code": "SMOKE_CHECK_FAIL",
+                                 "level": "FAIL", "detail": name} for name in REQUIRED_SMOKE_CHECKS if not checks.get(name, {}).get("ok"))
     except Exception as e:
         findings.append({"code": "JS_SMOKE_ERROR", "level": "FAIL",
                          "detail": str(e)})

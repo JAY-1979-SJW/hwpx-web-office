@@ -92,7 +92,7 @@ locked = [
 for f in locked:
     r = subprocess.run(
         ["git", "diff", BASELINE_COMMIT, "--", f],
-        capture_output=True, text=True, cwd=str(PR),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR),
     )
     if r.stdout.strip():
         _ok(f"changed_{Path(f).name}")
@@ -103,7 +103,7 @@ for f in locked:
 print("\n[6] staged 파일 0개")
 r = subprocess.run(
     ["git", "diff", "--cached", "--name-only"],
-    capture_output=True, text=True, cwd=str(PR),
+    capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR),
 )
 staged = [l for l in r.stdout.strip().splitlines() if l]
 if not staged:
@@ -120,7 +120,7 @@ if not node:
 else:
     r = subprocess.run(
         [node, str(_SMOKE_MJS)],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
     )
     if r.returncode == 0:
         data = json.loads(r.stdout)
@@ -146,7 +146,7 @@ print("\n[8] Python tests")
 r = subprocess.run(
     [sys.executable, "-m", "pytest",
      str(_TEST_PY), "-q", "--tb=short"],
-    capture_output=True, text=True, timeout=120,
+    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
     cwd=str(PR),
 )
 lines = r.stdout.strip().splitlines()

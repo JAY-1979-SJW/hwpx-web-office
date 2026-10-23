@@ -23,12 +23,13 @@
 - AI API / OCR 미참조. 값은 호출자가 `values_by_field`로 주입.
 - raw 개인정보 저장 안 함 — 템플릿에는 셀 좌표·필드키·라벨만.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -41,12 +42,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_TEMPLATE_DIR = PROJECT_ROOT / "data" / "drafts" / "form_templates"
 
 # 채움 계획 상태
-PLAN_READY = "READY"                       # 모든 필수 필드 값 있음
-PLAN_NEEDS_INPUT = "NEEDS_INPUT"           # 필수 필드 값 누락
+PLAN_READY = "READY"  # 모든 필수 필드 값 있음
+PLAN_NEEDS_INPUT = "NEEDS_INPUT"  # 필수 필드 값 누락
 PLAN_FINGERPRINT_MISMATCH = "FINGERPRINT_MISMATCH"  # 구조 불일치 — 채움 거부
 
 
 # ── 데이터 클래스 ─────────────────────────────────────────────────────
+
 
 @dataclass
 class CellTarget:
@@ -65,12 +67,13 @@ class CellTarget:
 @dataclass
 class FieldBinding:
     """셋팅 시 확정된 필드↔셀 바인딩."""
+
     fieldKey: str
     label: str
     target: CellTarget
     required: bool = False
-    confirmed: bool = False       # 사람이 셋팅 시 확인함
-    valueSourceHint: str = ""     # 예: "사업자등록증"
+    confirmed: bool = False  # 사람이 셋팅 시 확인함
+    valueSourceHint: str = ""  # 예: "사업자등록증"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -104,26 +107,28 @@ class FormTemplate:
         }
 
     @staticmethod
-    def from_dict(d: dict[str, Any]) -> "FormTemplate":
+    def from_dict(d: dict[str, Any]) -> FormTemplate:
         bindings = []
         for b in d.get("bindings", []):
             tgt = b.get("target", {})
-            bindings.append(FieldBinding(
-                fieldKey=b["fieldKey"],
-                label=b.get("label", ""),
-                target=CellTarget(
-                    tableId=tgt.get("tableId", ""),
-                    row=int(tgt.get("row", 0)),
-                    col=int(tgt.get("col", 0)),
-                    visualRow=int(tgt.get("visualRow", 0)),
-                    visualCol=int(tgt.get("visualCol", 0)),
-                    rowSpan=int(tgt.get("rowSpan", 1)),
-                    colSpan=int(tgt.get("colSpan", 1)),
-                ),
-                required=bool(b.get("required", False)),
-                confirmed=bool(b.get("confirmed", False)),
-                valueSourceHint=b.get("valueSourceHint", ""),
-            ))
+            bindings.append(
+                FieldBinding(
+                    fieldKey=b["fieldKey"],
+                    label=b.get("label", ""),
+                    target=CellTarget(
+                        tableId=tgt.get("tableId", ""),
+                        row=int(tgt.get("row", 0)),
+                        col=int(tgt.get("col", 0)),
+                        visualRow=int(tgt.get("visualRow", 0)),
+                        visualCol=int(tgt.get("visualCol", 0)),
+                        rowSpan=int(tgt.get("rowSpan", 1)),
+                        colSpan=int(tgt.get("colSpan", 1)),
+                    ),
+                    required=bool(b.get("required", False)),
+                    confirmed=bool(b.get("confirmed", False)),
+                    valueSourceHint=b.get("valueSourceHint", ""),
+                )
+            )
         return FormTemplate(
             templateId=d["templateId"],
             formName=d.get("formName", ""),
@@ -177,6 +182,7 @@ class FillPlan:
 # 표 역할 맵 + 슬롯 라벨/위치를 정렬해 SHA-256으로 요약한다.
 # 라벨 텍스트나 좌표가 달라지면 지문이 바뀌어 블라인드 채움을 막는다.
 
+
 def compute_structure_fingerprint(recognition_result) -> str:
     """FormRecognitionResult에서 구조 지문을 산출한다."""
     table_roles = getattr(recognition_result, "tableRoles", None)
@@ -206,7 +212,8 @@ def compute_structure_fingerprint(recognition_result) -> str:
 
 # ── 셋팅: 인식 결과 → 템플릿 ─────────────────────────────────────────
 
-def build_template_from_recognition(
+
+def build_template_from_recognition(  # ruff: ignore[too-many-arguments] (여러 테스트 파일에서 키워드 인자로 호출 — 시그니처 변경 보류)
     *,
     form_name: str,
     recognition_result,
@@ -227,9 +234,14 @@ def build_template_from_recognition(
     required = required_field_keys or set()
     value_hints = value_hints or {}
 
-    excluded = list(getattr(recognition_result, "unsafeTableIds", None)
-                    or (recognition_result.get("unsafeTableIds", [])
-                        if isinstance(recognition_result, dict) else []))
+    excluded = list(
+        getattr(recognition_result, "unsafeTableIds", None)
+        or (
+            recognition_result.get("unsafeTableIds", [])
+            if isinstance(recognition_result, dict)
+            else []
+        )
+    )
     excluded_set = set(excluded)
 
     slots = getattr(recognition_result, "enhancedSlots", None)
@@ -245,9 +257,10 @@ def build_template_from_recognition(
     bindings: list[FieldBinding] = []
     seen_keys: set[str] = set()
     for s in slots:
-        def _g(name, default=None):
-            return (getattr(s, name, default) if not isinstance(s, dict)
-                    else s.get(name, default))
+
+        def _g(name, default=None, s=s):
+            return getattr(s, name, default) if not isinstance(s, dict) else s.get(name, default)
+
         tid = _g("tableId", "")
         if tid in excluded_set:
             continue  # 안전 제외 표는 바인딩하지 않음
@@ -259,24 +272,26 @@ def build_template_from_recognition(
         if confirmed is not None and field_key not in confirmed:
             continue
         seen_keys.add(field_key)
-        bindings.append(FieldBinding(
-            fieldKey=field_key,
-            label=_g("labelText", ""),
-            target=CellTarget(
-                tableId=tid,
-                row=int(_g("row", 0) or 0),
-                col=int(_g("col", 0) or 0),
-                visualRow=int(_g("visualRow", 0) or 0),
-                visualCol=int(_g("visualCol", 0) or 0),
-                rowSpan=int(_g("rowSpan", 1) or 1),
-                colSpan=int(_g("colSpan", 1) or 1),
-            ),
-            required=field_key in required,
-            confirmed=confirmed is not None,
-            valueSourceHint=value_hints.get(field_key, ""),
-        ))
+        bindings.append(
+            FieldBinding(
+                fieldKey=field_key,
+                label=_g("labelText", ""),
+                target=CellTarget(
+                    tableId=tid,
+                    row=int(_g("row", 0) or 0),
+                    col=int(_g("col", 0) or 0),
+                    visualRow=int(_g("visualRow", 0) or 0),
+                    visualCol=int(_g("visualCol", 0) or 0),
+                    rowSpan=int(_g("rowSpan", 1) or 1),
+                    colSpan=int(_g("colSpan", 1) or 1),
+                ),
+                required=field_key in required,
+                confirmed=confirmed is not None,
+                valueSourceHint=value_hints.get(field_key, ""),
+            )
+        )
 
-    ref = now or datetime.now(timezone.utc)
+    ref = now or datetime.now(UTC)
     return FormTemplate(
         templateId=template_id or f"tpl_{uuid4().hex[:12]}",
         formName=form_name,
@@ -290,18 +305,16 @@ def build_template_from_recognition(
 
 # ── 저장·로드 ─────────────────────────────────────────────────────────
 
-def save_template(template: FormTemplate,
-                  template_dir: str | Path | None = None) -> Path:
+
+def save_template(template: FormTemplate, template_dir: str | Path | None = None) -> Path:
     directory = Path(template_dir) if template_dir else _DEFAULT_TEMPLATE_DIR
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{template.templateId}.json"
-    path.write_text(json.dumps(template.to_dict(), ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+    path.write_text(json.dumps(template.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 
-def load_template(template_id: str,
-                  template_dir: str | Path | None = None) -> FormTemplate | None:
+def load_template(template_id: str, template_dir: str | Path | None = None) -> FormTemplate | None:
     directory = Path(template_dir) if template_dir else _DEFAULT_TEMPLATE_DIR
     path = directory / f"{template_id}.json"
     if not path.exists():
@@ -329,6 +342,7 @@ def find_template_by_fingerprint(
 
 # ── 채움: 템플릿 + 값 → FillPlan ─────────────────────────────────────
 
+
 def apply_template(
     template: FormTemplate,
     values_by_field: dict[str, str],
@@ -342,8 +356,7 @@ def apply_template(
         uploaded_recognition: 지정 시 업로드 서식의 구조 지문을 템플릿과 대조.
             불일치면 상태 FINGERPRINT_MISMATCH로 채움을 거부한다(안전).
     """
-    plan = FillPlan(templateId=template.templateId,
-                    formName=template.formName, status=PLAN_READY)
+    plan = FillPlan(templateId=template.templateId, formName=template.formName, status=PLAN_READY)
 
     # 구조 대조 — 다른 서식에 블라인드 채움 방지
     if uploaded_recognition is not None:
@@ -362,15 +375,17 @@ def apply_template(
             if b.required:
                 plan.missingRequired.append(b.fieldKey)
             continue
-        plan.cellWrites.append(CellWrite(
-            tableId=b.target.tableId,
-            row=b.target.row,
-            col=b.target.col,
-            visualRow=b.target.visualRow,
-            visualCol=b.target.visualCol,
-            fieldKey=b.fieldKey,
-            value=str(value),
-        ))
+        plan.cellWrites.append(
+            CellWrite(
+                tableId=b.target.tableId,
+                row=b.target.row,
+                col=b.target.col,
+                visualRow=b.target.visualRow,
+                visualCol=b.target.visualCol,
+                fieldKey=b.fieldKey,
+                value=str(value),
+            )
+        )
 
     if plan.missingRequired:
         plan.status = PLAN_NEEDS_INPUT
@@ -378,6 +393,7 @@ def apply_template(
 
 
 # ── snapshot ─────────────────────────────────────────────────────────
+
 
 def dump_contract_snapshot() -> dict[str, Any]:
     return {

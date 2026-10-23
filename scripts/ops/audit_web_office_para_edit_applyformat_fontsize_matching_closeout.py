@@ -1,11 +1,12 @@
-﻿"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-CLOSEOUT-01.
+"""WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-CLOSEOUT-01.
 
 fontSize existing charPr matching 부분 준공 동결의 정적 검증.
 """
+
 from __future__ import annotations
+
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,9 +15,12 @@ PR = Path(__file__).resolve().parents[2]
 if str(PR) not in sys.path:
     sys.path.insert(0, str(PR))
 
-CLOSEOUT_DOC = (PR / "docs/architecture/"
-                   "web_office_para_edit_applyformat_fontsize_matching_closeout.md")
-BASELINE_COMMIT = "b992ad6"  # 중첩표 읽기/쓰기 대칭 준공 후 갱신 (f119308 → b992ad6)
+from scripts.ops import ops_common_checks as occ
+
+CLOSEOUT_DOC = (
+    PR / "docs/architecture/web_office_para_edit_applyformat_fontsize_matching_closeout.md"
+)
+BASELINE_COMMIT = "3114298"  # B608/B314 보안수정 + 9단계 AI 리뷰 준공 후 갱신 (84f6345 → 3114298)
 
 DOC_REQUIRED_IN_SCOPE = [
     "matchAxisChange",
@@ -107,74 +111,52 @@ FORBIDDEN_AUDIT_WRITER_SYMBOLS = [
 ]
 
 
+def _missing_phrase_findings(src: str, phrases: list[str], code: str) -> list[dict]:
+    return [
+        {"code": code, "level": "FAIL", "detail": phrase} for phrase in phrases if phrase not in src
+    ]
+
+
 def _check_required_doc() -> list[dict]:
     findings: list[dict] = []
     if not CLOSEOUT_DOC.is_file():
-        findings.append({"code": "MISSING_DOC", "level": "FAIL",
-                          "detail": str(CLOSEOUT_DOC.relative_to(PR))})
+        findings.append({
+            "code": "MISSING_DOC",
+            "level": "FAIL",
+            "detail": str(CLOSEOUT_DOC.relative_to(PR)),
+        })
         return findings
     src = CLOSEOUT_DOC.read_text(encoding="utf-8")
-    for phrase in DOC_REQUIRED_IN_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_IN_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_OUT_OF_SCOPE:
-        if phrase not in src:
-            findings.append({"code": "DOC_OUT_OF_SCOPE_PHRASE_MISSING",
-                              "level": "FAIL", "detail": phrase})
-    for phrase in DOC_REQUIRED_NEXT_PROCESSES:
-        if phrase not in src:
-            findings.append({"code": "DOC_NEXT_PROCESS_MISSING",
-                              "level": "FAIL", "detail": phrase})
+    findings += _missing_phrase_findings(src, DOC_REQUIRED_IN_SCOPE, "DOC_IN_SCOPE_PHRASE_MISSING")
+    findings += _missing_phrase_findings(
+        src, DOC_REQUIRED_OUT_OF_SCOPE, "DOC_OUT_OF_SCOPE_PHRASE_MISSING"
+    )
+    findings += _missing_phrase_findings(
+        src, DOC_REQUIRED_NEXT_PROCESSES, "DOC_NEXT_PROCESS_MISSING"
+    )
     if BASELINE_COMMIT not in src:
-        findings.append({"code": "DOC_BASELINE_MISSING",
-                          "level": "FAIL",
-                          "detail": f"baseline {BASELINE_COMMIT}"})
-    for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES:
-        name = Path(rel).name
-        if name not in src:
-            findings.append({"code": "DOC_FILE_NOT_LISTED",
-                              "level": "FAIL", "detail": name})
+        findings.append({
+            "code": "DOC_BASELINE_MISSING",
+            "level": "FAIL",
+            "detail": f"baseline {BASELINE_COMMIT}",
+        })
+    required_names = [Path(rel).name for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES]
+    findings += _missing_phrase_findings(src, required_names, "DOC_FILE_NOT_LISTED")
     return findings
 
 
 def _check_required_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES:
-        if not (PR / rel).is_file():
-            findings.append({"code": "MISSING_FILE", "level": "FAIL",
-                              "detail": rel})
+    findings: list[dict] = [{"code": "MISSING_FILE", "level": "FAIL", "detail": rel} for rel in REQUIRED_TESTS + REQUIRED_JS_SMOKES if not (PR / rel).is_file()]
     return findings
 
 
 def _check_locked_files() -> list[dict]:
-    findings: list[dict] = []
-    for rel in LOCKED_FILES_VS_BASELINE:
-        try:
-            r = subprocess.run(
-                ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
-                              "detail": f"{rel}: {e}"})
-            continue
-        if r.returncode != 0:
-            findings.append({"code": "GIT_DIFF_RC", "level": "WARN",
-                              "detail": f"{rel}: rc={r.returncode}"})
-            continue
-        if r.stdout.strip():
-            findings.append({"code": "LOCKED_FILE_CHANGED",
-                              "level": "FAIL", "detail": rel})
-    return findings
+    return occ.check_locked_files(LOCKED_FILES_VS_BASELINE, BASELINE_COMMIT, PR)
 
 
 def _check_audit_no_writer_calls() -> list[dict]:
-    findings: list[dict] = []
     me = Path(__file__).read_text(encoding="utf-8")
-    for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS:
-        if re.search(sym, me):
-            findings.append({"code": "AUDIT_FORBIDDEN_WRITER_CALL",
-                              "level": "FAIL", "detail": sym})
+    findings: list[dict] = [{"code": "AUDIT_FORBIDDEN_WRITER_CALL", "level": "FAIL", "detail": sym} for sym in FORBIDDEN_AUDIT_WRITER_SYMBOLS if re.search(sym, me)]
     return findings
 
 
@@ -187,8 +169,7 @@ def audit() -> dict[str, Any]:
     fail = [f for f in findings if f["level"] == "FAIL"]
     warn = [f for f in findings if f["level"] == "WARN"]
     return {
-        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-"
-                          "FONTSIZE-MATCHING-CLOSEOUT-01",
+        "audit": "WEB-OFFICE-PARA-EDIT-APPLYFORMAT-FONTSIZE-MATCHING-CLOSEOUT-01",
         "baseline": BASELINE_COMMIT,
         "findings": findings,
         "verdict": "FAIL" if fail else ("WARN" if warn else "PASS"),

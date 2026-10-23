@@ -254,7 +254,7 @@ def test_js_smoke_pass():
     result = subprocess.run(
         ["node", str(_SMOKE_MJS)],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
@@ -287,7 +287,7 @@ def test_regression_existing_para_edit_tests_pass():
             "--tb=short",
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=120,
         cwd=str(PR),
     )
@@ -303,7 +303,7 @@ def test_git_diff_check():
     result = subprocess.run(
         ["git", "diff", "--check", "HEAD"],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         cwd=str(PR),
     )
     assert result.returncode == 0, result.stdout + result.stderr

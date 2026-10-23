@@ -18,7 +18,7 @@ def _current_crontab() -> list[str]:
     result = subprocess.run(
         ["crontab", "-l"],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=False,
     )
     if result.returncode != 0:
@@ -31,7 +31,7 @@ def _install(lines: list[str]) -> None:
     subprocess.run(
         ["crontab", "-"],
         input=payload,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=True,
     )
 

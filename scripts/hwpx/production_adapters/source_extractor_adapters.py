@@ -10,7 +10,6 @@ env unset 시: AdapterDisabled raise → source_extractor가 skipped로 처리 (
 """
 from __future__ import annotations
 
-from typing import Any
 
 from . import adapter_contract as ac
 
@@ -21,7 +20,8 @@ def kprc_extractor(source: dict, target_labels: list[str]) -> list[dict]:
     sourceType: 'kprc'
     """
     ac.require_flag(ac.ENV_FLAG_KPRC)
-    # production에서 활성화 — `scripts.kprc_parse` 등 실제 파서 호출.
+    # production에서 활성화 — 실제 파서를 주입한다(KPRC 파서는 HWPX 범위 밖이라 저장소에서
+    # 제거됨, docs/deleted_code_index.md 참조).
     # 본 함수는 env unset 환경에서는 도달하지 않으므로 import도 lazy.
     raise NotImplementedError(
         "kprc extractor live invocation pending P14B-2 activation")

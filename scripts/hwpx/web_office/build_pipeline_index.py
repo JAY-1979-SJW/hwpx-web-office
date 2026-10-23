@@ -148,8 +148,7 @@ def write_index(rows: list[dict[str, Any]], *, out_dir: Path,
     cand_counts = Counter(r["candidacy"] for r in rows)
     lines = ["# 파이프라인 목차 (SQL 조인 — 재계산 없음, 문서 내용 기반 우선순위)",
              "", f"전체 {len(rows)}건", "", "## 단계 분포"]
-    for st in sorted(stage_counts):
-        lines.append(f"- {st}: {stage_counts[st]}건")
+    lines.extend(f"- {st}: {stage_counts[st]}건" for st in sorted(stage_counts))
     lines += ["", "## 우선순위 분류(내용 기반 — 이름 키워드 아님)"]
     for c in (CAND_REVIVABLE, CAND_DEAD_PROTECTED, CAND_LIVE, CAND_NO_SCHEMA):
         if cand_counts.get(c):

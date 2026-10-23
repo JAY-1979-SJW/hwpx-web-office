@@ -6,29 +6,42 @@ from typing import Any
 
 from hwpx_table_cell_address_style import normalize_cell_address
 
-
 VERT_ALIGN_VALUES = {"TOP", "CENTER", "BOTTOM"}
 TEXT_DIRECTION_VALUES = {"HORIZONTAL", "VERTICAL"}
 LINE_WRAP_VALUES = {"BREAK", "SQUEEZE"}
 MARGIN_FIELDS = ("left", "right", "top", "bottom")
 
 
-def _enum_value(value: Any, field: str, allowed: set[str], warnings: list[dict[str, Any]]) -> str | None:
+def _enum_value(
+    value: Any, field: str, allowed: set[str], warnings: list[dict[str, Any]]
+) -> str | None:
     normalized = str(value).strip().upper()
     if normalized not in allowed:
-        warnings.append({"type": "TABLE_CELL_LAYOUT_VALUE_IGNORED", "field": field, "value": value, "allowed": sorted(allowed)})
+        warnings.append({
+            "type": "TABLE_CELL_LAYOUT_VALUE_IGNORED",
+            "field": field,
+            "value": value,
+            "allowed": sorted(allowed),
+        })
         return None
     return normalized
 
 
-def _positive_int(value: Any, field: str, warnings: list[dict[str, Any]], min_value: int = 0) -> str | None:
+def _positive_int(
+    value: Any, field: str, warnings: list[dict[str, Any]], min_value: int = 0
+) -> str | None:
     try:
         number = int(value)
     except (TypeError, ValueError):
         warnings.append({"type": "TABLE_CELL_LAYOUT_VALUE_IGNORED", "field": field, "value": value})
         return None
     if number < min_value:
-        warnings.append({"type": "TABLE_CELL_LAYOUT_VALUE_IGNORED", "field": field, "value": value, "min": min_value})
+        warnings.append({
+            "type": "TABLE_CELL_LAYOUT_VALUE_IGNORED",
+            "field": field,
+            "value": value,
+            "min": min_value,
+        })
         return None
     return str(number)
 
@@ -62,7 +75,11 @@ def _address_value_map(
     for address, value in raw.items():
         normalized_address = normalize_cell_address(address)
         if normalized_address is None:
-            warnings.append({"type": "CELL_LAYOUT_ADDRESS_INVALID", "field": field, "address": address})
+            warnings.append({
+                "type": "CELL_LAYOUT_ADDRESS_INVALID",
+                "field": field,
+                "address": address,
+            })
             continue
         normalized_value = normalizer(value, f"{field}.{address}")
         if normalized_value is not None:
@@ -70,13 +87,11 @@ def _address_value_map(
     return result
 
 
-def table_cell_layout_refs(style: dict[str, Any] | None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    if not style:
-        return {}, []
+def _scalar_cell_refs(style: dict[str, Any], warnings: list[dict[str, Any]]) -> dict[str, Any]:
     refs: dict[str, Any] = {}
-    warnings: list[dict[str, Any]] = []
-
-    vert_align = style.get("cell_vertical_align", style.get("vertical_align", style.get("vert_align")))
+    vert_align = style.get(
+        "cell_vertical_align", style.get("vertical_align", style.get("vert_align"))
+    )
     if vert_align is not None:
         value = _enum_value(vert_align, "cell_vertical_align", VERT_ALIGN_VALUES, warnings)
         if value is not None:
@@ -91,10 +106,18 @@ def table_cell_layout_refs(style: dict[str, Any] | None) -> tuple[dict[str, Any]
         value = _enum_value(line_wrap, "cell_line_wrap", LINE_WRAP_VALUES, warnings)
         if value is not None:
             refs["cellLineWrap"] = value
-    margin = _margin_refs(style.get("cell_margin"), "cell_margin", warnings) if "cell_margin" in style else None
+    margin = (
+        _margin_refs(style.get("cell_margin"), "cell_margin", warnings)
+        if "cell_margin" in style
+        else None
+    )
     if margin:
         refs["cellMargin"] = margin
+    return refs
 
+
+def _map_cell_refs(style: dict[str, Any], warnings: list[dict[str, Any]]) -> dict[str, Any]:
+    refs: dict[str, Any] = {}
     vert_map = _address_value_map(
         style.get("cell_vertical_align_map"),
         "cell_vertical_align_map",
@@ -127,6 +150,16 @@ def table_cell_layout_refs(style: dict[str, Any] | None) -> tuple[dict[str, Any]
     )
     if margin_map:
         refs["cellMarginMap"] = margin_map
+    return refs
+
+
+def table_cell_layout_refs(
+    style: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if not style:
+        return {}, []
+    warnings: list[dict[str, Any]] = []
+    refs: dict[str, Any] = {**_scalar_cell_refs(style, warnings), **_map_cell_refs(style, warnings)}
     return refs, warnings
 
 

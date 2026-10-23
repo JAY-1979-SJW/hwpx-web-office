@@ -42,7 +42,7 @@ def _run_pytest(paths: list[str], timeout: int = 300) -> dict[str, Any]:
         [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=timeout,
     )
     lines = [line.strip() for line in (result.stdout + "\n" + result.stderr).splitlines() if line.strip()]
@@ -257,8 +257,7 @@ def audit() -> dict[str, Any]:
         "",
         "## Checks",
     ]
-    for item in checks:
-        md.append(f"- {item['status']} {item['code']} {item['desc']}")
+    md.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in checks)
     (REPORT_DIR / "browser_smoke_summary.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
     return summary

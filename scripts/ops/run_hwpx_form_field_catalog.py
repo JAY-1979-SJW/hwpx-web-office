@@ -20,8 +20,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from hwpx.recognition_corpus.form_field_catalog import (
     build_catalog,
     build_summary,
-    FORM_TYPE_JSONL,
-    INPUT_CELLS_JSONL,
 )
 
 DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "reports" / "hwpx_form_field_catalog"

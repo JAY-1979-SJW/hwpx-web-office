@@ -1,10 +1,15 @@
+import xml.etree.ElementTree as ET
 from collections import Counter
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
-import xml.etree.ElementTree as ET
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 import hwp_full_fidelity_converter as full
+import hwp_full_fidelity_decoders as decoders
 import hwp_full_fidelity_package as full_package
 
 
@@ -33,7 +38,11 @@ def test_security_gate_blocks_forbidden_conversion_dependencies() -> None:
         ["scripts/hwpx/hwp_full_fidelity_converter.py"],
     )
     assert blocked["status"] == "FAIL"
-    assert {hit["key"] for hit in blocked["forbidden_hits"]} >= {"network_dependency", "hancom_runtime", "shell_execution"}
+    assert {hit["key"] for hit in blocked["forbidden_hits"]} >= {
+        "network_dependency",
+        "hancom_runtime",
+        "shell_execution",
+    }
 
     archive_gate = full.security_gate(
         "rewrite zip preview entries with path traversal guard",
@@ -111,22 +120,52 @@ def test_build_coverage_keeps_incomplete_document_properties_as_next_target() ->
 
 def test_docinfo_extension_tags_are_known_and_audited() -> None:
     records = [
-        {"index": 0, "tag_id": 30, "tag_name": "COMPATIBLE_DOCUMENT", "decoded": full.decode_known_record(30, b"\x02\x00\x00\x00")},
-        {"index": 1, "tag_id": 31, "tag_name": "LAYOUT_COMPATIBILITY", "decoded": full.decode_known_record(31, b"\x00" * 20)},
-        {"index": 2, "tag_id": 32, "tag_name": "TRACK_CHANGE", "decoded": full.decode_known_record(32, b"\x03\x00\x00\x00" + b"\x00" * 1028)},
-        {"index": 3, "tag_id": 92, "tag_name": "MEMO_SHAPE", "decoded": full.decode_known_record(92, b"\x00" * 22)},
-        {"index": 4, "tag_id": 94, "tag_name": "FORBIDDEN_CHAR", "decoded": full.decode_known_record(94, b"\x00" * 4)},
+        {
+            "index": 0,
+            "tag_id": 30,
+            "tag_name": "COMPATIBLE_DOCUMENT",
+            "decoded": decoders.decode_known_record(30, b"\x02\x00\x00\x00"),
+        },
+        {
+            "index": 1,
+            "tag_id": 31,
+            "tag_name": "LAYOUT_COMPATIBILITY",
+            "decoded": decoders.decode_known_record(31, b"\x00" * 20),
+        },
+        {
+            "index": 2,
+            "tag_id": 32,
+            "tag_name": "TRACK_CHANGE",
+            "decoded": decoders.decode_known_record(32, b"\x03\x00\x00\x00" + b"\x00" * 1028),
+        },
+        {
+            "index": 3,
+            "tag_id": 92,
+            "tag_name": "MEMO_SHAPE",
+            "decoded": decoders.decode_known_record(92, b"\x00" * 22),
+        },
+        {
+            "index": 4,
+            "tag_id": 94,
+            "tag_name": "FORBIDDEN_CHAR",
+            "decoded": decoders.decode_known_record(94, b"\x00" * 4),
+        },
     ]
     decoded = full.build_decoded_docinfo(records)
 
-    coverage = full.build_coverage(Counter({30: 1, 31: 1, 32: 1, 92: 1, 94: 1}), [], {"ok": True, "text": "body"}, decoded)
+    coverage = full.build_coverage(
+        Counter({30: 1, 31: 1, 32: 1, 92: 1, 94: 1}), [], {"ok": True, "text": "body"}, decoded
+    )
 
     assert coverage["unknown_tags"] == []
     assert "UNKNOWN_RECORD_TAGS" not in coverage["blockers"]
     assert coverage["docinfo_extension_coverage"]["status"] == "PASS"
     assert coverage["docinfo_extension_coverage"]["decoded_count"] == 5
     assert "PARTIAL:docinfo_extensions" not in coverage["blockers"]
-    assert any(row["family"] == "docinfo_extensions" and row["status"] == "AUDITED" for row in coverage["required_families"])
+    assert any(
+        row["family"] == "docinfo_extensions" and row["status"] == "AUDITED"
+        for row in coverage["required_families"]
+    )
 
 
 def test_build_coverage_treats_id_mappings_as_audited() -> None:
@@ -184,7 +223,9 @@ def test_build_coverage_keeps_mismatched_id_mappings_as_next_target() -> None:
     coverage = full.build_coverage(Counter({17: 1}), [], {"ok": True, "text": "body"}, decoded)
 
     assert coverage["id_mappings_coverage"]["status"] == "PARTIAL_ID_MAPPINGS"
-    assert coverage["id_mappings_coverage"]["mismatches"] == [{"key": "char_shape", "expected": 2, "actual": 1}]
+    assert coverage["id_mappings_coverage"]["mismatches"] == [
+        {"key": "char_shape", "expected": 2, "actual": 1}
+    ]
     assert any(row["tag_id"] == 17 for row in coverage["next_decoder_targets"])
 
 
@@ -193,7 +234,11 @@ def test_build_coverage_treats_matched_bindata_streams_as_audited() -> None:
         Counter({18: 1}),
         ["BinData/BIN0001.png"],
         {"ok": True, "text": "body"},
-        {"binary_data": [{"storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}]},
+        {
+            "binary_data": [
+                {"storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}
+            ]
+        },
     )
 
     assert coverage["bindata_stream_coverage"]["status"] == "PASS"
@@ -207,7 +252,11 @@ def test_build_coverage_keeps_unmatched_bindata_streams_as_next_target() -> None
         Counter({18: 1}),
         ["BinData/BIN0002.png"],
         {"ok": True, "text": "body"},
-        {"binary_data": [{"storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}]},
+        {
+            "binary_data": [
+                {"storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}
+            ]
+        },
     )
 
     assert coverage["bindata_stream_coverage"]["status"] == "PARTIAL_RECORD_STREAM_MISMATCH"
@@ -240,7 +289,9 @@ def test_docinfo_groups_face_names_by_id_mapping_language_slots() -> None:
 
     decoded = full.build_decoded_docinfo(records)
     mapping = full.build_fontface_mapping(decoded)
-    coverage = full.build_coverage(Counter({17: 1, 19: 3}), [], {"ok": True, "text": "body"}, decoded)
+    coverage = full.build_coverage(
+        Counter({17: 1, 19: 3}), [], {"ok": True, "text": "body"}, decoded
+    )
 
     assert [row["name"] for row in decoded["face_name_groups"]["hangul"]] == ["HangulA", "HangulB"]
     assert [row["name"] for row in decoded["face_name_groups"]["latin"]] == ["LatinA"]
@@ -266,7 +317,9 @@ def test_build_coverage_treats_resolved_para_shape_refs_as_audited() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({25: 2, 66: 2}), [], {"ok": True, "text": "body"}, decoded, body_layout)
+    coverage = full.build_coverage(
+        Counter({25: 2, 66: 2}), [], {"ok": True, "text": "body"}, decoded, body_layout
+    )
 
     assert coverage["para_shape_coverage"]["status"] == "PASS"
     assert coverage["para_shape_coverage"]["resolved_ref_count"] == 2
@@ -281,10 +334,14 @@ def test_build_coverage_keeps_unresolved_para_shape_refs_as_next_target() -> Non
     }
     body_layout = {"sections": [{"paragraphs": [{"has_para_text": True, "para_shape_id": 3}]}]}
 
-    coverage = full.build_coverage(Counter({25: 1, 66: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout)
+    coverage = full.build_coverage(
+        Counter({25: 1, 66: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout
+    )
 
     assert coverage["para_shape_coverage"]["status"] == "PARTIAL_PARA_SHAPE_MAPPING"
-    assert coverage["para_shape_coverage"]["unresolved_refs"] == [{"paragraph_index": 0, "para_shape_id": 3}]
+    assert coverage["para_shape_coverage"]["unresolved_refs"] == [
+        {"paragraph_index": 0, "para_shape_id": 3}
+    ]
     assert any(row["tag_id"] == 25 for row in coverage["next_decoder_targets"])
 
 
@@ -310,7 +367,9 @@ def test_build_coverage_treats_resolved_char_shape_refs_as_audited() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({21: 3, 66: 1, 68: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout)
+    coverage = full.build_coverage(
+        Counter({21: 3, 66: 1, 68: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout
+    )
 
     assert coverage["char_shape_coverage"]["status"] == "PASS"
     assert coverage["char_shape_coverage"]["resolved_ref_count"] == 2
@@ -323,17 +382,23 @@ def test_build_coverage_keeps_unresolved_char_shape_refs_as_next_target() -> Non
         "id_mappings": {"counts": {"char_shape": 1}},
         "char_shapes": [{"index": 0}],
     }
-    body_layout = {"sections": [{"paragraphs": [{"has_para_text": True, "first_char_shape_id": 4}]}]}
+    body_layout = {
+        "sections": [{"paragraphs": [{"has_para_text": True, "first_char_shape_id": 4}]}]
+    }
 
-    coverage = full.build_coverage(Counter({21: 1, 66: 1, 68: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout)
+    coverage = full.build_coverage(
+        Counter({21: 1, 66: 1, 68: 1}), [], {"ok": True, "text": "body"}, decoded, body_layout
+    )
 
     assert coverage["char_shape_coverage"]["status"] == "PARTIAL_CHAR_SHAPE_MAPPING"
-    assert coverage["char_shape_coverage"]["unresolved_refs"] == [{"paragraph_index": 0, "char_shape_id": 4}]
+    assert coverage["char_shape_coverage"]["unresolved_refs"] == [
+        {"paragraph_index": 0, "char_shape_id": 4}
+    ]
     assert any(row["tag_id"] == 21 for row in coverage["next_decoder_targets"])
 
 
 def test_body_style_mapping_audits_para_pr_refs_against_decoded_docinfo() -> None:
-    section_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>'''
+    section_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>"""
     updates, report = full.build_body_style_section_updates(
         {"Contents/section0.xml": section_xml},
         {"sections": [{"paragraphs": [{"has_para_text": True, "para_shape_id": 1}]}]},
@@ -346,7 +411,7 @@ def test_body_style_mapping_audits_para_pr_refs_against_decoded_docinfo() -> Non
 
 
 def test_body_style_mapping_audits_char_pr_refs_against_decoded_docinfo() -> None:
-    section_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>'''
+    section_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>"""
     updates, report = full.build_body_style_section_updates(
         {"Contents/section0.xml": section_xml},
         {
@@ -383,9 +448,18 @@ def test_build_coverage_treats_resolved_border_fill_refs_as_audited() -> None:
         "para_shapes": [{"index": 0, "border_fill_id": 2}],
     }
     page_layout = {"sections": [{"section_index": 0, "page_border_fills": [{"border_fill_id": 1}]}]}
-    table_layout = {"sections": [{"section_index": 0, "tables": [{"table_index": 0, "list_headers": [{"border_fill_id": 2}]}]}]}
+    table_layout = {
+        "sections": [
+            {
+                "section_index": 0,
+                "tables": [{"table_index": 0, "list_headers": [{"border_fill_id": 2}]}],
+            }
+        ]
+    }
 
-    coverage = full.build_coverage(Counter({20: 3}), [], {"ok": True, "text": "body"}, decoded, None, page_layout, table_layout)
+    coverage = full.build_coverage(
+        Counter({20: 3}), [], {"ok": True, "text": "body"}, decoded, None, page_layout, table_layout
+    )
 
     assert coverage["border_fill_coverage"]["status"] == "PASS"
     assert coverage["border_fill_coverage"]["resolved_ref_count"] == 4
@@ -417,14 +491,21 @@ def test_build_coverage_keeps_unresolved_border_fill_refs_as_next_target() -> No
     coverage = full.build_coverage(Counter({20: 1}), [], {"ok": True, "text": "body"}, decoded)
 
     assert coverage["border_fill_coverage"]["status"] == "PARTIAL_BORDER_FILL_MAPPING"
-    assert coverage["border_fill_coverage"]["unresolved_refs"] == [{"source": "para_shape", "border_fill_id": 9, "record_index": 0}]
+    assert coverage["border_fill_coverage"]["unresolved_refs"] == [
+        {"source": "para_shape", "border_fill_id": 9, "record_index": 0}
+    ]
     assert any(row["tag_id"] == 20 for row in coverage["next_decoder_targets"])
 
 
 def test_build_coverage_treats_resolved_pictures_as_audited() -> None:
     decoded = {
         "binary_data": [
-            {"index": 0, "storage_id": 10, "extension": "png", "stream_name": "BinData/BIN000A.png"},
+            {
+                "index": 0,
+                "storage_id": 10,
+                "extension": "png",
+                "stream_name": "BinData/BIN000A.png",
+            },
         ]
     }
     shape_layout = {
@@ -436,7 +517,12 @@ def test_build_coverage_treats_resolved_pictures_as_audited() -> None:
                         "picture": {"binary_data_id": 10, "bbox": {"width": 3000, "height": 2000}},
                         "component": {"current_size_normalized": {"width": 3000, "height": 2000}},
                         "control": {
-                            "position": {"horizontal_offset": 10, "vertical_offset": 20, "width": 3000, "height": 2000},
+                            "position": {
+                                "horizontal_offset": 10,
+                                "vertical_offset": 20,
+                                "width": 3000,
+                                "height": 2000,
+                            },
                             "layout": {"text_wrap": "SQUARE", "text_flow": "BOTH_SIDES"},
                         },
                     }
@@ -445,7 +531,16 @@ def test_build_coverage_treats_resolved_pictures_as_audited() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({85: 1}), ["BinData/BIN000A.png"], {"ok": True, "text": "body"}, decoded, None, None, None, shape_layout)
+    coverage = full.build_coverage(
+        Counter({85: 1}),
+        ["BinData/BIN000A.png"],
+        {"ok": True, "text": "body"},
+        decoded,
+        None,
+        None,
+        None,
+        shape_layout,
+    )
 
     assert coverage["picture_coverage"]["status"] == "PASS"
     assert coverage["picture_coverage"]["unresolved_ref_count"] == 0
@@ -470,7 +565,16 @@ def test_build_coverage_keeps_unresolved_pictures_as_next_target() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({85: 1}), ["BinData/BIN0001.png"], {"ok": True, "text": "body"}, {}, None, None, None, shape_layout)
+    coverage = full.build_coverage(
+        Counter({85: 1}),
+        ["BinData/BIN0001.png"],
+        {"ok": True, "text": "body"},
+        {},
+        None,
+        None,
+        None,
+        shape_layout,
+    )
 
     assert coverage["picture_coverage"]["status"] == "PARTIAL_PICTURE_MAPPING"
     assert coverage["picture_coverage"]["unresolved_ref_count"] == 1
@@ -496,7 +600,9 @@ def test_build_coverage_treats_decoded_table_shapes_as_audited() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({77: 1}), [], {"ok": True, "text": "body"}, None, None, None, table_layout)
+    coverage = full.build_coverage(
+        Counter({77: 1}), [], {"ok": True, "text": "body"}, None, None, None, table_layout
+    )
 
     assert coverage["table_coverage"]["status"] == "PASS"
     assert coverage["table_coverage"]["table_record_count"] == 1
@@ -521,7 +627,9 @@ def test_build_coverage_keeps_invalid_table_shapes_as_next_target() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({77: 1}), [], {"ok": True, "text": "body"}, None, None, None, table_layout)
+    coverage = full.build_coverage(
+        Counter({77: 1}), [], {"ok": True, "text": "body"}, None, None, None, table_layout
+    )
 
     assert coverage["table_coverage"]["status"] == "PARTIAL_TABLE_MAPPING"
     assert coverage["table_coverage"]["invalid_row_cell_count"] == 1
@@ -530,7 +638,9 @@ def test_build_coverage_keeps_invalid_table_shapes_as_next_target() -> None:
 
 def test_build_coverage_audits_table_shape_and_binary_families_together() -> None:
     decoded = {
-        "binary_data": [{"index": 0, "storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}],
+        "binary_data": [
+            {"index": 0, "storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}
+        ],
     }
     table_layout = {
         "sections": [
@@ -555,15 +665,24 @@ def test_build_coverage_audits_table_shape_and_binary_families_together() -> Non
         "sections": [
             {
                 "components": [
-                    {"record_index": 4, "component": {"current_size_normalized": {"width": 100, "height": 100}}},
-                    {"record_index": 6, "component": {"current_size_normalized": {"width": 300, "height": 200}}},
+                    {
+                        "record_index": 4,
+                        "component": {"current_size_normalized": {"width": 100, "height": 100}},
+                    },
+                    {
+                        "record_index": 6,
+                        "component": {"current_size_normalized": {"width": 300, "height": 200}},
+                    },
                 ],
                 "rectangles": [
                     {
                         "record_index": 5,
                         "rectangle": {"bbox": {"width": 100, "height": 100}},
                         "component": {"current_size_normalized": {"width": 100, "height": 100}},
-                        "control": {"position": {"width": 100, "height": 100}, "layout": {"text_wrap": "SQUARE"}},
+                        "control": {
+                            "position": {"width": 100, "height": 100},
+                            "layout": {"text_wrap": "SQUARE"},
+                        },
                     }
                 ],
                 "pictures": [
@@ -571,7 +690,10 @@ def test_build_coverage_audits_table_shape_and_binary_families_together() -> Non
                         "record_index": 7,
                         "picture": {"binary_data_id": 1, "bbox": {"width": 300, "height": 200}},
                         "component": {"current_size_normalized": {"width": 300, "height": 200}},
-                        "control": {"position": {"width": 300, "height": 200}, "layout": {"text_wrap": "SQUARE"}},
+                        "control": {
+                            "position": {"width": 300, "height": 200},
+                            "layout": {"text_wrap": "SQUARE"},
+                        },
                     }
                 ],
             }
@@ -691,7 +813,21 @@ def test_build_coverage_audits_style_paragraph_and_page_families_together() -> N
     }
 
     coverage = full.build_coverage(
-        Counter({19: 1, 20: 1, 21: 1, 25: 1, 26: 1, 66: 1, 67: 1, 68: 1, 69: 1, 71: 1, 72: 1, 73: 1, 75: 1}),
+        Counter({
+            19: 1,
+            20: 1,
+            21: 1,
+            25: 1,
+            26: 1,
+            66: 1,
+            67: 1,
+            68: 1,
+            69: 1,
+            71: 1,
+            72: 1,
+            73: 1,
+            75: 1,
+        }),
         [],
         {"ok": True, "text": "body"},
         decoded,
@@ -727,7 +863,7 @@ def test_decode_eqedit_extracts_formula_text() -> None:
         + app.encode("utf-16le")
     )
 
-    decoded = full.decode_known_record(88, payload)
+    decoded = decoders.decode_known_record(88, payload)
 
     assert decoded["formula"] == formula
     assert decoded["version"] == version
@@ -752,7 +888,17 @@ def test_build_coverage_treats_preserved_eqedit_as_audited() -> None:
         ]
     }
 
-    coverage = full.build_coverage(Counter({88: 1}), [], {"ok": True, "text": "body"}, None, None, None, None, None, equation_layout)
+    coverage = full.build_coverage(
+        Counter({88: 1}),
+        [],
+        {"ok": True, "text": "body"},
+        None,
+        None,
+        None,
+        None,
+        None,
+        equation_layout,
+    )
 
     assert coverage["equation_coverage"]["status"] == "PASS"
     assert coverage["equation_coverage"]["preserved_equation_count"] == 1
@@ -760,9 +906,26 @@ def test_build_coverage_treats_preserved_eqedit_as_audited() -> None:
 
 
 def test_build_coverage_keeps_unpreserved_eqedit_as_next_target() -> None:
-    equation_layout = {"sections": [{"section_index": 0, "equations": [{"record_index": 7, "formula": "", "payload_size": 122}]}]}
+    equation_layout = {
+        "sections": [
+            {
+                "section_index": 0,
+                "equations": [{"record_index": 7, "formula": "", "payload_size": 122}],
+            }
+        ]
+    }
 
-    coverage = full.build_coverage(Counter({88: 1}), [], {"ok": True, "text": "body"}, None, None, None, None, None, equation_layout)
+    coverage = full.build_coverage(
+        Counter({88: 1}),
+        [],
+        {"ok": True, "text": "body"},
+        None,
+        None,
+        None,
+        None,
+        None,
+        equation_layout,
+    )
 
     assert coverage["equation_coverage"]["status"] == "PARTIAL_EQUATION_MAPPING"
     assert coverage["equation_coverage"]["missing_formula_count"] == 1
@@ -770,8 +933,8 @@ def test_build_coverage_keeps_unpreserved_eqedit_as_next_target() -> None:
 
 
 def test_page_and_table_mapping_audit_border_fill_refs_against_decoded_docinfo() -> None:
-    page_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>'''
-    table_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="1" colCnt="1"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>'''
+    page_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>"""
+    table_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="1" colCnt="1"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>"""
     decoded = {"border_fills": [{"index": 4}, {"index": 7}]}
 
     _updates, page_report = full.build_page_layout_section_updates(
@@ -812,7 +975,7 @@ def test_page_and_table_mapping_audit_border_fill_refs_against_decoded_docinfo()
 
 
 def test_table_mapping_skips_out_of_range_cell_border_refs() -> None:
-    table_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="1" colCnt="1"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>'''
+    table_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="1" colCnt="1"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>"""
 
     updates, report = full.build_table_layout_section_updates(
         {"Contents/section0.xml": table_xml},
@@ -823,7 +986,13 @@ def test_table_mapping_skips_out_of_range_cell_border_refs() -> None:
                     "tables": [
                         {
                             "table": {"row_count": 1, "col_count": 1, "row_cell_counts": [1]},
-                            "list_headers": [{"cell_addr": {"row": 99, "col": 99}, "cell_span": {"row": 1, "col": 1}, "border_fill_id": 7167}],
+                            "list_headers": [
+                                {
+                                    "cell_addr": {"row": 99, "col": 99},
+                                    "cell_span": {"row": 1, "col": 1},
+                                    "border_fill_id": 7167,
+                                }
+                            ],
                         }
                     ],
                 }
@@ -882,11 +1051,16 @@ def test_docinfo_decoders_parse_core_records() -> None:
         + (3).to_bytes(2, "little")
         + "^1.".encode("utf-16le")
     )
-    bullet = (1).to_bytes(4, "little") + (7).to_bytes(4, "little") + (1).to_bytes(2, "little") + "-".encode("utf-16le")
+    bullet = (
+        (1).to_bytes(4, "little")
+        + (7).to_bytes(4, "little")
+        + (1).to_bytes(2, "little")
+        + "-".encode("utf-16le")
+    )
 
-    assert full.decode_document_properties(doc_props)["section_count"] == 2
-    assert full.decode_id_mappings(mappings)["counts"]["style"] == 14
-    binary_data = full.decode_binary_data(
+    assert decoders.decode_document_properties(doc_props)["section_count"] == 2
+    assert decoders.decode_id_mappings(mappings)["counts"]["style"] == 14
+    binary_data = decoders.decode_binary_data(
         (0x0111).to_bytes(2, "little")
         + (7).to_bytes(2, "little")
         + (3).to_bytes(2, "little")
@@ -899,7 +1073,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert binary_data["extension"] == "png"
     assert binary_data["stream_name"] == "BinData/BIN0007.png"
     assert binary_data["manifest_id"] == "BIN0007"
-    face_name = full.decode_face_name(
+    face_name = decoders.decode_face_name(
         bytes([0xE0])
         + (4).to_bytes(2, "little")
         + "Main".encode("utf-16le")
@@ -916,13 +1090,15 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert face_name["type_info_names"][:4] == ["UNKNOWN", "TTF", "HFT", "BOTH"]
     assert face_name["font_type"] == "TTF"
     assert face_name["base_font"] == "Base"
-    assert full.decode_char_shape(char_shape)["bold"] is True
-    assert full.decode_char_shape(char_shape)["text_color"]["hex"] == "#112233"
-    assert full.decode_numbering(numbering_level * 7)["levels"][0]["text"] == "^1."
-    assert full.decode_numbering(numbering_level * 7)["level_count"] == 7
-    assert full.decode_bullet(bullet)["bullet_char"] == "-"
-    border_fill = full.decode_border_fill(
-        ((1 << 0) | (1 << 1) | (2 << 2) | (7 << 5) | (1 << 8) | (1 << 10) | (1 << 11) | (1 << 12)).to_bytes(2, "little")
+    assert decoders.decode_char_shape(char_shape)["bold"] is True
+    assert decoders.decode_char_shape(char_shape)["text_color"]["hex"] == "#112233"
+    assert decoders.decode_numbering(numbering_level * 7)["levels"][0]["text"] == "^1."
+    assert decoders.decode_numbering(numbering_level * 7)["level_count"] == 7
+    assert decoders.decode_bullet(bullet)["bullet_char"] == "-"
+    border_fill = decoders.decode_border_fill(
+        (
+            (1 << 0) | (1 << 1) | (2 << 2) | (7 << 5) | (1 << 8) | (1 << 10) | (1 << 11) | (1 << 12)
+        ).to_bytes(2, "little")
         + bytes([0, 2, 7, 10])
         + bytes([0, 1, 10, 15])
         + bytes.fromhex("11 11 11 00 22 22 22 00 33 33 33 00 44 44 44 00")
@@ -944,10 +1120,20 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert border_fill["diagonal_type_name"] == "DASH"
     assert border_fill["diagonal_width_name"] == "0.2 mm"
     assert border_fill["fill"]["solid"]["pattern_name"] == "CROSS"
-    assert full.decode_para_shape(para_shape)["align"] == 1
-    assert full.decode_para_header((3).to_bytes(4, "little") + b"\x00" * 4 + (2).to_bytes(2, "little") + bytes([1, 0]) + (1).to_bytes(2, "little") + b"\x00" * 8)["para_shape_id"] == 2
+    assert decoders.decode_para_shape(para_shape)["align"] == 1
+    assert (
+        decoders.decode_para_header(
+            (3).to_bytes(4, "little")
+            + b"\x00" * 4
+            + (2).to_bytes(2, "little")
+            + bytes([1, 0])
+            + (1).to_bytes(2, "little")
+            + b"\x00" * 8
+        )["para_shape_id"]
+        == 2
+    )
     ctrl_properties = 1 | (2 << 3) | (2 << 8) | (1 << 14) | (5 << 21) | (2 << 24)
-    ctrl_header = full.decode_ctrl_header(
+    ctrl_header = decoders.decode_ctrl_header(
         b" gso"
         + ctrl_properties.to_bytes(4, "little")
         + (200).to_bytes(4, "little", signed=True)
@@ -969,8 +1155,13 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert ctrl_header["layout"]["raw_text_wrap"] == "IN_FRONT_OF_TEXT"
     assert ctrl_header["layout"]["text_wrap"] == "TOP_AND_BOTTOM"
     assert ctrl_header["layout"]["text_flow"] == "RIGHT_ONLY"
-    assert full.decode_para_char_shape((0).to_bytes(4, "little") + (7).to_bytes(4, "little"))["first_char_shape_id"] == 7
-    list_header = full.decode_list_header(
+    assert (
+        decoders.decode_para_char_shape((0).to_bytes(4, "little") + (7).to_bytes(4, "little"))[
+            "first_char_shape_id"
+        ]
+        == 7
+    )
+    list_header = decoders.decode_list_header(
         (1).to_bytes(4, "little")
         + (32).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
@@ -985,7 +1176,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert list_header["cell_addr"] == {"col": 2, "row": 3}
     assert list_header["cell_span"] == {"col": 4, "row": 1}
     assert list_header["border_fill_id"] == 9
-    page_def = full.decode_page_def(
+    page_def = decoders.decode_page_def(
         (59528).to_bytes(4, "little", signed=True)
         + (84188).to_bytes(4, "little", signed=True)
         + (5669).to_bytes(4, "little", signed=True) * 3
@@ -994,7 +1185,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     )
     assert page_def["orientation"] == "portrait"
     assert page_def["margins"]["left"] == 5669
-    page_border_fill = full.decode_page_border_fill(
+    page_border_fill = decoders.decode_page_border_fill(
         (0x7).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
         + (1417).to_bytes(4, "little", signed=True)
@@ -1007,7 +1198,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert page_border_fill["header_inside"] is True
     assert page_border_fill["footer_inside"] is True
     assert page_border_fill["margins"]["bottom"] == 1420
-    footnote_shape = full.decode_footnote_shape(
+    footnote_shape = decoders.decode_footnote_shape(
         ((2 << 10) | (1 << 12) | (1 << 13)).to_bytes(4, "little")
         + "*".encode("utf-16le")
         + "[".encode("utf-16le")
@@ -1032,7 +1223,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert footnote_shape["separator_line_type"] == "DASH"
     assert footnote_shape["separator_line_width"] == "0.2 mm"
     assert footnote_shape["separator_line_color"]["hex"] == "#112233"
-    table = full.decode_table(
+    table = decoders.decode_table(
         (0).to_bytes(4, "little")
         + (2).to_bytes(2, "little")
         + (3).to_bytes(2, "little")
@@ -1048,7 +1239,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     assert table["row_cell_counts"] == [1, 2]
     assert table["row_cell_count_total"] == 3
     assert table["table_zone_u16"] == [99]
-    rectangle = full.decode_shape_component_rectangle(
+    rectangle = decoders.decode_shape_component_rectangle(
         bytes([12])
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little", signed=True)
@@ -1060,8 +1251,15 @@ def test_docinfo_decoders_parse_core_records() -> None:
         + (1000).to_bytes(4, "little", signed=True)
     )
     assert rectangle["round_ratio"] == 12
-    assert rectangle["bbox"] == {"left": 0, "top": 0, "right": 2000, "bottom": 1000, "width": 2000, "height": 1000}
-    fixed_point_rectangle = full.decode_shape_component_rectangle(
+    assert rectangle["bbox"] == {
+        "left": 0,
+        "top": 0,
+        "right": 2000,
+        "bottom": 1000,
+        "width": 2000,
+        "height": 1000,
+    }
+    fixed_point_rectangle = decoders.decode_shape_component_rectangle(
         bytes([0])
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little", signed=True)
@@ -1074,7 +1272,7 @@ def test_docinfo_decoders_parse_core_records() -> None:
     )
     assert fixed_point_rectangle["bbox"]["width"] == 2000
     assert fixed_point_rectangle["bbox"]["height"] == 1000
-    picture = full.decode_picture(
+    picture = decoders.decode_picture(
         (0).to_bytes(4, "little")
         + (0).to_bytes(4, "little", signed=True)
         + (0).to_bytes(4, "little")
@@ -1169,7 +1367,10 @@ def test_build_source_manifest_hashes_ole_streams() -> None:
     assert manifest["streams"][0]["kind"] == "header"
     assert manifest["streams"][1]["kind"] == "body_text"
     assert manifest["streams"][2]["kind"] == "binary_data"
-    assert manifest["streams"][1]["sha256"] == "230d8358dc8e8890b4c58deeb62912ee2f20357ae92a5cc861b98e68fe31acb5"
+    assert (
+        manifest["streams"][1]["sha256"]
+        == "230d8358dc8e8890b4c58deeb62912ee2f20357ae92a5cc861b98e68fe31acb5"
+    )
     assert manifest["unreadable_stream_count"] == 0
 
 
@@ -1226,8 +1427,20 @@ def test_copy_bindata_report_matches_docinfo_records(monkeypatch, tmp_path: Path
         source,
         {
             "binary_data": [
-                {"index": 0, "data_type": "EMBEDDING", "storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"},
-                {"index": 1, "data_type": "EMBEDDING", "storage_id": 2, "extension": "gif", "stream_name": "BinData/BIN0002.gif"},
+                {
+                    "index": 0,
+                    "data_type": "EMBEDDING",
+                    "storage_id": 1,
+                    "extension": "png",
+                    "stream_name": "BinData/BIN0001.png",
+                },
+                {
+                    "index": 1,
+                    "data_type": "EMBEDDING",
+                    "storage_id": 2,
+                    "extension": "gif",
+                    "stream_name": "BinData/BIN0002.gif",
+                },
             ]
         },
     )
@@ -1243,7 +1456,7 @@ def test_copy_bindata_report_matches_docinfo_records(monkeypatch, tmp_path: Path
 
 
 def test_visual_section_updates_emit_all_bindata_images_as_pictures() -> None:
-    section_xml = b'''<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>'''
+    section_xml = b"""<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>"""
 
     updates, report = full_package.build_visual_section_updates(
         {"Contents/section0.xml": section_xml},
@@ -1251,8 +1464,18 @@ def test_visual_section_updates_emit_all_bindata_images_as_pictures() -> None:
             "status": "PASS",
             "bindata_count": 2,
             "items": [
-                {"entry": "BinData/BIN0001.png", "size": 3, "sha256": "a", "media_type": "image/png"},
-                {"entry": "BinData/BIN0002.gif", "size": 4, "sha256": "b", "media_type": "image/gif"},
+                {
+                    "entry": "BinData/BIN0001.png",
+                    "size": 3,
+                    "sha256": "a",
+                    "media_type": "image/png",
+                },
+                {
+                    "entry": "BinData/BIN0002.gif",
+                    "size": 4,
+                    "sha256": "b",
+                    "media_type": "image/gif",
+                },
             ],
         },
         {"record_counts": {"85": 2}},
@@ -1270,14 +1493,21 @@ def test_visual_section_updates_emit_all_bindata_images_as_pictures() -> None:
 
 
 def test_visual_section_updates_reuses_bindata_to_cover_picture_records() -> None:
-    section_xml = b'''<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>'''
+    section_xml = b"""<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>"""
 
     updates, report = full_package.build_visual_section_updates(
         {"Contents/section0.xml": section_xml},
         {
             "status": "PASS",
             "bindata_count": 1,
-            "items": [{"entry": "BinData/BIN0001.png", "size": 3, "sha256": "a", "media_type": "image/png"}],
+            "items": [
+                {
+                    "entry": "BinData/BIN0001.png",
+                    "size": 3,
+                    "sha256": "a",
+                    "media_type": "image/png",
+                }
+            ],
         },
         {"record_counts": {"85": 3}},
     )
@@ -1290,7 +1520,7 @@ def test_visual_section_updates_reuses_bindata_to_cover_picture_records() -> Non
 
 
 def test_visual_section_updates_maps_picture_bindata_id_and_geometry() -> None:
-    section_xml = b'''<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>'''
+    section_xml = b"""<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>"""
 
     updates, report = full_package.build_visual_section_updates(
         {"Contents/section0.xml": section_xml},
@@ -1298,8 +1528,18 @@ def test_visual_section_updates_maps_picture_bindata_id_and_geometry() -> None:
             "status": "PASS",
             "bindata_count": 2,
             "items": [
-                {"entry": "BinData/BIN0001.png", "size": 3, "sha256": "a", "media_type": "image/png"},
-                {"entry": "BinData/BIN000A.png", "size": 4, "sha256": "b", "media_type": "image/png"},
+                {
+                    "entry": "BinData/BIN0001.png",
+                    "size": 3,
+                    "sha256": "a",
+                    "media_type": "image/png",
+                },
+                {
+                    "entry": "BinData/BIN000A.png",
+                    "size": 4,
+                    "sha256": "b",
+                    "media_type": "image/png",
+                },
             ],
         },
         {
@@ -1312,7 +1552,13 @@ def test_visual_section_updates_maps_picture_bindata_id_and_geometry() -> None:
                                 "record_index": 5,
                                 "control_record_index": 4,
                                 "control": {
-                                    "position": {"horizontal_offset": 120, "vertical_offset": 240, "width": 3000, "height": 2000, "z_order": 1},
+                                    "position": {
+                                        "horizontal_offset": 120,
+                                        "vertical_offset": 240,
+                                        "width": 3000,
+                                        "height": 2000,
+                                        "z_order": 1,
+                                    },
                                     "layout": {
                                         "treat_as_char": False,
                                         "flow_with_text": True,
@@ -1326,7 +1572,14 @@ def test_visual_section_updates_maps_picture_bindata_id_and_geometry() -> None:
                                 "component_record_index": 4,
                                 "picture": {
                                     "binary_data_id": 10,
-                                    "bbox": {"left": 0, "top": 0, "right": 3000, "bottom": 2000, "width": 3000, "height": 2000},
+                                    "bbox": {
+                                        "left": 0,
+                                        "top": 0,
+                                        "right": 3000,
+                                        "bottom": 2000,
+                                        "width": 3000,
+                                        "height": 2000,
+                                    },
                                 },
                             }
                         ]
@@ -1357,7 +1610,7 @@ def test_visual_section_updates_maps_picture_bindata_id_and_geometry() -> None:
 
 
 def test_visual_section_updates_emit_rectangle_shapes() -> None:
-    section_xml = b'''<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>'''
+    section_xml = b"""<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"><hp:p id="0"><hp:run><hp:t>body</hp:t></hp:run></hp:p></hs:sec>"""
 
     updates, report = full_package.build_visual_section_updates(
         {"Contents/section0.xml": section_xml},
@@ -1372,7 +1625,13 @@ def test_visual_section_updates_emit_rectangle_shapes() -> None:
                                 "record_index": 10,
                                 "control_record_index": 8,
                                 "control": {
-                                    "position": {"horizontal_offset": 100, "vertical_offset": 200, "width": 2000, "height": 1000, "z_order": 4},
+                                    "position": {
+                                        "horizontal_offset": 100,
+                                        "vertical_offset": 200,
+                                        "width": 2000,
+                                        "height": 1000,
+                                        "z_order": 4,
+                                    },
                                     "layout": {
                                         "treat_as_char": False,
                                         "flow_with_text": False,
@@ -1387,8 +1646,20 @@ def test_visual_section_updates_emit_rectangle_shapes() -> None:
                                 "component_record_index": 9,
                                 "rectangle": {
                                     "round_ratio": 12,
-                                    "points": [{"x": 0, "y": 0}, {"x": 2000, "y": 0}, {"x": 2000, "y": 1000}, {"x": 0, "y": 1000}],
-                                    "bbox": {"left": 0, "top": 0, "right": 2000, "bottom": 1000, "width": 2000, "height": 1000},
+                                    "points": [
+                                        {"x": 0, "y": 0},
+                                        {"x": 2000, "y": 0},
+                                        {"x": 2000, "y": 1000},
+                                        {"x": 0, "y": 1000},
+                                    ],
+                                    "bbox": {
+                                        "left": 0,
+                                        "top": 0,
+                                        "right": 2000,
+                                        "bottom": 1000,
+                                        "width": 2000,
+                                        "height": 1000,
+                                    },
                                 },
                             },
                             {
@@ -1396,8 +1667,20 @@ def test_visual_section_updates_emit_rectangle_shapes() -> None:
                                 "component_record_index": 10,
                                 "rectangle": {
                                     "round_ratio": 0,
-                                    "points": [{"x": 50, "y": 60}, {"x": 350, "y": 60}, {"x": 350, "y": 260}, {"x": 50, "y": 260}],
-                                    "bbox": {"left": 50, "top": 60, "right": 350, "bottom": 260, "width": 300, "height": 200},
+                                    "points": [
+                                        {"x": 50, "y": 60},
+                                        {"x": 350, "y": 60},
+                                        {"x": 350, "y": 260},
+                                        {"x": 50, "y": 260},
+                                    ],
+                                    "bbox": {
+                                        "left": 50,
+                                        "top": 60,
+                                        "right": 350,
+                                        "bottom": 260,
+                                        "width": 300,
+                                        "height": 200,
+                                    },
                                 },
                             },
                         ]
@@ -1429,7 +1712,9 @@ def test_visual_section_updates_emit_rectangle_shapes() -> None:
     assert 'vertOffset="200"' in xml_text
 
 
-def test_convert_full_refuses_to_write_when_decoders_are_incomplete(monkeypatch, tmp_path: Path) -> None:
+def test_convert_full_refuses_to_write_when_decoders_are_incomplete(
+    monkeypatch, tmp_path: Path
+) -> None:
     input_path = tmp_path / "source.hwp"
     output_path = tmp_path / "source.hwpx"
     report_path = tmp_path / "report.json"
@@ -1473,191 +1758,12 @@ def test_convert_full_refuses_to_write_when_decoders_are_incomplete(monkeypatch,
                 "streams": [
                     {"name": "FileHeader", "kind": "header", "size": 8, "sha256": "header-sha"},
                     {"name": "DocInfo", "kind": "docinfo", "size": 16, "sha256": "docinfo-sha"},
-                    {"name": "BodyText/Section0", "kind": "body_text", "size": 24, "sha256": "body-sha"},
-                ],
-            },
-            "body_layout": {
-                "sections": [
                     {
-                        "paragraphs": [
-                            {
-                                "has_para_text": True,
-                                "para_shape_id": 9,
-                                "style_id": 3,
-                                "first_char_shape_id": 5,
-                                "char_shape_runs": [
-                                    {"start_pos": 0, "char_shape_id": 5},
-                                    {"start_pos": 2, "char_shape_id": 7},
-                                ],
-                                "line_segments": [
-                                    {
-                                        "text_pos": 0,
-                                        "line_vertical_pos": 10,
-                                        "line_height": 1200,
-                                        "text_height": 1000,
-                                        "baseline": 850,
-                                        "line_spacing": 200,
-                                        "column_start": 0,
-                                        "segment_width": 5000,
-                                        "flags": 1,
-                                    }
-                                ],
-                            }
-                        ]
-                    }
-                ]
-            },
-            "page_layout": {
-                "sections": [
-                    {
-                        "section_index": 0,
-                        "page_definition": {
-                            "width": 59528,
-                            "height": 84188,
-                            "landscape": "NARROWLY",
-                            "margins": {"left": 5669, "right": 5669, "top": 5669, "bottom": 2834, "header": 0, "footer": 0, "gutter": 0},
-                        },
-                    }
-                ]
-            },
-            "page_layout": {
-                "sections": [
-                    {
-                        "section_index": 0,
-                        "page_definition": {
-                            "width": 59528,
-                            "height": 84188,
-                            "landscape": "NARROWLY",
-                            "margins": {"left": 5669, "right": 5669, "top": 5669, "bottom": 2834, "header": 0, "footer": 0, "gutter": 0},
-                        },
-                    }
-                ]
-            },
-            "table_layout": {
-                "sections": [
-                    {
-                        "section_index": 0,
-                        "tables": [
-                            {
-                                "record_index": 1,
-                                "table": {
-                                    "row_count": 1,
-                                    "col_count": 1,
-                                    "cell_spacing": 0,
-                                    "margins": {"left": 141, "right": 141, "top": 141, "bottom": 141},
-                                },
-                                "list_headers": [
-                                    {
-                                        "text_width": 1234,
-                                        "text_height": 567,
-                                        "margins": {"left": 10, "right": 11, "top": 12, "bottom": 13},
-                                    }
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
-            "table_layout": {
-                "sections": [
-                    {
-                        "section_index": 0,
-                        "tables": [
-                            {
-                                "record_index": 1,
-                                "table": {
-                                    "row_count": 1,
-                                    "col_count": 1,
-                                    "cell_spacing": 0,
-                                    "margins": {"left": 141, "right": 141, "top": 141, "bottom": 141},
-                                },
-                                "list_headers": [
-                                    {
-                                        "text_width": 1234,
-                                        "text_height": 567,
-                                        "margins": {"left": 10, "right": 11, "top": 12, "bottom": 13},
-                                    }
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
-            "table_layout": {
-                "sections": [
-                    {
-                        "section_index": 0,
-                        "tables": [
-                            {
-                                "record_index": 1,
-                                "table": {
-                                    "row_count": 1,
-                                    "col_count": 1,
-                                    "cell_spacing": 0,
-                                    "margins": {"left": 141, "right": 141, "top": 141, "bottom": 141},
-                                },
-                                "list_headers": [
-                                    {
-                                        "text_width": 1234,
-                                        "text_height": 567,
-                                        "margins": {"left": 10, "right": 11, "top": 12, "bottom": 13},
-                                    }
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
-        },
-    )
-
-    report = full.convert_full(input_path, output_path, report_json=report_path)
-
-    assert report["status"] == "FAIL"
-    assert report["error"] == "FULL_FIDELITY_DECODERS_INCOMPLETE"
-    assert not output_path.exists()
-    assert report_path.exists()
-
-
-def test_convert_full_allows_explicit_partial_derivative(monkeypatch, tmp_path: Path) -> None:
-    input_path = tmp_path / "source.hwp"
-    output_path = tmp_path / "source.hwpx"
-    input_path.write_bytes(b"fake")
-
-    monkeypatch.setattr(
-        full,
-        "analyze_hwp",
-        lambda *_args, **_kwargs: {
-            "status": "PASS",
-            "input": str(input_path),
-            "coverage": {
-                "full_fidelity_ready": False,
-                "blockers": ["UNSUPPORTED:fonts_and_styles"],
-            },
-            "ole_metadata": {
-                "status": "PASS",
-                "present_field_count": 2,
-                "present_fields": ["title", "author"],
-                "fields": {"title": "Source title", "author": "Writer"},
-            },
-            "record_audit": {
-                "status": "PASS",
-                "record_count": 2,
-                "unknown_tag_count": 0,
-                "risk_tag_count": 1,
-                "decoded_error_count": 0,
-                "risk_tags": [{"tag_id": 77, "tag_name": "TABLE", "count": 1, "samples": []}],
-            },
-            "source_manifest": {
-                "status": "PASS",
-                "stream_count": 3,
-                "hashed_stream_count": 3,
-                "storage_count": 1,
-                "unreadable_stream_count": 0,
-                "streams": [
-                    {"name": "FileHeader", "kind": "header", "size": 8, "sha256": "header-sha"},
-                    {"name": "DocInfo", "kind": "docinfo", "size": 16, "sha256": "docinfo-sha"},
-                    {"name": "BodyText/Section0", "kind": "body_text", "size": 24, "sha256": "body-sha"},
+                        "name": "BodyText/Section0",
+                        "kind": "body_text",
+                        "size": 24,
+                        "sha256": "body-sha",
+                    },
                 ],
             },
             "body_layout": {
@@ -1723,13 +1829,167 @@ def test_convert_full_allows_explicit_partial_derivative(monkeypatch, tmp_path: 
                                     "row_count": 1,
                                     "col_count": 1,
                                     "cell_spacing": 0,
-                                    "margins": {"left": 141, "right": 141, "top": 141, "bottom": 141},
+                                    "margins": {
+                                        "left": 141,
+                                        "right": 141,
+                                        "top": 141,
+                                        "bottom": 141,
+                                    },
                                 },
                                 "list_headers": [
                                     {
                                         "text_width": 1234,
                                         "text_height": 567,
-                                        "margins": {"left": 10, "right": 11, "top": 12, "bottom": 13},
+                                        "margins": {
+                                            "left": 10,
+                                            "right": 11,
+                                            "top": 12,
+                                            "bottom": 13,
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            },
+        },
+    )
+
+    report = full.convert_full(input_path, output_path, report_json=report_path)
+
+    assert report["status"] == "FAIL"
+    assert report["error"] == "FULL_FIDELITY_DECODERS_INCOMPLETE"
+    assert not output_path.exists()
+    assert report_path.exists()
+
+
+def test_convert_full_allows_explicit_partial_derivative(monkeypatch, tmp_path: Path) -> None:
+    input_path = tmp_path / "source.hwp"
+    output_path = tmp_path / "source.hwpx"
+    input_path.write_bytes(b"fake")
+
+    monkeypatch.setattr(
+        full,
+        "analyze_hwp",
+        lambda *_args, **_kwargs: {
+            "status": "PASS",
+            "input": str(input_path),
+            "coverage": {
+                "full_fidelity_ready": False,
+                "blockers": ["UNSUPPORTED:fonts_and_styles"],
+            },
+            "ole_metadata": {
+                "status": "PASS",
+                "present_field_count": 2,
+                "present_fields": ["title", "author"],
+                "fields": {"title": "Source title", "author": "Writer"},
+            },
+            "record_audit": {
+                "status": "PASS",
+                "record_count": 2,
+                "unknown_tag_count": 0,
+                "risk_tag_count": 1,
+                "decoded_error_count": 0,
+                "risk_tags": [{"tag_id": 77, "tag_name": "TABLE", "count": 1, "samples": []}],
+            },
+            "source_manifest": {
+                "status": "PASS",
+                "stream_count": 3,
+                "hashed_stream_count": 3,
+                "storage_count": 1,
+                "unreadable_stream_count": 0,
+                "streams": [
+                    {"name": "FileHeader", "kind": "header", "size": 8, "sha256": "header-sha"},
+                    {"name": "DocInfo", "kind": "docinfo", "size": 16, "sha256": "docinfo-sha"},
+                    {
+                        "name": "BodyText/Section0",
+                        "kind": "body_text",
+                        "size": 24,
+                        "sha256": "body-sha",
+                    },
+                ],
+            },
+            "body_layout": {
+                "sections": [
+                    {
+                        "paragraphs": [
+                            {
+                                "has_para_text": True,
+                                "para_shape_id": 9,
+                                "style_id": 3,
+                                "first_char_shape_id": 5,
+                                "char_shape_runs": [
+                                    {"start_pos": 0, "char_shape_id": 5},
+                                    {"start_pos": 2, "char_shape_id": 7},
+                                ],
+                                "line_segments": [
+                                    {
+                                        "text_pos": 0,
+                                        "line_vertical_pos": 10,
+                                        "line_height": 1200,
+                                        "text_height": 1000,
+                                        "baseline": 850,
+                                        "line_spacing": 200,
+                                        "column_start": 0,
+                                        "segment_width": 5000,
+                                        "flags": 1,
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            },
+            "page_layout": {
+                "sections": [
+                    {
+                        "section_index": 0,
+                        "page_definition": {
+                            "width": 59528,
+                            "height": 84188,
+                            "landscape": "NARROWLY",
+                            "margins": {
+                                "left": 5669,
+                                "right": 5669,
+                                "top": 5669,
+                                "bottom": 2834,
+                                "header": 0,
+                                "footer": 0,
+                                "gutter": 0,
+                            },
+                        },
+                    }
+                ]
+            },
+            "table_layout": {
+                "sections": [
+                    {
+                        "section_index": 0,
+                        "tables": [
+                            {
+                                "record_index": 1,
+                                "table": {
+                                    "row_count": 1,
+                                    "col_count": 1,
+                                    "cell_spacing": 0,
+                                    "margins": {
+                                        "left": 141,
+                                        "right": 141,
+                                        "top": 141,
+                                        "bottom": 141,
+                                    },
+                                },
+                                "list_headers": [
+                                    {
+                                        "text_width": 1234,
+                                        "text_height": 567,
+                                        "margins": {
+                                            "left": 10,
+                                            "right": 11,
+                                            "top": 12,
+                                            "bottom": 13,
+                                        },
                                     }
                                 ],
                             }
@@ -1744,7 +2004,11 @@ def test_convert_full_allows_explicit_partial_derivative(monkeypatch, tmp_path: 
         "convert_hwp_to_hwpx",
         lambda *_args, **_kwargs: make_fake_partial_output(output_path),
     )
-    monkeypatch.setattr(full.HwpxValidator, "validate_hwpx", staticmethod(lambda _path: {"zip_ok": True, "xml_ok": True}))
+    monkeypatch.setattr(
+        full.HwpxValidator,
+        "validate_hwpx",
+        staticmethod(lambda _path: {"zip_ok": True, "xml_ok": True}),
+    )
 
     report = full.convert_full(input_path, output_path, allow_partial=True)
 
@@ -1794,7 +2058,9 @@ def test_convert_full_allows_explicit_partial_derivative(monkeypatch, tmp_path: 
         assert "Source title" in zf.read("Preview/DocumentMetadata.json").decode("utf-8")
         assert "risk_tag_count" in zf.read("Preview/RecordAudit.json").decode("utf-8")
         assert "BodyText/Section0" in zf.read("Preview/SourceManifest.json").decode("utf-8")
-        assert "byte_exact_original_embedded" in zf.read("Preview/OriginalIntegrity.json").decode("utf-8")
+        assert "byte_exact_original_embedded" in zf.read("Preview/OriginalIntegrity.json").decode(
+            "utf-8"
+        )
         content_hpf = zf.read("Contents/content.hpf").decode("utf-8")
         assert "Contents/header.xml" in content_hpf
         assert 'idref="header"' in content_hpf
@@ -1843,7 +2109,11 @@ def test_identity_audit_fails_closed_for_text_only_derivative(tmp_path: Path) ->
         output_path,
         analysis={
             "status": "PASS",
-            "coverage": {"status": "FAIL", "full_fidelity_ready": False, "blockers": ["UNSUPPORTED:fonts_and_styles"]},
+            "coverage": {
+                "status": "FAIL",
+                "full_fidelity_ready": False,
+                "blockers": ["UNSUPPORTED:fonts_and_styles"],
+            },
             "source_manifest": {
                 "input_info": {
                     "path": str(input_path),
@@ -1851,7 +2121,12 @@ def test_identity_audit_fails_closed_for_text_only_derivative(tmp_path: Path) ->
                     "sha256": "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
                 }
             },
-            "record_audit": {"record_count": 1, "unknown_tag_count": 0, "risk_tag_count": 1, "decoded_error_count": 0},
+            "record_audit": {
+                "record_count": 1,
+                "unknown_tag_count": 0,
+                "risk_tag_count": 1,
+                "decoded_error_count": 0,
+            },
         },
     )
 
@@ -1866,8 +2141,23 @@ def test_identity_audit_fails_closed_for_text_only_derivative(tmp_path: Path) ->
 
 def test_build_decoded_header_xml_maps_docinfo_styles() -> None:
     decoded_docinfo = {
-        "document_properties": {"page_start": 3, "footnote_start": 4, "endnote_start": 5, "picture_start": 6, "table_start": 7, "equation_start": 8},
-        "binary_data": [{"index": 0, "data_type": "EMBEDDING", "storage_id": 1, "extension": "png", "stream_name": "BinData/BIN0001.png"}],
+        "document_properties": {
+            "page_start": 3,
+            "footnote_start": 4,
+            "endnote_start": 5,
+            "picture_start": 6,
+            "table_start": 7,
+            "equation_start": 8,
+        },
+        "binary_data": [
+            {
+                "index": 0,
+                "data_type": "EMBEDDING",
+                "storage_id": 1,
+                "extension": "png",
+                "stream_name": "BinData/BIN0001.png",
+            }
+        ],
         "face_names": [{"index": 0, "name": "TestFont"}],
         "border_fills": [
             {
@@ -1878,17 +2168,36 @@ def test_build_decoded_header_xml_maps_docinfo_styles() -> None:
                 "back_slash": {"type": "ALL", "crooked": False, "is_counter": True},
                 "border_types": [0, 2, 7, 10],
                 "border_widths": [1, 2, 3, 4],
-                "border_colors": [{"hex": "#111111"}, {"hex": "#222222"}, {"hex": "#333333"}, {"hex": "#444444"}],
+                "border_colors": [
+                    {"hex": "#111111"},
+                    {"hex": "#222222"},
+                    {"hex": "#333333"},
+                    {"hex": "#444444"},
+                ],
                 "diagonal_type_name": "DASH",
                 "diagonal_width_name": "0.2 mm",
                 "diagonal_color": {"hex": "#555555"},
-                "fill": {"solid": {"background": {"hex": "#ffffff"}, "pattern": {"hex": "#000000"}, "pattern_type": 5}},
+                "fill": {
+                    "solid": {
+                        "background": {"hex": "#ffffff"},
+                        "pattern": {"hex": "#000000"},
+                        "pattern_type": 5,
+                    }
+                },
             }
         ],
         "char_shapes": [
             {
                 "index": 0,
-                "face_ids": {"hangul": 1, "latin": 2, "hanja": 3, "japanese": 4, "other": 5, "symbol": 6, "user": 7},
+                "face_ids": {
+                    "hangul": 1,
+                    "latin": 2,
+                    "hanja": 3,
+                    "japanese": 4,
+                    "other": 5,
+                    "symbol": 6,
+                    "user": 7,
+                },
                 "ratios": {"hangul": 95, "latin": 105},
                 "spacings": {"hangul": -5, "latin": 3},
                 "relative_sizes": {"hangul": 110, "latin": 90},
@@ -1924,12 +2233,34 @@ def test_build_decoded_header_xml_maps_docinfo_styles() -> None:
                 "numbering_bullet_id": 1,
             }
         ],
-        "numberings": [{"index": 0, "levels": [{"level": 1, "text": "^1.", "text_offset": 50, "char_shape_id": 4294967295, "num_format": "DIGIT"}]}],
+        "numberings": [
+            {
+                "index": 0,
+                "levels": [
+                    {
+                        "level": 1,
+                        "text": "^1.",
+                        "text_offset": 50,
+                        "char_shape_id": 4294967295,
+                        "num_format": "DIGIT",
+                    }
+                ],
+            }
+        ],
         "bullets": [{"index": 0, "bullet_char": "-", "char_shape_id": 0}],
-        "styles": [{"index": 0, "name": "본문", "english_name": "Body", "style_type": 0, "para_shape_id": 0, "char_shape_id": 0}],
+        "styles": [
+            {
+                "index": 0,
+                "name": "본문",
+                "english_name": "Body",
+                "style_type": 0,
+                "para_shape_id": 0,
+                "char_shape_id": 0,
+            }
+        ],
     }
 
-    root = ET.fromstring(full.build_decoded_header_xml(decoded_docinfo).encode("utf-8"))
+    root = _dx_fromstring(full.build_decoded_header_xml(decoded_docinfo).encode("utf-8"))
     xml_text = ET.tostring(root, encoding="unicode")
 
     assert root.tag.endswith("head")
@@ -1941,10 +2272,16 @@ def test_build_decoded_header_xml_maps_docinfo_styles() -> None:
     assert '<hh:rightBorder type="DASH" width="0.15 mm" color="#222222"' in xml_text
     assert '<hh:topBorder type="DOUBLE_SLIM" width="0.2 mm" color="#333333"' in xml_text
     assert '<hh:diagonal type="DASH" width="0.2 mm" color="#555555"' in xml_text
-    assert '<hc:winBrush faceColor="#FFFFFF" hatchColor="#000000" alpha="0" hatchStyle="CROSS"' in xml_text
-    assert "height=\"1200\"" in xml_text
-    assert "textColor=\"#123456\"" in xml_text
-    assert '<hh:fontRef hangul="1" latin="2" hanja="3" japanese="4" other="5" symbol="6" user="7"' in xml_text
+    assert (
+        '<hc:winBrush faceColor="#FFFFFF" hatchColor="#000000" alpha="0" hatchStyle="CROSS"'
+        in xml_text
+    )
+    assert 'height="1200"' in xml_text
+    assert 'textColor="#123456"' in xml_text
+    assert (
+        '<hh:fontRef hangul="1" latin="2" hanja="3" japanese="4" other="5" symbol="6" user="7"'
+        in xml_text
+    )
     assert '<hh:ratio hangul="95" latin="105"' in xml_text
     assert '<hh:spacing hangul="-5" latin="3"' in xml_text
     assert '<hh:relSz hangul="110" latin="90"' in xml_text
@@ -1952,28 +2289,33 @@ def test_build_decoded_header_xml_maps_docinfo_styles() -> None:
     assert '<hh:underline type="BOTTOM" shape="SOLID" color="#112233"' in xml_text
     assert '<hh:strikeout shape="SOLID" color="#223344"' in xml_text
     assert '<hh:shadow type="DROP" color="#334455" offsetX="3" offsetY="4"' in xml_text
-    assert "horizontal=\"CENTER\"" in xml_text
-    assert '<hh:breakSetting breakLatinWord="HYPHENATION" breakNonLatinWord="BREAK_WORD"' in xml_text
+    assert 'horizontal="CENTER"' in xml_text
+    assert (
+        '<hh:breakSetting breakLatinWord="HYPHENATION" breakNonLatinWord="BREAK_WORD"' in xml_text
+    )
     assert '<hh:intent value="30" unit="HWPUNIT"' in xml_text
     assert '<hh:left value="10" unit="HWPUNIT"' in xml_text
     assert '<hh:lineSpacing type="PERCENT" value="180" unit="HWPUNIT"' in xml_text
-    assert '<hh:border borderFillIDRef="0" offsetLeft="1" offsetRight="2" offsetTop="3" offsetBottom="4"' in xml_text
+    assert (
+        '<hh:border borderFillIDRef="0" offsetLeft="1" offsetRight="2" offsetTop="3" offsetBottom="4"'
+        in xml_text
+    )
     assert '<hh:autoSpacing eAsianEng="0" eAsianNum="0"' in xml_text
     assert "<hh:numbering" in xml_text
     assert "^1." in xml_text
     assert "<hh:bullet" in xml_text
     assert "<hh:heading" in xml_text
-    assert "idRef=\"0\"" in xml_text
-    assert "level=\"2\"" in xml_text
+    assert 'idRef="0"' in xml_text
+    assert 'level="2"' in xml_text
     mapping = full.build_list_style_mapping(decoded_docinfo)
     assert mapping["applied_para_shape_count"] == 1
     assert mapping["referenced_para_shapes"][0]["mapping"]["kind"] == "numbering"
     assert full.decoded_header_summary({"counts": {"binary_data": 1}})["binary_data"] == 1
-    assert "name=\"본문\"" in xml_text
+    assert 'name="본문"' in xml_text
 
 
 def test_page_layout_updates_emit_page_border_fill() -> None:
-    section_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>'''
+    section_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p></hp:sec>"""
 
     updates, report = full.build_page_layout_section_updates(
         {"Contents/section0.xml": section_xml},
@@ -1985,7 +2327,15 @@ def test_page_layout_updates_emit_page_border_fill() -> None:
                         "width": 59528,
                         "height": 84188,
                         "landscape": "NARROWLY",
-                        "margins": {"left": 5669, "right": 5669, "top": 5669, "bottom": 2834, "header": 0, "footer": 0, "gutter": 0},
+                        "margins": {
+                            "left": 5669,
+                            "right": 5669,
+                            "top": 5669,
+                            "bottom": 2834,
+                            "header": 0,
+                            "footer": 0,
+                            "gutter": 0,
+                        },
                     },
                     "footnote_shapes": [
                         {
@@ -2047,18 +2397,27 @@ def test_page_layout_updates_emit_page_border_fill() -> None:
     assert report["applied_footnote_shape_count"] == 1
     assert report["applied_endnote_shape_count"] == 1
     assert report["applied_page_border_fill_count"] == 1
-    assert '<hp:footNotePr><hp:autoNumFormat type="DIGIT" userChar="*" prefixChar="" suffixChar=")" supscript="1"' in xml_text
+    assert (
+        '<hp:footNotePr><hp:autoNumFormat type="DIGIT" userChar="*" prefixChar="" suffixChar=")" supscript="1"'
+        in xml_text
+    )
     assert '<hp:noteLine length="100" type="DASH" width="0.2 mm" color="#112233"' in xml_text
     assert '<hp:numbering type="ON_PAGE" newNum="3"' in xml_text
     assert '<hp:placement place="RIGHT_MOST_COLUMN" beneathText="0"' in xml_text
-    assert '<hp:endNotePr><hp:autoNumFormat type="ROMAN_SMALL" userChar="" prefixChar="[" suffixChar="]" supscript="0"' in xml_text
+    assert (
+        '<hp:endNotePr><hp:autoNumFormat type="ROMAN_SMALL" userChar="" prefixChar="[" suffixChar="]" supscript="0"'
+        in xml_text
+    )
     assert '<hp:placement place="END_OF_SECTION" beneathText="1"' in xml_text
-    assert '<hp:pageBorderFill type="BOTH" borderFillIDRef="4" textBorder="CONTENT" headerInside="1" footerInside="0" fillArea="PAPER">' in xml_text
+    assert (
+        '<hp:pageBorderFill type="BOTH" borderFillIDRef="4" textBorder="CONTENT" headerInside="1" footerInside="0" fillArea="PAPER">'
+        in xml_text
+    )
     assert '<hp:offset left="1417" right="1418" top="1419" bottom="1420"' in xml_text
 
 
 def test_table_layout_uses_row_cell_counts_for_cell_metric_mapping() -> None:
-    section_xml = b'''<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="2" colCnt="2"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>'''
+    section_xml = b"""<hp:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:tbl rowCnt="2" colCnt="2"><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr><hp:tr><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc><hp:tc><hp:subList textWidth="0" textHeight="0" /><hp:cellMargin left="0" right="0" top="0" bottom="0" /></hp:tc></hp:tr></hp:tbl></hp:run></hp:p></hp:sec>"""
     updates, report = full.build_table_layout_section_updates(
         {"Contents/section0.xml": section_xml},
         {

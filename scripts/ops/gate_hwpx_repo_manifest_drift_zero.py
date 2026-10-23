@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.ops import build_hwpx_repo_manifest_promotion_candidates as promotion_builder  # noqa: E402
 from scripts.ops import gate_hwpx_repo_classification_contract as contract_gate  # noqa: E402
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_manifest_drift_zero_gate"
 
@@ -80,18 +81,16 @@ def run_manifest_drift_zero_gate(
 
 
 def _no_leak(text: str) -> bool:
-    return not (
-        contract_gate.inventory.ABS_PATH_RE.search(text)
-        or contract_gate.inventory.RAW_FILENAME_RE.search(text)
-        or contract_gate.inventory.PII_RE.search(text)
+    return occ.no_leak(
+        text,
+        contract_gate.inventory.ABS_PATH_RE,
+        contract_gate.inventory.RAW_FILENAME_RE,
+        contract_gate.inventory.PII_RE,
     )
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"{contract_gate.new_gate.FAIL_UNSAFE_REPORT}: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, contract_gate.new_gate.FAIL_UNSAFE_REPORT)
 
 
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:

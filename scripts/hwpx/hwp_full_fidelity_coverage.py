@@ -7,7 +7,6 @@ from typing import Any
 
 from extract_hwp_body_fields import FIDELITY_RISK_TAGS, HWP_RECORD_TAGS, TEXT_ONLY_SUPPORTED_TAGS
 
-
 REQUIRED_RECORD_FAMILIES: dict[str, dict[str, Any]] = {
     "document_properties": {
         "tags": {16, 17, 27},
@@ -73,15 +72,69 @@ def coverage_catalog() -> dict[str, Any]:
         name: {
             **{key: value for key, value in spec.items() if key != "tags"},
             "tags": [
-                {"tag_id": tag, "tag_name": _record_name(tag)}
-                for tag in sorted(spec["tags"])
+                {"tag_id": tag, "tag_name": _record_name(tag)} for tag in sorted(spec["tags"])
             ],
         }
         for name, spec in REQUIRED_RECORD_FAMILIES.items()
     }
 
 
-def build_coverage(
+def _build_family_rows(
+    counts: Counter[int],
+    present_tags: set[int],
+    coverage_evidence: dict[str, Any],
+    covered_tags: set[int],
+    blockers: list[str],
+) -> list[dict[str, Any]]:
+    family_rows = []
+    for name, spec in REQUIRED_RECORD_FAMILIES.items():
+        tags = set(spec["tags"])
+        present = sorted(tags & present_tags)
+        audit_decision = _family_audit_decision(name, present, coverage_evidence)
+        if not present:
+            family_status = "NOT_PRESENT"
+        elif audit_decision["status"] == "AUDITED":
+            family_status = "AUDITED"
+            covered_tags.update(present)
+        elif spec["status"] == "supported":
+            family_status = "SUPPORTED"
+            covered_tags.update(present)
+        elif spec["status"] == "partial":
+            family_status = "PARTIAL"
+            blockers.append(f"PARTIAL:{name}")
+        else:
+            family_status = "UNSUPPORTED"
+            blockers.append(f"UNSUPPORTED:{name}")
+        family_rows.append({
+            "family": name,
+            "status": family_status,
+            "present_tags": [
+                {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]}
+                for tag in present
+            ],
+            "reason": spec["reason"],
+            "audit_evidence": audit_decision["evidence"],
+        })
+    return family_rows
+
+
+def _summarize_tag_counts(counts: Counter[int], covered_tags: set[int]) -> tuple[int, int, int]:
+    present_count = sum(counts.values())
+    covered_count = sum(count for tag, count in counts.items() if tag in covered_tags)
+    decoded_count = sum(
+        count
+        for tag, count in counts.items()
+        if tag in DECODED_DOCINFO_TAGS
+        or tag in DECODED_BODY_LAYOUT_TAGS
+        or tag in DECODED_PAGE_LAYOUT_TAGS
+        or tag in DECODED_TABLE_LAYOUT_TAGS
+        or tag in DECODED_SHAPE_LAYOUT_TAGS
+        or tag in FULL_SUPPORTED_TAGS
+    )
+    return present_count, covered_count, decoded_count
+
+
+def build_coverage(  # ruff: ignore[too-many-arguments] -- 28곳 이상 위치 인자 호출부(테스트 포함), 시그니처 변경 보류
     counts: Counter[int],
     bindata_streams: list[str],
     extraction: dict[str, Any],
@@ -112,8 +165,12 @@ def build_coverage(
     shape_coverage = build_shape_coverage(counts, shape_layout)
     numbering_coverage = build_numbering_coverage(decoded_docinfo)
     equation_coverage = build_equation_coverage(counts, equation_layout)
-    picture_coverage = build_picture_coverage(counts, bindata_streams, decoded_docinfo, shape_layout)
-    binary_object_coverage = build_binary_object_coverage(counts, bindata_coverage, picture_coverage)
+    picture_coverage = build_picture_coverage(
+        counts, bindata_streams, decoded_docinfo, shape_layout
+    )
+    binary_object_coverage = build_binary_object_coverage(
+        counts, bindata_coverage, picture_coverage
+    )
     coverage_evidence = {
         "document_properties_coverage": document_properties_coverage,
         "id_mappings_coverage": id_mappings_coverage,
@@ -134,42 +191,19 @@ def build_coverage(
         "equation_coverage": equation_coverage,
     }
 
-    for name, spec in REQUIRED_RECORD_FAMILIES.items():
-        tags = set(spec["tags"])
-        present = sorted(tags & present_tags)
-        audit_decision = _family_audit_decision(name, present, coverage_evidence)
-        if not present:
-            family_status = "NOT_PRESENT"
-        elif audit_decision["status"] == "AUDITED":
-            family_status = "AUDITED"
-            covered_tags.update(present)
-        elif spec["status"] == "supported":
-            family_status = "SUPPORTED"
-            covered_tags.update(present)
-        elif spec["status"] == "partial":
-            family_status = "PARTIAL"
-            blockers.append(f"PARTIAL:{name}")
-        else:
-            family_status = "UNSUPPORTED"
-            blockers.append(f"UNSUPPORTED:{name}")
-        family_rows.append(
-            {
-                "family": name,
-                "status": family_status,
-                "present_tags": [
-                    {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]}
-                    for tag in present
-                ],
-                "reason": spec["reason"],
-                "audit_evidence": audit_decision["evidence"],
-            }
-        )
+    family_rows.extend(
+        _build_family_rows(counts, present_tags, coverage_evidence, covered_tags, blockers)
+    )
 
     unknown_tags = sorted(tag for tag in present_tags if tag not in HWP_RECORD_TAGS)
     if unknown_tags:
         blockers.append("UNKNOWN_RECORD_TAGS")
 
-    risk_tags = sorted(tag for tag in present_tags if tag in FIDELITY_RISK_TAGS or tag not in TEXT_ONLY_SUPPORTED_TAGS)
+    risk_tags = sorted(
+        tag
+        for tag in present_tags
+        if tag in FIDELITY_RISK_TAGS or tag not in TEXT_ONLY_SUPPORTED_TAGS
+    )
     if bindata_streams and bindata_coverage.get("status") != "PASS":
         blockers.append("BINDATA_STREAMS_PRESENT")
     if not extraction.get("ok"):
@@ -177,24 +211,12 @@ def build_coverage(
     if not blockers and risk_tags:
         warnings.append("RISK_TAGS_PRESENT_BUT_NOT_BLOCKING")
 
-    present_count = sum(counts.values())
-    covered_count = sum(count for tag, count in counts.items() if tag in covered_tags)
-    decoded_count = sum(
-        count
-        for tag, count in counts.items()
-        if tag in DECODED_DOCINFO_TAGS
-        or tag in DECODED_BODY_LAYOUT_TAGS
-        or tag in DECODED_PAGE_LAYOUT_TAGS
-        or tag in DECODED_TABLE_LAYOUT_TAGS
-        or tag in DECODED_SHAPE_LAYOUT_TAGS
-        or tag in FULL_SUPPORTED_TAGS
-    )
+    present_count, covered_count, decoded_count = _summarize_tag_counts(counts, covered_tags)
     return {
         "status": "PASS" if not blockers else "FAIL",
         "full_fidelity_ready": not blockers,
         "supported_tags": [
-            {"tag_id": tag, "tag_name": _record_name(tag)}
-            for tag in sorted(covered_tags)
+            {"tag_id": tag, "tag_name": _record_name(tag)} for tag in sorted(covered_tags)
         ],
         "risk_tags": [
             {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]}
@@ -229,17 +251,19 @@ def build_coverage(
         "next_decoder_targets": next_decoder_targets(
             counts,
             bindata_streams,
+            {
+                16: document_properties_coverage,
+                17: id_mappings_coverage,
+                19: fontface_coverage,
+                20: border_fill_coverage,
+                21: char_shape_coverage,
+                23: numbering_coverage,
+                25: para_shape_coverage,
+                77: table_coverage,
+                85: picture_coverage,
+                88: equation_coverage,
+            },
             bindata_coverage,
-            document_properties_coverage,
-            id_mappings_coverage,
-            fontface_coverage,
-            border_fill_coverage,
-            char_shape_coverage,
-            para_shape_coverage,
-            table_coverage,
-            numbering_coverage,
-            equation_coverage,
-            picture_coverage,
         ),
     }
 
@@ -247,7 +271,11 @@ def build_coverage(
 def _docinfo_mapping_count(decoded_docinfo: dict[str, Any] | None, key: str) -> int | None:
     if not isinstance(decoded_docinfo, dict):
         return None
-    mappings = decoded_docinfo.get("id_mappings") if isinstance(decoded_docinfo.get("id_mappings"), dict) else {}
+    mappings = (
+        decoded_docinfo.get("id_mappings")
+        if isinstance(decoded_docinfo.get("id_mappings"), dict)
+        else {}
+    )
     counts = mappings.get("counts") if isinstance(mappings.get("counts"), dict) else {}
     try:
         return int(counts[key])
@@ -258,7 +286,11 @@ def _docinfo_mapping_count(decoded_docinfo: dict[str, Any] | None, key: str) -> 
 def build_document_properties_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
         return {"status": "NO_DECODED_DOCINFO", "mapped_field_count": 0, "missing_fields": []}
-    props = decoded_docinfo.get("document_properties") if isinstance(decoded_docinfo.get("document_properties"), dict) else {}
+    props = (
+        decoded_docinfo.get("document_properties")
+        if isinstance(decoded_docinfo.get("document_properties"), dict)
+        else {}
+    )
     if not props:
         return {"status": "NO_DOCUMENT_PROPERTIES", "mapped_field_count": 0, "missing_fields": []}
     required_fields = [
@@ -289,14 +321,30 @@ def build_document_properties_coverage(decoded_docinfo: dict[str, Any] | None) -
     }
 
 
-def build_docinfo_extension_coverage(counts: Counter[int], decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
+def build_docinfo_extension_coverage(
+    counts: Counter[int], decoded_docinfo: dict[str, Any] | None
+) -> dict[str, Any]:
     extension_tags = {28, 30, 31, 32, 92, 94, 96, 97}
     present = sorted(tag for tag in extension_tags if counts.get(tag, 0))
     if not present:
-        return {"status": "NOT_PRESENT", "present_tags": [], "decoded_count": 0, "decode_error_count": 0}
+        return {
+            "status": "NOT_PRESENT",
+            "present_tags": [],
+            "decoded_count": 0,
+            "decode_error_count": 0,
+        }
     if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "present_tags": present, "decoded_count": 0, "decode_error_count": 0}
-    rows = decoded_docinfo.get("docinfo_extensions") if isinstance(decoded_docinfo.get("docinfo_extensions"), list) else []
+        return {
+            "status": "NO_DECODED_DOCINFO",
+            "present_tags": present,
+            "decoded_count": 0,
+            "decode_error_count": 0,
+        }
+    rows = (
+        decoded_docinfo.get("docinfo_extensions")
+        if isinstance(decoded_docinfo.get("docinfo_extensions"), list)
+        else []
+    )
     decoded_by_tag: Counter[int] = Counter()
     decode_errors: list[dict[str, Any]] = []
     for row in rows:
@@ -306,15 +354,23 @@ def build_docinfo_extension_coverage(counts: Counter[int], decoded_docinfo: dict
             continue
         decoded_by_tag[tag_id] += 1
         if row.get("decode_error"):
-            decode_errors.append({"tag_id": tag_id, "tag_name": _record_name(tag_id), "message": row.get("message")})
+            decode_errors.append({
+                "tag_id": tag_id,
+                "tag_name": _record_name(tag_id),
+                "message": row.get("message"),
+            })
     missing = [tag for tag in present if decoded_by_tag.get(tag, 0) < counts.get(tag, 0)]
     status = "PASS" if not missing and not decode_errors else "PARTIAL_DOCINFO_EXTENSIONS"
     return {
         "status": status,
-        "present_tags": [{"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]} for tag in present],
+        "present_tags": [
+            {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]} for tag in present
+        ],
         "decoded_count": sum(decoded_by_tag.values()),
         "decode_error_count": len(decode_errors),
-        "missing_decoded_tags": [{"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]} for tag in missing],
+        "missing_decoded_tags": [
+            {"tag_id": tag, "tag_name": _record_name(tag), "count": counts[tag]} for tag in missing
+        ],
         "decode_errors": decode_errors[:20],
     }
 
@@ -323,12 +379,25 @@ def _coverage_ok(row: dict[str, Any] | None, *, absent_ok: bool = True) -> bool:
     status = (row or {}).get("status")
     if status == "PASS":
         return True
-    if absent_ok and status in {"NOT_PRESENT", "NO_BORDER_FILLS", "NO_LIST_DEFINITIONS", "NO_STYLES", "NO_TABLES", "NO_PICTURES", "NO_BINDATA_STREAMS", "NO_EQUATIONS", "NO_BINARY_OBJECTS", "NO_VECTOR_SHAPES"}:
+    if absent_ok and status in {
+        "NOT_PRESENT",
+        "NO_BORDER_FILLS",
+        "NO_LIST_DEFINITIONS",
+        "NO_STYLES",
+        "NO_TABLES",
+        "NO_PICTURES",
+        "NO_BINDATA_STREAMS",
+        "NO_EQUATIONS",
+        "NO_BINARY_OBJECTS",
+        "NO_VECTOR_SHAPES",
+    }:
         return True
     return False
 
 
-def _family_audit_decision(name: str, present: list[int], evidence: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _family_audit_decision(
+    name: str, present: list[int], evidence: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     if not present:
         return {"status": "NOT_PRESENT", "evidence": []}
     family_checks = {
@@ -352,15 +421,24 @@ def _family_audit_decision(name: str, present: list[int], evidence: dict[str, di
     check_names = family_checks.get(name)
     if not check_names:
         return {"status": "PARTIAL", "evidence": []}
-    rows = [{"name": check_name, "status": (evidence.get(check_name) or {}).get("status")} for check_name in check_names]
+    rows = [
+        {"name": check_name, "status": (evidence.get(check_name) or {}).get("status")}
+        for check_name in check_names
+    ]
     if all(_coverage_ok(evidence.get(check_name)) for check_name in check_names):
         return {"status": "AUDITED", "evidence": rows}
     return {"status": "PARTIAL", "evidence": rows}
 
 
 def _id_mapping_actual_counts(decoded_docinfo: dict[str, Any]) -> dict[str, int]:
-    counts = decoded_docinfo.get("counts") if isinstance(decoded_docinfo.get("counts"), dict) else {}
-    groups = decoded_docinfo.get("face_name_groups") if isinstance(decoded_docinfo.get("face_name_groups"), dict) else {}
+    counts = (
+        decoded_docinfo.get("counts") if isinstance(decoded_docinfo.get("counts"), dict) else {}
+    )
+    groups = (
+        decoded_docinfo.get("face_name_groups")
+        if isinstance(decoded_docinfo.get("face_name_groups"), dict)
+        else {}
+    )
     return {
         "binary_data": int(counts.get("binary_data") or 0),
         "hangul_font": len(groups.get("hangul") or []),
@@ -383,7 +461,11 @@ def _id_mapping_actual_counts(decoded_docinfo: dict[str, Any]) -> dict[str, int]
 def build_id_mappings_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
         return {"status": "NO_DECODED_DOCINFO", "mapped_count": 0, "mismatches": []}
-    mappings = decoded_docinfo.get("id_mappings") if isinstance(decoded_docinfo.get("id_mappings"), dict) else {}
+    mappings = (
+        decoded_docinfo.get("id_mappings")
+        if isinstance(decoded_docinfo.get("id_mappings"), dict)
+        else {}
+    )
     expected = mappings.get("counts") if isinstance(mappings.get("counts"), dict) else {}
     if not expected:
         return {"status": "NO_ID_MAPPINGS", "mapped_count": 0, "mismatches": []}
@@ -412,11 +494,24 @@ def build_id_mappings_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[s
 
 def build_fontface_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "face_name_count": 0, "mapped_total": 0, "mismatches": []}
-    faces = decoded_docinfo.get("face_names") if isinstance(decoded_docinfo.get("face_names"), list) else []
+        return {
+            "status": "NO_DECODED_DOCINFO",
+            "face_name_count": 0,
+            "mapped_total": 0,
+            "mismatches": [],
+        }
+    faces = (
+        decoded_docinfo.get("face_names")
+        if isinstance(decoded_docinfo.get("face_names"), list)
+        else []
+    )
     if not faces:
         return {"status": "NO_FONTFACES", "face_name_count": 0, "mapped_total": 0, "mismatches": []}
-    groups = decoded_docinfo.get("face_name_groups") if isinstance(decoded_docinfo.get("face_name_groups"), dict) else {}
+    groups = (
+        decoded_docinfo.get("face_name_groups")
+        if isinstance(decoded_docinfo.get("face_name_groups"), dict)
+        else {}
+    )
     mismatches = []
     mapped_total = 0
     for slot in ["hangul", "latin", "hanja", "japanese", "other", "symbol", "user"]:
@@ -435,7 +530,11 @@ def build_fontface_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str,
     return {
         "status": status,
         "face_name_count": len(faces),
-        "mapped_total": mapped_total or sum(len(groups.get(slot) or []) for slot in ["hangul", "latin", "hanja", "japanese", "other", "symbol", "user"]),
+        "mapped_total": mapped_total
+        or sum(
+            len(groups.get(slot) or [])
+            for slot in ["hangul", "latin", "hanja", "japanese", "other", "symbol", "user"]
+        ),
         "unassigned_count": len(unassigned),
         "mismatches": mismatches,
     }
@@ -449,9 +548,7 @@ def _body_text_paragraphs(body_layout: dict[str, Any] | None) -> list[dict[str, 
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for paragraph in section.get("paragraphs") or []:
-            if isinstance(paragraph, dict) and paragraph.get("has_para_text"):
-                paragraphs.append(paragraph)
+        paragraphs.extend(paragraph for paragraph in section.get("paragraphs") or [] if isinstance(paragraph, dict) and paragraph.get("has_para_text"))
     return paragraphs
 
 
@@ -498,7 +595,9 @@ def _border_refs_from_docinfo(decoded_docinfo: dict[str, Any] | None) -> list[di
         rows = decoded_docinfo.get(key) if isinstance(decoded_docinfo.get(key), list) else []
         for row in rows:
             if isinstance(row, dict):
-                _append_border_ref(refs, source, row.get("border_fill_id"), record_index=row.get("index"))
+                _append_border_ref(
+                    refs, source, row.get("border_fill_id"), record_index=row.get("index")
+                )
     return refs
 
 
@@ -513,7 +612,13 @@ def _border_refs_from_page_layout(page_layout: dict[str, Any] | None) -> list[di
         section_index = section.get("section_index")
         for row in section.get("page_border_fills") or []:
             if isinstance(row, dict):
-                _append_border_ref(refs, "page_border_fill", row.get("border_fill_id"), section_index=section_index, record_index=row.get("record_index"))
+                _append_border_ref(
+                    refs,
+                    "page_border_fill",
+                    row.get("border_fill_id"),
+                    section_index=section_index,
+                    record_index=row.get("record_index"),
+                )
     return refs
 
 
@@ -521,7 +626,9 @@ def _border_refs_from_table_layout(table_layout: dict[str, Any] | None) -> list[
     refs: list[dict[str, Any]] = []
     if not isinstance(table_layout, dict):
         return refs
-    sections = table_layout.get("sections") if isinstance(table_layout.get("sections"), list) else []
+    sections = (
+        table_layout.get("sections") if isinstance(table_layout.get("sections"), list) else []
+    )
     for section in sections:
         if not isinstance(section, dict):
             continue
@@ -535,7 +642,9 @@ def _border_refs_from_table_layout(table_layout: dict[str, Any] | None) -> list[
             col_count = decoded_table.get("col_count")
             for row in table.get("list_headers") or []:
                 if isinstance(row, dict):
-                    cell_addr = row.get("cell_addr") if isinstance(row.get("cell_addr"), dict) else {}
+                    cell_addr = (
+                        row.get("cell_addr") if isinstance(row.get("cell_addr"), dict) else {}
+                    )
                     try:
                         row_addr = int(cell_addr.get("row"))
                         col_addr = int(cell_addr.get("col"))
@@ -551,7 +660,14 @@ def _border_refs_from_table_layout(table_layout: dict[str, Any] | None) -> list[
                         and (row_addr >= max_row or col_addr >= max_col)
                     ):
                         continue
-                    _append_border_ref(refs, "table_cell", row.get("border_fill_id"), section_index=section_index, table_index=table_index, record_index=row.get("record_index"))
+                    _append_border_ref(
+                        refs,
+                        "table_cell",
+                        row.get("border_fill_id"),
+                        section_index=section_index,
+                        table_index=table_index,
+                        record_index=row.get("record_index"),
+                    )
     return refs
 
 
@@ -561,10 +677,20 @@ def build_border_fill_coverage(
     table_layout: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "border_fill_count": 0, "referenced_border_fill_count": 0, "unresolved_ref_count": 0}
+        return {
+            "status": "NO_DECODED_DOCINFO",
+            "border_fill_count": 0,
+            "referenced_border_fill_count": 0,
+            "unresolved_ref_count": 0,
+        }
     border_fill_ids = _known_docinfo_ids(decoded_docinfo, "border_fills")
     if not border_fill_ids:
-        return {"status": "NO_BORDER_FILLS", "border_fill_count": 0, "referenced_border_fill_count": 0, "unresolved_ref_count": 0}
+        return {
+            "status": "NO_BORDER_FILLS",
+            "border_fill_count": 0,
+            "referenced_border_fill_count": 0,
+            "unresolved_ref_count": 0,
+        }
     expected = _docinfo_mapping_count(decoded_docinfo, "border_fill")
     count_mismatch = expected is not None and expected != len(border_fill_ids)
     refs = (
@@ -572,7 +698,11 @@ def build_border_fill_coverage(
         + _border_refs_from_page_layout(page_layout)
         + _border_refs_from_table_layout(table_layout)
     )
-    missing_refs = [ref for ref in refs if _resolve_border_fill_id(ref.get("border_fill_id"), border_fill_ids) is None]
+    missing_refs = [
+        ref
+        for ref in refs
+        if _resolve_border_fill_id(ref.get("border_fill_id"), border_fill_ids) is None
+    ]
     status = "PASS" if not count_mismatch and not missing_refs else "PARTIAL_BORDER_FILL_MAPPING"
     return {
         "status": status,
@@ -591,10 +721,24 @@ def build_para_shape_coverage(
     body_layout: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "para_shape_count": 0, "referenced_text_paragraphs": 0, "unresolved_ref_count": 0}
-    shapes = decoded_docinfo.get("para_shapes") if isinstance(decoded_docinfo.get("para_shapes"), list) else []
+        return {
+            "status": "NO_DECODED_DOCINFO",
+            "para_shape_count": 0,
+            "referenced_text_paragraphs": 0,
+            "unresolved_ref_count": 0,
+        }
+    shapes = (
+        decoded_docinfo.get("para_shapes")
+        if isinstance(decoded_docinfo.get("para_shapes"), list)
+        else []
+    )
     if not shapes:
-        return {"status": "NO_PARA_SHAPES", "para_shape_count": 0, "referenced_text_paragraphs": 0, "unresolved_ref_count": 0}
+        return {
+            "status": "NO_PARA_SHAPES",
+            "para_shape_count": 0,
+            "referenced_text_paragraphs": 0,
+            "unresolved_ref_count": 0,
+        }
     expected = _docinfo_mapping_count(decoded_docinfo, "para_shape")
     count_mismatch = expected is not None and expected != len(shapes)
     known_ids = set()
@@ -632,7 +776,11 @@ def build_para_shape_coverage(
 
 def _paragraph_char_shape_refs(paragraph: dict[str, Any]) -> list[int]:
     refs = []
-    runs = paragraph.get("char_shape_runs") if isinstance(paragraph.get("char_shape_runs"), list) else []
+    runs = (
+        paragraph.get("char_shape_runs")
+        if isinstance(paragraph.get("char_shape_runs"), list)
+        else []
+    )
     for run in runs:
         if not isinstance(run, dict):
             continue
@@ -653,10 +801,24 @@ def build_char_shape_coverage(
     body_layout: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "char_shape_count": 0, "referenced_text_paragraphs": 0, "unresolved_ref_count": 0}
-    shapes = decoded_docinfo.get("char_shapes") if isinstance(decoded_docinfo.get("char_shapes"), list) else []
+        return {
+            "status": "NO_DECODED_DOCINFO",
+            "char_shape_count": 0,
+            "referenced_text_paragraphs": 0,
+            "unresolved_ref_count": 0,
+        }
+    shapes = (
+        decoded_docinfo.get("char_shapes")
+        if isinstance(decoded_docinfo.get("char_shapes"), list)
+        else []
+    )
     if not shapes:
-        return {"status": "NO_CHAR_SHAPES", "char_shape_count": 0, "referenced_text_paragraphs": 0, "unresolved_ref_count": 0}
+        return {
+            "status": "NO_CHAR_SHAPES",
+            "char_shape_count": 0,
+            "referenced_text_paragraphs": 0,
+            "unresolved_ref_count": 0,
+        }
     expected = _docinfo_mapping_count(decoded_docinfo, "char_shape")
     count_mismatch = expected is not None and expected != len(shapes)
     known_ids = set()
@@ -694,10 +856,14 @@ def build_char_shape_coverage(
     }
 
 
-def build_style_coverage(decoded_docinfo: dict[str, Any] | None, body_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_style_coverage(
+    decoded_docinfo: dict[str, Any] | None, body_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     if not isinstance(decoded_docinfo, dict):
         return {"status": "NO_DECODED_DOCINFO", "style_count": 0, "unresolved_ref_count": 0}
-    styles = decoded_docinfo.get("styles") if isinstance(decoded_docinfo.get("styles"), list) else []
+    styles = (
+        decoded_docinfo.get("styles") if isinstance(decoded_docinfo.get("styles"), list) else []
+    )
     expected = _docinfo_mapping_count(decoded_docinfo, "style")
     if not styles and not expected:
         return {"status": "NO_STYLES", "style_count": 0, "unresolved_ref_count": 0}
@@ -726,30 +892,68 @@ def build_style_coverage(decoded_docinfo: dict[str, Any] | None, body_layout: di
     }
 
 
-def build_paragraph_layout_coverage(counts: Counter[int], body_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_paragraph_layout_coverage(
+    counts: Counter[int], body_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     para_header_count = int(counts.get(66, 0))
     para_text_count = int(counts.get(67, 0))
     para_char_shape_count = int(counts.get(68, 0))
     para_line_seg_count = int(counts.get(69, 0))
     para_range_tag_count = int(counts.get(70, 0))
-    if not any((para_header_count, para_text_count, para_char_shape_count, para_line_seg_count, para_range_tag_count)):
-        return {"status": "NOT_PRESENT", "paragraph_count": 0, "text_paragraph_count": 0, "mismatches": []}
+    if not any((
+        para_header_count,
+        para_text_count,
+        para_char_shape_count,
+        para_line_seg_count,
+        para_range_tag_count,
+    )):
+        return {
+            "status": "NOT_PRESENT",
+            "paragraph_count": 0,
+            "text_paragraph_count": 0,
+            "mismatches": [],
+        }
     if not isinstance(body_layout, dict):
-        return {"status": "NO_BODY_LAYOUT", "paragraph_count": 0, "text_paragraph_count": 0, "mismatches": []}
+        return {
+            "status": "NO_BODY_LAYOUT",
+            "paragraph_count": 0,
+            "text_paragraph_count": 0,
+            "mismatches": [],
+        }
     paragraph_count = int(body_layout.get("paragraph_count") or 0)
     text_paragraph_count = int(body_layout.get("text_paragraph_count") or 0)
     paragraphs = _body_text_paragraphs(body_layout)
     mismatches = []
     if paragraph_count != para_header_count:
-        mismatches.append({"field": "paragraph_count", "expected": para_header_count, "actual": paragraph_count})
+        mismatches.append({
+            "field": "paragraph_count",
+            "expected": para_header_count,
+            "actual": paragraph_count,
+        })
     if text_paragraph_count != para_text_count:
-        mismatches.append({"field": "text_paragraph_count", "expected": para_text_count, "actual": text_paragraph_count})
-    char_shape_mapped = sum(1 for paragraph in paragraphs if paragraph.get("char_shape_runs") or paragraph.get("first_char_shape_id") is not None)
+        mismatches.append({
+            "field": "text_paragraph_count",
+            "expected": para_text_count,
+            "actual": text_paragraph_count,
+        })
+    char_shape_mapped = sum(
+        1
+        for paragraph in paragraphs
+        if paragraph.get("char_shape_runs") or paragraph.get("first_char_shape_id") is not None
+    )
     line_seg_mapped = sum(1 for paragraph in paragraphs if paragraph.get("line_segments"))
     if para_char_shape_count and char_shape_mapped == 0:
-        mismatches.append({"field": "para_char_shape_runs", "expected": para_char_shape_count, "actual": char_shape_mapped})
+        mismatches.append({
+            "field": "para_char_shape_runs",
+            "expected": para_char_shape_count,
+            "actual": char_shape_mapped,
+        })
     if para_line_seg_count and line_seg_mapped == 0:
-        mismatches.append({"field": "para_line_segments", "expected": para_line_seg_count, "actual": line_seg_mapped})
+        mismatches.append({
+            "field": "para_line_segments",
+            "expected": para_line_seg_count,
+            "actual": line_seg_mapped,
+        })
     status = "PASS" if not mismatches else "PARTIAL_PARAGRAPH_LAYOUT"
     return {
         "status": status,
@@ -767,7 +971,9 @@ def build_paragraph_layout_coverage(counts: Counter[int], body_layout: dict[str,
     }
 
 
-def build_controls_page_coverage(counts: Counter[int], page_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_controls_page_coverage(
+    counts: Counter[int], page_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     tag_counts = {
         71: int(counts.get(71, 0)),
         72: int(counts.get(72, 0)),
@@ -781,26 +987,65 @@ def build_controls_page_coverage(counts: Counter[int], page_layout: dict[str, An
         return {"status": "NO_PAGE_LAYOUT", "mismatch_count": 0, "mismatches": []}
     sections = page_layout.get("sections") if isinstance(page_layout.get("sections"), list) else []
     actual = {
-        71: sum(int(section.get("ctrl_header_count") or 0) for section in sections if isinstance(section, dict)),
-        72: sum(int(section.get("list_header_count") or 0) for section in sections if isinstance(section, dict)),
-        73: sum(int(section.get("page_definition_count") or 0) for section in sections if isinstance(section, dict)),
-        74: sum(int(section.get("footnote_shape_count") or 0) for section in sections if isinstance(section, dict)),
-        75: sum(int(section.get("page_border_fill_count") or 0) for section in sections if isinstance(section, dict)),
+        71: sum(
+            int(section.get("ctrl_header_count") or 0)
+            for section in sections
+            if isinstance(section, dict)
+        ),
+        72: sum(
+            int(section.get("list_header_count") or 0)
+            for section in sections
+            if isinstance(section, dict)
+        ),
+        73: sum(
+            int(section.get("page_definition_count") or 0)
+            for section in sections
+            if isinstance(section, dict)
+        ),
+        74: sum(
+            int(section.get("footnote_shape_count") or 0)
+            for section in sections
+            if isinstance(section, dict)
+        ),
+        75: sum(
+            int(section.get("page_border_fill_count") or 0)
+            for section in sections
+            if isinstance(section, dict)
+        ),
     }
     mismatches = [
-        {"tag_id": tag, "tag_name": _record_name(tag), "expected": expected, "actual": actual.get(tag, 0)}
+        {
+            "tag_id": tag,
+            "tag_name": _record_name(tag),
+            "expected": expected,
+            "actual": actual.get(tag, 0),
+        }
         for tag, expected in tag_counts.items()
         if expected != actual.get(tag, 0)
     ]
     mapped_page_defs = int(page_layout.get("mapped_page_definition_count") or 0)
     if tag_counts[73] and mapped_page_defs <= 0:
-        mismatches.append({"tag_id": 73, "tag_name": _record_name(73), "expected": tag_counts[73], "actual": mapped_page_defs, "field": "mapped_page_definition_count"})
+        mismatches.append({
+            "tag_id": 73,
+            "tag_name": _record_name(73),
+            "expected": tag_counts[73],
+            "actual": mapped_page_defs,
+            "field": "mapped_page_definition_count",
+        })
     status = "PASS" if not mismatches else "PARTIAL_CONTROLS_PAGE"
     return {
         "status": status,
         "section_count": len(sections),
-        "record_counts": {str(tag): {"tag_name": _record_name(tag), "count": count} for tag, count in tag_counts.items() if count},
-        "mapped_counts": {str(tag): {"tag_name": _record_name(tag), "count": actual.get(tag, 0)} for tag, count in tag_counts.items() if count},
+        "record_counts": {
+            str(tag): {"tag_name": _record_name(tag), "count": count}
+            for tag, count in tag_counts.items()
+            if count
+        },
+        "mapped_counts": {
+            str(tag): {"tag_name": _record_name(tag), "count": actual.get(tag, 0)}
+            for tag, count in tag_counts.items()
+            if count
+        },
         "mapped_page_definition_count": mapped_page_defs,
         "mismatch_count": len(mismatches),
         "mismatches": mismatches[:50],
@@ -810,15 +1055,15 @@ def build_controls_page_coverage(counts: Counter[int], page_layout: dict[str, An
 def _table_rows_from_layout(table_layout: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(table_layout, dict):
         return []
-    sections = table_layout.get("sections") if isinstance(table_layout.get("sections"), list) else []
+    sections = (
+        table_layout.get("sections") if isinstance(table_layout.get("sections"), list) else []
+    )
     rows = []
     for section in sections:
         if not isinstance(section, dict):
             continue
         section_index = section.get("section_index")
-        for table in section.get("tables") or []:
-            if isinstance(table, dict):
-                rows.append({**table, "_section_index": section_index})
+        rows.extend({**table, "_section_index": section_index} for table in section.get("tables") or [] if isinstance(table, dict))
     return rows
 
 
@@ -835,7 +1080,9 @@ def _valid_row_cell_counts(row_cell_counts: Any, row_count: int, col_count: int)
     return True
 
 
-def build_table_coverage(counts: Counter[int], table_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_table_coverage(
+    counts: Counter[int], table_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     table_record_count = int(counts.get(77, 0) or 0)
     if table_record_count <= 0:
         return {
@@ -868,27 +1115,31 @@ def build_table_coverage(counts: Counter[int], table_layout: dict[str, Any] | No
         except (TypeError, ValueError):
             row_count = col_count = 0
         if row_count <= 0 or col_count <= 0:
-            missing_dimensions.append(
-                {
-                    "table_index": table.get("table_index", index),
-                    "section_index": table.get("_section_index"),
-                    "record_index": table.get("record_index"),
-                    "row_count": decoded_table.get("row_count"),
-                    "col_count": decoded_table.get("col_count"),
-                }
+            missing_dimensions.append({
+                "table_index": table.get("table_index", index),
+                "section_index": table.get("_section_index"),
+                "record_index": table.get("record_index"),
+                "row_count": decoded_table.get("row_count"),
+                "col_count": decoded_table.get("col_count"),
+            })
+        if (
+            row_count > 0
+            and col_count > 0
+            and not _valid_row_cell_counts(
+                decoded_table.get("row_cell_counts"), row_count, col_count
             )
-        if row_count > 0 and col_count > 0 and not _valid_row_cell_counts(decoded_table.get("row_cell_counts"), row_count, col_count):
-            invalid_row_cells.append(
-                {
-                    "table_index": table.get("table_index", index),
-                    "section_index": table.get("_section_index"),
-                    "record_index": table.get("record_index"),
-                    "row_count": row_count,
-                    "col_count": col_count,
-                    "row_cell_counts": decoded_table.get("row_cell_counts"),
-                }
-            )
-        list_headers = table.get("list_headers") if isinstance(table.get("list_headers"), list) else []
+        ):
+            invalid_row_cells.append({
+                "table_index": table.get("table_index", index),
+                "section_index": table.get("_section_index"),
+                "record_index": table.get("record_index"),
+                "row_count": row_count,
+                "col_count": col_count,
+                "row_cell_counts": decoded_table.get("row_cell_counts"),
+            })
+        list_headers = (
+            table.get("list_headers") if isinstance(table.get("list_headers"), list) else []
+        )
         list_header_total += len(list_headers)
         mapped_list_header_total += int(table.get("mapped_list_header_count") or 0)
         extra_list_header_total += int(table.get("extra_list_header_count") or 0)
@@ -899,9 +1150,7 @@ def build_table_coverage(counts: Counter[int], table_layout: dict[str, Any] | No
     ]
     status = (
         "PASS"
-        if len(tables) >= table_record_count
-        and not missing_dimensions
-        and not invalid_row_cells
+        if len(tables) >= table_record_count and not missing_dimensions and not invalid_row_cells
         else "PARTIAL_TABLE_MAPPING"
     )
     warnings = []
@@ -943,7 +1192,12 @@ def _numbering_level_count(row: dict[str, Any]) -> int:
     return len([level for level in levels if isinstance(level, dict)])
 
 
-def _resolve_numbering_para_shape(row: dict[str, Any], numbering_ids: set[int], bullet_ids: set[int], numbering_levels: dict[int, int]) -> dict[str, Any]:
+def _resolve_numbering_para_shape(
+    row: dict[str, Any],
+    numbering_ids: set[int],
+    bullet_ids: set[int],
+    numbering_levels: dict[int, int],
+) -> dict[str, Any]:
     try:
         raw_id = int(row.get("numbering_bullet_id"))
     except (TypeError, ValueError):
@@ -968,7 +1222,12 @@ def _resolve_numbering_para_shape(row: dict[str, Any], numbering_ids: set[int], 
             "reason": None if level < level_count else "LEVEL_OUT_OF_RANGE",
         }
     if raw_id is None or raw_id <= 0:
-        return {"status": "NOT_APPLIED", "raw_id": raw_id, "level": level, "reason": "NO_NUMBERING_BULLET_ID"}
+        return {
+            "status": "NOT_APPLIED",
+            "raw_id": raw_id,
+            "level": level,
+            "reason": "NO_NUMBERING_BULLET_ID",
+        }
     for candidate in (raw_id - 1, raw_id):
         if candidate in numbering_ids:
             level_count = numbering_levels.get(candidate, 0)
@@ -982,41 +1241,54 @@ def _resolve_numbering_para_shape(row: dict[str, Any], numbering_ids: set[int], 
             }
     for candidate in (raw_id - 1, raw_id):
         if candidate in bullet_ids:
-            return {"status": "APPLIED", "kind": "bullet", "id_ref": candidate, "raw_id": raw_id, "level": level}
+            return {
+                "status": "APPLIED",
+                "kind": "bullet",
+                "id_ref": candidate,
+                "raw_id": raw_id,
+                "level": level,
+            }
     return {"status": "UNRESOLVED", "raw_id": raw_id, "level": level, "reason": "LIST_ID_NOT_FOUND"}
 
 
-def build_numbering_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
-    if not isinstance(decoded_docinfo, dict):
-        return {"status": "NO_DECODED_DOCINFO", "numbering_count": 0, "unresolved_ref_count": 0}
-    numberings = decoded_docinfo.get("numberings") if isinstance(decoded_docinfo.get("numberings"), list) else []
-    bullets = decoded_docinfo.get("bullets") if isinstance(decoded_docinfo.get("bullets"), list) else []
-    if not numberings and not bullets:
-        return {"status": "NO_LIST_DEFINITIONS", "numbering_count": 0, "bullet_count": 0, "unresolved_ref_count": 0}
-    expected_numberings = _docinfo_mapping_count(decoded_docinfo, "numbering")
-    expected_bullets = _docinfo_mapping_count(decoded_docinfo, "bullet")
+def _numbering_count_mismatches(
+    numberings: list[Any],
+    bullets: list[Any],
+    expected_numberings: int | None,
+    expected_bullets: int | None,
+) -> list[dict[str, Any]]:
     count_mismatches = []
     if expected_numberings is not None and expected_numberings != len(numberings):
-        count_mismatches.append({"key": "numbering", "expected": expected_numberings, "actual": len(numberings)})
+        count_mismatches.append({
+            "key": "numbering",
+            "expected": expected_numberings,
+            "actual": len(numberings),
+        })
     if expected_bullets is not None and expected_bullets != len(bullets):
-        count_mismatches.append({"key": "bullet", "expected": expected_bullets, "actual": len(bullets)})
-    numbering_ids = _known_list_ids(decoded_docinfo, "numberings")
-    bullet_ids = _known_list_ids(decoded_docinfo, "bullets")
-    numbering_levels = {
-        int(row.get("index")): _numbering_level_count(row)
-        for row in numberings
-        if isinstance(row, dict) and row.get("index") is not None
-    }
+        count_mismatches.append({
+            "key": "bullet",
+            "expected": expected_bullets,
+            "actual": len(bullets),
+        })
+    return count_mismatches
+
+
+def _malformed_numberings(numberings: list[Any]) -> list[dict[str, Any]]:
     malformed_numberings = []
     for row in numberings:
         if not isinstance(row, dict):
             continue
         if _numbering_level_count(row) <= 0:
             malformed_numberings.append({"numbering_id": row.get("index"), "reason": "NO_LEVELS"})
+    return malformed_numberings
+
+
+def _resolve_numbering_references(
+    para_shapes: list[Any], numbering_ids: Any, bullet_ids: Any, numbering_levels: dict[int, int]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
     referenced = []
     unresolved = []
     not_applied = 0
-    para_shapes = decoded_docinfo.get("para_shapes") if isinstance(decoded_docinfo.get("para_shapes"), list) else []
     for row in para_shapes:
         if not isinstance(row, dict):
             continue
@@ -1035,7 +1307,53 @@ def build_numbering_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str
             unresolved.append(ref)
         elif resolved.get("status") == "NOT_APPLIED":
             not_applied += 1
-    status = "PASS" if not count_mismatches and not malformed_numberings and not unresolved else "PARTIAL_NUMBERING_MAPPING"
+    return referenced, unresolved, not_applied
+
+
+def build_numbering_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(decoded_docinfo, dict):
+        return {"status": "NO_DECODED_DOCINFO", "numbering_count": 0, "unresolved_ref_count": 0}
+    numberings = (
+        decoded_docinfo.get("numberings")
+        if isinstance(decoded_docinfo.get("numberings"), list)
+        else []
+    )
+    bullets = (
+        decoded_docinfo.get("bullets") if isinstance(decoded_docinfo.get("bullets"), list) else []
+    )
+    if not numberings and not bullets:
+        return {
+            "status": "NO_LIST_DEFINITIONS",
+            "numbering_count": 0,
+            "bullet_count": 0,
+            "unresolved_ref_count": 0,
+        }
+    expected_numberings = _docinfo_mapping_count(decoded_docinfo, "numbering")
+    expected_bullets = _docinfo_mapping_count(decoded_docinfo, "bullet")
+    count_mismatches = _numbering_count_mismatches(
+        numberings, bullets, expected_numberings, expected_bullets
+    )
+    numbering_ids = _known_list_ids(decoded_docinfo, "numberings")
+    bullet_ids = _known_list_ids(decoded_docinfo, "bullets")
+    numbering_levels = {
+        int(row.get("index")): _numbering_level_count(row)
+        for row in numberings
+        if isinstance(row, dict) and row.get("index") is not None
+    }
+    malformed_numberings = _malformed_numberings(numberings)
+    para_shapes = (
+        decoded_docinfo.get("para_shapes")
+        if isinstance(decoded_docinfo.get("para_shapes"), list)
+        else []
+    )
+    referenced, unresolved, not_applied = _resolve_numbering_references(
+        para_shapes, numbering_ids, bullet_ids, numbering_levels
+    )
+    status = (
+        "PASS"
+        if not count_mismatches and not malformed_numberings and not unresolved
+        else "PARTIAL_NUMBERING_MAPPING"
+    )
     return {
         "status": status,
         "numbering_count": len(numberings),
@@ -1047,7 +1365,9 @@ def build_numbering_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str
         "malformed_numbering_count": len(malformed_numberings),
         "malformed_numberings": malformed_numberings[:50],
         "referenced_para_shape_count": len(referenced),
-        "applied_para_shape_count": sum(1 for row in referenced if row.get("mapping", {}).get("status") == "APPLIED"),
+        "applied_para_shape_count": sum(
+            1 for row in referenced if row.get("mapping", {}).get("status") == "APPLIED"
+        ),
         "not_applied_para_shape_count": not_applied,
         "unresolved_ref_count": len(unresolved),
         "unresolved_refs": unresolved[:50],
@@ -1057,44 +1377,47 @@ def build_numbering_coverage(decoded_docinfo: dict[str, Any] | None) -> dict[str
 def _equation_rows(equation_layout: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(equation_layout, dict):
         return []
-    sections = equation_layout.get("sections") if isinstance(equation_layout.get("sections"), list) else []
+    sections = (
+        equation_layout.get("sections") if isinstance(equation_layout.get("sections"), list) else []
+    )
     rows = []
     for section in sections:
         if not isinstance(section, dict):
             continue
         section_index = section.get("section_index")
-        for row in section.get("equations") or []:
-            if isinstance(row, dict):
-                rows.append({**row, "section_index": section_index})
+        rows.extend({**row, "section_index": section_index} for row in section.get("equations") or [] if isinstance(row, dict))
     return rows
 
 
-def build_equation_coverage(counts: Counter[int], equation_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_equation_coverage(
+    counts: Counter[int], equation_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     eqedit_count = int(counts.get(88, 0) or 0)
     ctrl_data_count = int(counts.get(87, 0) or 0)
     if eqedit_count <= 0 and ctrl_data_count <= 0:
-        return {"status": "NO_EQUATIONS", "eqedit_count": 0, "ctrl_data_count": 0, "preserved_equation_count": 0}
+        return {
+            "status": "NO_EQUATIONS",
+            "eqedit_count": 0,
+            "ctrl_data_count": 0,
+            "preserved_equation_count": 0,
+        }
     rows = _equation_rows(equation_layout)
     missing_formula = []
     for index, row in enumerate(rows[:eqedit_count]):
         if not str(row.get("formula") or "").strip():
-            missing_formula.append(
-                {
-                    "equation_index": index,
-                    "section_index": row.get("section_index"),
-                    "record_index": row.get("record_index"),
-                    "payload_size": row.get("payload_size"),
-                }
-            )
+            missing_formula.append({
+                "equation_index": index,
+                "section_index": row.get("section_index"),
+                "record_index": row.get("record_index"),
+                "payload_size": row.get("payload_size"),
+            })
     missing_records = [
         {"equation_index": index, "reason": "EQEDIT_LAYOUT_RECORD_NOT_DECODED"}
         for index in range(len(rows), eqedit_count)
     ]
     status = (
         "PASS"
-        if ctrl_data_count == 0
-        and len(rows) >= eqedit_count
-        and not missing_formula
+        if ctrl_data_count == 0 and len(rows) >= eqedit_count and not missing_formula
         else "PARTIAL_EQUATION_MAPPING"
     )
     return {
@@ -1123,14 +1446,14 @@ def build_equation_coverage(counts: Counter[int], equation_layout: dict[str, Any
 def _shape_layout_pictures(shape_layout: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(shape_layout, dict):
         return []
-    sections = shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    sections = (
+        shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    )
     pictures = []
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("pictures") or []:
-            if isinstance(row, dict):
-                pictures.append(row)
+        pictures.extend(row for row in section.get("pictures") or [] if isinstance(row, dict))
     return pictures
 
 
@@ -1145,11 +1468,12 @@ def _picture_has_geometry(row: dict[str, Any]) -> bool:
     picture = row.get("picture") if isinstance(row.get("picture"), dict) else {}
     component = row.get("component") if isinstance(row.get("component"), dict) else {}
     bbox = picture.get("bbox") if isinstance(picture.get("bbox"), dict) else {}
-    current_size = component.get("current_size_normalized") if isinstance(component.get("current_size_normalized"), dict) else {}
-    return (
-        _positive_dimension(bbox.get("width"))
-        and _positive_dimension(bbox.get("height"))
-    ) or (
+    current_size = (
+        component.get("current_size_normalized")
+        if isinstance(component.get("current_size_normalized"), dict)
+        else {}
+    )
+    return (_positive_dimension(bbox.get("width")) and _positive_dimension(bbox.get("height"))) or (
         _positive_dimension(current_size.get("width"))
         and _positive_dimension(current_size.get("height"))
     )
@@ -1165,7 +1489,9 @@ def _picture_has_layout_policy(row: dict[str, Any]) -> bool:
     return isinstance(control.get("layout"), dict)
 
 
-def _bindata_picture_numeric_ids(bindata_streams: list[str], decoded_docinfo: dict[str, Any] | None) -> set[int]:
+def _bindata_picture_numeric_ids(
+    bindata_streams: list[str], decoded_docinfo: dict[str, Any] | None
+) -> set[int]:
     ids: set[int] = set()
     for stream in bindata_streams:
         name = str(stream).replace("\\", "/").rsplit("/", 1)[-1]
@@ -1181,7 +1507,11 @@ def _bindata_picture_numeric_ids(bindata_streams: list[str], decoded_docinfo: di
             except ValueError:
                 pass
     if isinstance(decoded_docinfo, dict):
-        records = decoded_docinfo.get("binary_data") if isinstance(decoded_docinfo.get("binary_data"), list) else []
+        records = (
+            decoded_docinfo.get("binary_data")
+            if isinstance(decoded_docinfo.get("binary_data"), list)
+            else []
+        )
         for row in records:
             if not isinstance(row, dict):
                 continue
@@ -1219,19 +1549,26 @@ def build_picture_coverage(
         except (TypeError, ValueError):
             binary_data_id = None
         if binary_data_id is None or binary_data_id not in bindata_ids:
-            unresolved_refs.append(
-                {
-                    "picture_index": index,
-                    "record_index": row.get("record_index"),
-                    "binary_data_id": binary_data_id,
-                }
-            )
+            unresolved_refs.append({
+                "picture_index": index,
+                "record_index": row.get("record_index"),
+                "binary_data_id": binary_data_id,
+            })
         if not _picture_has_geometry(row):
-            missing_geometry.append({"picture_index": index, "record_index": row.get("record_index")})
+            missing_geometry.append({
+                "picture_index": index,
+                "record_index": row.get("record_index"),
+            })
         if not _picture_has_position(row):
-            missing_position.append({"picture_index": index, "record_index": row.get("record_index")})
+            missing_position.append({
+                "picture_index": index,
+                "record_index": row.get("record_index"),
+            })
         if not _picture_has_layout_policy(row):
-            missing_layout_policy.append({"picture_index": index, "record_index": row.get("record_index")})
+            missing_layout_policy.append({
+                "picture_index": index,
+                "record_index": row.get("record_index"),
+            })
     missing_layout_rows = [
         {"picture_index": index, "reason": "PICTURE_LAYOUT_RECORD_NOT_DECODED"}
         for index in range(len(pictures), picture_count)
@@ -1252,7 +1589,8 @@ def build_picture_coverage(
         "image_bindata_id_count": len(bindata_ids),
         "geometry_mapped_count": min(len(pictures), picture_count) - len(missing_geometry),
         "position_mapped_count": min(len(pictures), picture_count) - len(missing_position),
-        "layout_policy_mapped_count": min(len(pictures), picture_count) - len(missing_layout_policy),
+        "layout_policy_mapped_count": min(len(pictures), picture_count)
+        - len(missing_layout_policy),
         "unresolved_ref_count": len(unresolved_refs),
         "unresolved_refs": unresolved_refs[:50],
         "missing_geometry_count": len(missing_geometry),
@@ -1270,13 +1608,13 @@ def _shape_layout_rectangles(shape_layout: dict[str, Any] | None) -> list[dict[s
     if not isinstance(shape_layout, dict):
         return []
     rectangles = []
-    sections = shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    sections = (
+        shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    )
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("rectangles") or []:
-            if isinstance(row, dict):
-                rectangles.append(row)
+        rectangles.extend(row for row in section.get("rectangles") or [] if isinstance(row, dict))
     return rectangles
 
 
@@ -1284,13 +1622,13 @@ def _shape_layout_components(shape_layout: dict[str, Any] | None) -> list[dict[s
     if not isinstance(shape_layout, dict):
         return []
     components = []
-    sections = shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    sections = (
+        shape_layout.get("sections") if isinstance(shape_layout.get("sections"), list) else []
+    )
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for row in section.get("components") or []:
-            if isinstance(row, dict):
-                components.append(row)
+        components.extend(row for row in section.get("components") or [] if isinstance(row, dict))
     return components
 
 
@@ -1298,11 +1636,12 @@ def _rectangle_has_geometry(row: dict[str, Any]) -> bool:
     rectangle = row.get("rectangle") if isinstance(row.get("rectangle"), dict) else {}
     component = row.get("component") if isinstance(row.get("component"), dict) else {}
     bbox = rectangle.get("bbox") if isinstance(rectangle.get("bbox"), dict) else {}
-    current_size = component.get("current_size_normalized") if isinstance(component.get("current_size_normalized"), dict) else {}
-    return (
-        _positive_dimension(bbox.get("width"))
-        and _positive_dimension(bbox.get("height"))
-    ) or (
+    current_size = (
+        component.get("current_size_normalized")
+        if isinstance(component.get("current_size_normalized"), dict)
+        else {}
+    )
+    return (_positive_dimension(bbox.get("width")) and _positive_dimension(bbox.get("height"))) or (
         _positive_dimension(current_size.get("width"))
         and _positive_dimension(current_size.get("height"))
     )
@@ -1318,7 +1657,9 @@ def _rectangle_has_layout_policy(row: dict[str, Any]) -> bool:
     return isinstance(control.get("layout"), dict)
 
 
-def build_shape_coverage(counts: Counter[int], shape_layout: dict[str, Any] | None) -> dict[str, Any]:
+def build_shape_coverage(
+    counts: Counter[int], shape_layout: dict[str, Any] | None
+) -> dict[str, Any]:
     vector_tags = {78, 79, 80, 81, 82, 83, 86}
     vector_record_count = sum(int(counts.get(tag, 0) or 0) for tag in vector_tags)
     shape_component_count = int(counts.get(76, 0) or 0)
@@ -1354,7 +1695,10 @@ def build_shape_coverage(counts: Counter[int], shape_layout: dict[str, Any] | No
         if not _rectangle_has_position(row):
             missing_position.append({"shape_index": index, "record_index": row.get("record_index")})
         if not _rectangle_has_layout_policy(row):
-            missing_layout_policy.append({"shape_index": index, "record_index": row.get("record_index")})
+            missing_layout_policy.append({
+                "shape_index": index,
+                "record_index": row.get("record_index"),
+            })
     unmapped_vector_count = max(0, vector_record_count - len(rectangles))
     unmapped_component_count = max(0, shape_component_count - len(components))
     status = (
@@ -1402,12 +1746,16 @@ def build_bindata_stream_coverage(
 
     records = []
     if isinstance(decoded_docinfo, dict):
-        records = [item for item in decoded_docinfo.get("binary_data") or [] if isinstance(item, dict)]
-    record_streams = {str(item.get("stream_name") or "").replace("\\", "/") for item in records if item.get("stream_name")}
-    numeric_records = {
-        int(item["storage_id"])
+        records = [
+            item for item in decoded_docinfo.get("binary_data") or [] if isinstance(item, dict)
+        ]
+    record_streams = {
+        str(item.get("stream_name") or "").replace("\\", "/")
         for item in records
-        if isinstance(item.get("storage_id"), int)
+        if item.get("stream_name")
+    }
+    numeric_records = {
+        int(item["storage_id"]) for item in records if isinstance(item.get("storage_id"), int)
     }
     matched = []
     missing = []
@@ -1437,14 +1785,25 @@ def build_binary_object_coverage(
     ole_count = int(counts.get(84, 0) or 0)
     picture_count = int(counts.get(85, 0) or 0)
     if bindata_count <= 0 and ole_count <= 0 and picture_count <= 0:
-        return {"status": "NO_BINARY_OBJECTS", "bindata_record_count": 0, "ole_record_count": 0, "picture_record_count": 0}
+        return {
+            "status": "NO_BINARY_OBJECTS",
+            "bindata_record_count": 0,
+            "ole_record_count": 0,
+            "picture_record_count": 0,
+        }
     blockers = []
     if ole_count:
         blockers.append({"kind": "OLE_OBJECTS_NOT_MAPPED", "count": ole_count})
     if bindata_count and (bindata_coverage or {}).get("status") != "PASS":
-        blockers.append({"kind": "BINDATA_NOT_FULLY_MATCHED", "status": (bindata_coverage or {}).get("status")})
+        blockers.append({
+            "kind": "BINDATA_NOT_FULLY_MATCHED",
+            "status": (bindata_coverage or {}).get("status"),
+        })
     if picture_count and (picture_coverage or {}).get("status") != "PASS":
-        blockers.append({"kind": "PICTURES_NOT_FULLY_MAPPED", "status": (picture_coverage or {}).get("status")})
+        blockers.append({
+            "kind": "PICTURES_NOT_FULLY_MAPPED",
+            "status": (picture_coverage or {}).get("status"),
+        })
     status = "PASS" if not blockers else "PARTIAL_BINARY_OBJECT_MAPPING"
     return {
         "status": status,
@@ -1469,63 +1828,38 @@ def _bindata_numeric_id(stream_name: str) -> int | None:
     return int(digits)
 
 
-def next_decoder_targets(
-    counts: Counter[int],
-    bindata_streams: list[str],
-    bindata_coverage: dict[str, Any] | None = None,
-    document_properties_coverage: dict[str, Any] | None = None,
-    id_mappings_coverage: dict[str, Any] | None = None,
-    fontface_coverage: dict[str, Any] | None = None,
-    border_fill_coverage: dict[str, Any] | None = None,
-    char_shape_coverage: dict[str, Any] | None = None,
-    para_shape_coverage: dict[str, Any] | None = None,
-    table_coverage: dict[str, Any] | None = None,
-    numbering_coverage: dict[str, Any] | None = None,
-    equation_coverage: dict[str, Any] | None = None,
-    picture_coverage: dict[str, Any] | None = None,
+def _priority_tag_targets(
+    counts: Counter[int], coverage_by_tag: dict[int, dict[str, Any] | None]
 ) -> list[dict[str, Any]]:
-    priority_tags = [16, 17, 19, 20, 21, 23, 24, 25, 77, 85, 88]
     targets = []
-    for tag in priority_tags:
-        if tag == 16 and (document_properties_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 17 and (id_mappings_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 19 and (fontface_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 20 and (border_fill_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 21 and (char_shape_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 23 and (numbering_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 25 and (para_shape_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 77 and (table_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 85 and (picture_coverage or {}).get("status") == "PASS":
-            continue
-        if tag == 88 and (equation_coverage or {}).get("status") == "PASS":
+    for tag in (16, 17, 19, 20, 21, 23, 24, 25, 77, 85, 88):
+        if (coverage_by_tag.get(tag) or {}).get("status") == "PASS":
             continue
         count = counts.get(tag, 0)
         if count:
-            targets.append(
-                {
-                    "tag_id": tag,
-                    "tag_name": _record_name(tag),
-                    "count": count,
-                    "action": decoder_action(tag),
-                }
-            )
+            targets.append({
+                "tag_id": tag,
+                "tag_name": _record_name(tag),
+                "count": count,
+                "action": decoder_action(tag),
+            })
+    return targets
+
+
+def next_decoder_targets(
+    counts: Counter[int],
+    bindata_streams: list[str],
+    coverage_by_tag: dict[int, dict[str, Any] | None],
+    bindata_coverage: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    targets = _priority_tag_targets(counts, coverage_by_tag)
     if bindata_streams and (bindata_coverage or {}).get("status") != "PASS":
-        targets.append(
-            {
-                "tag_id": 18,
-                "tag_name": "BIN_DATA_STREAMS",
-                "count": len(bindata_streams),
-                "action": "Decode BinData storage names, copy binary payloads, and emit HWPX manifest/resource references.",
-            }
-        )
+        targets.append({
+            "tag_id": 18,
+            "tag_name": "BIN_DATA_STREAMS",
+            "count": len(bindata_streams),
+            "action": "Decode BinData storage names, copy binary payloads, and emit HWPX manifest/resource references.",
+        })
     return targets
 
 

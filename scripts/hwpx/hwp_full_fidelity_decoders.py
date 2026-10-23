@@ -786,14 +786,10 @@ def decode_para_header(payload: bytes) -> dict[str, Any]:
 
 
 def decode_para_char_shape(payload: bytes) -> dict[str, Any]:
-    runs = []
-    for offset in range(0, len(payload) - 7, 8):
-        runs.append(
-            {
+    runs = [{
                 "start_pos": _u32(payload, offset),
                 "char_shape_id": _u32(payload, offset + 4),
-            }
-        )
+            } for offset in range(0, len(payload) - 7, 8)]
     return {
         "run_count": len(runs),
         "runs": runs,
@@ -803,10 +799,7 @@ def decode_para_char_shape(payload: bytes) -> dict[str, Any]:
 
 
 def decode_para_line_seg(payload: bytes) -> dict[str, Any]:
-    segments = []
-    for offset in range(0, len(payload) - 35, 36):
-        segments.append(
-            {
+    segments = [{
                 "text_pos": _u32(payload, offset),
                 "line_vertical_pos": _i32(payload, offset + 4),
                 "line_height": _i32(payload, offset + 8),
@@ -816,8 +809,7 @@ def decode_para_line_seg(payload: bytes) -> dict[str, Any]:
                 "column_start": _i32(payload, offset + 24),
                 "segment_width": _i32(payload, offset + 28),
                 "flags": _u32(payload, offset + 32),
-            }
-        )
+            } for offset in range(0, len(payload) - 35, 36)]
     return {
         "segment_count": len(segments),
         "segments": segments,

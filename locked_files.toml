@@ -1,0 +1,109 @@
+# hwpx-web-office baseline-lock 파일 registry (신설 2026-09-28)
+#
+# 배경: 여러 테스트/감사 스크립트(tests/test_web_office_*.py, scripts/ops/audit_web_office_*.py)가
+# 각자 자기만의 LOCKED_FILES / LOCKED_VS_BASELINE 목록을 갖고 있다(18곳). ruff 자동수정처럼
+# "안전하다"고 여겨지는 일괄 도구가 이 목록을 전혀 모른 채 파일을 건드려도, 지금까지는
+# 전체 pytest(약 25분)를 다 돌려봐야만 걸렸다(2026-09-28 실측: STD-10 ruff 자동수정이
+# locked 파일 6개를 건드린 걸 커밋 직전에야 발견).
+#
+# 이 파일은 그 18곳에 흩어진 목록의 합집합이다. 목적은 "저장 시점에 미리 경고"이지,
+# 각 closeout이 물고 있는 정확한 BASELINE_COMMIT을 대신하는 게 아니다 — 실제 "진짜
+# 변경됐는가"의 최종 판정은 여전히 각 테스트 파일의 git diff 비교가 한다. 이 registry는
+# py_locked_file_guard.py(PreToolUse Write|Edit|MultiEdit)가 읽어서 "ask"로만 알려주고
+# 막지는 않는다 — 검증 후 의도적으로 고치고 BASELINE_COMMIT을 재고정하는 경우가 실제로
+# 있기 때문(예: ro_view_importer._find_cell_elem 좌표조회 수리).
+#
+# 새 locked 파일이 생기면(새 closeout 작성 시) 여기에도 추가한다. enforced_by는 최초
+# 생성 시점 기준이며, 이후 다른 closeout이 같은 파일을 추가로 잠글 수 있어 참고용이다.
+
+[[locked]]
+path = "frontend/web_office_viewer/format_charpr_matcher.mjs"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_container_scope_bridge.py"]
+
+[[locked]]
+path = "frontend/web_office_viewer/format_charpr_matcher_smoke.mjs"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_container_scope_bridge.py"]
+
+[[locked]]
+path = "frontend/web_office_viewer/para_edit_apply_format_smoke.mjs"
+enforced_by = ["tests/test_web_office_para_edit_applyformat_*_closeout.py (5개)"]
+
+[[locked]]
+path = "frontend/web_office_viewer/para_edit_command.mjs"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py, tests/test_web_office_p3_*.py 등 (9개)"]
+
+[[locked]]
+path = "frontend/web_office_viewer/para_edit_runtime.mjs"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (7개)"]
+
+[[locked]]
+path = "frontend/web_office_viewer/para_edit_state.mjs"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (8개)"]
+
+[[locked]]
+path = "frontend/web_office_viewer/para_edit_structure_smoke.mjs"
+enforced_by = ["tests/test_web_office_para_edit_structure_*.py (3개)"]
+
+[[locked]]
+path = "scripts/hwpx/hwpx_edit_tool.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (7개)"]
+
+[[locked]]
+path = "scripts/hwpx/hwpx_paragraph_ops.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (7개)"]
+
+[[locked]]
+path = "scripts/hwpx/hwpx_writer_adapter.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (4개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/charpr_inventory.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (9개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/document_model.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_e2e_full_closeout.py 등 (5개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/edit_command_model.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_e2e_full_closeout.py 등 (5개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/para_edit_e2e_pipeline.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (9개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/para_edit_model.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (10개, 가장 많이 참조됨)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/para_edit_normalizer.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_e2e_full_closeout.py 등 (5개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/paragraph_edit_plan.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (7개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/paragraph_save_audit.py"
+enforced_by = ["scripts/ops/audit_web_office_para_readback_parser.py 등 (2개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/paragraph_save_pipeline.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (16개, 가장 많이 참조됨)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/paragraph_save_verify7.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (8개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/paragraph_writer_adapter.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (8개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/render_payload.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (7개)"]
+
+[[locked]]
+path = "scripts/hwpx/web_office/ro_view_importer.py"
+enforced_by = ["scripts/ops/audit_web_office_para_edit_*.py 등 (8개)"]

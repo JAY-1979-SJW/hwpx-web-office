@@ -116,8 +116,11 @@ class HwpxEditor:
         visual_col: int,
         value: str,
         clear_remaining: bool = True,
+        text_edits: list[dict] | None = None,
     ) -> dict:
-        return set_table_visual_cell_text(self.package, table_index, visual_row, visual_col, value, clear_remaining)
+        return set_table_visual_cell_text(
+            self.package, table_index, visual_row, visual_col, value, clear_remaining, text_edits
+        )
 
     def append_table_row(self, table_index: int, row_values: list[str], clear_remaining: bool = True) -> dict:
         return append_table_row(self.package, table_index, row_values, clear_remaining)

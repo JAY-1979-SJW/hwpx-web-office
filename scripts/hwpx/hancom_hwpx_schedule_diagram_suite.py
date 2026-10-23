@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,7 @@ from hwpx_section_ops import inspect_sections
 from hwpx_table_ops import find_tables
 
 
-def run_schedule_diagram_suite(
+def run_schedule_diagram_suite(  # ruff: ignore[too-many-arguments] -- 여러 파일(hwpx_server_ops.py, 테스트)에서 호출, 시그니처 변경 보류
     input_path: Path,
     output_path: Path,
     *,
@@ -94,7 +94,11 @@ def main() -> int:
     parser.add_argument("--daily-start", default="2026-05-01")
     parser.add_argument("--daily-days", type=int, default=31)
     parser.add_argument("--month-count", type=int, default=3)
-    parser.add_argument("--append", action="store_true", help="Append diagrams at the end instead of inserting at document start.")
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append diagrams at the end instead of inserting at document start.",
+    )
     parser.add_argument("--title", default="공정표 및 그래프 도식")
     parser.add_argument("--report-json", type=Path)
     args = parser.parse_args()
@@ -111,7 +115,9 @@ def main() -> int:
     )
     if args.report_json:
         args.report_json.parent.mkdir(parents=True, exist_ok=True)
-        args.report_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.report_json.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["status"] == "PASS" else 1
 

@@ -12,6 +12,7 @@ HWPX 파일 전체를 read-only로 전수 조사하여
 - AI API / OCR 호출 없음
 - 절대경로 / 원본 파일명 / 셀 내 PII 값 보고서 저장 없음
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,27 +23,47 @@ import re
 import sys
 import traceback
 import unicodedata
+import xml.etree.ElementTree as ET
 import zipfile
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from collections import Counter
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 # ── namespaces ────────────────────────────────────────────────────────────────
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 NS_OPF = "http://www.idpf.org/2007/opf/"
 
 # ── 입력셀 타입 ────────────────────────────────────────────────────────────────
-ITYPE_LABEL_ADJACENT = "label_adjacent"   # 2-col 표: 왼쪽 라벨, 오른쪽 빈 셀
-ITYPE_HEADER_COLUMN  = "header_column"    # 헤더 아래 데이터행 빈 셀
-ITYPE_FORM_FIELD     = "form_field"       # form_table 내 빈 값 셀
+ITYPE_LABEL_ADJACENT = "label_adjacent"  # 2-col 표: 왼쪽 라벨, 오른쪽 빈 셀
+ITYPE_HEADER_COLUMN = "header_column"  # 헤더 아래 데이터행 빈 셀
+ITYPE_FORM_FIELD = "form_field"  # form_table 내 빈 값 셀
 
 # ── 표 분류용 키워드 (profiler 공유) ──────────────────────────────────────────
 SCHEDULE_HEADER_KW = (
-    "공종", "작업명", "공사명", "시작일", "착수일", "종료일", "완료일", "준공일",
-    "기간", "공기", "진행률", "진도율", "예정", "실적", "task", "start", "end", "duration",
+    "공종",
+    "작업명",
+    "공사명",
+    "시작일",
+    "착수일",
+    "종료일",
+    "완료일",
+    "준공일",
+    "기간",
+    "공기",
+    "진행률",
+    "진도율",
+    "예정",
+    "실적",
+    "task",
+    "start",
+    "end",
+    "duration",
 )
 DATE_HEADER_RE = [
     re.compile(r"^\d{4}[-./]\d{1,2}[-./]\d{1,2}"),
@@ -54,32 +75,52 @@ DATE_HEADER_RE = [
     re.compile(r"^\d{4}년"),
 ]
 FORM_LABEL_KW = (
-    "공사명", "현장명", "사업명", "시공사", "감리자",
-    "접수번호", "접수일", "발신", "수신", "문서번호", "보고일",
-    "작성자", "작성일", "승인자", "검토자", "제출일", "수신처",
+    "공사명",
+    "현장명",
+    "사업명",
+    "시공사",
+    "감리자",
+    "접수번호",
+    "접수일",
+    "발신",
+    "수신",
+    "문서번호",
+    "보고일",
+    "작성자",
+    "작성일",
+    "승인자",
+    "검토자",
+    "제출일",
+    "수신처",
 )
 FIELD_HINTS: list[tuple[str, tuple[str, ...]]] = [
-    ("projectName",        ("공사명", "사업명", "프로젝트명")),
-    ("siteName",           ("현장명", "현장",)),
-    ("contractorName",     ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
-    ("reportDate",         ("작성일", "보고일", "제출일")),
-    ("receiptNumber",      ("접수번호", "접수번", "문서번호", "접수")),
-    ("number",             ("번호",)),
-    ("trade",              ("공종", "공정", "trade")),
-    ("taskName",           ("작업명", "task", "내용", "항목")),
-    ("startDate",          ("시작일", "착수일", "착공일", "start")),
-    ("endDate",            ("종료일", "완료일", "준공일", "end")),
-    ("durationDays",       ("기간", "공기", "duration")),
-    ("responsiblePerson",  ("담당자", "책임자", "성명", "지정자")),
-    ("progressRate",       ("진행률", "진도율", "달성률", "progress")),
-    ("materialStatus",     ("자재", "재료", "material")),
-    ("inspectionStatus",   ("검측", "검사", "inspection")),
-    ("remarks",            ("비고", "참고", "remark", "note")),
-    ("quantity",           ("수량", "량")),
-    ("unit",               ("단위", "unit")),
-    ("spec",               ("규격", "사양", "spec")),
-    ("amount",             ("금액", "단가", "amount", "price")),
-    ("location",           ("위치", "장소", "구간")),
+    ("projectName", ("공사명", "사업명", "프로젝트명")),
+    (
+        "siteName",
+        (
+            "현장명",
+            "현장",
+        ),
+    ),
+    ("contractorName", ("시공사", "도급사", "수급인", "업체명", "회사명", "상호")),
+    ("reportDate", ("작성일", "보고일", "제출일")),
+    ("receiptNumber", ("접수번호", "접수번", "문서번호", "접수")),
+    ("number", ("번호",)),
+    ("trade", ("공종", "공정", "trade")),
+    ("taskName", ("작업명", "task", "내용", "항목")),
+    ("startDate", ("시작일", "착수일", "착공일", "start")),
+    ("endDate", ("종료일", "완료일", "준공일", "end")),
+    ("durationDays", ("기간", "공기", "duration")),
+    ("responsiblePerson", ("담당자", "책임자", "성명", "지정자")),
+    ("progressRate", ("진행률", "진도율", "달성률", "progress")),
+    ("materialStatus", ("자재", "재료", "material")),
+    ("inspectionStatus", ("검측", "검사", "inspection")),
+    ("remarks", ("비고", "참고", "remark", "note")),
+    ("quantity", ("수량", "량")),
+    ("unit", ("단위", "unit")),
+    ("spec", ("규격", "사양", "spec")),
+    ("amount", ("금액", "단가", "amount", "price")),
+    ("location", ("위치", "장소", "구간")),
 ]
 
 # ── PII 탐지 (셀 값 보고서 저장 차단용) ────────────────────────────────────
@@ -91,6 +132,7 @@ _PII_RE = [
 
 
 # ── 식별자 유틸 ───────────────────────────────────────────────────────────────
+
 
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8", errors="replace")).hexdigest()
@@ -113,6 +155,7 @@ def file_content_hash(path: Path) -> str:
 
 
 # ── 텍스트 정규화 ─────────────────────────────────────────────────────────────
+
 
 def normalize(text: str) -> str:
     if not text:
@@ -145,6 +188,7 @@ def _has_pii(text: str) -> bool:
 
 
 # ── XML 파싱 헬퍼 ─────────────────────────────────────────────────────────────
+
 
 def _cell_text(cell: ET.Element) -> str:
     parts = []
@@ -196,6 +240,7 @@ def _detect_header_rows(grid: list[list[ET.Element]]) -> list[int]:
 
 # ── 표 레이아웃 간이 분류 ─────────────────────────────────────────────────────
 
+
 def _classify_layout(
     grid: list[list[ET.Element]],
     header_texts: list[str],
@@ -219,7 +264,9 @@ def _classify_layout(
         return "horizontal_schedule"
 
     form_hits = sum(
-        1 for row in grid for c in row
+        1
+        for row in grid
+        for c in row
         if any(kw in normalize(_cell_text(c)) for kw in FORM_LABEL_KW)
     )
     if form_hits >= 2 and rows <= 8:
@@ -234,6 +281,7 @@ def _classify_layout(
 
 # ── 입력셀 탐지 ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class InputCell:
     maskedFileId: str
@@ -243,7 +291,7 @@ class InputCell:
     rowIndex: int
     colIndex: int
     inputCellType: str
-    adjacentLabel: str        # 라벨 텍스트 (필드명 수준, 값 아님)
+    adjacentLabel: str  # 라벨 텍스트 (필드명 수준, 값 아님)
     guessedField: str
     fieldConfidence: float
     colSpan: int
@@ -268,6 +316,111 @@ class InputCell:
         }
 
 
+def _detect_label_adjacent_type(cols: int, ci: int, row: list[ET.Element]) -> str | None:
+    """타입 1: label_adjacent (2-col 표, 왼쪽 라벨 + 오른쪽 빈 셀)."""
+    if not (cols == 2 and ci == 1):
+        return None
+    left_norm = normalize(_cell_text(row[0])) if row else ""
+    return left_norm if left_norm and len(left_norm) <= 20 else None
+
+
+def _detect_form_field_type(layout: str, row: list[ET.Element], ci: int) -> str | None:
+    """타입 2: form_field (form_table 내 빈 값 셀, 같은 행 라벨 후보)."""
+    if layout != "form_table":
+        return None
+    row_labels = [
+        normalize(_cell_text(c)) for j, c in enumerate(row) if j != ci and normalize(_cell_text(c))
+    ]
+    if not row_labels:
+        return None
+    candidate_label = min(row_labels, key=len)
+    return candidate_label if len(candidate_label) <= 20 else None
+
+
+def _detect_header_column_type(
+    header_row_idxs: list[int], ri: int, grid: list[list[ET.Element]], ci: int
+) -> str | None:
+    """타입 3: header_column (헤더 아래 데이터행 빈 셀)."""
+    if not (header_row_idxs and ri > max(header_row_idxs)):
+        return None
+    header_row = grid[header_row_idxs[-1]]
+    if ci >= len(header_row):
+        return None
+    hdr_norm = normalize(_cell_text(header_row[ci]))
+    return hdr_norm if hdr_norm and len(hdr_norm) <= 20 else None
+
+
+@dataclass(frozen=True)
+class _InputCellTableContext:
+    """`_find_input_cells` 한 번 호출(표 1개) 동안 셀마다 공통인 컨텍스트."""
+
+    grid: list[list[ET.Element]]
+    header_row_idxs: list[int]
+    header_zone: set[int]
+    layout: str
+    cols: int
+    fid: str
+    sec_idx: int
+    tbl_idx: int
+
+
+def _detect_input_cell_type(
+    row: list[ET.Element], ri: int, ci: int, ctx: _InputCellTableContext
+) -> tuple[str, str] | None:
+    """빈 셀 하나에 대해 (itype, label) 을 판정하거나, 후보가 아니면 None."""
+    detected = _detect_label_adjacent_type(ctx.cols, ci, row)
+    if detected is not None:
+        return ITYPE_LABEL_ADJACENT, detected
+
+    detected = _detect_form_field_type(ctx.layout, row, ci)
+    if detected is not None:
+        return ITYPE_FORM_FIELD, detected
+
+    detected = _detect_header_column_type(ctx.header_row_idxs, ri, ctx.grid, ci)
+    if detected is not None:
+        return ITYPE_HEADER_COLUMN, detected
+
+    return None
+
+
+def _build_input_cell_candidate(
+    cell: ET.Element, ri: int, ci: int, row: list[ET.Element], ctx: _InputCellTableContext
+) -> InputCell | None:
+    raw = _cell_text(cell).strip()
+    norm_val = normalize(raw)
+
+    # 빈 셀 판정: 텍스트 없거나 공백/줄바꿈만
+    if len(norm_val) != 0:
+        return None
+
+    # 헤더행 자체는 입력셀 후보에서 제외
+    if ri in ctx.header_zone:
+        return None
+
+    detected_type = _detect_input_cell_type(row, ri, ci, ctx)
+    if detected_type is None:
+        return None
+    itype, label = detected_type
+    gfield, gconf = guess_field(label)
+    cs, rs = _cell_span(cell)
+
+    return InputCell(
+        maskedFileId=ctx.fid,
+        sectionIndex=ctx.sec_idx,
+        tableIndex=ctx.tbl_idx,
+        tableLayout=ctx.layout,
+        rowIndex=ri,
+        colIndex=ci,
+        inputCellType=itype,
+        adjacentLabel=label,
+        guessedField=gfield,
+        fieldConfidence=gconf,
+        colSpan=cs,
+        rowSpan=rs,
+        isInHeaderZone=(ri in ctx.header_zone),
+    )
+
+
 def _find_input_cells(
     fid: str,
     sec_idx: int,
@@ -276,87 +429,29 @@ def _find_input_cells(
     header_row_idxs: list[int],
     layout: str,
 ) -> list[InputCell]:
-    results: list[InputCell] = []
-    header_zone = set(header_row_idxs)
-    rows = len(grid)
-    cols = max((len(r) for r in grid), default=0)
+    ctx = _InputCellTableContext(
+        grid=grid,
+        header_row_idxs=header_row_idxs,
+        header_zone=set(header_row_idxs),
+        layout=layout,
+        cols=max((len(r) for r in grid), default=0),
+        fid=fid,
+        sec_idx=sec_idx,
+        tbl_idx=tbl_idx,
+    )
 
+    results: list[InputCell] = []
     for ri, row in enumerate(grid):
         for ci, cell in enumerate(row):
-            raw = _cell_text(cell).strip()
-            norm_val = normalize(raw)
-            cs, rs = _cell_span(cell)
-
-            # 빈 셀 판정: 텍스트 없거나 공백/줄바꿈만
-            is_empty = len(norm_val) == 0
-
-            if not is_empty:
-                continue
-
-            # 헤더행 자체는 입력셀 후보에서 제외
-            if ri in header_zone:
-                continue
-
-            itype: str | None = None
-            label: str = ""
-            gfield = "unknown"
-            gconf = 0.0
-
-            # ── 타입 1: label_adjacent (2-col 표, 왼쪽 라벨 + 오른쪽 빈 셀) ──
-            if cols == 2 and ci == 1:
-                left_norm = normalize(_cell_text(row[0])) if row else ""
-                if left_norm and len(left_norm) <= 20:
-                    itype = ITYPE_LABEL_ADJACENT
-                    label = left_norm
-                    gfield, gconf = guess_field(label)
-
-            # ── 타입 2: form_field (form_table 내 빈 값 셀) ──
-            if itype is None and layout == "form_table":
-                # 같은 행에 라벨 후보가 있으면 form_field
-                row_labels = [
-                    normalize(_cell_text(c))
-                    for j, c in enumerate(row) if j != ci and normalize(_cell_text(c))
-                ]
-                if row_labels:
-                    candidate_label = min(row_labels, key=len)
-                    if len(candidate_label) <= 20:
-                        itype = ITYPE_FORM_FIELD
-                        label = candidate_label
-                        gfield, gconf = guess_field(label)
-
-            # ── 타입 3: header_column (헤더 아래 데이터행 빈 셀) ──
-            if itype is None and header_row_idxs and ri > max(header_row_idxs):
-                header_row = grid[header_row_idxs[-1]]
-                if ci < len(header_row):
-                    hdr_norm = normalize(_cell_text(header_row[ci]))
-                    if hdr_norm and len(hdr_norm) <= 20:
-                        itype = ITYPE_HEADER_COLUMN
-                        label = hdr_norm
-                        gfield, gconf = guess_field(label)
-
-            if itype is None:
-                continue
-
-            results.append(InputCell(
-                maskedFileId=fid,
-                sectionIndex=sec_idx,
-                tableIndex=tbl_idx,
-                tableLayout=layout,
-                rowIndex=ri,
-                colIndex=ci,
-                inputCellType=itype,
-                adjacentLabel=label,
-                guessedField=gfield,
-                fieldConfidence=gconf,
-                colSpan=cs,
-                rowSpan=rs,
-                isInHeaderZone=(ri in header_zone),
-            ))
+            candidate = _build_input_cell_candidate(cell, ri, ci, row, ctx)
+            if candidate is not None:
+                results.append(candidate)
 
     return results
 
 
 # ── 헤더 레코드 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class HeaderRecord:
@@ -389,6 +484,7 @@ class HeaderRecord:
 
 
 # ── 파일별 처리 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class FileResult:
@@ -424,11 +520,112 @@ class FileResult:
         }
 
 
+@dataclass
+class _TableId:
+    """(파일, 섹션, 테이블) 식별자 묶음 — 헬퍼 함수 인자 수를 줄이기 위한 것."""
+
+    fid: str
+    sec_idx: int
+    tbl_idx: int
+
+
+def _count_cells(grid) -> tuple[int, int]:
+    total_cells = 0
+    empty_cells = 0
+    for row in grid:
+        for cell in row:
+            total_cells += 1
+            if not normalize(_cell_text(cell)):
+                empty_cells += 1
+    return total_cells, empty_cells
+
+
+def _collect_header_records(
+    tid: _TableId,
+    grid,
+    header_row_idxs,
+    headers: list[HeaderRecord],
+    field_ctr: Counter,
+) -> list[str]:
+    """header_row_idxs 의 셀들로 HeaderRecord 를 만들어 headers 에 append 한다(부수효과).
+
+    field_ctr 를 갱신하고, 레이아웃 분류에 쓸 정규화된 헤더 텍스트 목록을 반환한다.
+    """
+    hdr_texts: list[str] = []
+    for hri in header_row_idxs:
+        if hri >= len(grid):
+            continue
+        for ci, cell in enumerate(grid[hri]):
+            norm = normalize(_cell_text(cell))
+            if not norm:
+                continue
+            cs, _ = _cell_span(cell)
+            gf, gc = guess_field(norm)
+            hdr_texts.append(norm)
+            field_ctr[gf] += 1
+            headers.append(
+                HeaderRecord(
+                    maskedFileId=tid.fid,
+                    sectionIndex=tid.sec_idx,
+                    tableIndex=tid.tbl_idx,
+                    tableLayout="",  # fill after layout classify
+                    rowIndex=hri,
+                    colIndex=ci,
+                    normalizedText=norm,
+                    guessedField=gf,
+                    fieldConfidence=gc,
+                    isDateLike=is_date_like(norm),
+                    colSpan=cs,
+                )
+            )
+    return hdr_texts
+
+
+def _process_one_table(
+    fid: str,
+    sec_idx: int,
+    tbl_idx: int,
+    tbl,
+    headers: list[HeaderRecord],
+    field_ctr: Counter,
+) -> tuple[int, int, str, list[InputCell]]:
+    """단일 테이블을 처리해 (total_cells, empty_cells, layout, input_cells)를 반환한다.
+
+    headers 에 이번 테이블의 HeaderRecord 를 append 하고 field_ctr 를 갱신한다(부수효과).
+    """
+    tid = _TableId(fid, sec_idx, tbl_idx)
+    grid = _table_grid(tbl)
+
+    total_cells, empty_cells = _count_cells(grid)
+
+    header_row_idxs = _detect_header_rows(grid)
+    hdr_texts = _collect_header_records(tid, grid, header_row_idxs, headers, field_ctr)
+
+    layout = _classify_layout(grid, hdr_texts)
+
+    # layout을 header records에 역주입
+    for hr in headers:
+        if (
+            hr.maskedFileId == fid
+            and hr.sectionIndex == sec_idx
+            and hr.tableIndex == tbl_idx
+            and not hr.tableLayout
+        ):
+            hr.tableLayout = layout
+
+    # 입력셀 탐지
+    icells = _find_input_cells(fid, sec_idx, tbl_idx, grid, header_row_idxs, layout)
+    for ic in icells:
+        if ic.guessedField != "unknown":
+            field_ctr[f"input:{ic.guessedField}"] += 1
+
+    return total_cells, empty_cells, layout, icells
+
+
 def _survey_file(
     path: Path,
     fid: str,
 ) -> tuple[FileResult, list[HeaderRecord], list[InputCell]]:
-    now = datetime.now(tz=timezone.utc).isoformat()
     warnings: list[str] = []
     headers: list[HeaderRecord] = []
     inputs: list[InputCell] = []
@@ -444,11 +641,11 @@ def _survey_file(
     # ZIP 열기
     try:
         zf_handle = zipfile.ZipFile(path)
-    except (zipfile.BadZipFile, Exception) as exc:
+    except (zipfile.BadZipFile, OSError) as exc:
         return (
-            FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {},
-                       "BROKEN_ZIP", [str(exc)]),
-            headers, inputs,
+            FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {}, "BROKEN_ZIP", [str(exc)]),
+            headers,
+            inputs,
         )
 
     section_count = 0
@@ -460,14 +657,26 @@ def _survey_file(
 
     with zf_handle as zf:
         names = zf.namelist()
-        section_files = sorted(
-            n for n in names if re.match(r"Contents/section\d+\.xml$", n)
-        )
+        section_files = sorted(n for n in names if re.match(r"Contents/section\d+\.xml$", n))
         if not section_files or "Contents/content.hpf" not in names:
             return (
-                FileResult(fid, fhash, size, 0, 0, 0, 0, 0, 0, {}, {},
-                           "MISSING_XML", ["no section files or content.hpf"]),
-                headers, inputs,
+                FileResult(
+                    fid,
+                    fhash,
+                    size,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    {},
+                    {},
+                    "MISSING_XML",
+                    ["no section files or content.hpf"],
+                ),
+                headers,
+                inputs,
             )
 
         section_count = len(section_files)
@@ -475,73 +684,24 @@ def _survey_file(
         for sec_idx, sec_name in enumerate(section_files):
             try:
                 raw = zf.read(sec_name)
-                root = ET.fromstring(raw)
+                root = _dx_fromstring(raw)
             except ET.ParseError as exc:
                 warnings.append(f"{sec_name}: XML parse error: {exc}")
                 continue
-            except Exception as exc:
+            except (KeyError, UnicodeDecodeError, OSError) as exc:
                 warnings.append(f"{sec_name}: read error: {exc}")
                 continue
 
             tables = list(root.iter(f"{{{NS_HP}}}tbl"))
             for tbl_idx, tbl in enumerate(tables):
                 table_count += 1
-                grid = _table_grid(tbl)
-
-                # 셀 집계
-                for row in grid:
-                    for cell in row:
-                        total_cells += 1
-                        if not normalize(_cell_text(cell)):
-                            empty_cells += 1
-
-                header_row_idxs = _detect_header_rows(grid)
-
-                # 헤더 텍스트 수집
-                hdr_texts: list[str] = []
-                for hri in header_row_idxs:
-                    if hri >= len(grid):
-                        continue
-                    for ci, cell in enumerate(grid[hri]):
-                        norm = normalize(_cell_text(cell))
-                        if not norm:
-                            continue
-                        cs, _ = _cell_span(cell)
-                        gf, gc = guess_field(norm)
-                        hdr_texts.append(norm)
-                        field_ctr[gf] += 1
-                        headers.append(HeaderRecord(
-                            maskedFileId=fid,
-                            sectionIndex=sec_idx,
-                            tableIndex=tbl_idx,
-                            tableLayout="",   # fill after layout classify
-                            rowIndex=hri,
-                            colIndex=ci,
-                            normalizedText=norm,
-                            guessedField=gf,
-                            fieldConfidence=gc,
-                            isDateLike=is_date_like(norm),
-                            colSpan=cs,
-                        ))
-
-                layout = _classify_layout(grid, hdr_texts)
+                tc_cells, tc_empty, layout, icells = _process_one_table(
+                    fid, sec_idx, tbl_idx, tbl, headers, field_ctr
+                )
+                total_cells += tc_cells
+                empty_cells += tc_empty
                 layout_ctr[layout] += 1
-
-                # layout을 header records에 역주입
-                for hr in headers:
-                    if (hr.maskedFileId == fid
-                            and hr.sectionIndex == sec_idx
-                            and hr.tableIndex == tbl_idx
-                            and not hr.tableLayout):
-                        hr.tableLayout = layout
-
-                # 입력셀 탐지
-                icells = _find_input_cells(fid, sec_idx, tbl_idx, grid,
-                                           header_row_idxs, layout)
                 inputs.extend(icells)
-                for ic in icells:
-                    if ic.guessedField != "unknown":
-                        field_ctr[f"input:{ic.guessedField}"] += 1
 
     result = FileResult(
         maskedFileId=fid,
@@ -562,6 +722,7 @@ def _survey_file(
 
 
 # ── 집계 사전 ────────────────────────────────────────────────────────────────
+
 
 def _build_header_dict(
     all_headers: list[HeaderRecord],
@@ -610,7 +771,6 @@ def _build_input_cell_dict(
 ) -> list[dict[str, Any]]:
     label_map: dict[str, dict] = {}
     for ic in all_inputs:
-        key = (ic.adjacentLabel, ic.inputCellType)
         k = f"{ic.adjacentLabel}|{ic.inputCellType}"
         if k not in label_map:
             label_map[k] = {
@@ -627,9 +787,8 @@ def _build_input_cell_dict(
         e["occurrences"] += 1
         e["layoutCounter"][ic.tableLayout] += 1
 
-    rows = []
-    for k, e in label_map.items():
-        rows.append({
+    rows = [
+        {
             "adjacentLabel": e["adjacentLabel"],
             "inputCellType": e["inputCellType"],
             "guessedField": e["guessedField"],
@@ -637,12 +796,15 @@ def _build_input_cell_dict(
             "fileCount": len(e["fileCount"]),
             "occurrences": e["occurrences"],
             "layoutDistribution": dict(e["layoutCounter"].most_common()),
-        })
+        }
+        for e in label_map.values()
+    ]
     rows.sort(key=lambda r: r["occurrences"], reverse=True)
     return rows
 
 
 # ── 보고서 출력 ───────────────────────────────────────────────────────────────
+
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as f:
@@ -689,11 +851,11 @@ def _build_summary_md(
         "| 헤더 | 파일수 | 발생횟수 | 추정 필드 | 신뢰도 |",
         "|------|--------|----------|-----------|--------|",
     ]
-    for r in hdr_dict[:50]:
-        lines.append(
-            f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
-            f" | {r['guessedField']} | {r['fieldConfidence']} |"
-        )
+    lines.extend(
+        f"| {r['normalizedText']} | {r['fileCount']} | {r['totalOccurrences']}"
+        f" | {r['guessedField']} | {r['fieldConfidence']} |"
+        for r in hdr_dict[:50]
+    )
     lines += [
         "",
         "## 입력셀 라벨 빈도 TOP 50",
@@ -719,7 +881,7 @@ def _build_summary_md(
     return "\n".join(lines) + "\n"
 
 
-def _write_reports(
+def _write_reports(  # ruff: ignore[too-many-arguments] (보고서 작성 전용 헬퍼, 인자 모두 필요 — 시그니처 변경 보류)
     output_dir: Path,
     file_results: list[FileResult],
     all_headers: list[HeaderRecord],
@@ -752,8 +914,14 @@ def _write_reports(
     paths["header_dict"] = p
 
     hdr_csv_fields = [
-        "normalizedText", "guessedField", "fieldConfidence", "isDateLike",
-        "fileCount", "tableCount", "totalOccurrences", "commonColIndexes",
+        "normalizedText",
+        "guessedField",
+        "fieldConfidence",
+        "isDateLike",
+        "fileCount",
+        "tableCount",
+        "totalOccurrences",
+        "commonColIndexes",
         "layoutDistribution",
     ]
     p = output_dir / "survey_header_dictionary.csv"
@@ -766,8 +934,13 @@ def _write_reports(
     paths["input_cell_dict"] = p
 
     icd_csv_fields = [
-        "adjacentLabel", "inputCellType", "guessedField", "fieldConfidence",
-        "fileCount", "occurrences", "layoutDistribution",
+        "adjacentLabel",
+        "inputCellType",
+        "guessedField",
+        "fieldConfidence",
+        "fileCount",
+        "occurrences",
+        "layoutDistribution",
     ]
     p = output_dir / "survey_input_cell_dictionary.csv"
     _write_csv(p, icd, icd_csv_fields)
@@ -789,14 +962,15 @@ def _write_reports(
 
 # ── 전수조사 메인 ─────────────────────────────────────────────────────────────
 
+
 def discover_hwpx(
     input_dir: Path,
     pattern: str = "*.hwpx",
     limit: int = 0,
 ) -> list[Path]:
     import fnmatch
-    files = [p for p in input_dir.rglob("*")
-             if fnmatch.fnmatch(p.name, pattern) and p.is_file()]
+
+    files = [p for p in input_dir.rglob("*") if fnmatch.fnmatch(p.name, pattern) and p.is_file()]
     files.sort()
     if limit and limit > 0:
         files = files[:limit]
@@ -820,13 +994,12 @@ def run_survey(
     for i, path in enumerate(files):
         fid = masked_file_id(path, i)
         if verbose:
-            print(f"[{i+1}/{len(files)}] {fid}", file=sys.stderr)
+            print(f"[{i + 1}/{len(files)}] {fid}", file=sys.stderr)
         try:
             fr, hdrs, ics = _survey_file(path, fid)
-        except Exception as exc:
+        except Exception as exc:  # ruff: ignore[blind-except] (배치 처리 — 파일 하나 실패해도 나머지 계속 진행)
             tb = traceback.format_exc(limit=2)
-            fr = FileResult(fid, "", 0, 0, 0, 0, 0, 0, 0, {}, {},
-                            "ERROR", [f"{exc}", tb[-200:]])
+            fr = FileResult(fid, "", 0, 0, 0, 0, 0, 0, 0, {}, {}, "ERROR", [f"{exc}", tb[-200:]])
         file_results.append(fr)
         all_headers.extend(hdrs)
         all_inputs.extend(ics)
@@ -848,7 +1021,9 @@ def run_survey(
     summary: dict[str, Any] = {
         "totalFiles": len(files),
         "parsedOk": sum(1 for r in file_results if r.parseStatus in ("PASS", "PARTIAL")),
-        "parseErrors": sum(1 for r in file_results if r.parseStatus in ("BROKEN_ZIP", "MISSING_XML", "ERROR")),
+        "parseErrors": sum(
+            1 for r in file_results if r.parseStatus in ("BROKEN_ZIP", "MISSING_XML", "ERROR")
+        ),
         "totalTables": sum(r.tableCount for r in file_results),
         "totalCells": sum(r.totalCells for r in file_results),
         "totalEmptyCells": sum(r.emptyCells for r in file_results),
@@ -856,38 +1031,38 @@ def run_survey(
         "totalInputCells": len(all_inputs),
         "uniqueHeaders": len(hdr_dict),
         "uniqueInputLabels": len(icd),
-        "inputCellTypeDistribution": dict(Counter(ic.inputCellType for ic in all_inputs).most_common()),
+        "inputCellTypeDistribution": dict(
+            Counter(ic.inputCellType for ic in all_inputs).most_common()
+        ),
         "layoutDistribution": dict(layout_dist.most_common()),
         "topFields": dict(field_dist.most_common(20)),
-        "profiledAt": datetime.now(tz=timezone.utc).isoformat(),
+        "profiledAt": datetime.now(tz=UTC).isoformat(),
     }
 
     if not dry_run:
-        _write_reports(output_dir, file_results, all_headers, all_inputs,
-                       hdr_dict, icd, summary)
+        _write_reports(output_dir, file_results, all_headers, all_inputs, hdr_dict, icd, summary)
 
     return summary
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="HWPX 헤더·입력셀 전수조사 (read-only)"
-    )
-    p.add_argument("--input-dir", required=True,
-                   help="스캔할 HWPX 루트 디렉터리")
-    p.add_argument("--output-dir", required=True,
-                   help="보고서 출력 디렉터리")
-    p.add_argument("--limit", type=int, default=0,
-                   help="최대 스캔 파일 수 (0=제한 없음)")
-    p.add_argument("--dry-run", action="store_true", default=False,
-                   help="스캔만 수행, 파일 미생성")
-    p.add_argument("--include-pattern", default="*.hwpx",
-                   help="파일 glob 패턴 (기본: *.hwpx)")
+    p = argparse.ArgumentParser(description="HWPX 헤더·입력셀 전수조사 (read-only)")
+    p.add_argument("--input-dir", required=True, help="스캔할 HWPX 루트 디렉터리")
+    p.add_argument("--output-dir", required=True, help="보고서 출력 디렉터리")
+    p.add_argument("--limit", type=int, default=0, help="최대 스캔 파일 수 (0=제한 없음)")
+    p.add_argument("--dry-run", action="store_true", default=False, help="스캔만 수행, 파일 미생성")
+    p.add_argument("--include-pattern", default="*.hwpx", help="파일 glob 패턴 (기본: *.hwpx)")
     p.add_argument("--verbose", action="store_true", default=False)
-    p.add_argument("--json", dest="output_json", action="store_true", default=False,
-                   help="요약 JSON을 stdout에 출력")
+    p.add_argument(
+        "--json",
+        dest="output_json",
+        action="store_true",
+        default=False,
+        help="요약 JSON을 stdout에 출력",
+    )
     return p.parse_args(argv)
 
 

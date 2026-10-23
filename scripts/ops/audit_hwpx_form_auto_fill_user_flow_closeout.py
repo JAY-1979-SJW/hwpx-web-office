@@ -9,9 +9,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from hwpx.pipeline import form_auto_fill_real_file_preflight as pf  # noqa: E402
+
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_form_auto_fill_user_flow_closeout"
 CLOSEOUT = ROOT / "docs" / "reports" / "HWPX_FORM_AUTO_FILL_USER_FLOW_CLOSEOUT_14.md"
@@ -53,7 +56,7 @@ def _run_pytest(paths: list[str], timeout: int = 900) -> dict[str, Any]:
         [sys.executable, "-m", "pytest", *paths, "-q", "--tb=no"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=timeout,
     )
     text = result.stdout + "\n" + result.stderr
@@ -78,7 +81,7 @@ def _dirty_baseline() -> dict[str, Any]:
         ["git", "status", "--short"],
         cwd=str(ROOT),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -122,7 +125,7 @@ def _check(code: str, desc: str, ok: bool, fail_code: str | None = None) -> dict
 
 
 def _no_leak(text: str) -> bool:
-    return not (pf.ABS_PATH_RE.search(text) or pf.RAW_FILENAME_RE.search(text) or pf.PII_RE.search(text))
+    return occ.no_leak(text, pf.ABS_PATH_RE, pf.RAW_FILENAME_RE, pf.PII_RE)
 
 
 def _safe_report_write(path: Path, payload: Any) -> None:
@@ -278,8 +281,7 @@ def _write_summary_md(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Checks",
     ]
-    for item in summary["checks"]:
-        lines.append(f"- {item['status']} {item['code']} {item['desc']}")
+    lines.extend(f"- {item['status']} {item['code']} {item['desc']}" for item in summary["checks"])
     text = "\n".join(lines) + "\n"
     if not _no_leak(text):
         raise ValueError("unsafe markdown report")

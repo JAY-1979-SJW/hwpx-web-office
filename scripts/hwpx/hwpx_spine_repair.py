@@ -12,11 +12,14 @@ import argparse
 import html
 import json
 import re
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+# 트리 생성은 defusedxml 이 재노출 안 해 stdlib ET 그대로 두고 파싱만 바꾼다.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 OPF_NS = "http://www.idpf.org/2007/opf/"
 OCF_NS = "urn:oasis:names:tc:opendocument:xmlns:container"
@@ -115,14 +118,17 @@ def _container_xml() -> str:
 
 def _manifest_xml(section_entries: list[str], has_header: bool) -> str:
     entries = [
-        ('/', HPF_MEDIA_TYPE),
-        ('version.xml', 'application/xml'),
-        ('settings.xml', 'application/xml'),
-        ('Contents/content.hpf', HPF_MEDIA_TYPE),
+        ("/", HPF_MEDIA_TYPE),
+        ("version.xml", "application/xml"),
+        ("settings.xml", "application/xml"),
+        ("Contents/content.hpf", HPF_MEDIA_TYPE),
     ]
     if has_header:
-        entries.append(('Contents/header.xml', 'application/xml'))
-    entries.extend((entry.replace("\\", "/"), 'application/xml') for entry in sorted(section_entries, key=_section_sort_key))
+        entries.append(("Contents/header.xml", "application/xml"))
+    entries.extend(
+        (entry.replace("\\", "/"), "application/xml")
+        for entry in sorted(section_entries, key=_section_sort_key)
+    )
     file_entries = "".join(
         f'<manifest:file-entry manifest:full-path="{html.escape(path, quote=True)}" manifest:media-type="{media_type}"/>'
         for path, media_type in entries
@@ -130,7 +136,7 @@ def _manifest_xml(section_entries: list[str], has_header: bool) -> str:
     return _xml_declaration(
         '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">'
         + file_entries
-        + '</manifest:manifest>'
+        + "</manifest:manifest>"
     )
 
 
@@ -181,7 +187,7 @@ def _content_hpf_repaired(
     has_preview_text: bool,
 ) -> tuple[str, dict[str, Any]]:
     try:
-        before_refs = _spine_refs(ET.fromstring(xml_text.encode("utf-8")))
+        before_refs = _spine_refs(_dx_fromstring(xml_text.encode("utf-8")))
     except ET.ParseError:
         before_refs = []
 
@@ -267,10 +273,21 @@ def _ordered_names(names: list[str], section_entries: list[str]) -> list[str]:
     seen = set()
     ordered = []
     for name in priority:
-        if name in names or name in {"mimetype", "version.xml", "settings.xml", "META-INF/container.rdf", "Contents/content.hpf", "META-INF/container.xml", "META-INF/manifest.xml"}:
-            if name not in seen:
-                ordered.append(name)
-                seen.add(name)
+        if (
+            name in names
+            or name
+            in {
+                "mimetype",
+                "version.xml",
+                "settings.xml",
+                "META-INF/container.rdf",
+                "Contents/content.hpf",
+                "META-INF/container.xml",
+                "META-INF/manifest.xml",
+            }
+        ) and name not in seen:
+            ordered.append(name)
+            seen.add(name)
     for name in names:
         if name not in seen:
             ordered.append(name)
@@ -291,16 +308,24 @@ def repair_hwpx_spine(input_path: Path, output_path: Path) -> dict[str, Any]:
             and name.replace("\\", "/").lower().endswith(".xml")
         ]
         if "Contents/content.hpf" not in names:
-            return {"status": "FAIL", "input": str(input_path), "output": str(output_path), "error": "CONTENT_HPF_NOT_FOUND"}
+            return {
+                "status": "FAIL",
+                "input": str(input_path),
+                "output": str(output_path),
+                "error": "CONTENT_HPF_NOT_FOUND",
+            }
         if not section_entries:
-            return {"status": "FAIL", "input": str(input_path), "output": str(output_path), "error": "SECTION_XML_NOT_FOUND"}
+            return {
+                "status": "FAIL",
+                "input": str(input_path),
+                "output": str(output_path),
+                "error": "SECTION_XML_NOT_FOUND",
+            }
         content_text = src.read("Contents/content.hpf").decode("utf-8", errors="replace")
         has_header = "Contents/header.xml" in names
         has_preview_text = "Preview/PrvText.txt" in names
         bindata_entries = [
-            name
-            for name in names
-            if name.replace("\\", "/").lower().startswith("bindata/")
+            name for name in names if name.replace("\\", "/").lower().startswith("bindata/")
         ]
         repaired_content, repair = _content_hpf_repaired(
             content_text,
@@ -318,7 +343,9 @@ def repair_hwpx_spine(input_path: Path, output_path: Path) -> dict[str, Any]:
             "META-INF/manifest.xml": _manifest_xml(section_entries, has_header).encode("utf-8"),
             "Contents/content.hpf": repaired_content.encode("utf-8"),
         }
-        all_names = list(dict.fromkeys(["META-INF/", "Contents/", "Preview/", *names, *generated_entries]))
+        all_names = list(
+            dict.fromkeys(["META-INF/", "Contents/", "Preview/", *names, *generated_entries])
+        )
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_STORED) as dst:
             for name in _ordered_names(all_names, section_entries):
                 normalized = name.replace("\\", "/").lower()
@@ -346,7 +373,9 @@ def repair_hwpx_spine(input_path: Path, output_path: Path) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Repair HWPX content.hpf spine to point to section XML entries")
+    parser = argparse.ArgumentParser(
+        description="Repair HWPX content.hpf spine to point to section XML entries"
+    )
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--report-json")
@@ -354,7 +383,9 @@ def main() -> int:
     report = repair_hwpx_spine(Path(args.input), Path(args.output))
     if args.report_json:
         Path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.report_json).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        Path(args.report_json).write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     else:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report.get("status") == "PASS" else 1

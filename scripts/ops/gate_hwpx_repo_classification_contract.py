@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.ops import classify_hwpx_repo_inventory as inventory  # noqa: E402
 from scripts.ops import gate_hwpx_repo_existing_file_classification as existing_gate  # noqa: E402
 from scripts.ops import gate_hwpx_repo_new_file_classification as new_gate  # noqa: E402
+from scripts.ops import ops_common_checks as occ
 
 REPORT_DIR = ROOT / "data" / "reports" / "hwpx_repo_classification_contract_gate"
 
@@ -94,18 +95,11 @@ def run_repo_classification_contract_gate(
 
 
 def _no_leak(text: str) -> bool:
-    return not (
-        inventory.ABS_PATH_RE.search(text)
-        or inventory.RAW_FILENAME_RE.search(text)
-        or inventory.PII_RE.search(text)
-    )
+    return occ.no_leak(text, inventory.ABS_PATH_RE, inventory.RAW_FILENAME_RE, inventory.PII_RE)
 
 
 def _safe_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if not _no_leak(text):
-        raise ValueError(f"{new_gate.FAIL_UNSAFE_REPORT}: {path.name}")
-    path.write_text(text, encoding="utf-8")
+    occ.safe_write_json(path, payload, _no_leak, new_gate.FAIL_UNSAFE_REPORT)
 
 
 def _write_reports(report_dir: Path, payload: dict[str, Any]) -> None:

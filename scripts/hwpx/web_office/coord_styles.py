@@ -3,11 +3,13 @@
 coordinate_layout 에서 분리(모듈화). 실패 시 빈 결과 반환 — 좌표(위치)
 재현은 서식 없이도 계속된다. read-only, 원본 무수정.
 """
-import xml.etree.ElementTree as ET
+
+# B314 — stdlib ET.fromstring 의 내부 엔티티 확장("billion laughs") DoS 방어.
+from defusedxml.ElementTree import fromstring as _dx_fromstring
 
 try:
     from .coord_xml import HU, ln, mm_px
-except ImportError:                      # 스크립트 직접 실행 폴백
+except ImportError:  # 스크립트 직접 실행 폴백
     from coord_xml import HU, ln, mm_px
 
 
@@ -17,7 +19,7 @@ def parse_para_aligns(z):
     hdr = [n for n in z.namelist() if n.lower().endswith("header.xml")]
     if not hdr:
         return {}
-    root = ET.fromstring(z.read(hdr[0]))
+    root = _dx_fromstring(z.read(hdr[0]))
     out = {}
     for pp in root.iter():
         if ln(pp.tag) != "paraPr":
@@ -53,10 +55,10 @@ def parse_char_prs(z):
         return {}
     try:
         hb = z.read(hdr[0])
-        from scripts.hwpx.parser.style_parser import (
-            parse_char_pr_defs, parse_font_face_table)
+        from scripts.hwpx.parser.style_parser import parse_char_pr_defs, parse_font_face_table
+
         return parse_char_pr_defs(hb, parse_font_face_table(hb))
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except] — 실패 시 빈 결과(서식 없이 계속)
         return {}
 
 
@@ -72,7 +74,7 @@ def _fill_color(bf_el):
             if not v or v.lower() == "none":
                 continue
             h = v[1:] if v.startswith("#") else v
-            if len(h) == 8:      # AARRGGBB/RRGGBBAA → 앞 6자리
+            if len(h) == 8:  # AARRGGBB/RRGGBBAA → 앞 6자리
                 h = h[:6]
             if len(h) == 6 and all(c in "0123456789abcdefABCDEF" for c in h):
                 col = "#" + h.upper()
@@ -87,7 +89,7 @@ def parse_border_fills(z):
     hdr = [n for n in z.namelist() if n.lower().endswith("header.xml")]
     if not hdr:
         return {}
-    root = ET.fromstring(z.read(hdr[0]))
+    root = _dx_fromstring(z.read(hdr[0]))
     out = {}
     for bf in root.iter():
         if ln(bf.tag) != "borderFill":
@@ -96,8 +98,7 @@ def parse_border_fills(z):
         sides = {}
         for ch in bf:
             name = ln(ch.tag)
-            if name in ("leftBorder", "rightBorder", "topBorder",
-                        "bottomBorder"):
+            if name in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
                 sides[name] = dict(ch.attrib)
         if bid is not None:
             out[bid] = {"sides": sides, "fill": _fill_color(bf)}
@@ -106,11 +107,13 @@ def parse_border_fills(z):
 
 def border_sides_css(sides):
     """borderFill sides → 변별 CSS border 선언({"l","r","t","b"})."""
+
     def one(sd):
         if not sd or sd.get("type", "NONE") == "NONE":
             return "none"
         w = max(0.7, mm_px(sd.get("width")))
         return f"{w:.2f}px solid {sd.get('color', '#000')}"
+
     return {
         "l": one(sides.get("leftBorder")),
         "r": one(sides.get("rightBorder")),
@@ -135,12 +138,14 @@ def parse_page_geometry(root):
     m_header = float(mg.get("header", "0")) * HU
     m_footer = float(mg.get("footer", "0")) * HU
     content_h = page_h - m_top - m_bottom - m_header - m_footer
-    if content_h < page_h * 0.3:   # 비정상 여백 방어
+    if content_h < page_h * 0.3:  # 비정상 여백 방어
         content_h = page_h - m_top - m_bottom
     if content_h <= 0:
         content_h = page_h
     return {
-        "page_w": page_w, "page_h": page_h,
-        "m_left": m_left, "m_top": m_top,
+        "page_w": page_w,
+        "page_h": page_h,
+        "m_left": m_left,
+        "m_top": m_top,
         "content_h": content_h,
     }

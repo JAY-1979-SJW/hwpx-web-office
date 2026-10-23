@@ -75,11 +75,8 @@ BASELINE_COMMIT = "aeab86a"
 
 
 def _check_files_exist() -> list[dict]:
-    findings: list[dict] = []
-    for p in REQUIRED_FILES:
-        if not p.is_file():
-            findings.append({"code": "MISSING_FILE", "level": "FAIL",
-                                            "detail": str(p.relative_to(PR))})
+    findings: list[dict] = [{"code": "MISSING_FILE", "level": "FAIL",
+                                            "detail": str(p.relative_to(PR))} for p in REQUIRED_FILES if not p.is_file()]
     return findings
 
 
@@ -89,11 +86,9 @@ def _check_no_writer_import() -> list[dict]:
         if not p.is_file():
             continue
         src = p.read_text(encoding="utf-8")
-        for tok in FORBIDDEN_WRITER_TOKENS:
-            if tok in src:
-                findings.append({"code": "FORBIDDEN_WRITER_TOKEN",
+        findings.extend({"code": "FORBIDDEN_WRITER_TOKEN",
                                                 "level": "FAIL",
-                                                "detail": f"{p.name}: {tok}"})
+                                                "detail": f"{p.name}: {tok}"} for tok in FORBIDDEN_WRITER_TOKENS if tok in src)
     return findings
 
 
@@ -103,7 +98,7 @@ def _check_unchanged() -> list[dict]:
         try:
             r = subprocess.run(
                 ["git", "diff", BASELINE_COMMIT, "--", rel],
-                capture_output=True, text=True, cwd=str(PR), timeout=20)
+                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PR), timeout=20)
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             findings.append({"code": "GIT_DIFF_FAILED", "level": "WARN",
                                             "detail": f"{rel}: {e}"})

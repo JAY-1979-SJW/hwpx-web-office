@@ -17,8 +17,7 @@ apply_edit_plan / fill_schedule_bars 호출 없음 — 색상값 조회만 수�
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import ClassVar
+from dataclasses import dataclass
 
 
 # ── 정책 테이블 (근거: 건설공사 감리 기준 색상 통례 + 엔진 내부 일관성) ───────

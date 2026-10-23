@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 CONTRACT_NAME = "HWPX-PRODUCTION-ADAPTER-CONTRACT-01"
 CONTRACT_VERSION = "v1"
@@ -125,11 +125,9 @@ def audit_adapter_isolation() -> dict:
             continue
         checked.append(str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"))
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for needle in FORBIDDEN_ADAPTER_IMPORTS:
-            if needle in text:
-                violations.append({
+        violations.extend({
                     "file": str(path.relative_to(PROJECT_ROOT)).replace("\\", "/"),
                     "forbidden": needle,
-                })
+                } for needle in FORBIDDEN_ADAPTER_IMPORTS if needle in text)
     return {"violations": violations, "ok": not violations,
               "filesChecked": checked}

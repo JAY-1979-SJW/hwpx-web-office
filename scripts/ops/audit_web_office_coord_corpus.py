@@ -6,6 +6,7 @@
 
 read-only — 원본 무수정. 보고는 stdout(JSON). 파일 저장은 --json 지정 시만.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/hwpx"))
 
-from scripts.hwpx.web_office.coordinate_layout import extract  # noqa: E402
+from scripts.hwpx.web_office.coordinate_layout import extract  # ruff: ignore[module-import-not-at-top-of-file]
 
 DEFAULT_ROOTS = ["samples", "tests/fixtures/hwpx", "data/drafts"]
 
@@ -50,7 +51,7 @@ def _read_prv_text(path: Path) -> str:
                 pass
         try:
             t = raw.decode("utf-8")
-            if "\x00" not in t:   # ASCII-계열 utf-16 오검출 방지
+            if "\x00" not in t:  # ASCII-계열 utf-16 오검출 방지
                 return t
         except UnicodeDecodeError:
             pass
@@ -59,7 +60,7 @@ def _read_prv_text(path: Path) -> str:
                 return raw.decode(enc)
             except (UnicodeDecodeError, UnicodeError):
                 continue
-    except Exception:
+    except Exception:  # ruff: ignore[blind-except]
         pass
     return ""
 
@@ -81,8 +82,7 @@ def _char_coverage(ours: str, truth: str) -> float:
 
 
 def _cellid_summary(results: list[dict]) -> dict:
-    vals = [r["cellIdMatch"] for r in results
-            if r.get("cellIdMatch") is not None]
+    vals = [r["cellIdMatch"] for r in results if r.get("cellIdMatch") is not None]
     if not vals:
         return {"docs": 0}
     return {
@@ -93,14 +93,68 @@ def _cellid_summary(results: list[dict]) -> dict:
     }
 
 
+def _check_line_geometry(lay: dict, pw) -> list[str]:
+    """줄 단위 좌표/세그먼트-텍스트/페이지 밖 이탈을 검사해 경고 목록을 반환한다."""
+    bad_coord = bad_span = off_page = 0
+    for ln in lay.get("lines", []):
+        if not all(_finite(ln.get(k)) for k in ("x", "y", "w", "h")):
+            bad_coord += 1
+            continue
+        if ln.get("segments"):
+            joined = "".join(s.get("text", "") for s in ln["segments"])
+            if joined != ln.get("text", ""):
+                bad_span += 1
+        if pw and (ln["x"] < -2 or ln["x"] > pw + 2):
+            off_page += 1
+    warnings = []
+    if bad_coord:
+        warnings.append(f"NONFINITE_COORDS:{bad_coord}")
+    if bad_span:
+        warnings.append(f"SEGMENT_TEXT_MISMATCH:{bad_span}")
+    if off_page:
+        warnings.append(f"LINE_OFF_PAGE_X:{off_page}")
+    return warnings
+
+
+def _check_cell_id_match(path: Path, box_ids: set) -> dict:
+    """좌표 박스 cellId 가 문서모델 셀 ID 와 일치하는지 검사한다(편집 파이프라인 연결).
+
+    불일치 셀은 클릭 편집이 안 된다. 반환값을 `rec` 에 병합해 쓴다.
+    """
+    out: dict = {"warnings": []}
+    try:
+        from scripts.hwpx.web_office.ro_view_importer import import_hwpx_as_ro_view
+
+        doc = import_hwpx_as_ro_view(path)
+        model_ids = {c.cellId for c in doc.cells}
+        matched = box_ids & model_ids
+        out["cellIdMatch"] = round(len(matched) / len(box_ids), 3)
+        out["inputCells"] = sum(1 for c in doc.cells if not (c.text or "").strip())
+        if out["cellIdMatch"] < 0.98:
+            out["warnings"].append(f"CELLID_MISMATCH:{out['cellIdMatch']:.2f}")
+    except Exception as e:  # ruff: ignore[blind-except]
+        out["warnings"].append(f"CELLID_CHECK_FAIL:{type(e).__name__}")
+    return out
+
+
+def _check_text_coverage(path: Path, lay: dict) -> tuple[float | None, str | None]:
+    """한컴 PrvText 대조로 텍스트 충실도를 채점한다. (coverage, warning_or_none)."""
+    truth = _read_prv_text(path)
+    if not truth.strip():
+        return None, None
+    ours = "\n".join(ln.get("text", "") for ln in lay.get("lines", []))
+    cov = round(_char_coverage(ours, truth), 3)
+    warning = f"TEXT_COVERAGE_LOW:{cov:.2f}" if cov < 0.85 else None
+    return cov, warning
+
+
 def audit_one(path: Path, project_root: Path) -> dict:
-    rel = str(path.relative_to(project_root)) if path.is_relative_to(
-        project_root) else str(path)
+    rel = str(path.relative_to(project_root)) if path.is_relative_to(project_root) else str(path)
     rec: dict = {"path": rel, "verdict": "OK", "warnings": []}
     t0 = time.time()
     try:
         lay = extract(str(path))
-    except Exception as e:
+    except Exception as e:  # ruff: ignore[blind-except]
         rec["verdict"] = "ERROR"
         rec["error"] = f"{type(e).__name__}: {e}"[:160]
         return rec
@@ -113,62 +167,26 @@ def audit_one(path: Path, project_root: Path) -> dict:
     if not (pw > 50 and ph > 50):
         rec["warnings"].append("PAGE_GEOMETRY_BAD")
 
-    bad_coord = bad_span = off_page = 0
-    for ln in lay.get("lines", []):
-        if not all(_finite(ln.get(k)) for k in ("x", "y", "w", "h")):
-            bad_coord += 1
-            continue
-        if ln.get("segments"):
-            joined = "".join(s.get("text", "") for s in ln["segments"])
-            if joined != ln.get("text", ""):
-                bad_span += 1
-        if pw and (ln["x"] < -2 or ln["x"] > pw + 2):
-            off_page += 1
-    if bad_coord:
-        rec["warnings"].append(f"NONFINITE_COORDS:{bad_coord}")
-    if bad_span:
-        rec["warnings"].append(f"SEGMENT_TEXT_MISMATCH:{bad_span}")
-    if off_page:
-        rec["warnings"].append(f"LINE_OFF_PAGE_X:{off_page}")
+    rec["warnings"].extend(_check_line_geometry(lay, pw))
 
-    neg_box = sum(1 for b in lay.get("boxes", [])
-                  if not (b.get("w", 0) > 0 and b.get("h", 0) > 0))
+    neg_box = sum(1 for b in lay.get("boxes", []) if not (b.get("w", 0) > 0 and b.get("h", 0) > 0))
     if neg_box:
         rec["warnings"].append(f"BOX_NONPOSITIVE:{neg_box}")
 
-    # 편집 연결성 — 좌표 박스 cellId 가 문서모델 셀 ID 와 일치하는지(편집
-    # 파이프라인 연결). 불일치 셀은 클릭 편집이 안 된다.
     box_ids = {b["cellId"] for b in lay.get("boxes", []) if b.get("cellId")}
     if box_ids:
-        try:
-            from scripts.hwpx.web_office.ro_view_importer import (
-                import_hwpx_as_ro_view)
-            doc = import_hwpx_as_ro_view(path)
-            model_ids = {c.cellId for c in doc.cells}
-            matched = box_ids & model_ids
-            rec["cellIdMatch"] = round(len(matched) / len(box_ids), 3)
-            rec["inputCells"] = sum(
-                1 for c in doc.cells if not (c.text or "").strip())
-            if rec["cellIdMatch"] < 0.98:
-                rec["warnings"].append(
-                    f"CELLID_MISMATCH:{rec['cellIdMatch']:.2f}")
-        except Exception as e:
-            rec["warnings"].append(f"CELLID_CHECK_FAIL:{type(e).__name__}")
+        cell_id_result = _check_cell_id_match(path, box_ids)
+        rec["warnings"].extend(cell_id_result.pop("warnings"))
+        rec.update(cell_id_result)
 
     # 페이지 인플레이션 휴리스틱: 내용 대비 페이지 과다(빈 페이지 남발)
     if rec["pages"] > 3 and rec["lines"] / max(1, rec["pages"]) < 6:
         rec["warnings"].append("PAGE_INFLATION_SUSPECT")
 
-    # 텍스트 충실도 (한컴 PrvText 대조)
-    truth = _read_prv_text(path)
-    if truth.strip():
-        ours = "\n".join(ln.get("text", "") for ln in lay.get("lines", []))
-        cov = _char_coverage(ours, truth)
-        rec["textCoverage"] = round(cov, 3)
-        if cov < 0.85:
-            rec["warnings"].append(f"TEXT_COVERAGE_LOW:{cov:.2f}")
-    else:
-        rec["textCoverage"] = None
+    cov, cov_warning = _check_text_coverage(path, lay)
+    rec["textCoverage"] = cov
+    if cov_warning:
+        rec["warnings"].append(cov_warning)
 
     if rec["warnings"]:
         rec["verdict"] = "WARN"
@@ -190,13 +208,15 @@ def discover(roots: list[str], project_root: Path, limit: int = 0) -> list[Path]
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--root", action="append", default=None,
-                    help="검색 루트(반복 지정 가능). 기본: 저장소 표준 위치")
-    ap.add_argument("--limit", type=int, default=0,
-                    help="균등 샘플링 상한(0=전수)")
+    ap.add_argument(
+        "--root",
+        action="append",
+        default=None,
+        help="검색 루트(반복 지정 가능). 기본: 저장소 표준 위치",
+    )
+    ap.add_argument("--limit", type=int, default=0, help="균등 샘플링 상한(0=전수)")
     ap.add_argument("--json", default=None, help="상세 결과 JSON 저장 경로")
-    ap.add_argument("--worst", type=int, default=15,
-                    help="요약에 표시할 최악 문서 수")
+    ap.add_argument("--worst", type=int, default=15, help="요약에 표시할 최악 문서 수")
     args = ap.parse_args()
 
     roots = args.root or DEFAULT_ROOTS
@@ -209,13 +229,14 @@ def main() -> int:
         for w in r["warnings"]:
             warn_modes[w.split(":")[0]] += 1
 
-    covs = [r["textCoverage"] for r in results
-            if r.get("textCoverage") is not None]
+    covs = [r["textCoverage"] for r in results if r.get("textCoverage") is not None]
     ranked = sorted(
         (r for r in results if r["verdict"] != "OK"),
-        key=lambda r: (r["verdict"] != "ERROR",
-                       r.get("textCoverage") if r.get("textCoverage")
-                       is not None else 1.0))
+        key=lambda r: (
+            r["verdict"] != "ERROR",
+            r.get("textCoverage") if r.get("textCoverage") is not None else 1.0,
+        ),
+    )
 
     summary = {
         "schemaVersion": "web_office_coord_corpus_audit_v1",
@@ -233,17 +254,21 @@ def main() -> int:
         "cellIdMatch": _cellid_summary(results),
         "warningModes": dict(warn_modes.most_common()),
         "worst": [
-            {"path": r["path"], "verdict": r["verdict"],
-             "textCoverage": r.get("textCoverage"),
-             "warnings": r["warnings"][:4],
-             "error": r.get("error")}
+            {
+                "path": r["path"],
+                "verdict": r["verdict"],
+                "textCoverage": r.get("textCoverage"),
+                "warnings": r["warnings"][:4],
+                "error": r.get("error"),
+            }
             for r in ranked[: args.worst]
         ],
     }
     if args.json:
         Path(args.json).write_text(
-            json.dumps({"summary": summary, "results": results},
-                       ensure_ascii=False, indent=1), encoding="utf-8")
+            json.dumps({"summary": summary, "results": results}, ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
     print(json.dumps(summary, ensure_ascii=False, indent=1))
     return 0 if summary["verdict"] == PASS_VERDICT else 1
 

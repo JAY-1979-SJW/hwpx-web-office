@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -182,9 +181,8 @@ def run_audit() -> dict:
             f"verdict: **{summary['auditVerdict']}**  "
             f"pass={summary['passCount']}/{summary['totalChecks']}",
             "", "| check | ok | detail |", "|---|---|---|"]
-    for f in findings:
-        md.append(f"| {f['check']} | {'PASS' if f['ok'] else 'FAIL'} "
-                     f"| {f['detail']} |")
+    md.extend(f"| {f['check']} | {'PASS' if f['ok'] else 'FAIL'} "
+                     f"| {f['detail']} |" for f in findings)
     (OUTPUT_DIR / "audit.md").write_text("\n".join(md), encoding="utf-8")
     return summary
 
