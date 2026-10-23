@@ -16,7 +16,14 @@ from ..hwpx_cell_text_edits import (  # 편집 엔진(L4)의 순수 글자 편�
     apply_edit,
     apply_edits,
 )
-from ..parser.slot_modes import DATE_PATTERN, EDIT_MODES, INLINE, mark_choice
+from ..parser.slot_modes import (
+    DATE_PATTERN,
+    EDIT_MODES,
+    INLINE,
+    SEPARATOR,
+    mark_choice,
+    separator_text,
+)
 from ..parser.table_parser import (
     _normalize as normalize_text,  # 칸 글자를 읽을 때 쓰는 것과 같은 정규화
 )
@@ -126,6 +133,8 @@ def _final_cell_text(slot: object, value: str) -> str | None:
         return f"{value}{base}"
     if mode == "choice":
         return mark_choice(base, value)
+    if mode == SEPARATOR:
+        return separator_text(base.strip(), value)  # 칸에 적힌 기호(-·~)를 값 안에 남긴다
     return value
 
 

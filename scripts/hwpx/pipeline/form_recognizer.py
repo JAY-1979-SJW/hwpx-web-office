@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..parser.cell_kind import grid_of, table_exclusion
+from ..parser.cell_kind import grid_of, has_notice_exception, table_exclusion
 from ..parser.slot_modes import slot_key
 
 # ── 상수 ──────────────────────────────────────────────────────────────────────
@@ -382,6 +382,14 @@ def _detect_merged_input_slots(table, table_role: str) -> list[EnhancedSlot]:
     return slots
 
 
+def _notice_exception_ok(role: str, evidence) -> bool:
+    """안내문 표(legal_notice)라도 서명 문단과 따로 있는 날짜·서명 칸이 따로 있는 성명 칸은 입력칸으로 남긴다.
+
+    결재란·쪽 표시 표는 예외 없이 통째로 제외하고, 안내문 표의 나머지 칸도 그대로 제외한다.
+    """
+    return role == "legal_notice" and has_notice_exception(evidence)
+
+
 def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[EnhancedSlot]:
     """Parser V2의 inputSlotCandidates를 보강하고 새 규칙을 추가한다.
 
@@ -401,7 +409,7 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
     # ── 기존 슬롯 보강 ───────────────────────────────────────────────────────
     for slot in getattr(parser_result, "inputSlotCandidates", []) or []:
         tid = getattr(slot, "tableId", "")
-        if tid in unsafe_tables:
+        if tid in unsafe_tables and not _notice_exception_ok(table_roles.get(tid, ""), getattr(slot, "evidence", [])):
             continue
         row, col = getattr(slot, "row", 0), getattr(slot, "col", 0)
         key = slot_key(slot)
@@ -451,7 +459,7 @@ def enhance_input_slots(parser_result, table_roles: dict[str, str]) -> list[Enha
     tables = getattr(parser_result, "tables", []) or []
     new_slots = detect_input_slots(tables, table_roles=table_roles)
     for slot in new_slots:
-        if slot.tableId in unsafe_tables:
+        if slot.tableId in unsafe_tables and not _notice_exception_ok(table_roles.get(slot.tableId, ""), slot.evidence):
             continue
         key = slot_key(slot)
         if key in seen_targets:
@@ -524,7 +532,10 @@ def recognize_form(parser_result) -> FormRecognitionResult:
     ordinals = table_ordinals(tables)
     for slot in slots:
         slot.tableOrdinal = ordinals.get(slot.tableId, -1)
-    safe_slots = [s for s in slots if s.tableId not in unsafe_ids]
+    unsafe_set = set(unsafe_ids)
+    safe_slots = [
+        s for s in slots if s.tableId not in unsafe_set or _notice_exception_ok(table_roles.get(s.tableId, ""), s.evidence)
+    ]
 
     # 5. 전체 confidence
     if safe_slots:

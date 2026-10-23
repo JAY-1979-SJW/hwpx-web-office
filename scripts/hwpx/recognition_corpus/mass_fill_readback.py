@@ -62,10 +62,12 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
     from hwpx_edit_tool import apply_edit_plan
 
     from hwpx.parser import parse_hwpx_v2
+    from hwpx.parser.cell_kind import has_notice_exception
     from hwpx.parser.slot_modes import choice_options
     from hwpx.pipeline.form_recognizer import recognize_form
     from hwpx.pipeline.plan_builder import _build_slot_item, edit_base, merge_edit_item
     from hwpx.pipeline.recognition_pipeline import run_pipeline
+    from hwpx.pipeline.reparse_verifier import sign_paragraph_changes
 
     src = Path(path_str)
     work = Path(work_dir_str) / src.stem[:40]
@@ -98,8 +100,12 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
 
     # ── 가짜값 입력(기존 plan_builder 가 만드는 항목 그대로) ──────────────
     items, targets, sign_targets, bases = [], [], 0, {}
+    relaxed: list[str] = []  # 4차 완화(서명 문단과 따로 있는 날짜·서명 칸이 따로 있는 성명 칸) — 엄격 서명 쓰기와 따로 센다
     for i, s in enumerate(slots):
         mode = getattr(s, "writeMode", "set")
+        is_relaxed = has_notice_exception(getattr(s, "evidence", []))
+        if is_relaxed:
+            relaxed.append(f"{s.tableId}:r{s.visualRow}c{s.visualCol}:{getattr(s, 'labelText', '')}")
         options = choice_options(getattr(s, "cellText", "")) if mode == "choice" else []
         val = options[0] if options else f"@{i:03d}"
         item, dest = _build_slot_item(s, "mass", val, 0.95, {"mass": 1})
@@ -112,16 +118,18 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
                 res["failures"].append("PLAN_EDIT_CONFLICT")
                 continue
             if any(t[0] == (s.tableId, s.visualRow, s.visualCol) for t in targets):
-                sign_targets += 1 if _is_sign_target(s, cell_by_pos, row_cells) else 0
+                sign_targets += 1 if not is_relaxed and _is_sign_target(s, cell_by_pos, row_cells) else 0
                 continue
         else:
             items.append(item)
         # (위치, 최종 글자를 담은 항목, 원래 글자를 덮어써도 되는 방식인지)
         targets.append(((s.tableId, s.visualRow, s.visualCol), item, mode == "set"))
-        if _is_sign_target(s, cell_by_pos, row_cells):
+        if not is_relaxed and _is_sign_target(s, cell_by_pos, row_cells):
             sign_targets += 1
     res["planned"] = len(items)
     res["sign_writes"] = sign_targets
+    res["relaxed_writes"] = len(relaxed)
+    res["relaxed"] = relaxed
 
     matched = mismatch = stray = overwrote = 0
     if items:
@@ -132,6 +140,10 @@ def run_one(path_str: str, work_dir_str: str) -> dict:
                 res["failures"].append("EDIT_FAIL")
             after = parse_hwpx_v2(out)
             after_pos = {(t.tableId, c.visualRow, c.visualCol): c for t in after.tables for c in t.cells}
+            sign_changed = sign_paragraph_changes(before, after)  # 서명·(인) 문단은 쓰기 전후 글자까지 같아야 한다
+            res["sign_paragraph_changes"] = len(sign_changed)
+            if sign_changed:
+                res["failures"].append("SIGN_PARAGRAPH_CHANGED")
             for pos, titem, replaces in targets:
                 val = titem["value"]
                 written = after_pos.get(pos)
@@ -206,6 +218,8 @@ def summarize(results: list[dict]) -> dict:
         "readback_match_rate": round(matched / planned, 4) if planned else 0.0,
         "forms_with_any_mismatch": sum(1 for r in ok if r.get("mismatch", 0) > 0),
         "sign_writes": sum(r.get("sign_writes", 0) for r in results),
+        "relaxed_writes": sum(r.get("relaxed_writes", 0) for r in results),
+        "sign_paragraph_changes": sum(r.get("sign_paragraph_changes", 0) for r in results),
         "label_overwrites": sum(r.get("overwrote", 0) for r in results),
         "stray_write_forms": sum(1 for r in ok if r.get("stray", 0) > 0),
         "zero_slot_pass": sum(1 for r in results if "ZERO_SLOT_PASS" in r.get("failures", [])),
@@ -271,7 +285,8 @@ def cmd_compare(args) -> int:
     b = json.loads(Path(args.after).read_text(encoding="utf-8"))
     sa, sb = summarize(a), summarize(b)
     keys = ["analysis_success", "zero_value_forms", "slots_total", "readback_match_rate",
-            "forms_with_any_mismatch", "sign_writes", "label_overwrites", "stray_write_forms",
+            "forms_with_any_mismatch", "sign_writes", "relaxed_writes", "sign_paragraph_changes",
+            "label_overwrites", "stray_write_forms",
             "zero_slot_pass", "hancom_pass_not_final_pass"]
     print("| 지표 | 전 | 후 |\n|---|---|---|")
     for k in keys:
@@ -283,7 +298,8 @@ def cmd_compare(args) -> int:
         if not o:
             continue
         if (r.get("slots", 0) < o.get("slots", 0) or r.get("mismatch", 0) > o.get("mismatch", 0)
-                or r.get("sign_writes", 0) > o.get("sign_writes", 0) or (o.get("parse_ok") and not r.get("parse_ok"))):
+                or r.get("sign_writes", 0) > o.get("sign_writes", 0)
+                or r.get("sign_paragraph_changes", 0) > o.get("sign_paragraph_changes", 0) or (o.get("parse_ok") and not r.get("parse_ok"))):
             worse.append(r["name"])
     print(f"\n나빠진 서식: {len(worse)}")
     for x in worse[:20]:

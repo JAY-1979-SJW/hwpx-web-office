@@ -15,7 +15,14 @@ from __future__ import annotations
 
 import re
 
-from .cell_kind import grid_of, rows_index, slot_block_reason, table_exclusion
+from .cell_kind import (
+    NAME_NEXT_TO_SIGN,
+    grid_of,
+    name_next_to_sign,
+    rows_index,
+    slot_block_reason,
+    table_exclusion,
+)
 from .parser_contract import CellInfo, InputSlotCandidate, TableInfo
 from .slot_modes import (
     EDIT_MODES,
@@ -24,8 +31,17 @@ from .slot_modes import (
     detect_inline_slots,
     detect_placeholder_slots,
     detect_same_cell_slots,
+    detect_separator_slots,
     slot_key,
 )
+
+_DESCRIPTION_RE = re.compile(r"\([^)]*\)|\[[^\]]*\]|（[^）]*）")
+
+
+def _label_length(text: str) -> int:
+    """라벨 길이 — 괄호·대괄호 안 풀이('(법인은 법인명)')는 라벨 본문이 아니라서 뺀다."""
+    return len(_DESCRIPTION_RE.sub("", text).strip())
+
 
 _AUTO_EDIT_THRESHOLD = 0.90
 _REVIEW_REQUIRED_THRESHOLD = 0.70
@@ -215,7 +231,7 @@ def detect_label_right_slots(table: TableInfo) -> list[InputSlotCandidate]:
     for cell in table.cells:
         if not cell.normalizedText:
             continue
-        if not getattr(cell, "isLikelyLabel", False) and len(cell.normalizedText) > 20:
+        if not getattr(cell, "isLikelyLabel", False) and _label_length(cell.normalizedText) > 20:
             continue
         right = cell_map.get((_grid(cell)[0], _grid(cell)[1] + getattr(cell, "colSpan", 1)))
         if not right or right.normalizedText or getattr(right, "isCoveredByMerge", False):
@@ -720,6 +736,7 @@ def detect_input_slots(
         # 글자 일부만 고치는 칸은 다른 탐지기가 잡은 칸이 없을 때만 — 칸 전체를 덮는 슬롯과 한 칸에 겹치지 않게 맨 뒤에 둔다
         candidate_slots.extend(detect_inline_slots(table))
         candidate_slots.extend(detect_placeholder_slots(table))
+        candidate_slots.extend(detect_separator_slots(table))
 
         row_index = rows_index(table)
         for slot in candidate_slots:
@@ -728,6 +745,8 @@ def detect_input_slots(
                 continue
             if slot_block_reason(table, slot, row_index):
                 continue  # 서명·안내문·관청기재·쪽 표시 칸 — 칸 단위 차단(막힌 슬롯은 같은 자리의 다른 탐지기를 가리지 않는다)
+            if name_next_to_sign(table, slot, row_index) is not None:
+                slot.evidence.append(NAME_NEXT_TO_SIGN)  # 서명 칸이 따로 있는 성명 칸 — 완화로 통과한 칸을 표시(공지표 예외·측정용)
             seen.add(key)
             if slot.tableRole == "unknown" and table_role != "unknown":
                 slot.tableRole = table_role

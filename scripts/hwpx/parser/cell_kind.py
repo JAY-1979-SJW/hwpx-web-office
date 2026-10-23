@@ -17,6 +17,8 @@ OFFICE = "office"
 PAGE = "page"
 
 _SIGN_RE = re.compile(r"\(\s*인\s*\)|\(\s*서명|서명|날인|직인|인감|도장|결재|\(\s*인$|^인$")
+# 서명·날인 문구가 든 문단 — 서식 안내 문장 속 '서명' 이 아니라 서명줄/서명 표시를 가리킨다
+SIGN_TEXT_RE = re.compile(r"서명|\(\s*인\s*\)|또는\s*인|날인|직인")
 _PURE_SIGN_RE = re.compile(r"^[\s(（]*(서명\s*(또는|및|/)?\s*인|서명|인|날인|직인|인감)[\s)）]*$")
 # '… 성명 (서명 또는 인)' '… 수급인 (서명 또는 인) 귀하' 처럼 서명 표시로 끝나는 칸 — 길이와 무관하게 서명줄이다.
 _TRAILING_SIGN_RE = re.compile(r"[(（]\s*(서명\s*(또는|및|/)?\s*(인|날인)|인)\s*[)）]\s*(귀하|귀중|앞)?\s*$")
@@ -31,6 +33,7 @@ _PAGE_RE = re.compile(r"[(（]?\s*(앞|뒤)\s*쪽\s*[)）]?|쪽\s*번호|^\s*\d+
 # 서명·안내 같은 '종류 판정'은 짧은 칸 글자에만 적용한다. 긴 문장 속의 '서명' 이라는 낱말은
 # 설명문이지 서명칸이 아니다(안내문 종류는 길이와 무관하게 판정).
 _SHORT = 20
+_EDIT_MODES = ("inline", "replace")  # slot_modes.EDIT_MODES — cell_kind 가 slot_modes 보다 아래 층이라 값만 맞춘다
 
 
 def cell_kind(text: str | None) -> str:
@@ -75,6 +78,24 @@ def _is_title_label(table, label: str) -> bool:
         if (getattr(c, "normalizedText", "") or "").strip() == label and (getattr(c, "colSpan", 1) or 1) * 10 >= n_cols * 6:
             return True
     return False
+
+
+# 서명 표시 옆 칸이어도 이름을 쓸 수 있는 라벨 — 성명·신고인·건축주·대표자·명칭 류 (서명 표시는 별도 칸이고 그 칸은 안 건드린다)
+_NAME_LABEL_RE = re.compile(r"성명|신고인|건축주|대표자|명칭")
+
+# 서명·안내 표 안에서도 예외로 살리는 칸의 증거 이름 (form_recognizer 가 표 전체 제외에서 이 칸만 빼준다)
+SIGN_CELL_DATE = "sign_cell_date"
+NAME_NEXT_TO_SIGN = "name_next_to_sign"
+NOTICE_EXCEPTIONS = (SIGN_CELL_DATE, NAME_NEXT_TO_SIGN)
+
+
+def has_notice_exception(evidence) -> bool:
+    return any(e in NOTICE_EXCEPTIONS for e in (evidence or []))
+
+
+def sign_paragraphs(cell) -> list[str]:
+    """칸 안에서 서명·날인 문구가 든 문단 목록(글자 그대로)."""
+    return [p for p in (getattr(cell, "paragraphs", None) or []) if SIGN_TEXT_RE.search(p)]
 
 
 def is_pure_sign_marker(text: str | None) -> bool:
@@ -122,12 +143,42 @@ def is_spacer_cell(cell, row_cells: list, n_cols: int) -> bool:
     return 0 < height < _THIN_ROW_HEIGHT and len(row_cells) == 1 and span * 10 >= n_cols * 8
 
 
+def _adjacent_sign_cell(slot, cells_by_row: dict, row: int, col: int, span: int):
+    """슬롯 바로 옆(왼쪽·오른쪽)에 있는 '(인)' 같은 서명 표시만 있는 칸. 없으면 None."""
+    for c in cells_by_row.get(row, []):
+        t = getattr(c, "normalizedText", "") or ""
+        if not t or not is_pure_sign_marker(t):
+            continue
+        c_col = grid_of(c)[1]
+        c_span = getattr(c, "colSpan", 1) or 1
+        if c_col + c_span == col or c_col == col + span:
+            return c
+    return None
+
+
+def name_next_to_sign(table, slot, cells_by_row: dict | None = None):
+    """이름 라벨의 값칸이 별도의 서명 표시 칸 바로 옆일 때 그 서명 칸. 해당 없으면 None.
+
+    왼쪽 라벨이 성명·신고인·건축주·대표자·명칭 류이고 서명 표시가 따로 있는 칸일 때만 좁게 허용한다.
+    서명 표시가 같은 칸에 있으면 슬롯 자체가 생기지 않거나(글자가 있는 칸) 쓰기 방식이 달라 막힌다.
+    """
+    if getattr(slot, "writeMode", "set") not in ("set", "unit") or getattr(slot, "source", "") == "group_header":
+        return None
+    if not _NAME_LABEL_RE.search(getattr(slot, "labelText", "") or ""):
+        return None
+    if cells_by_row is None:
+        cells_by_row = rows_index(table)
+    row, col = grid_of(slot)
+    return _adjacent_sign_cell(slot, cells_by_row, row, col, getattr(slot, "colSpan", 1) or 1)
+
+
 def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
     """입력칸 후보 1개를 칸 단위로 막을 사유. 막지 않으면 ''.
 
     - 라벨이 서명/안내문/관청기재/쪽 표시이면 그 오른쪽·아래 칸은 입력칸이 아니다.
     - 같은 행에 안내문 칸이 있으면 그 행의 칸은 입력칸이 아니다.
     - 바로 옆(왼쪽·오른쪽)이 '(인)' 같은 서명 표시만 있는 칸이면 서명/날인 자리로 보고 막는다.
+      단 옆 칸이 별도 서명 표시 칸이고 라벨이 이름 류이면(name_next_to_sign) 이름 자리로 허용한다.
     """
     kind = cell_kind(getattr(slot, "labelText", ""))
     if kind:
@@ -149,25 +200,23 @@ def slot_block_reason(table, slot, cells_by_row: dict | None = None) -> str:
         if grid_of(c) == (row, col) and is_spacer_cell(c, cells_by_row.get(row, []), n_cols):
             return "spacer_row"
     for c in cells_by_row.get(row, []):
-        if grid_of(c) == (row, col) and getattr(c, "hasNestedTable", False):
-            # 안쪽 표를 품은 칸은 쓴 글자가 안쪽 표의 첫 칸으로 들어가 라벨을 덮어쓴다
+        # 안쪽 표를 품은 칸은 쓴 글자가 안쪽 표의 첫 칸으로 들어가 라벨을 덮어쓴다 — 칸 전체를 덮는 방식만 해당(글자 일부 편집은 해당 글자 노드만 고친다)
+        if grid_of(c) == (row, col) and getattr(c, "hasNestedTable", False) and mode not in _EDIT_MODES:
             return "nested_table_cell"
         t = getattr(c, "normalizedText", "") or ""
         if not t:
             continue
         if cell_kind(t) == NOTICE:
             return "row_notice"
-        c_col = grid_of(c)[1]
-        c_span = getattr(c, "colSpan", 1) or 1
-        # 글자가 이미 있는 칸(이어 쓰기·선택 상자)은 도장 찍는 빈 자리가 아니라서 서명 표시 옆이어도 막지 않는다
-        # 머리글 아래 열(group_header)은 열 이름이 값칸임을 밝혀 주므로 옆 칸이 서명 표시여도 도장 자리가 아니다
-        if (
-            mode in ("set", "unit")
-            and getattr(slot, "source", "") != "group_header"
-            and is_pure_sign_marker(t)
-            and (c_col + c_span == col or c_col == col + span)
-        ):
-            return "next_to_sign_marker"
+    # 글자가 이미 있는 칸(이어 쓰기·선택 상자)은 도장 찍는 빈 자리가 아니라서 서명 표시 옆이어도 막지 않는다
+    # 머리글 아래 열(group_header)은 열 이름이 값칸임을 밝혀 주므로 옆 칸이 서명 표시여도 도장 자리가 아니다
+    if (
+        mode in ("set", "unit", "separator")
+        and getattr(slot, "source", "") != "group_header"
+        and _adjacent_sign_cell(slot, cells_by_row, row, col, span) is not None
+        and name_next_to_sign(table, slot, cells_by_row) is None
+    ):
+        return "next_to_sign_marker"
     return ""
 
 
